@@ -11,7 +11,7 @@
   var STEPS = [
     {
       title: "Draw it here, mint it from here",
-      body: "This is the design suite — a collection goes from nothing to minted without " +
+      body: "This is the editor — a collection goes from nothing to minted without " +
             "leaving the page. Four steps, left to right: name, draw, rarity, generate.",
       target: null
     },

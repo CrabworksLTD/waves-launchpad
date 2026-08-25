@@ -14,7 +14,7 @@
   window.BRAND = {
     name: NAME,                       // "SUNPAD" — display, uppercase
     lower: lower,                     // "sunpad" — keys, slugs, filenames
-    tagline: "Design Suite",
+    tagline: "Editor",
     description: "Design, assemble, and deploy your own NFT collection on Solana.",
     chain: "Solana",
     domain: "",                       // set once a domain is registered
