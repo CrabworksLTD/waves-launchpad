@@ -106,7 +106,12 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
   height:76px;
   display:flex;align-items:center;gap:40px;
 }
-.logo{display:flex;align-items:center;gap:12px;font-family:var(--px);font-size:15px;letter-spacing:.14em;color:var(--text)}
+.logo{
+  display:flex;align-items:center;gap:12px;font-family:var(--px);font-size:15px;
+  letter-spacing:.14em;
+  background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 12px rgba(var(--accent-2-rgb),.35));
+}
 .logo img{display:block}
 /* Lighter than the hero it sits over: smaller, tracked like the site's mono
    micro-labels, dim at rest. Three destinations, two of them dropdowns. */
@@ -188,11 +193,15 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 }
 .btn:active{transform:translateY(1px)}
 .btn-solid{
-  background:var(--phos);color:#0A0C08;
+  background:var(--grad);color:var(--accent-ink);border:1px solid transparent;
 }
 /* color restated: the generic a:hover above outranks .btn-solid on hover and
    was turning the label white — the "glow" was white text smearing on lime */
-.btn-solid:hover{background:var(--accent-hi);color:#0A0C08}
+.btn-solid:hover{
+  background:var(--grad-hi);color:var(--accent-ink);
+  box-shadow:0 0 24px -6px rgba(var(--accent-2-rgb),.55),
+             0 0 32px -10px rgba(var(--accent-rgb),.45);
+}
 .btn-ghost{
   border:1px solid var(--line-strong);color:var(--text);
 }
@@ -229,7 +238,10 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
   top:50%;right:calc(min(58vw,900px)/2);
   width:min(48vw,760px);aspect-ratio:1;
   transform:translate(50%,-50%);
-  background:radial-gradient(circle,rgba(var(--accent-rgb),.07) 0%,rgba(var(--accent-rgb),.025) 38%,transparent 68%);
+  /* two offset radials, purple biased left — a single centred wash reads flat green */
+  background:
+    radial-gradient(circle at 38% 42%,rgba(var(--accent-2-rgb),.10) 0%,transparent 58%),
+    radial-gradient(circle at 62% 58%,rgba(var(--accent-rgb),.075) 0%,transparent 60%);
 }
 .hero-content{max-width:720px;position:relative}
 .hero .eyebrow{margin-bottom:28px}
@@ -281,7 +293,14 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 }
 .step{padding:0;position:relative}
 .step-top{display:flex;align-items:baseline;gap:12px;margin-bottom:8px}
-.step-num{font-family:var(--mono);font-size:12px;color:var(--phos);flex:none}
+.step-num{
+  font-family:var(--mono);font-size:12px;flex:none;
+  background:var(--grad);background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.step:nth-child(1) .step-num{background-position:0% 0}
+.step:nth-child(2) .step-num{background-position:50% 0}
+.step:nth-child(3) .step-num{background-position:100% 0}
 .step h3{
   font-family:var(--display);font-weight:600;font-size:19px;
   letter-spacing:-0.01em;margin:0;
@@ -380,8 +399,16 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 .feature:hover{border-top-color:var(--phos-line)}
 .feature-dot{
   grid-column:1;grid-row:1;width:6px;height:6px;margin-top:7px;
-  background:var(--phos);box-shadow:0 0 10px rgba(var(--accent-rgb),.5);
+  background:var(--grad);background-size:600% 100%;
+  box-shadow:0 0 10px rgba(var(--accent-rgb),.4);
 }
+/* the six dots step across one ramp, so the column reads as a progression */
+.feature:nth-child(1) .feature-dot{background-position:0% 0}
+.feature:nth-child(2) .feature-dot{background-position:20% 0}
+.feature:nth-child(3) .feature-dot{background-position:40% 0}
+.feature:nth-child(4) .feature-dot{background-position:60% 0}
+.feature:nth-child(5) .feature-dot{background-position:80% 0}
+.feature:nth-child(6) .feature-dot{background-position:100% 0}
 .feature h3{
   grid-column:2;grid-row:1;font-family:var(--display);font-weight:600;font-size:15px;
   letter-spacing:-0.01em;margin-bottom:3px;
@@ -543,7 +570,9 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 .final-halo{
   position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:min(70vw,900px);aspect-ratio:2/1;z-index:-1;
-  background:radial-gradient(ellipse,rgba(var(--accent-rgb),.06) 0%,transparent 65%);
+  background:
+    radial-gradient(ellipse at 35% 50%,rgba(var(--accent-2-rgb),.085) 0%,transparent 62%),
+    radial-gradient(ellipse at 65% 50%,rgba(var(--accent-rgb),.065) 0%,transparent 62%);
 }
 
 /* ---------- footer ---------- */

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SUNPAD — NFT design and deployment on Solana</title>
+<meta name="description" content="NFT design suite and launchpad on Solana.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SUNPAD">
+<meta property="og:title" content="SUNPAD">
+<meta property="og:description" content="NFT design suite and launchpad on Solana.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SUNPAD">
+<meta name="twitter:description" content="NFT design suite and launchpad on Solana.">
+<meta name="theme-color" content="#0a0810">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800&family=Instrument+Sans:wght@400;500;600&family=Silkscreen:wght@400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/landing.css">
+</head>
+<body>
+
+<canvas id="moon-canvas" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+<div class="bg-grid" aria-hidden="true"></div>
+
+<!-- ================= NAV ================= -->
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <!-- Nav only lists what exists. Marketplace, the pass and the token were
+         Robinhood-side; Connect wallet waits for the Solana chain layer. -->
+    <a class="logo" href="/" aria-label="Sunpad home">SUNPAD</a>
+    <div class="nav-links">
+      <a href="/app">Design Suite</a>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn-solid" href="/app">Open the design suite</a>
+    </div>
+    <button class="nav-burger" id="navBurger" aria-label="Open menu" aria-expanded="false">
+      <span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- full-screen mobile menu -->
+<div class="nav-overlay" id="navOverlay" hidden aria-hidden="true">
+  <div class="nav-ov-links">
+    <a href="/app">Design Suite</a>
+    <a href="/app" class="nav-ov-cta">Start drawing &rarr;</a>
+  </div>
+</div>
+
+<!-- ================= HERO ================= -->
+<header class="hero" id="top">
+  <div class="moon-halo" aria-hidden="true"></div>
+
+  <div class="hero-content">
+    <p class="eyebrow will-reveal" data-hero="eyebrow">Solana &middot; NFT Design Suite</p>
+    <h1 class="h-xl">
+      <span class="line"><span data-hero="line">Draw it.</span></span>
+      <span class="line"><span data-hero="line">Generate it.</span></span>
+      <span class="line"><span data-hero="line"><em>Mint it on Solana.</em></span></span>
+    </h1>
+    <p class="lede will-reveal" data-hero="lede">
+      A real drawing tool, not an upload box. Build the art trait by trait,
+      set the rarities, generate the whole collection in your browser
+      &mdash; then take it on-chain.
+    </p>
+    <div class="hero-actions will-reveal" data-hero="actions">
+      <a class="btn btn-solid" href="/app">Open the design suite <span class="arrow">&rarr;</span></a>
+      <a class="btn btn-ghost" href="#design-suite">See how it works</a>
+    </div>
+  </div>
+
+  <div class="hero-ticker" aria-hidden="true">
+    <div class="ticker-track">
+      <span>Draw <i>&#9632;</i> Trait <i>&#9632;</i> Rarity <i>&#9632;</i> Generate <i>&#9632;</i> Mint <i>&#9632;</i></span>
+      <span>Draw <i>&#9632;</i> Trait <i>&#9632;</i> Rarity <i>&#9632;</i> Generate <i>&#9632;</i> Mint <i>&#9632;</i></span>
+    </div>
+  </div>
+</header>
+
+<!-- ================= HOW IT WORKS ================= -->
+<section class="section" id="launchpad">
+  <div class="section-head">
+    <p class="eyebrow will-reveal">How it works</p>
+    <h2 class="h-lg will-reveal">Three steps and it's live.</h2>
+  </div>
+
+  <div class="steps" id="steps">
+    <div class="step">
+      <div class="step-top"><span class="step-num">01</span><h3>Design</h3></div>
+      <p>Draw or import the pieces and set the rarity. Pixel or brush, layers, colorways &mdash; the whole kit.</p>
+    </div>
+    <div class="step">
+      <div class="step-top"><span class="step-num">02</span><h3>Assemble</h3></div>
+      <p>Choose the supply of your collection and we generate it with the metadata to match.</p>
+    </div>
+    <div class="step">
+      <div class="step-top"><span class="step-num">03</span><h3>Deploy</h3></div>
+      <p>Your art goes to permanent storage and the collection goes on-chain from your own wallet.</p>
+    </div>
+  </div>
+</section>
+
+<div class="hr"></div>
+
+<!-- ================= EDITOR ================= -->
+<section class="section" id="design-suite">
+  <div class="section-head">
+    <p class="eyebrow will-reveal">The design suite</p>
+    <h2 class="h-lg will-reveal">A real drawing tool, not just an upload box.</h2>
+  </div>
+
+  <div class="features">
+    <div class="feature will-reveal">
+      <div class="feature-dot"></div>
+      <h3>Pixel or paint</h3>
+      <p>Pixel mode snaps to a grid for crisp, blocky art. Brush mode gives you a soft pencil, marker, chalk and airbrush &mdash; and it follows the pressure of a stylus if you draw on a tablet.</p>
+    </div>
+    <div class="feature will-reveal">
+      <div class="feature-dot"></div>
+      <h3>See the whole character</h3>
+      <p>While you draw a hat, the rest of the character sits faintly underneath &mdash; so it lands on the head instead of floating above it.</p>
+    </div>
+    <div class="feature will-reveal">
+      <div class="feature-dot"></div>
+      <h3>One hat, six colors</h3>
+      <p>Draw a hat once, then add colorways. Each one is a real drawing you can keep tweaking, so it can have a gradient or a pattern rather than just a hue slider dragged across it.</p>
+    </div>
+    <div class="feature will-reveal">
+      <div class="feature-dot"></div>
+      <h3>Trace over anything</h3>
+      <p>Drop a photo or a sketch behind the canvas and draw on top of it. It never ends up in your collection.</p>
+    </div>
+    <div class="feature will-reveal">
+      <div class="feature-dot"></div>
+      <h3>Rules that stop the weird ones</h3>
+      <p>No hoods over long hair, no glasses under a helmet. Set it once and every bad pairing gets thrown out and rerolled.</p>
+    </div>
+    <div class="feature will-reveal">
+      <div class="feature-dot"></div>
+      <h3>Your work stays yours</h3>
+      <p>Save the whole project &mdash; art and all &mdash; as one file on your machine, and open it again whenever. Nothing is held on a server.</p>
+    </div>
+  </div>
+</section>
+
+<div class="hr"></div>
+
+<!-- ================= FINAL CTA ================= -->
+<section class="section final">
+  <div class="final-halo" aria-hidden="true"></div>
+  <p class="eyebrow will-reveal">Ready when you are</p>
+  <h2 class="h-xl will-reveal">Blank canvas<br>to full collection.</h2>
+  <p class="lede will-reveal">Draw the traits, set the rarities, generate the set. It all runs in your browser.</p>
+  <div class="final-actions will-reveal">
+    <a class="btn btn-solid" href="/app">Open the design suite <span class="arrow">&rarr;</span></a>
+  </div>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer>
+  <div class="footer-inner">
+    <a class="logo" href="#top" style="font-size:13px">SUNPAD</a>
+    <div class="footer-links">
+      <a href="#launchpad">How it works</a>
+      <a href="#design-suite">Design Suite</a>
+    </div>
+    <p class="mono-note">Built for Solana</p>
+  </div>
+</footer>
+
+
+<script src="/vendor/three.min.js"></script>
+<script src="/vendor/gsap.min.js"></script>
+<script src="/vendor/ScrollTrigger.min.js"></script>
+<script src="/landing.js"></script>
+</body>
+</html>
