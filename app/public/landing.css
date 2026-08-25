@@ -7,9 +7,9 @@
   --text:#E9ECE4;
   --dim:#8B9094;
   --faint:#5A5F64;
-  --phos:#C9F53F;
-  --phos-soft:rgba(201,245,63,.14);
-  --phos-line:rgba(201,245,63,.35);
+  --phos:var(--accent);
+  --phos-soft:rgba(var(--accent-rgb),.14);
+  --phos-line:rgba(var(--accent-rgb),.35);
   --display:'Archivo',system-ui,sans-serif;
   --body:'Instrument Sans',system-ui,sans-serif;
   --px:'Silkscreen',monospace;
@@ -192,7 +192,7 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 }
 /* color restated: the generic a:hover above outranks .btn-solid on hover and
    was turning the label white — the "glow" was white text smearing on lime */
-.btn-solid:hover{background:#daff52;color:#0A0C08}
+.btn-solid:hover{background:var(--accent-hi);color:#0A0C08}
 .btn-ghost{
   border:1px solid var(--line-strong);color:var(--text);
 }
@@ -229,7 +229,7 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
   top:50%;right:calc(min(58vw,900px)/2);
   width:min(48vw,760px);aspect-ratio:1;
   transform:translate(50%,-50%);
-  background:radial-gradient(circle,rgba(201,245,63,.07) 0%,rgba(201,245,63,.025) 38%,transparent 68%);
+  background:radial-gradient(circle,rgba(var(--accent-rgb),.07) 0%,rgba(var(--accent-rgb),.025) 38%,transparent 68%);
 }
 .hero-content{max-width:720px;position:relative}
 .hero .eyebrow{margin-bottom:28px}
@@ -344,10 +344,10 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 .pf-halo{fill:none;stroke:var(--phos);stroke-width:1;opacity:.2}
 .pf-ring{fill:#08090D;stroke:var(--phos);stroke-width:1.5}
 .pf-onfill{fill:#08090D}
-.pf-onring{fill:none;stroke:var(--phos);stroke-width:1.75;filter:drop-shadow(0 0 6px rgba(201,245,63,.45))}
+.pf-onring{fill:none;stroke:var(--phos);stroke-width:1.75;filter:drop-shadow(0 0 6px rgba(var(--accent-rgb),.45))}
 .pf-glow{fill:var(--phos);opacity:.3}
 .pf-particle{fill:var(--phos);opacity:.2}
-.pf .dg-lab-final i{text-shadow:0 0 8px rgba(201,245,63,.4)}
+.pf .dg-lab-final i{text-shadow:0 0 8px rgba(var(--accent-rgb),.4)}
 .pf .dg-lab b{font-size:16px}
 /* entrance initial states (JS clears these; no-JS/reduced-motion shows everything) */
 .js-anim .pf .dg-lab,.js-anim .pf .pf-node,.js-anim .pf .pf-glowline,.js-anim .pf .pf-wave,.js-anim .pf #pf-glow{opacity:0}
@@ -380,7 +380,7 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 .feature:hover{border-top-color:var(--phos-line)}
 .feature-dot{
   grid-column:1;grid-row:1;width:6px;height:6px;margin-top:7px;
-  background:var(--phos);box-shadow:0 0 10px rgba(201,245,63,.5);
+  background:var(--phos);box-shadow:0 0 10px rgba(var(--accent-rgb),.5);
 }
 .feature h3{
   grid-column:2;grid-row:1;font-family:var(--display);font-weight:600;font-size:15px;
@@ -424,7 +424,7 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 .dg-dot.dg-final{stroke-width:1.75}
 .dg-path{fill:none;stroke:var(--line);stroke-width:1.5}
 .dg-path.dg-bright{stroke:var(--phos-line);stroke-dasharray:4 5}
-.dg-trav{fill:var(--phos);filter:drop-shadow(0 0 5px rgba(201,245,63,.9))}
+.dg-trav{fill:var(--phos);filter:drop-shadow(0 0 5px rgba(var(--accent-rgb),.9))}
 .dg-lab i{display:block;font-style:normal;font-family:var(--mono);font-size:11px;letter-spacing:.26em;color:var(--phos);margin-bottom:4px;transition:text-shadow .25s ease}
 .dg-lab.hot i{text-shadow:0 0 10px var(--phos)}
 .dg-lab b{display:block;font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:-.01em;color:var(--text);margin-bottom:3px}
@@ -441,7 +441,7 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 .ml-hub{fill:none;stroke:var(--line);stroke-width:1}
 .ml-hub-t{fill:var(--faint);font-family:var(--px);font-size:11px;letter-spacing:.14em}
 .ml-dot{fill:#08090D;stroke:var(--phos);stroke-width:1.5}
-.ml-trav{fill:var(--phos);filter:drop-shadow(0 0 5px rgba(201,245,63,.9))}
+.ml-trav{fill:var(--phos);filter:drop-shadow(0 0 5px rgba(var(--accent-rgb),.9))}
 .ml-lab i{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.26em;color:var(--phos);margin-bottom:5px;transition:text-shadow .25s ease}
 .ml-lab.hot i{text-shadow:0 0 10px var(--phos)}
 .ml-lab b{display:block;font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:-.01em;margin-bottom:3px;color:var(--text)}
@@ -543,7 +543,7 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 .final-halo{
   position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:min(70vw,900px);aspect-ratio:2/1;z-index:-1;
-  background:radial-gradient(ellipse,rgba(201,245,63,.06) 0%,transparent 65%);
+  background:radial-gradient(ellipse,rgba(var(--accent-rgb),.06) 0%,transparent 65%);
 }
 
 /* ---------- footer ---------- */

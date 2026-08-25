@@ -32,6 +32,7 @@
   /* primary accent — Solana green */
   --accent:      #14F195;
   --accent-dim:  #0fbf76;
+  --accent-hi:   #5cffb9;   /* hover brighten */
   --accent-glow: rgba(20,241,149,.16);
   --accent-ink:  #04120c;   /* text ON an accent fill */
 
@@ -40,7 +41,21 @@
   --accent-2-dim:  #7b35d6;
   --accent-2-glow: rgba(153,69,255,.18);
 
-  --grad: linear-gradient(90deg, #9945FF 0%, #14F195 100%);
+  /* Bare channels, so rgba(var(--accent-rgb),.25) works. Without these every
+     translucent glow ends up as a hardcoded hex, which is exactly how Moonpad
+     ended up with sixteen literal rgba(205,253,55,…) that survived a token
+     swap and kept rendering the old green. */
+  --accent-rgb:   20,241,149;
+  --accent-2-rgb: 153,69,255;
+
+  /* Gradients. --grad runs purple to green across a wide element; --grad-rev
+     for anything that reads right-to-left; --grad-soft for washes and glows
+     where a full-strength sweep would shout. */
+  --grad:      linear-gradient(90deg, #9945FF 0%, #14F195 100%);
+  --grad-rev:  linear-gradient(90deg, #14F195 0%, #9945FF 100%);
+  --grad-hi:   linear-gradient(90deg, #b06bff 0%, #5cffb9 100%);
+  --grad-soft: linear-gradient(90deg, rgba(153,69,255,.16) 0%, rgba(20,241,149,.16) 100%);
+  --grad-line: linear-gradient(90deg, transparent, #9945FF 28%, #14F195 72%, transparent);
 
   --warn: #ffcc55;
   --bad:  #ff6b6b;

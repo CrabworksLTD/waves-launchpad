@@ -10,7 +10,7 @@
   --bg:#08090D; --panel:#15171d; --panel-2:#1a1d24;
   --line:rgba(232,236,228,.08); --line-strong:rgba(232,236,228,.16);
   --text:#E9ECE4; --dim:#8B9094; --faint:#5A5F64;
-  --phos:#C9F53F; --phos-soft:rgba(201,245,63,.14); --phos-line:rgba(201,245,63,.35);
+  --phos:var(--accent); --phos-soft:rgba(var(--accent-rgb),.14); --phos-line:rgba(var(--accent-rgb),.35);
   --display:'Archivo',system-ui,sans-serif; --body:'Instrument Sans',system-ui,sans-serif;
   --px:'Silkscreen',monospace; --mono:'Space Mono',monospace;
   --gutter:clamp(20px,4vw,64px); --max:1440px;
@@ -84,7 +84,7 @@ a:hover{color:var(--text)}
 .btn-solid{background:var(--phos);color:#0A0C08}
 /* color restated: the generic a:hover above outranks .btn-solid on hover and
    was turning the label white — the "glow" was white text smearing on lime */
-.btn-solid:hover{background:#daff52;color:#0A0C08}
+.btn-solid:hover{background:var(--accent-hi);color:#0A0C08}
 .btn-ghost{border:1px solid var(--line-strong);color:var(--text)}
 .btn-ghost:hover{border-color:var(--phos-line);color:var(--phos)}
 .btn .arrow{transition:transform .2s;display:inline-block}
