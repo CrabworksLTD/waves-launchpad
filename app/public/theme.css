@@ -1,0 +1,57 @@
+/* Theme — every colour in the app resolves here.
+ *
+ * Moonpad had its palette duplicated across four :root blocks plus ten inline
+ * ones, with the accent living under two names (--lime #cdfd37 and --phos
+ * #C9F53F) at two slightly different hexes. That is why a recolour used to be
+ * a scavenger hunt. One file now, and recolouring is editing this block.
+ *
+ * Solana's brand is a #9945FF → #14F195 gradient. Green is the primary accent
+ * because it is what carries on near-black: purple at #9945FF sits around 3:1
+ * against --bg, which is fine for a wordmark and not fine for the button text,
+ * focus rings and hover states the old --lime drove. Purple is the secondary,
+ * used for the gradient, the wordmark and accents that sit on raised panels.
+ *
+ * The greys are pulled a few degrees toward violet so the purple reads as part
+ * of the surface rather than pasted onto a neutral grey app. */
+
+:root{
+  /* surfaces — near-black through raised panel */
+  --void:   #07060b;
+  --bg:     #0a0810;
+  --panel:  #13111c;
+  --panel2: #191622;
+  --raise:  #221d2c;
+  --line:   #2c2637;
+  --line2:  #3a3348;
+
+  /* type */
+  --ink:    #ece9f2;
+  --dim:    #948da6;
+  --faint:  #635c73;
+
+  /* primary accent — Solana green */
+  --accent:      #14F195;
+  --accent-dim:  #0fbf76;
+  --accent-glow: rgba(20,241,149,.16);
+  --accent-ink:  #04120c;   /* text ON an accent fill */
+
+  /* secondary accent — Solana purple */
+  --accent-2:      #9945FF;
+  --accent-2-dim:  #7b35d6;
+  --accent-2-glow: rgba(153,69,255,.18);
+
+  --grad: linear-gradient(90deg, #9945FF 0%, #14F195 100%);
+
+  --warn: #ffcc55;
+  --bad:  #ff6b6b;
+  --r: 6px;
+
+  /* Back-compat aliases. The editor CSS was written against Moonpad's token
+     names and there are several hundred usages; aliasing costs nothing and
+     keeps the port to a copy rather than a rewrite. New code should use
+     --accent. */
+  --lime:      var(--accent);
+  --lime-dim:  var(--accent-dim);
+  --lime-glow: var(--accent-glow);
+  --phos:      var(--accent);
+}

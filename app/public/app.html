@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SUNPAD — Design Suite</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="style.css">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SUNPAD">
+<meta property="og:title" content="SUNPAD">
+<meta property="og:description" content="Design, assemble, and deploy your own NFT collection on Solana.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SUNPAD">
+<meta name="twitter:description" content="Design, assemble, and deploy your own NFT collection on Solana.">
+<meta name="theme-color" content="#0a0810">
+</head>
+<body class="pixelmode">
+
+<header class="brand">
+  <a class="wordmark" href="/"><span>SUN</span><em>PAD</em></a>
+  <p class="tag">Design Suite</p>
+  <button id="howto" class="howto" title="How it works" aria-label="How it works"><span aria-hidden="true">?</span></button>
+</header>
+
+<div class="app">
+
+  <div class="col">
+    <!-- The way in for somebody with no art, so it is the first thing in the
+         rail rather than a button under Generate that assumes you got there. -->
+    <button id="usetemplate" class="tplbtn" title="Open a ready-made trait set you can change">
+      <b style="color:var(--accent);font-size:16px;display:block;text-align:center">Start from a template &rarr;</b>
+    </button>
+    <div class="lbl"><i>1</i>Your collection</div>
+    <input type="text" id="projName" style="width:100%" value="Untitled collection">
+    <div class="lbl"><i>2</i>Traits</div>
+    <p class="guide">Categories stack bottom to top &mdash; the first is furthest back.
+      Each <b>trait</b> is one option that category can roll.
+      Click a swatch to draw it. Drag a category by its number to reorder.</p>
+    <div id="cats"></div>
+    <button id="addCat" style="width:100%;margin-top:6px">+ Category</button>
+    <button id="rndAll" style="width:100%;margin-top:6px" title="Give every trait in every category a random rarity">⤮ Randomize all rarities</button>
+  </div>
+
+  <div class="mid">
+    <div class="modebar">
+      <button id="mPixel" class="on">Pixel</button>
+      <button id="mRaster">Brush</button>
+      <span class="stat" id="dims">48 &times; 48</span>
+    </div>
+    <div class="now" id="now">&mdash;</div>
+    <div class="stagewrap">
+      <canvas id="surface" width="48" height="48"></canvas>
+      <canvas id="fxover"></canvas>
+      <div id="grid"></div>
+      <div class="canvasnote" id="canvasnote">
+        <div><b>Pick a trait to start drawing</b>
+        Click any swatch in the Traits panel on the left.</div>
+      </div>
+    </div>
+    <div class="tools">
+      <button id="tDraw" class="on">Draw</button>
+      <button id="tErase">Erase</button>
+      <button id="tFill">Fill</button>
+      <button id="tPick">Pick</button>
+      <button id="tMove">Move</button>
+      <button id="tScaleUp" title="Grow the selected layer">Scale +</button>
+      <button id="tScaleDown" title="Shrink the selected layer">Scale &minus;</button>
+      <button id="tMirror">Mirror</button>
+      <button id="tUndo">Undo</button>
+      <button id="tRedo">Redo</button>
+      <button id="tClear">Clear</button>
+      <button id="tGrid" class="on">Grid</button>
+      <button id="tOnion" class="on">Guide</button>
+    </div>
+    <div class="tools" id="xformrow">
+      <label class="stat" style="align-self:center">Rotate</label>
+      <input type="range" id="tRotate" min="-180" max="180" step="1" value="0" style="flex:1;max-width:240px;align-self:center">
+      <output id="tRotateV" class="stat" style="align-self:center;min-width:38px;text-align:right">0&deg;</output>
+    </div>
+    <p class="hint" id="modehint">Pixel mode &mdash; 48&times;48, 1px pencil.</p>
+  </div>
+
+  <div class="col">
+    <div class="lbl"><i>3</i>Draw</div>
+    <div class="picker" id="picker"></div>
+
+    <div id="brushpanel" hidden>
+      <div class="lbl">Brush</div>
+      <div class="brushes" id="brushes"></div>
+      <div class="row"><label>Size</label><input type="range" id="bSize" min="1" max="180" value="24"><output id="bSizeV">24</output></div>
+      <div class="row"><label>Opacity</label><input type="range" id="bOpacity" min="1" max="100" value="100"><output id="bOpacityV">100</output></div>
+      <div class="row"><label>Pressure</label><input type="checkbox" id="bPressure" checked style="accent-color:var(--accent)"><span class="stat" id="pressureNote"></span></div>
+    </div>
+
+    <div id="pixelpanel">
+      <div class="lbl">Grid</div>
+      <div class="row"><label>Shape</label><select id="aspectSel">
+        <option value="square">Square &middot; 1:1</option>
+        <option value="paper">Paper &middot; A4 portrait</option>
+      </select></div>
+      <div class="row"><label>Grid</label><input type="range" id="pSize" min="16" max="128" step="8" value="48"><output id="pSizeV">48</output></div>
+      <div class="row"><label>Pencil</label><input type="range" id="pPen" min="1" max="8" step="1" value="1"><output id="pPenV">1</output></div>
+      <p class="hint">Grid is the canvas resolution; pencil is how many cells one
+        dab covers. Changing the grid reloads the trait, so set it early.</p>
+    </div>
+
+    <details class="fold"><summary>Paint layers</summary><div class="foldbody">
+      <div id="layerlist"></div>
+      <button id="addLayer" style="width:100%;margin-top:6px">+ Paint layer</button>
+      <p class="hint">Stack passes inside <b>this one trait</b> — flats, then shading
+        at lower opacity. They flatten into a single image. This is not the trait
+        stacking order; that is the order of your categories on the left.</p>
+    </div></details>
+
+    <details class="fold"><summary>Trace reference</summary><div class="foldbody">
+      <button id="refLoad" style="width:100%">Import image to trace</button>
+      <div class="row" id="refRow" hidden><label>Fade</label><input type="range" id="refFade" min="5" max="100" value="45"><output id="refFadeV">45</output></div>
+      <div class="row" id="refRow2" hidden><label>Scale</label><input type="range" id="refScale" min="10" max="300" value="100"><output id="refScaleV">100</output></div>
+      <button id="refClear" style="width:100%;margin-top:5px" hidden>Remove</button>
+      <p class="hint">Drop an image on the canvas or paste it. It sits under your
+        drawing and is never exported.</p>
+    </div></details>
+
+    <details class="fold"><summary>Effects</summary><div class="foldbody">
+      <div class="row"><label>Blur</label><input type="range" id="fxBlur" min="0" max="20" step="0.5" value="0"><output id="fxBlurV">0</output></div>
+      <div class="row"><label>Grain</label><input type="range" id="fxGrain" min="0" max="100" value="0"><output id="fxGrainV">0</output></div>
+      <p class="hint">A gaussian blur and film grain baked into <b>this trait</b> —
+        soften a background while the figure on top stays crisp. Applied live and
+        on export.</p>
+    </div></details>
+    <input type="file" id="refFile" accept="image/*" hidden>
+
+    <details class="fold" id="rulesfold"><summary>Rules</summary><div class="foldbody">
+      <div id="rules"></div>
+      <button id="addRule" style="width:100%">+ Rule</button>
+      <p class="hint">Combinations matching a rule are re-rolled. End a value with
+      <b>*</b> to match by prefix, so new colors stay covered.</p>
+    </div></details>
+
+    <div class="pinned">
+    <div class="lbl"><i>4</i>Generate</div>
+    <div class="row"><label>Supply</label><input type="number" id="supply" value="100" min="1" step="1" style="flex:1"></div>
+    <div class="stat" id="space">&mdash;</div>
+    <div class="warnrow" id="warn"></div>
+    <button id="generate" class="primary" style="width:100%;margin-top:10px">Generate collection</button>
+    <button id="download" style="width:100%;margin-top:6px" hidden>Download .zip</button>
+    <button id="launch" class="primary" style="width:100%;margin-top:6px" hidden>Launch collection</button>
+    <div class="savebtns">
+      <button id="savefile" title="Download this whole project as one file, art included">Save project</button>
+      <button id="openfile" title="Open a project you saved earlier">Open project</button>
+    </div>
+    <p class="hint" id="saveinfo"></p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="brand.js"></script>
+<script src="brush.js"></script>
+<script src="picker.js"></script>
+<script src="project.js"></script>
+<script src="zip.js"></script>
+<script src="generate.js"></script>
+<script src="app.js"></script>
+<script src="tour.js"></script>
+
+<!-- The chain layer used to load here: chains, contract, registry, launch,
+     storage, pons, vault, launchpanel. None of it is ported yet. The editor
+     runs standalone without it — every call site is guarded on
+     window.LaunchPanel, so the Launch button simply stays hidden until a
+     Solana panel registers itself. That guard is the seam phase 2 plugs into;
+     don't remove it. -->
+</body>
+</html>

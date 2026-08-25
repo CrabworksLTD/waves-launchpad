@@ -1,0 +1,14 @@
+{
+  "name": "nft-builder-sol",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Draw-and-launch NFT collection builder for Solana. Pixel or raster canvas.",
+  "scripts": {
+    "start": "node app/server/supervise.js",
+    "dev": "node app/server/server.js",
+    "rename": "node tools/rename.js"
+  },
+  "dependencies": {
+    "pngjs": "^7.0.0"
+  }
+}

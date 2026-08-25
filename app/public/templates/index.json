@@ -1,0 +1,85 @@
+{
+  "note": "Starting points a creator can open in the builder and then change completely. Each entry is a .moonpad.json \u2014 exactly what Save project writes.",
+  "templates": [
+    {
+      "file": "chain-punks.moonpad.json",
+      "name": "Chain Punks",
+      "blurb": "The classic 24x24 head-and-shoulders \u2014 mohawks, smokes, an earring, and two rare skins. Original pixels, familiar attitude.",
+      "categories": 7,
+      "traits": 34,
+      "combinations": 56000
+    },
+    {
+      "file": "crypto-rats.moonpad.json",
+      "name": "Crypto Rats",
+      "blurb": "Beady eyes, big ears, whiskers, and the odd gold chain. Scrappy on purpose.",
+      "categories": 6,
+      "traits": 26,
+      "combinations": 6000
+    },
+    {
+      "file": "monkey-business.moonpad.json",
+      "name": "Monkey Business",
+      "blurb": "Round ears, a lighter muzzle, plenty of attitude. Wide-eyed or unimpressed \u2014 your call.",
+      "categories": 5,
+      "traits": 24,
+      "combinations": 2400
+    },
+    {
+      "file": "alley-cats.moonpad.json",
+      "name": "Alley Cats",
+      "blurb": "Slit pupils, flared cheeks, proper triangular ears. The easiest set to recolour into your own.",
+      "categories": 5,
+      "traits": 24,
+      "combinations": 2500
+    },
+    {
+      "file": "moonettes.moonpad.json",
+      "name": "Moonettes",
+      "blurb": "Pixel chibi \u2014 big shiny eyes, blush, bows and buns on pastel grounds. Sweet where the punks are sour.",
+      "categories": 7,
+      "traits": 38,
+      "combinations": 126000
+    },
+    {
+      "file": "moon-frogs.moonpad.json",
+      "name": "Moon Frogs",
+      "blurb": "Wide grins, eye bumps, a belly patch and the odd golden rare. The pond\u2019s answer to the punks.",
+      "categories": 6,
+      "traits": 27,
+      "combinations": 8000
+    },
+    {
+      "file": "lunar-drift.moonpad.json",
+      "name": "Lunar Drift",
+      "blurb": "Raster, not pixel: gradient skies, glowing moons, auroras and a noise-drawn horizon. Landscapes, no characters.",
+      "categories": 5,
+      "traits": 22,
+      "combinations": 1600
+    },
+    {
+      "file": "night-blooms.moonpad.json",
+      "name": "Night Blooms",
+      "blurb": "Procedural flowers \u2014 petal counts, colourways and glowing cores on deep grounds. Organic, and nothing like the portraits.",
+      "categories": 4,
+      "traits": 18,
+      "combinations": 360
+    },
+    {
+      "file": "orbitals.moonpad.json",
+      "name": "Orbitals",
+      "blurb": "Generative ring systems \u2014 a glowing core, tilted orbits, comets mid-flight. The abstract one.",
+      "categories": 4,
+      "traits": 15,
+      "combinations": 192
+    },
+    {
+      "file": "moon-spirits.moonpad.json",
+      "name": "Moon Spirits",
+      "blurb": "Soft glowing ghosts \u2014 smooth domes, wavy hems, glossy eyes, a halo or a sprout. The raster character set.",
+      "categories": 6,
+      "traits": 26,
+      "combinations": 6000
+    }
+  ]
+}
