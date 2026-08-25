@@ -39,24 +39,87 @@ body{
 .grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.035;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")}
 
-.wrap{position:relative;z-index:2;max-width:1180px;margin:0 auto;padding:0 32px}
+/* ---- vertical icon rail ----
+   Icon-only navigation is a real accessibility trade: the label has to exist
+   somewhere a screen reader can reach it. aria-label carries it, and the
+   tooltip is generated from the same data-label so the two can never drift
+   apart the way a duplicated string would. */
+/* 60px, flat, and opaque. pump.fun's rail is chrome — it sits still while the
+   page moves behind it, so blurring the aurora through it just makes the icons
+   swim. Flat also keeps it from competing with the one glass panel. */
+.rail{
+  position:fixed;left:0;top:0;bottom:0;width:60px;z-index:5;
+  display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0;
+  background:#0c0a12;
+  border-right:1px solid rgba(255,255,255,.06);
+}
+.mark{
+  width:32px;height:32px;border-radius:10px;background:var(--grad);
+  display:grid;place-items:center;margin-bottom:14px;flex:none;
+  font-family:"Space Grotesk";font-weight:700;font-size:15px;color:var(--accent-ink);
+  text-decoration:none;box-shadow:0 6px 18px -8px rgba(var(--accent-2-rgb),.9);
+}
+.rail a.ico{
+  position:relative;width:40px;height:40px;border-radius:11px;flex:none;
+  display:grid;place-items:center;color:var(--faint);text-decoration:none;
+  border:1px solid transparent;transition:color .18s,background .18s,border-color .18s;
+}
+/* The one filled action, the way pump.fun sets Create apart from navigation.
+   Extra margin so it reads as a different kind of thing, not the next tab. */
+.rail a.ico.cta{
+  background:var(--grad);color:var(--accent-ink);margin:10px 0;
+  box-shadow:0 8px 20px -10px rgba(var(--accent-2-rgb),.9);
+}
+.rail a.ico.cta:hover{background:var(--grad-hi);color:var(--accent-ink);border-color:transparent}
+.rail a.ico.cta svg{stroke-width:2.1}
+.rail a.ico:hover{color:var(--ink);background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.09)}
+.rail a.ico.on{
+  color:var(--accent-ink);background:var(--grad);border-color:transparent;
+  box-shadow:0 8px 22px -12px rgba(var(--accent-2-rgb),.9);
+}
+.rail a.ico svg{width:19px;height:19px;stroke:currentColor;fill:none;
+  stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+/* tooltip, built from data-label so there is one source for the name */
+.rail a.ico::after{
+  content:attr(data-label);position:absolute;left:calc(100% + 12px);
+  padding:7px 11px;border-radius:9px;white-space:nowrap;font-size:12.5px;
+  background:rgba(18,15,26,.92);border:1px solid rgba(255,255,255,.1);
+  color:var(--ink);backdrop-filter:blur(12px);
+  opacity:0;transform:translateX(-4px);pointer-events:none;
+  transition:opacity .16s ease,transform .16s ease;
+}
+.rail a.ico:hover::after{opacity:1;transform:translateX(0)}
+.rail .spacer{flex:1}
 
-nav{display:flex;align-items:center;justify-content:space-between;padding:24px 0}
-.logo{font-family:"Space Grotesk";font-weight:700;font-size:17px;letter-spacing:-.02em;
-  text-decoration:none;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
-.navlinks{display:flex;gap:28px;font-size:14px}
-.navlinks a{color:var(--dim);text-decoration:none;transition:color .2s}
-.navlinks a:hover{color:var(--ink)}
+.wrap{position:relative;z-index:2;max-width:1180px;margin:0 auto;padding:0 32px 0 92px}
+
+@media (max-width:720px){
+  /* Below the fold of a phone the rail becomes a bottom bar — a 72px column
+     eats a fifth of a small viewport. */
+  .rail{top:auto;right:0;bottom:0;width:auto;height:58px;flex-direction:row;
+    justify-content:center;gap:6px;padding:0 10px;
+    border-right:0;border-top:1px solid rgba(255,255,255,.07)}
+  .mark{margin:0 8px 0 0}
+  .rail a.ico.cta{margin:0 4px}
+  .rail .spacer{display:none}
+  .rail a.ico::after{left:50%;bottom:calc(100% + 10px);transform:translate(-50%,4px)}
+  .rail a.ico:hover::after{transform:translate(-50%,0)}
+  .wrap{padding:0 20px 78px}
+}
 
 /* ---- asymmetric hero ---- */
-.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,520px);
-  gap:56px;align-items:center;padding:56px 0 80px}
+.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,470px);
+  gap:48px;align-items:center;padding:56px 0 80px}
 .eyebrow{display:inline-flex;align-items:center;gap:9px;font-size:12px;
   letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:0 0 22px}
 .eyebrow b{width:6px;height:6px;border-radius:50%;background:var(--accent);
   box-shadow:0 0 10px var(--accent)}
-h1{font-family:"Space Grotesk";font-size:clamp(36px,4.6vw,60px);line-height:1.05;
-  font-weight:600;letter-spacing:-.035em;margin:0}
+/* balance keeps the two sentences from breaking mid-phrase once the rail
+   takes 60px off the column; nowrap on the second line is the fallback for
+   browsers without text-wrap support. */
+h1{font-family:"Space Grotesk";font-size:clamp(34px,4.2vw,54px);line-height:1.06;
+  font-weight:600;letter-spacing:-.035em;margin:0;text-wrap:balance}
+h1 em{white-space:nowrap}
 h1 em{font-style:normal;background:var(--grad);
   -webkit-background-clip:text;background-clip:text;color:transparent}
 .lede{max-width:46ch;margin:22px 0 0;color:var(--dim);font-size:16px}
@@ -120,12 +183,37 @@ h1 em{font-style:normal;background:var(--grad);
 <div class="aur" aria-hidden="true"><i class="a1"></i><i class="a2"></i><i class="a3"></i></div>
 <div class="grain" aria-hidden="true"></div>
 
-<div class="wrap">
-  <nav>
-    <a class="logo" href="#">SUNPAD</a>
-    <div class="navlinks"><a href="#">Editor</a><a href="#">How it works</a><a href="#">Docs</a></div>
-  </nav>
+<nav class="rail" aria-label="Main">
+  <a class="mark" href="/" aria-label="Sunpad home">S</a>
 
+  <a class="ico on" href="/app" data-label="Editor" aria-label="Editor">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+  </a>
+  <a class="ico" href="#" data-label="Templates" aria-label="Templates">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>
+  </a>
+  <a class="ico" href="#" data-label="Collections" aria-label="Collections">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+  </a>
+  <a class="ico" href="#" data-label="How it works" aria-label="How it works">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 0 1 4.7 1.1c0 1.7-2.3 2.2-2.3 3.7"/><path d="M12 17.2h.01"/></svg>
+  </a>
+  <a class="ico" href="#" data-label="Docs" aria-label="Docs">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
+  </a>
+
+  <a class="ico cta" href="/app" data-label="New collection" aria-label="New collection">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+  </a>
+
+  <span class="spacer"></span>
+
+  <a class="ico" href="#" data-label="Sunpad on X" aria-label="Sunpad on X">
+    <svg viewBox="0 0 24 24" aria-hidden="true" style="fill:currentColor;stroke:none"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+  </a>
+</nav>
+
+<div class="wrap">
   <section class="hero">
     <div>
       <p class="eyebrow mono"><b></b> Solana &middot; NFT Editor</p>
