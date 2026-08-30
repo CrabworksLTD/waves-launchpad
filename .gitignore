@@ -7,3 +7,4 @@ out/
 .devnet-smoke.key
 .dbc-config-*.json
 .dev-records.json
+app/public/.vercel

@@ -1,7 +1,7 @@
 {
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/mint/:address([1-9A-HJ-NP-Za-km-z]{32,44})", "destination": "/mint.html" },
-    { "source": "/token/:address([1-9A-HJ-NP-Za-km-z]{32,44})", "destination": "/token.html" }
+    { "source": "/mint/:address", "destination": "/mint" },
+    { "source": "/token/:address", "destination": "/token" }
   ]
 }
