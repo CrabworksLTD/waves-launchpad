@@ -145,8 +145,8 @@
     ".shl-w .tx small{display:block;color:var(--faint);font-size:11.5px;margin-top:1px}",
     /* launch gate: the site blurred behind a password card */
     "#shl-gate{position:fixed;inset:0;z-index:999;display:grid;place-items:center;",
-    "  padding:24px;background:rgba(0,0,0,.5);",
-    "  backdrop-filter:blur(28px) brightness(.6);-webkit-backdrop-filter:blur(28px) brightness(.6)}",
+    "  padding:24px;background:rgba(0,0,0,.35);",
+    "  backdrop-filter:blur(13px) brightness(.75);-webkit-backdrop-filter:blur(13px) brightness(.75)}",
     "#shl-gate .gcard{width:min(360px,100%);border:1px solid transparent;border-radius:14px;",
     "  background:linear-gradient(var(--panel),var(--panel)) padding-box,var(--grad) border-box;",
     "  padding:26px;text-align:center}",
