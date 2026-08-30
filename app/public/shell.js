@@ -65,10 +65,15 @@
     ".shl-nav a:hover{color:var(--ink);background:var(--panel2)}",
     ".shl-nav a.on{color:var(--ink)}",
     ".shl-dd{position:relative}",
-    ".shl-dd>button{padding:10px 16px;border:0;border-radius:9px;font:500 15.5px Inter,sans-serif;",
+    /* :not(.shl-wallet) — the wallet pill lives inside a .shl-dd wrapper too,
+     * and this trigger rule outspecifies .shl-wallet, which silently stripped
+     * the pill's gradient border for weeks */
+    ".shl-dd>button:not(.shl-wallet){padding:10px 16px;border:0;border-radius:9px;",
+    "  font:500 15.5px Inter,sans-serif;",
     "  color:var(--dim);background:transparent;cursor:pointer;display:flex;gap:6px;",
     "  align-items:center;transition:color .18s,background .18s}",
-    ".shl-dd>button:hover,.shl-dd.open>button{color:var(--ink);background:var(--panel2)}",
+    ".shl-dd>button:not(.shl-wallet):hover,.shl-dd.open>button:not(.shl-wallet){",
+    "  color:var(--ink);background:var(--panel2)}",
     ".shl-dd>button i{font-style:normal;font-size:10px;transform:translateY(1px)}",
     ".shl-dd .menu{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);",
     "  min-width:150px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;",
@@ -138,6 +143,25 @@
     ".shl-w .tx{flex:1;min-width:0}",
     ".shl-w .tx b{display:block}",
     ".shl-w .tx small{display:block;color:var(--faint);font-size:11.5px;margin-top:1px}",
+    /* launch gate: the site blurred behind a password card */
+    "#shl-gate{position:fixed;inset:0;z-index:999;display:grid;place-items:center;",
+    "  padding:24px;background:rgba(0,0,0,.5);",
+    "  backdrop-filter:blur(28px) brightness(.6);-webkit-backdrop-filter:blur(28px) brightness(.6)}",
+    "#shl-gate .gcard{width:min(360px,100%);border:1px solid transparent;border-radius:14px;",
+    "  background:linear-gradient(var(--panel),var(--panel)) padding-box,var(--grad) border-box;",
+    "  padding:26px;text-align:center}",
+    "#shl-gate svg{width:40px;height:40px;margin:0 auto 14px;display:block}",
+    "#shl-gate b{display:block;font:800 18px Archivo,sans-serif;margin-bottom:4px}",
+    "#shl-gate p{margin:0 0 16px;color:var(--dim);font-size:13px}",
+    "#shl-gate input{width:100%;background:var(--void);color:var(--ink);text-align:center;",
+    "  border:1px solid var(--line2);border-radius:9px;padding:11px 12px;",
+    "  font:500 15px 'IBM Plex Mono',monospace}",
+    "#shl-gate input:focus{outline:none;border-color:var(--accent)}",
+    "#shl-gate input.no{border-color:#ff6b6b}",
+    "#shl-gate button{width:100%;margin-top:10px;padding:12px;border:0;border-radius:9px;",
+    "  cursor:pointer;font:700 14px Archivo,sans-serif;color:var(--accent-ink);",
+    "  background-image:var(--grad);background-repeat:no-repeat;",
+    "  background-size:calc(100% + 2px) 100%;background-position:-1px 0}",
     "@media (max-width:860px){.shl-nav{display:none}.shl{gap:10px}}"
   ].join("\n");
 
@@ -172,6 +196,46 @@
     // the name rides in every browser tab; pages keep their own first word
     var NM = (window.BRAND && window.BRAND.name) || "WAVES";
     document.title = NM + " Launchpad";
+
+    /* Launch gate. A curtain for humans while the site is being built —
+     * client-side by design, so it keeps out visitors, not attackers. The
+     * hash lives in brand.js; localhost stays open for development. */
+    (function () {
+      var gh = window.BRAND && window.BRAND.gate;
+      if (!gh || /^(localhost|127\.)/.test(location.hostname)) return;
+      try { if (sessionStorage.getItem("shl.gate") === gh) return; } catch (e) {}
+      var ov = document.createElement("div");
+      ov.id = "shl-gate";
+      ov.innerHTML =
+        '<div class="gcard"><svg viewBox="0 0 24 24">' +
+        '<defs><linearGradient id="shl-gg" x1="0" y1="1" x2="1" y2="0">' +
+        '<stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>' +
+        '</linearGradient></defs>' +
+        '<path fill="url(#shl-gg)" d="M0 16h8v8H0ZM8 8h8v8H8Zm8-8h8v8h-8Z"/></svg>' +
+        "<b>" + NM + " is almost here</b>" +
+        "<p>The launchpad is in closed testing. Have the password?</p>" +
+        '<input id="shl-gate-in" type="password" placeholder="password" autocomplete="off">' +
+        '<button id="shl-gate-go">Enter</button></div>';
+      document.body.appendChild(ov);
+      var inp = ov.querySelector("#shl-gate-in");
+      async function tryPass() {
+        var buf = new TextEncoder().encode(inp.value.trim().toLowerCase());
+        var d = await crypto.subtle.digest("SHA-256", buf);
+        var hex = [].map.call(new Uint8Array(d), function (b) {
+          return b.toString(16).padStart(2, "0");
+        }).join("");
+        if (hex === gh) {
+          try { sessionStorage.setItem("shl.gate", gh); } catch (e) {}
+          ov.remove();
+        } else {
+          inp.classList.add("no");
+          setTimeout(function () { inp.classList.remove("no"); }, 900);
+        }
+      }
+      ov.querySelector("#shl-gate-go").addEventListener("click", tryPass);
+      inp.addEventListener("keydown", function (e) { if (e.key === "Enter") tryPass(); });
+      inp.focus();
+    })();
     // favicon rides along on every page the shell mounts on
     if (!document.querySelector('link[rel="icon"]')) {
       var fav = document.createElement("link");
