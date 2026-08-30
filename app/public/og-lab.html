@@ -72,14 +72,15 @@ async function drawBanner() {
   var g = document.getElementById("x").getContext("2d");
   g.fillStyle = "#000";
   g.fillRect(0, 0, 1500, 500);
-  // X lays its circular PFP over the banner's bottom-left — ride high so
-  // the word clears it
+  // X lays its circular PFP over the banner's bottom-left — sit vertically
+  // centred but shifted right, so the circle gets clean black and the word
+  // never looks pushed
   g.fillStyle = "#fff";
-  g.font = "900 340px Archivo";
+  g.font = "900 300px Archivo";
   g.textBaseline = "middle";
   g.textAlign = "center";
-  g.letterSpacing = "-12px";
-  g.fillText("WAVES", 750, 185);
+  g.letterSpacing = "-10px";
+  g.fillText("WAVES", 905, 245);
 }
 drawBanner();
 
