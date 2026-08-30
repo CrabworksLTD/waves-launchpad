@@ -166,9 +166,7 @@
       '<path fill="url(#shl-g)" d="M0 16h8v8H0ZM8 8h8v8H8Zm8-8h8v8h-8Z"/></svg>';
     // the name rides in every browser tab; pages keep their own first word
     var NM = (window.BRAND && window.BRAND.name) || "WAVES";
-    if (document.title.indexOf(NM) < 0) {
-      document.title = document.title ? document.title + " — " + NM : NM;
-    }
+    document.title = NM + " Launchpad";
     // favicon rides along on every page the shell mounts on
     if (!document.querySelector('link[rel="icon"]')) {
       var fav = document.createElement("link");
