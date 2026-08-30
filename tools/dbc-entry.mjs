@@ -21,6 +21,7 @@ export {
   MigrationOption,
   MigrationFeeOption,
   TokenType,
+  TokenAuthorityOption,
 } from "@meteora-ag/dynamic-bonding-curve-sdk";
 
 /* BN for fee-claim maxima — the claim instructions type their limits as BN and

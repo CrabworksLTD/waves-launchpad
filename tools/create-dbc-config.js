@@ -29,37 +29,14 @@ const CLUSTERS = {
   devnet: "https://api.devnet.solana.com"
 };
 
-/* ⚠️ initialMarketCap and migrationMarketCap are in QUOTE TOKEN UNITS, not
- * dollars. Writing 80_000 against a SOL quote means 80,000 SOL — about $14M —
- * not $80k. The first version of this file did exactly that and would have
- * shipped a launchpad where a token needed ~$2.9M of buying to graduate.
- * Hence per-quote numbers, and a live USD readout in the summary below. */
-const QUOTES = {
-  sol: {
-    mint: "So11111111111111111111111111111111111111112", decimals: 9, label: "SOL",
-    initialMarketCap: 28,      // ~$5k at $180 SOL
-    migrationMarketCap: 385    // ~$69k, deliberately near pump.fun's graduation
-  },
-  usdc: {
-    mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6, label: "USDC",
-    initialMarketCap: 5_000,
-    migrationMarketCap: 69_000
-  }
-};
+/* The terms live in app/public/dbc-terms.js, SHARED with the sign-in-browser
+ * page (config-create.html) so the two can never drift. The unit warnings and
+ * the reasoning behind every enum live there too. */
+const { TERMS, QUOTES, buildParams } = require(path.join(__dirname, "..", "app", "public", "dbc-terms.js"));
 
 const CLUSTER = process.env.CLUSTER || "devnet";
 const QUOTE = QUOTES[(process.env.QUOTE || "sol").toLowerCase()];
 const DRY = process.argv.includes("--dry-run");
-
-/* ---- the terms ----
- * Deliberately conservative. Anything here that reads as a guess should be
- * argued about before mainnet, because none of it can be changed later. */
-const TERMS = {
-  totalTokenSupply: 1_000_000_000,   // 1B, the memecoin convention
-  baseFeeBps: 100,                   // 1% trading fee, industry standard
-  creatorTradingFeePercentage: 25,   // 25% of the 80% LP share -> 20% of the total fee
-  poolCreationFee: 0                 // free to launch; storage margin is our revenue
-};
 
 (async () => {
   const {
@@ -106,58 +83,10 @@ const TERMS = {
    *                        sides against the people taking the most risk
    *   locked LP 50/50    — neither side can pull liquidity after graduation
    */
-  const curve = buildCurveWithMarketCap({
-    initialMarketCap: QUOTE.initialMarketCap,
-    migrationMarketCap: QUOTE.migrationMarketCap,
-    activationType: ActivationType.Slot,
-
-    token: {
-      tokenType: TokenType.SPLToken,
-      tokenBaseDecimal: TokenDecimal.SIX,
-      tokenQuoteDecimal: QUOTE.decimals === 9 ? TokenDecimal.NINE : TokenDecimal.SIX,
-      tokenAuthorityOption: TokenAuthorityOption.Immutable,
-      totalTokenSupply: TERMS.totalTokenSupply,
-      leftover: 0
-    },
-
-    fee: {
-      baseFeeParams: {
-        baseFeeMode: BaseFeeMode.FeeSchedulerLinear,
-        feeSchedulerParam: {
-          startingFeeBps: TERMS.baseFeeBps,
-          endingFeeBps: TERMS.baseFeeBps,
-          numberOfPeriod: 0,
-          totalDuration: 0
-        }
-      },
-      dynamicFeeEnabled: true,
-      collectFeeMode: CollectFeeMode.QuoteToken,
-      creatorTradingFeePercentage: TERMS.creatorTradingFeePercentage,
-      poolCreationFee: TERMS.poolCreationFee,
-      enableFirstSwapWithMinFee: false
-    },
-
-    migration: {
-      migrationOption: MigrationOption.MET_DAMM_V2,
-      migrationFeeOption: MigrationFeeOption.FixedBps100,
-      migrationFee: { feePercentage: 0, creatorFeePercentage: 0 }
-    },
-
-    liquidityDistribution: {
-      partnerPermanentLockedLiquidityPercentage: 50,
-      partnerLiquidityPercentage: 0,
-      creatorPermanentLockedLiquidityPercentage: 50,
-      creatorLiquidityPercentage: 0
-    },
-
-    lockedVesting: {
-      totalLockedVestingAmount: 0,
-      numberOfVestingPeriod: 0,
-      cliffUnlockAmount: 0,
-      totalVestingDuration: 0,
-      cliffDurationFromMigrationTime: 0
-    }
-  });
+  const curve = buildCurveWithMarketCap(buildParams({
+    ActivationType, BaseFeeMode, CollectFeeMode, TokenDecimal,
+    TokenType, MigrationOption, MigrationFeeOption, TokenAuthorityOption
+  }, (process.env.QUOTE || "sol").toLowerCase()));
 
   if (DRY) {
     // Only BN and PublicKey get stringified; a blanket toString() turns every

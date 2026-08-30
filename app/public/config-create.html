@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Create the partner config</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+/* Internal tool, deliberately unlinked from the nav. The wallet that signs
+ * here becomes the launchpad's fee owner FOREVER — the page exists so that
+ * wallet can be a browser/Ledger wallet instead of a keyfile on disk.
+ * Terms come from dbc-terms.js, the same file the CLI uses. */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--void);color:var(--ink);font:400 15px/1.6 Inter,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono",monospace}
+main{max-width:640px;margin:0 auto;padding:48px 24px 90px}
+h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}
+.sub{color:var(--dim);margin:0 0 26px;font-size:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:20px 22px;margin-bottom:18px}
+.row{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;
+  padding:8px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row b{font-weight:600;text-align:right;font-family:"IBM Plex Mono",monospace}
+.k{color:var(--dim)}
+.warn{border:1px solid rgba(255,180,80,.35);background:rgba(255,180,80,.07);
+  border-radius:8px;padding:13px 15px;font-size:13px;color:#ffd9a0;margin-bottom:18px}
+.cluster{font:600 12px "IBM Plex Mono",monospace;letter-spacing:.1em;
+  text-transform:uppercase;padding:5px 12px;border-radius:99px;display:inline-block;
+  margin-bottom:18px}
+.cluster.main{background:rgba(255,107,107,.12);color:#ff9f9f;border:1px solid rgba(255,107,107,.4)}
+.cluster.dev{background:rgba(20,241,149,.1);color:var(--accent);border:1px solid rgba(20,241,149,.35)}
+.go{width:100%;padding:15px;border-radius:8px;border:0;cursor:pointer;
+  font:800 14.5px Archivo;color:var(--accent-ink);
+  background-image:var(--grad);background-repeat:no-repeat;
+  background-size:calc(100% + 2px) 100%;background-position:-1px 0}
+.go:disabled{opacity:.45;cursor:default}
+.msg{margin-top:14px;font-size:13px;padding:12px 14px;border-radius:8px;display:none;
+  word-break:break-all}
+.msg.err{display:block;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ffb3b3}
+.msg.ok{display:block;background:rgba(20,241,149,.08);border:1px solid rgba(20,241,149,.3);color:#8ff5cd}
+.msg code{font:500 12.5px ui-monospace,monospace}
+.msg a{color:inherit}
+.note{color:var(--faint);font-size:12px;margin-top:12px;line-height:1.6}
+</style>
+</head>
+<body>
+<main>
+  <h1>Create the partner config</h1>
+  <p class="sub">One transaction, signed by the wallet that will own the launchpad's
+  fee share. Terms below are read from <span class="mono">dbc-terms.js</span> —
+  the same file the CLI tool uses.</p>
+
+  <span class="cluster" id="cl">…</span>
+
+  <div class="warn"><b>This cannot be undone or edited.</b> The signing wallet is the
+  only address that can ever claim the platform's 60% of trading fees. Sign with a
+  wallet you will still control in years — a Ledger through Phantom counts.</div>
+
+  <div class="panel" id="terms">loading terms…</div>
+
+  <button class="go" id="go" disabled>Loading…</button>
+  <div class="msg" id="msg"></div>
+  <p class="note">Cost is ~0.03 SOL of rent plus the network fee, paid by the signing
+  wallet. After it confirms, the config address goes into brand.js — the address is
+  public, the ownership is what the signature just decided.</p>
+</main>
+
+<script src="/brand.js"></script>
+<script src="/ui.js"></script>
+<script src="/dbc-terms.js"></script>
+<script src="/wallet.js"></script>
+<script src="/shell.js"></script>
+<script src="/launch.js"></script>
+<script>
+(function () {
+  "use strict";
+  var esc = UI.esc;
+  Shell.mount({ search: false });
+
+  var qs = new URLSearchParams(location.search);
+  var CLUSTER = qs.get("cluster") === "devnet" ? "devnet" : "mainnet-beta";
+  window.Launch.cluster(CLUSTER);
+  var QUOTE = (qs.get("quote") || "sol").toLowerCase();
+  var Q = DBC_TERMS.QUOTES[QUOTE];
+  var T = DBC_TERMS.TERMS;
+  var $ = function (id) { return document.getElementById(id); };
+
+  var cl = $("cl");
+  cl.textContent = CLUSTER + " · " + Q.label + " quote";
+  cl.className = "cluster " + (CLUSTER === "mainnet-beta" ? "main" : "dev");
+
+  function say(k, h) { var m = $("msg"); m.className = "msg " + k; m.innerHTML = h; }
+
+  /* The review the wallet owner reads before signing. Same derivation as the
+   * CLI summary — platform share is (100 - creator%) of the 80% LP share. */
+  var plat = 80 * (100 - T.creatorTradingFeePercentage) / 100;
+  var crea = 80 * T.creatorTradingFeePercentage / 100;
+  $("terms").innerHTML =
+    '<div class="row"><span class="k">Quote</span><b>' + esc(Q.label) + "</b></div>" +
+    '<div class="row"><span class="k">Supply per launch</span><b>' +
+      T.totalTokenSupply.toLocaleString() + " · fixed</b></div>" +
+    '<div class="row"><span class="k">Trading fee</span><b>' + (T.baseFeeBps / 100) + "%</b></div>" +
+    '<div class="row"><span class="k">Split</span><b>' +
+      plat + "% platform / " + crea + "% creator / 20% Meteora</b></div>" +
+    '<div class="row"><span class="k">Curve</span><b>' +
+      Q.initialMarketCap.toLocaleString() + " → " + Q.migrationMarketCap.toLocaleString() +
+      " " + esc(Q.label) + " mcap</b></div>" +
+    '<div class="row"><span class="k">Launch cost to creators</span><b>free</b></div>' +
+    '<div class="row"><span class="k">Graduation</span><b>Meteora DAMM v2, LP locked</b></div>' +
+    '<div class="row"><span class="k">Token metadata</span><b>immutable</b></div>';
+
+  var busy = false;
+  function paint() {
+    var w = window.Wallet.current();
+    var go = $("go");
+    if (busy) return;
+    go.disabled = false;
+    if (!w) { go.textContent = "Connect the owner wallet"; go.onclick = connect; return; }
+    go.textContent = "Create config — sign as " + UI.shortAddr(w.publicKey, 4);
+    go.onclick = create;
+  }
+  async function connect() { await Shell.connect(); paint(); }
+
+  async function create() {
+    var w = window.Wallet.current();
+    if (!w || busy) return;
+    busy = true;
+    var go = $("go");
+    go.disabled = true; go.textContent = "Building the transaction…";
+    say("", "");
+    try {
+      var sdk = await import("/vendor/dbc.esm.js");
+      var X = await import("/vendor/metaplex.esm.js");
+      var rpc = window.Launch.clusters()[CLUSTER].rpc;
+      var conn = new X.Connection(rpc, "confirmed");
+      var cli = new sdk.DynamicBondingCurveClient(conn, "confirmed");
+
+      var curve = sdk.buildCurveWithMarketCap(DBC_TERMS.buildParams(sdk, QUOTE));
+      var owner = new X.PublicKey(w.publicKey);
+      var cfgKp = X.Keypair.generate();
+
+      var tx = await cli.partner.createConfig(Object.assign({
+        config: cfgKp.publicKey,
+        feeClaimer: owner,
+        leftoverReceiver: owner,
+        payer: owner,
+        quoteMint: new X.PublicKey(Q.mint)
+      }, curve));
+
+      tx.feePayer = owner;
+      tx.recentBlockhash = (await conn.getLatestBlockhash("confirmed")).blockhash;
+      // the new config account signs for its own creation; the wallet's
+      // signature must cover a message that already includes it
+      tx.partialSign(cfgKp);
+
+      go.textContent = "Confirm in your wallet…";
+      var signed = await w.signTransaction(tx);
+      go.textContent = "Sending…";
+      var sig = await conn.sendRawTransaction(signed.serialize(), { skipPreflight: false });
+      await conn.confirmTransaction(sig, "confirmed");
+
+      var addr = cfgKp.publicKey.toBase58();
+      say("ok",
+        "<b>Config created.</b><br>Address: <code>" + esc(addr) + "</code><br>" +
+        "Owner: <code>" + esc(w.publicKey) + "</code><br>" +
+        '<a href="https://explorer.solana.com/tx/' + esc(sig) +
+          (CLUSTER === "devnet" ? "?cluster=devnet" : "") +
+          '" target="_blank" rel="noopener">View transaction ↗</a><br><br>' +
+        "brand.js entry: <code>dbcConfigs[\"" + esc(CLUSTER) + "\"]." + esc(QUOTE) +
+        ' = "' + esc(addr) + '"</code>');
+      go.textContent = "Done";
+      return;
+    } catch (e) {
+      var m = String(e && e.message || e);
+      if (/reject/i.test(m)) m = "You cancelled the signature.";
+      say("err", esc(m.slice(0, 300)));
+    }
+    busy = false;
+    paint();
+  }
+
+  paint();
+  var n = 0, t = setInterval(function () {
+    paint(); if (window.Wallet.current() || ++n > 10) clearInterval(t);
+  }, 500);
+})();
+</script>
+</body>
+</html>

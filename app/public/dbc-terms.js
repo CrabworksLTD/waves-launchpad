@@ -1,0 +1,99 @@
+/* The launchpad's economics, in ONE place. Both tools/create-dbc-config.js
+ * (CLI) and config-create.html (sign-in-browser) build the partner config
+ * from this file, so the terms a wallet signs are the terms the CLI would
+ * have sent — they cannot drift.
+ *
+ * ⚠️ Everything here is IMMUTABLE once a config is created. New terms mean a
+ * new config key; launched tokens keep the terms they launched under.
+ *
+ * ⚠️ initialMarketCap and migrationMarketCap are in QUOTE TOKEN UNITS, not
+ * dollars. 80_000 against a SOL quote means 80,000 SOL (~$14M), not $80k. */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.DBC_TERMS = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  var TERMS = {
+    totalTokenSupply: 1000000000,      // 1B, the memecoin convention
+    baseFeeBps: 100,                   // 1% trading fee, industry standard
+    creatorTradingFeePercentage: 25,   // 25% of the 80% LP share -> 20% of the
+                                       // total fee (60% platform, 20% Meteora)
+    poolCreationFee: 0                 // free to launch
+  };
+
+  var QUOTES = {
+    sol: {
+      mint: "So11111111111111111111111111111111111111112", decimals: 9, label: "SOL",
+      initialMarketCap: 28,      // ~$5k at $180 SOL
+      migrationMarketCap: 385    // ~$69k, deliberately near pump.fun's graduation
+    },
+    usdc: {
+      mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6, label: "USDC",
+      initialMarketCap: 5000,
+      migrationMarketCap: 69000
+    }
+  };
+
+  /* The full buildCurveWithMarketCap argument, given the DBC SDK module (its
+   * enums differ by build, so the caller passes its own). See the tool's
+   * comment block for why each choice: Immutable metadata, QuoteToken fees,
+   * flat fee schedule, LP locked 50/50 permanently. */
+  function buildParams(sdk, quote) {
+    var Q = QUOTES[quote];
+    return {
+      initialMarketCap: Q.initialMarketCap,
+      migrationMarketCap: Q.migrationMarketCap,
+      activationType: sdk.ActivationType.Slot,
+
+      token: {
+        tokenType: sdk.TokenType.SPLToken,
+        tokenBaseDecimal: sdk.TokenDecimal.SIX,
+        tokenQuoteDecimal: Q.decimals === 9 ? sdk.TokenDecimal.NINE : sdk.TokenDecimal.SIX,
+        tokenAuthorityOption: sdk.TokenAuthorityOption.Immutable,
+        totalTokenSupply: TERMS.totalTokenSupply,
+        leftover: 0
+      },
+
+      fee: {
+        baseFeeParams: {
+          baseFeeMode: sdk.BaseFeeMode.FeeSchedulerLinear,
+          feeSchedulerParam: {
+            startingFeeBps: TERMS.baseFeeBps,
+            endingFeeBps: TERMS.baseFeeBps,
+            numberOfPeriod: 0,
+            totalDuration: 0
+          }
+        },
+        dynamicFeeEnabled: true,
+        collectFeeMode: sdk.CollectFeeMode.QuoteToken,
+        creatorTradingFeePercentage: TERMS.creatorTradingFeePercentage,
+        poolCreationFee: TERMS.poolCreationFee,
+        enableFirstSwapWithMinFee: false
+      },
+
+      migration: {
+        migrationOption: sdk.MigrationOption.MET_DAMM_V2,
+        migrationFeeOption: sdk.MigrationFeeOption.FixedBps100,
+        migrationFee: { feePercentage: 0, creatorFeePercentage: 0 }
+      },
+
+      liquidityDistribution: {
+        partnerPermanentLockedLiquidityPercentage: 50,
+        partnerLiquidityPercentage: 0,
+        creatorPermanentLockedLiquidityPercentage: 50,
+        creatorLiquidityPercentage: 0
+      },
+
+      lockedVesting: {
+        totalLockedVestingAmount: 0,
+        numberOfVestingPeriod: 0,
+        cliffUnlockAmount: 0,
+        totalVestingDuration: 0,
+        cliffDurationFromMigrationTime: 0
+      }
+    };
+  }
+
+  return { TERMS: TERMS, QUOTES: QUOTES, buildParams: buildParams };
+});
