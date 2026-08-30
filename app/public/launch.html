@@ -111,13 +111,22 @@ svg .df{stroke:var(--accent);stroke-dasharray:3 4}
 <script src="/shell.js"></script>
 <script>
 Shell.mount({ active: "launch", search: false });
-// ?mode=pair keeps the choice through to the panel
 (function () {
   var mode = new URLSearchParams(location.search).get("mode") === "pair" ? "pair" : "collection";
   if (mode === "pair") {
     document.getElementById("eyebrow").textContent = "Launch a pair";
     document.getElementById("upload-cta").href = "/app?launch=files-pair";
   }
+  // The upload flow opens HERE, over the fork page. The editor is only ever
+  // visible behind a launch window when the launch actually came out of the
+  // editor — routing uploads through /app put the wrong room behind the
+  // window. The href stays as a fallback for middle-click and no-JS.
+  document.getElementById("upload-cta").addEventListener("click", function (e) {
+    e.preventDefault();
+    Shell.ensureLaunchStack().then(function () {
+      window.LaunchPanel.openMode("files-" + mode);
+    });
+  });
 })();
 </script>
 </body>

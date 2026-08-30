@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Token</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+/* The trading page. Left: the bonding curve drawn from live pool state with
+ * the current position marked — deterministic, no indexer required, unlike a
+ * candle chart which needs trade history we do not index yet. Right: the
+ * trade box. Everything readable renders before any wallet connects. */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--void);color:var(--ink);font:400 15px/1.6 Inter,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono",monospace}
+a{color:inherit;text-decoration:none}
+main{max-width:1420px;margin:0 auto;padding:28px 24px 90px}
+
+/* header */
+.head{display:flex;gap:16px;align-items:center;margin-bottom:10px}
+.logo{width:56px;height:56px;border-radius:12px;background:var(--raise);flex:none;
+  display:grid;place-items:center;font:800 22px Archivo;color:var(--dim);overflow:hidden}
+.logo img{width:100%;height:100%;object-fit:cover}
+.head h1{font-family:Archivo;font-size:24px;font-weight:800;margin:0;letter-spacing:-.015em}
+.head .sym{color:var(--faint);font-size:14px;margin-left:8px}
+.socials{margin-left:auto;display:flex;gap:8px}
+.socials a{padding:7px 13px;border:1px solid var(--line2);border-radius:99px;
+  font-size:12px;color:var(--dim)}
+.socials a:hover{color:var(--ink);border-color:var(--faint)}
+.ca{display:flex;align-items:center;gap:10px;padding:8px 12px;margin:8px 0 24px;
+  border:1px solid var(--line);border-radius:8px;background:var(--bg);max-width:620px}
+.ca .lb{flex:none;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.ca code{flex:1;font:500 12px ui-monospace,monospace;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.ca button{flex:none;font:600 11.5px Inter;padding:6px 12px;border-radius:6px;cursor:pointer;
+  background:var(--panel2);color:var(--ink);border:1px solid var(--line2)}
+.ca button.did{color:var(--accent);border-color:var(--accent)}
+
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px}
+
+/* stats + curve */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-bottom:14px}
+.stat{padding:4px 10px;border-right:1px solid var(--line)}
+.stat:last-child{border-right:0}
+.stat .k{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.stat b{display:block;font:600 15px "IBM Plex Mono",monospace;margin-top:2px}
+#curve{width:100%;height:400px;display:block}
+.bar{height:7px;border-radius:99px;background:var(--raise);overflow:hidden;margin-top:12px}
+.bar i{display:block;height:100%;background:var(--grad);width:0;transition:width .5s}
+.barlb{display:flex;justify-content:space-between;font-size:11.5px;color:var(--faint);margin-top:6px}
+
+/* trade box */
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tabs button{flex:1;font:700 13.5px Archivo;padding:11px;border-radius:8px;cursor:pointer;
+  background:var(--panel2);color:var(--dim);border:1px solid transparent}
+.tabs button.on.buy{background:rgba(20,241,149,.14);color:var(--accent);
+  border-color:rgba(20,241,149,.4)}
+.tabs button.on.sell{background:rgba(255,107,107,.12);color:#ff8f8f;
+  border-color:rgba(255,107,107,.4)}
+label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--faint);margin:10px 0 6px}
+input{width:100%;background:var(--void);color:var(--ink);border:1px solid var(--line);
+  border-radius:8px;padding:11px 12px;font:500 15px "IBM Plex Mono",monospace}
+input:focus{outline:none;border-color:var(--accent)}
+.chips{display:flex;gap:6px;margin-top:8px}
+.chips button{flex:1;font:600 12px Inter;padding:7px;border-radius:6px;cursor:pointer;
+  background:var(--panel2);color:var(--dim);border:1px solid var(--line)}
+.chips button:hover{color:var(--ink)}
+.est{display:flex;justify-content:space-between;font-size:13px;color:var(--dim);
+  padding:12px 2px 2px}
+.est b{font-family:"IBM Plex Mono",monospace}
+.go{width:100%;margin-top:14px;padding:14px;border-radius:8px;border:0;cursor:pointer;
+  font:800 14px Archivo;background:var(--grad);color:var(--accent-ink)}
+.go:disabled{opacity:.45;cursor:default}
+.msg{margin-top:12px;font-size:12.5px;padding:10px 12px;border-radius:8px;display:none}
+.msg.err{display:block;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ffb3b3}
+.msg.ok{display:block;background:rgba(20,241,149,.08);border:1px solid rgba(20,241,149,.3);color:#8ff5cd}
+.msg a{color:inherit;text-decoration:underline}
+.note{color:var(--faint);font-size:11.5px;margin-top:10px;line-height:1.5}
+.desc{color:var(--dim);font-size:13.5px;margin-top:16px;max-width:70ch}
+</style>
+</head>
+<body>
+<main>
+  <div class="head">
+    <div class="logo" id="logo">?</div>
+    <div><h1 id="name">Loading…<span class="sym" id="sym"></span></h1></div>
+    <div class="socials" id="socials"></div>
+  </div>
+  <div class="ca"><span class="lb">Token CA</span><code id="ca">—</code>
+    <button id="ca-copy">Copy</button></div>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="stats">
+        <div class="stat"><span class="k">Price</span><b id="s-price">—</b></div>
+        <div class="stat"><span class="k">Raised</span><b id="s-raised">—</b></div>
+        <div class="stat"><span class="k">Graduates at</span><b id="s-grad">—</b></div>
+        <div class="stat"><span class="k">Status</span><b id="s-status">—</b></div>
+      </div>
+      <canvas id="curve"></canvas>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="barlb"><span id="pct">—</span><span>graduation → Meteora DAMM v2, LP locked</span></div>
+      <p class="desc" id="desc"></p>
+    </div>
+
+    <div class="panel">
+      <div class="tabs">
+        <button class="on buy" id="t-buy">Buy</button>
+        <button class="sell" id="t-sell">Sell</button>
+      </div>
+      <label id="amt-label">Amount (SOL)</label>
+      <input id="amt" type="number" min="0" step="0.05" placeholder="0.0">
+      <div class="chips" id="chips">
+        <button data-v="0.1">0.1</button><button data-v="0.5">0.5</button>
+        <button data-v="1">1</button><button data-v="5">5</button>
+      </div>
+      <div class="est"><span>You receive ≈</span><b id="est">—</b></div>
+      <div class="est"><span>Slippage</span><b>1%</b></div>
+      <button class="go" id="go" disabled>Loading…</button>
+      <div class="msg" id="msg"></div>
+      <p class="note">Trades run against the bonding curve — no order book, no LP.
+      1% trading fee: 40% creator / 40% platform / 20% Meteora.</p>
+    </div>
+  </div>
+</main>
+
+<script src="/brand.js"></script>
+<script src="/ui.js"></script>
+<script src="/wallet.js"></script>
+<script src="/shell.js"></script>
+<script src="/launch.js"></script>
+<script src="/token.js"></script>
+<script>
+(function () {
+  "use strict";
+  var esc = UI.esc;
+  Shell.mount({ search: false });
+
+  var qs = new URLSearchParams(location.search);
+  if (qs.get("cluster")) window.Launch.cluster(qs.get("cluster"));
+  var MINT = (location.pathname.match(/\/token\/([1-9A-HJ-NP-Za-km-z]{32,44})/) || [])[1]
+          || qs.get("mint") || "";
+  var $ = function (id) { return document.getElementById(id); };
+  var side = "buy", market = null, lastQuote = null, quoteSeq = 0;
+
+  function say(k, h) { var m = $("msg"); m.className = "msg " + k; m.innerHTML = h; }
+
+  if (!MINT) { $("name").textContent = "No token"; say("err", "This link is missing a mint address."); }
+  else {
+    $("ca").textContent = MINT;
+    $("ca-copy").onclick = function () {
+      navigator.clipboard.writeText(MINT).then(function () {
+        var b = $("ca-copy"); b.classList.add("did"); b.textContent = "Copied";
+        setTimeout(function () { b.classList.remove("did"); b.textContent = "Copy"; }, 1600);
+      });
+    };
+    load();
+  }
+
+  async function load() {
+    // identity from the pinned record if we have one; chain has name via
+    // metadata uri but the record round-trip is cheaper
+    fetch("/api/tokens").then(function (r) { return r.json(); }).then(function (j) {
+      var rec = (j.tokens || []).find(function (t) { return t.mint === MINT; });
+      if (rec) { $("name").firstChild.textContent = rec.name; $("sym").textContent = "$" + rec.symbol; }
+    }).catch(function () {});
+
+    try {
+      market = await window.Token.readMarket(MINT);
+    } catch (e) {
+      $("name").firstChild.textContent = "Not found";
+      say("err", esc(String(e.message)));
+      return;
+    }
+    if ($("name").firstChild.textContent === "Loading…")
+      $("name").firstChild.textContent = UI.shortAddr(MINT, 4);
+    $("s-price").textContent = market.price ? market.price.toFixed(9) : "—";
+    $("s-raised").textContent = UI.fmt(market.raised, 2) + " " + market.quote;
+    $("s-grad").textContent = UI.fmt(market.threshold, 0) + " " + market.quote;
+    $("s-status").textContent = market.migrated ? "GRADUATED" : "on the curve";
+    $("bar").style.width = (market.progress * 100).toFixed(1) + "%";
+    $("pct").textContent = (market.progress * 100).toFixed(1) + "% to graduation";
+    drawCurve(market.progress);
+
+    if (market.migrated) {
+      $("go").textContent = "Trade on Jupiter ↗";
+      $("go").disabled = false;
+      $("go").onclick = function () {
+        window.open("https://jup.ag/swap/SOL-" + MINT, "_blank", "noopener");
+      };
+      return;
+    }
+    armTradeBox();
+  }
+
+  /* The price curve, drawn as the constant-product virtual pool actually
+   * behaves: price rises smoothly to the graduation point. X is progress
+   * toward the raise target, Y is relative price; the dot is where the pool
+   * is NOW. Deterministic from state — no indexer, no candles, no pretending. */
+  function drawCurve(progress) {
+    var cv = $("curve"), dpr = window.devicePixelRatio || 1;
+    var W = cv.clientWidth, H = 400;
+    cv.width = W * dpr; cv.height = H * dpr;
+    var g = cv.getContext("2d");
+    g.scale(dpr, dpr);
+    var pad = 10, w = W - pad * 2, h = H - pad * 2;
+    function xy(t) {
+      var y = Math.pow(t, 1.9);                    // virtual-pool price growth shape
+      return [pad + t * w, pad + h - y * h * 0.92 - h * 0.04];
+    }
+    // curve
+    g.beginPath();
+    for (var t = 0; t <= 1.001; t += 0.01) {
+      var p = xy(Math.min(t, 1));
+      t === 0 ? g.moveTo(p[0], p[1]) : g.lineTo(p[0], p[1]);
+    }
+    g.strokeStyle = "rgba(255,255,255,.16)"; g.lineWidth = 2; g.stroke();
+    // travelled portion in gradient
+    var grad = g.createLinearGradient(pad, 0, pad + w, 0);
+    grad.addColorStop(0, "#9945FF"); grad.addColorStop(1, "#14F195");
+    g.beginPath();
+    for (var t2 = 0; t2 <= progress + 0.001; t2 += 0.01) {
+      var p2 = xy(Math.min(t2, progress));
+      t2 === 0 ? g.moveTo(p2[0], p2[1]) : g.lineTo(p2[0], p2[1]);
+    }
+    g.strokeStyle = grad; g.lineWidth = 3; g.stroke();
+    // the dot: where this pool is now
+    var d = xy(progress);
+    g.beginPath(); g.arc(d[0], d[1], 6, 0, 7);
+    g.fillStyle = "#14F195"; g.fill();
+    g.beginPath(); g.arc(d[0], d[1], 11, 0, 7);
+    g.strokeStyle = "rgba(20,241,149,.35)"; g.stroke();
+  }
+
+  function armTradeBox() {
+    $("t-buy").onclick = function () { setSide("buy"); };
+    $("t-sell").onclick = function () { setSide("sell"); };
+    $("chips").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-v]");
+      if (b) { $("amt").value = b.dataset.v; requote(); }
+    });
+    $("amt").addEventListener("input", requote);
+    paintGo();
+  }
+
+  function setSide(s) {
+    side = s;
+    $("t-buy").className = s === "buy" ? "on buy" : "buy";
+    $("t-sell").className = s === "sell" ? "on sell" : "sell";
+    $("amt-label").textContent = s === "buy" ? "Amount (SOL)" : "Amount (tokens)";
+    $("chips").innerHTML = s === "buy"
+      ? '<button data-v="0.1">0.1</button><button data-v="0.5">0.5</button><button data-v="1">1</button><button data-v="5">5</button>'
+      : '<button data-v="1000">1k</button><button data-v="10000">10k</button><button data-v="100000">100k</button><button data-v="1000000">1M</button>';
+    $("est").textContent = "—"; lastQuote = null; requote(); paintGo();
+  }
+
+  var qTimer = null;
+  function requote() {
+    clearTimeout(qTimer);
+    qTimer = setTimeout(async function () {
+      var amt = parseFloat($("amt").value);
+      if (!(amt > 0)) { $("est").textContent = "—"; lastQuote = null; paintGo(); return; }
+      var seq = ++quoteSeq;
+      try {
+        var q = await window.Token.getQuote(MINT, amt, side);
+        if (seq !== quoteSeq) return;              // a newer quote superseded this one
+        lastQuote = q;
+        $("est").textContent = UI.fmt(q.out, side === "buy" ? 0 : 4) +
+          (side === "buy" ? " tokens" : " SOL");
+      } catch (e) {
+        if (seq !== quoteSeq) return;
+        lastQuote = null; $("est").textContent = "—";
+        say("err", esc(String(e.message).slice(0, 120)));
+      }
+      paintGo();
+    }, 350);
+  }
+
+  function paintGo() {
+    var w = window.Wallet.current();
+    var go = $("go");
+    go.disabled = false;
+    if (!w) { go.textContent = "Connect wallet"; go.onclick = connect; return; }
+    if (!lastQuote) { go.textContent = side === "buy" ? "Buy" : "Sell"; go.disabled = true; return; }
+    go.textContent = side === "buy" ? "Buy" : "Sell";
+    go.onclick = trade;
+  }
+
+  async function connect() {
+    var w = await Shell.connect();
+    if (w) { paintGo(); }
+  }
+
+  async function trade() {
+    var go = $("go");
+    go.disabled = true; go.textContent = "Confirm in your wallet…";
+    say("", "");
+    try {
+      var sig = await window.Token.swap(MINT, side, lastQuote.amountIn, lastQuote.minOut);
+      say("ok", (side === "buy" ? "Bought." : "Sold.") +
+        ' <a href="https://explorer.solana.com/tx/' + esc(sig) + '" target="_blank" rel="noopener">View tx ↗</a>');
+      load();                                      // refresh price, curve, bar
+    } catch (e) {
+      var m = String(e.message || e);
+      if (/reject/i.test(m)) m = "You cancelled the transaction.";
+      say("err", esc(m.slice(0, 160)));
+    }
+    go.disabled = false; paintGo();
+  }
+})();
+</script>
+</body>
+</html>

@@ -102,7 +102,16 @@
       ".lp .filebtn button{flex:none;padding:8px 12px;font-size:12px}",
       ".lp .filebtn span{color:var(--faint);font-size:11.5px;overflow:hidden;",
       "  text-overflow:ellipsis;white-space:nowrap}",
-      ".lp textarea.walls{font-family:ui-monospace,monospace;font-size:11.5px;min-height:74px}"
+      ".lp textarea.walls{font-family:ui-monospace,monospace;font-size:11.5px;min-height:74px}",
+      /* copyable contract-address rows on the Live window */
+      ".lp .ca{display:flex;align-items:center;gap:10px;padding:9px 11px;margin-top:8px;",
+      "  border:1px solid var(--line);border-radius:8px;background:var(--void)}",
+      ".lp .ca .lb{flex:none;font-size:11px;letter-spacing:.12em;text-transform:uppercase;",
+      "  color:var(--faint);min-width:96px}",
+      ".lp .ca code{flex:1;font:500 12px ui-monospace,monospace;color:var(--ink);",
+      "  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+      ".lp .ca button{flex:none;padding:6px 12px;font-size:11.5px}",
+      ".lp .ca button.did{color:var(--accent);border-color:var(--accent)}"
     ].join("\n");
     document.head.appendChild(s);
   }
@@ -122,6 +131,25 @@
     }
     el.innerHTML = '<div class="lp">' + (node.s || node) + "</div>";
     return el.querySelector(".lp");
+  }
+
+  /* A contract address the way people actually use one: the full string,
+   * one tap to copy, per-row. Shortened text is for recognising an address —
+   * launching is the moment you need the whole thing. */
+  function caRow(label, value) {
+    return '<div class="ca"><span class="lb">' + esc(label) + '</span>' +
+      "<code>" + esc(value) + "</code>" +
+      '<button type="button" data-copy="' + esc(value) + '">Copy</button></div>';
+  }
+  function bindCopy(box) {
+    box.querySelectorAll("[data-copy]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        navigator.clipboard.writeText(b.dataset.copy).then(function () {
+          b.classList.add("did"); b.textContent = "Copied";
+          setTimeout(function () { b.classList.remove("did"); b.textContent = "Copy"; }, 1600);
+        });
+      });
+    });
   }
 
   function fail(box, msg) {
@@ -582,15 +610,16 @@
     var box = shell(H`
       <h2>Live</h2>
       <p class="sub">${cfg.name} is on ${res.cluster}.</p>
-      <div class="row"><span class="k">Candy machine</span><b>${shortAddr(res.candyMachine, 6)}</b></div>
-      <div class="row"><span class="k">Collection</span><b>${shortAddr(res.collection, 6)}</b></div>
       <div class="row"><span class="k">Items loaded</span><b>${cfg.supply}</b></div>
+      ${raw(caRow("Collection", res.collection))}
+      ${raw(caRow("Candy machine", res.candyMachine))}
       <label>Mint page</label>
       <input readonly value="${res.mintUrl}" onclick="this.select()">
       <p class="note"><a href="${res.explorer}" target="_blank" rel="noopener">View on Solana Explorer ↗</a></p>
       <div class="acts"><button id="lp-done">Close</button>
       <button class="go" id="lp-open">Open mint page</button></div>
     `);
+    bindCopy(box);
     box.querySelector("#lp-done").onclick = close;
     box.querySelector("#lp-open").onclick = function () { location.href = res.mintUrl; };
   }
@@ -950,15 +979,16 @@
     var box = shell(H`
       <h2>Live</h2>
       <p class="sub">$${flow.tsym} is trading on ${res.cluster}.</p>
-      <div class="row"><span class="k">Token mint</span><b>${shortAddr(res.mint, 6)}</b></div>
       <div class="row"><span class="k">Rewards in</span><b>${flow.reward.symbol}</b></div>
-      ${nft ? H`<div class="row"><span class="k">Paired collection</span><b>${shortAddr(nft.res.collection, 6)}</b></div>
-      <label>Mint page</label>
+      ${raw(caRow("Token CA", res.mint))}
+      ${nft ? raw(caRow("Collection", nft.res.collection) + caRow("Candy machine", nft.res.candyMachine)) : ""}
+      ${nft ? H`<label>Mint page</label>
       <input readonly value="${nft.res.mintUrl}" onclick="this.select()">` : ""}
       <p class="note"><a href="${jup}" target="_blank" rel="noopener">Trade on Jupiter ↗</a></p>
       <div class="acts"><button id="lp-done">Close</button>
       ${nft ? H`<button class="go" id="lp-open">Open mint page</button>` : ""}</div>
     `);
+    bindCopy(box);
     box.querySelector("#lp-done").onclick = close;
     var open = box.querySelector("#lp-open");
     if (open) open.onclick = function () { location.href = nft.res.mintUrl; };

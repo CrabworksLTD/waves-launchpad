@@ -285,7 +285,7 @@ footer{border-top:1px solid var(--line);margin-top:90px;padding:26px 0 60px;
     if (tokens.length) {
       tok.innerHTML = tokens.map(function (t) {
         return '<a class="card" data-name="' + esc(t.name + " " + t.symbol) +
-          '" href="https://jup.ag/swap/SOL-' + esc(t.mint) + '" target="_blank" rel="noopener">' +
+          '" href="/token/' + esc(t.mint) + '">' +
           '<div class="tok"><b>$' + esc(t.symbol || "?") + '</b></div>' +
           '<div class="meta"><b>' + esc(t.name) + '</b><span class="mono">' +
           esc(shortAddr(t.mint)) + "</span></div></a>";

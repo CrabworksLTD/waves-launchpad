@@ -226,7 +226,8 @@
       baseMint: baseMint,
       // 0..1 toward the migration threshold; past 1 it has graduated to DAMM
       curveProgress: progress == null ? null : Number(progress),
-      migrated: !!(pool.account && pool.account.isMigrated),
+      migrated: !!(pool.account &&
+        (pool.account.poolState || pool.account).isMigrated),
       fees: fees || null
     };
   }
@@ -253,7 +254,110 @@
     return await send(c, tx);
   }
 
+  /* ---- trading, for the /token page ---- */
+
+  async function readCtx(baseMint) {
+    var M = await dbc(), X = await mx();
+    var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
+    var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
+    var cli = new M.DynamicBondingCurveClient(conn, "confirmed");
+    var pool = await cli.state.getPoolByBaseMint(new X.PublicKey(baseMint));
+    if (!pool) throw new Error("No pool for that mint on " + cluster);
+    // the decoded state nests one level down as .poolState — but swapQuote
+    // wants the WRAPPED object (it reads virtualPool.poolState.* itself)
+    var acct = pool.account.poolState || pool.account;
+    var vpool = pool.account.poolState ? pool.account : { poolState: pool.account };
+    var cfg = await cli.state.getPoolConfig(acct.config);
+    // no decimal field on the config for the quote side — it follows the mint
+    var quoteDec = String(cfg.quoteMint) === "So11111111111111111111111111111111111111112" ? 9 : 6;
+    return { M: M, X: X, conn: conn, cli: cli, pool: pool, acct: acct,
+             vpool: vpool, cfg: cfg, quoteDec: quoteDec };
+  }
+
+  /* Everything the trading page shows, in one read. Price is quoted from the
+   * live curve by pricing a tiny buy — the same maths a real swap uses, so the
+   * number cannot drift from what a buyer would actually pay. */
+  async function readMarket(baseMint) {
+    var c = await readCtx(baseMint);
+    var acct = c.acct;
+    var quoteDec = c.quoteDec;
+    var threshold = Number(c.cfg.migrationQuoteThreshold) / Math.pow(10, quoteDec);
+    var raised = Number(acct.quoteReserve) / Math.pow(10, quoteDec);
+
+    var price = null;
+    try {
+      var probe = new c.M.BN(Math.pow(10, quoteDec - 3)); // 0.001 quote units in
+      var slot = await c.conn.getSlot("confirmed");
+      var q = c.cli.pool.swapQuote({
+        virtualPool: c.vpool, config: c.cfg,
+        swapBaseForQuote: false, amountIn: probe,
+        slippageBps: 0, hasReferral: false,
+        eligibleForFirstSwapWithMinFee: false,
+        currentPoint: new c.M.BN(slot)
+      });
+      var out = Number(q.outputAmount || q.amountOut || 0);
+      if (out > 0) price = (0.001) / (out / 1e6);  // quote per token, 6-dec base
+    } catch (e) { /* price stays null, page says so */ }
+
+    return {
+      pool: String(c.pool.publicKey),
+      migrated: !!acct.isMigrated,
+      raised: raised,
+      threshold: threshold,
+      progress: threshold > 0 ? Math.min(1, raised / threshold) : 0,
+      price: price,
+      quote: quoteDec === 9 ? "SOL" : "USDC",
+      creator: String(acct.creator)
+    };
+  }
+
+  /* A live quote for the trade box. direction "buy" = quote in, base out. */
+  async function getQuote(baseMint, amount, direction) {
+    var c = await readCtx(baseMint);
+    var quoteDec = c.quoteDec;
+    var dec = direction === "buy" ? quoteDec : 6;
+    var amountIn = new c.M.BN(Math.round(amount * Math.pow(10, dec)));
+    var slot = await c.conn.getSlot("confirmed");
+    var q = c.cli.pool.swapQuote({
+      virtualPool: c.vpool, config: c.cfg,
+      swapBaseForQuote: direction !== "buy",
+      amountIn: amountIn,
+      slippageBps: 100,                            // 1%
+      hasReferral: false,
+      eligibleForFirstSwapWithMinFee: false,
+      currentPoint: new c.M.BN(slot)
+    });
+    var outRaw = q.outputAmount || q.amountOut || 0;
+    var minRaw = q.minimumAmountOut || q.minAmountOut || outRaw;
+    var outDec = direction === "buy" ? 6 : quoteDec;
+    return {
+      out: Number(outRaw) / Math.pow(10, outDec),
+      minOut: String(minRaw),
+      amountIn: String(amountIn)
+    };
+  }
+
+  /* Execute the trade with the connected wallet. minOut comes from getQuote so
+   * the user was shown the number their slippage floor protects. */
+  async function swap(baseMint, direction, amountInRaw, minOutRaw) {
+    var c = await client();                        // wallet-connected web3 ctx
+    var pool = await c.cli.state.getPoolByBaseMint(new c.X.PublicKey(baseMint));
+    if (!pool) throw new Error("No pool for that mint");
+    var tx = await c.cli.pool.swap({
+      owner: c.owner,
+      pool: pool.publicKey,
+      amountIn: new c.M.BN(amountInRaw),
+      minimumAmountOut: new c.M.BN(minOutRaw),
+      swapBaseForQuote: direction !== "buy",
+      referralTokenAccount: null
+    });
+    return await send(c, tx);
+  }
+
   window.Token = {
+    readMarket: readMarket,
+    getQuote: getQuote,
+    swap: swap,
     launchToken: launchToken,
     readPool: readPool,
     claimCreatorFeesTo: claimCreatorFeesTo,
