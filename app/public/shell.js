@@ -83,20 +83,15 @@
     "  color:var(--ink);text-decoration:none}",
     ".shl-dd .menu a:hover{background:var(--panel2)}",
     ".shl-dd.r .menu{left:auto;right:0;transform:none}",
-    /* the connected wallet's Profile/Disconnect menu matches the pill: hollow
-     * gradient border via the same double background */
-    "#shl-wmenu .menu{border:1px solid transparent;",
-    "  background:linear-gradient(var(--panel),var(--panel)) padding-box,",
-    "    var(--grad) border-box}",
     /* Hollow pill: the gradient runs through a transparent 1px border via the
      * padding-box/border-box double background, and through the lettering via
      * background-clip on an inner span — it cannot sit on the button itself,
      * because that background is already busy being the border. */
     ".shl-wallet{font:700 15px Archivo,'Space Grotesk',sans-serif;cursor:pointer;",
-    "  padding:11px 22px;border-radius:999px;border:1px solid transparent;",
-    "  background:linear-gradient(var(--void),var(--void)) padding-box,",
-    "    var(--grad) border-box;",
-    "  white-space:nowrap;transition:filter .2s}",
+    "  padding:11px 22px;border-radius:999px;border:1px solid var(--line2);",
+    "  background:var(--void);",
+    "  white-space:nowrap;transition:filter .2s,border-color .2s}",
+    ".shl-wallet:hover{border-color:var(--faint)}",
     ".shl-wallet span{background:var(--grad);-webkit-background-clip:text;",
     "  background-clip:text;color:transparent}",
     ".shl-wallet:hover{filter:brightness(1.18)}",
