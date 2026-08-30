@@ -198,6 +198,14 @@
       }
       trig.addEventListener("click", function (e) {
         e.stopPropagation();
+        // one menu at a time — the trigger's stopPropagation means the
+        // document click that would close a sibling never fires
+        document.querySelectorAll(".shl-nav .shl-dd.open").forEach(function (o) {
+          if (o !== dd) {
+            o.classList.remove("open");
+            o.querySelector("button").setAttribute("aria-expanded", "false");
+          }
+        });
         setOpen(!dd.classList.contains("open"));
       });
       document.addEventListener("click", function () { setOpen(false); });
