@@ -51,7 +51,9 @@ main{max-width:1420px;margin:0 auto;padding:28px 24px 90px}
 .stat b{display:block;font:600 15px "IBM Plex Mono",monospace;margin-top:2px}
 #curve{width:100%;height:400px;display:block}
 .bar{height:7px;border-radius:99px;background:var(--raise);overflow:hidden;margin-top:12px}
-.bar i{display:block;height:100%;background:var(--grad);width:0;transition:width .5s}
+.bar i{display:block;height:100%;width:0;transition:width .5s;
+  background-image:var(--grad);background-repeat:no-repeat;
+  background-size:calc(100% + 2px) 100%;background-position:-1px 0}
 .barlb{display:flex;justify-content:space-between;font-size:11.5px;color:var(--faint);margin-top:6px}
 
 /* trade box */
@@ -75,7 +77,9 @@ input:focus{outline:none;border-color:var(--accent)}
   padding:12px 2px 2px}
 .est b{font-family:"IBM Plex Mono",monospace}
 .go{width:100%;margin-top:14px;padding:14px;border-radius:8px;border:0;cursor:pointer;
-  font:800 14px Archivo;background:var(--grad);color:var(--accent-ink)}
+  font:800 14px Archivo;color:var(--accent-ink);
+  background-image:var(--grad);background-repeat:no-repeat;
+  background-size:calc(100% + 2px) 100%;background-position:-1px 0}
 .go:disabled{opacity:.45;cursor:default}
 .msg{margin-top:12px;font-size:12.5px;padding:10px 12px;border-radius:8px;display:none}
 .msg.err{display:block;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ffb3b3}

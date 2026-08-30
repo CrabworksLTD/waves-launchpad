@@ -37,13 +37,15 @@ button:disabled{opacity:.35;cursor:default}
    the button. Border is transparent over a padding-box/border-box double
    background so the gradient reaches the edge without a seam. */
 button.primary{
-  background:var(--grad);border:1px solid transparent;color:var(--accent-ink);
+  background-image:var(--grad);background-repeat:no-repeat;
+  background-size:calc(100% + 2px) 100%;background-position:-1px 0;
+  border:1px solid transparent;color:var(--accent-ink);
   font-weight:800;letter-spacing:.03em;text-transform:uppercase;font-size:13.5px;
   padding:15px 18px;
   box-shadow:0 0 0 0 rgba(var(--accent-2-rgb),0);
 }
 button.primary:hover{
-  background:var(--grad-hi);border-color:transparent;color:var(--accent-ink);
+  background-image:var(--grad-hi);border-color:transparent;color:var(--accent-ink);
   box-shadow:0 0 22px -6px rgba(var(--accent-2-rgb),.55),
              0 0 30px -10px rgba(var(--accent-rgb),.45);
 }

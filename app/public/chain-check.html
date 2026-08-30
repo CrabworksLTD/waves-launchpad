@@ -23,7 +23,9 @@ p.sub{color:var(--faint);margin:0 0 24px;font-size:12.5px}
 button{font:inherit;cursor:pointer;background:var(--panel2);color:var(--ink);
   border:1px solid var(--line2);border-radius:6px;padding:9px 15px;margin:18px 8px 0 0}
 button:hover{background:var(--raise)}
-button.primary{background:var(--grad);color:var(--accent-ink);border-color:transparent;font-weight:700}
+button.primary{color:var(--accent-ink);border-color:transparent;font-weight:700;
+  background-image:var(--grad);background-repeat:no-repeat;
+  background-size:calc(100% + 2px) 100%;background-position:-1px 0}
 #wallets{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
 pre{background:var(--void);border:1px solid var(--line);border-radius:6px;
   padding:12px;overflow:auto;font-size:12px;color:var(--dim);margin-top:18px}

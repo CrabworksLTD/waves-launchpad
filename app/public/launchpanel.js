@@ -50,7 +50,9 @@
       ".lp button{flex:1;font:inherit;font-weight:600;font-size:13px;cursor:pointer;",
       "  border-radius:6px;padding:12px 16px;border:1px solid var(--line2);",
       "  background:var(--panel2);color:var(--ink)}",
-      ".lp button.go{background:var(--grad);color:var(--accent-ink);border-color:transparent}",
+      ".lp button.go{color:var(--accent-ink);border-color:transparent;",
+      "  background-image:var(--grad);background-repeat:no-repeat;",
+      "  background-size:calc(100% + 2px) 100%;background-position:-1px 0}",
       ".lp button:disabled{opacity:.4;cursor:default}",
       ".lp .steps{margin:6px 0 0;padding:0;list-style:none;font-size:13px}",
       ".lp .steps li{padding:9px 0;border-bottom:1px solid var(--line);color:var(--faint);",
@@ -61,6 +63,14 @@
       ".lp .err{margin-top:14px;padding:11px 12px;border-radius:6px;font-size:12.5px;",
       "  background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ffb3b3}",
       ".lp .note{color:var(--faint);font-size:11.5px;margin-top:8px;line-height:1.5}",
+      /* the perforated drop box for bring-your-own-files */
+      ".lp .drop{border:2px dashed var(--line2);border-radius:8px;background:var(--bg);",
+      "  padding:34px 20px;text-align:center;cursor:pointer;",
+      "  transition:border-color .15s,background .15s}",
+      ".lp .drop:hover,.lp .drop.hot{border-color:var(--accent);",
+      "  background:rgba(var(--accent-rgb),.05)}",
+      ".lp .drop b{display:block;font-size:13.5px;margin-bottom:4px}",
+      ".lp .drop span{color:var(--faint);font-size:12px}",
       ".lp a{color:var(--accent)}",
       /* mode cards */
       ".lp .modes{display:grid;gap:10px;margin-top:4px}",
@@ -1059,9 +1069,10 @@
     var flow = mode === "pair" ? { pair: true } : null;
     var box = shell(H`
       <h2>Your files</h2>
-      <p class="sub">Pick the images — PNGs, one per piece. They become 1.png upward
+      <p class="sub">PNGs, one per piece. They become 1.png upward
       in natural order.</p>
-      <div class="acts" style="margin-top:0"><button class="go" id="of-pick">Choose files…</button></div>
+      <div class="drop" id="of-drop"><b>Drop your files here</b>
+      <span>or click to browse — PNG images, plus an optional .json each</span></div>
       <input type="file" id="of-input" accept="image/png,application/json" multiple hidden>
       <p class="note" id="of-note"></p>
       <div id="lp-err"></div>
@@ -1070,11 +1081,21 @@
     `);
     box.querySelector("#lp-x").onclick = function () { sourceSelect(mode); };
     var input = box.querySelector("#of-input");
-    box.querySelector("#of-pick").onclick = function () { input.click(); };
+    var drop = box.querySelector("#of-drop");
+    drop.onclick = function () { input.click(); };
+    // dragover must be cancelled or the browser navigates to the dropped file
+    drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("hot"); });
+    drop.addEventListener("dragleave", function () { drop.classList.remove("hot"); });
+    drop.addEventListener("drop", function (e) {
+      e.preventDefault(); drop.classList.remove("hot");
+      stage([].slice.call((e.dataTransfer && e.dataTransfer.files) || []));
+    });
+    input.addEventListener("change", function () {
+      stage([].slice.call(input.files || []));
+    });
 
     var staged = null;
-    input.addEventListener("change", function () {
-      var all = [].slice.call(input.files || []);
+    function stage(all) {
       if (!all.length) return;
       var pngs = all.filter(function (f) { return /\.png$/i.test(f.name); });
       var jsons = all.filter(function (f) { return /\.json$/i.test(f.name); });
@@ -1141,7 +1162,7 @@
           box.querySelector("#of-go").disabled = false;
         });
       });
-    });
+    }
 
     box.querySelector("#of-go").onclick = function () {
       if (!staged) return;

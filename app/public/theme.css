@@ -62,6 +62,13 @@
   /* Gradients. --grad runs purple to green across a wide element; --grad-rev
      for anything that reads right-to-left; --grad-soft for washes and glows
      where a full-strength sweep would shout. */
+  /* ⚠️ Never paint a fill with the bare `background:var(--grad)` shorthand:
+     at fractional zoom/DPR Chrome nudges the 90deg tile by a rounded fraction
+     and the far-end green wraps into the first pixel column — the "little
+     green line on the left". Fills use the longhands instead:
+       background-image:var(--grad);background-repeat:no-repeat;
+       background-size:calc(100% + 2px) 100%;background-position:-1px 0
+     Text clips (background-clip:text) and tiles sized >100% are immune. */
   --grad:      linear-gradient(90deg, #9945FF 0%, #14F195 100%);
   --grad-rev:  linear-gradient(90deg, #14F195 0%, #9945FF 100%);
   --grad-hi:   linear-gradient(90deg, #b06bff 0%, #5cffb9 100%);

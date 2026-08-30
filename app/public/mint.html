@@ -39,9 +39,13 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
   border-bottom:1px solid rgba(255,255,255,.07)}
 .row .k{color:var(--dim)}
 .bar{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin:16px 0 4px}
-.bar i{display:block;height:100%;background:var(--grad);width:0;transition:width .4s ease}
+.bar i{display:block;height:100%;width:0;transition:width .4s ease;
+  background-image:var(--grad);background-repeat:no-repeat;
+  background-size:calc(100% + 2px) 100%;background-position:-1px 0}
 .btn{display:block;width:100%;margin-top:20px;padding:15px;border-radius:999px;border:1px solid transparent;
-  font:600 15px "Space Grotesk",sans-serif;cursor:pointer;background:var(--grad);color:var(--accent-ink)}
+  font:600 15px "Space Grotesk",sans-serif;cursor:pointer;color:var(--accent-ink);
+  background-image:var(--grad);background-repeat:no-repeat;
+  background-size:calc(100% + 2px) 100%;background-position:-1px 0}
 .btn:disabled{opacity:.4;cursor:default}
 .btn.quiet{background:transparent;border-color:rgba(255,255,255,.14);color:var(--ink)}
 .msg{margin-top:14px;font-size:12.5px;padding:11px 12px;border-radius:8px;display:none}
