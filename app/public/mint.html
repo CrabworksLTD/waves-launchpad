@@ -6,88 +6,138 @@
 <title>Mint</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/theme.css">
 <style>
+/* The mint page, after the reference Kyle likes: a full-width banner hero
+ * with the collection's identity on it, the sale panel floating on the right
+ * with the phase ladder, and the minted pieces in a grid below. Identity
+ * comes from the _collection.json / _banner.png pinned at launch; numbers
+ * come from the machine; phases from the guard. Nothing is editorial. */
 *{box-sizing:border-box}
+[hidden]{display:none !important}
 html,body{margin:0;min-height:100%}
-body{background:#07060b;color:var(--ink);
+body{background:var(--void);color:var(--ink);
   font:400 15px/1.6 Inter,ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-.disp{font-family:"Space Grotesk",ui-sans-serif,sans-serif}
+.disp{font-family:Archivo,ui-sans-serif,sans-serif}
 .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+a{color:inherit;text-decoration:none}
 
-.aur{position:fixed;inset:-20%;z-index:0;pointer-events:none;filter:blur(100px);opacity:.7}
-.aur i{position:absolute;display:block;border-radius:50%;mix-blend-mode:screen}
-.a1{width:44vw;height:44vw;right:4%;top:-12%;background:#9945FF;opacity:.3}
-.a2{width:36vw;height:36vw;left:-6%;bottom:-8%;background:#14F195;opacity:.16}
+/* ---- hero: banner behind, identity left, sale panel right ---- */
+.hero{position:relative;border-bottom:1px solid var(--line);overflow:hidden}
+.hero .bg{position:absolute;inset:0;background:var(--panel);overflow:hidden}
+.hero .bg img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated;
+  display:block;filter:brightness(.55)}
+.hero .bg::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,rgba(0,0,0,.82) 0%,rgba(0,0,0,.45) 45%,rgba(0,0,0,.6) 100%)}
+.hero-in{position:relative;max-width:1400px;margin:0 auto;padding:40px 24px;
+  display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:36px;align-items:start}
+@media (max-width:960px){.hero-in{grid-template-columns:1fr}}
 
-.wrap{position:relative;z-index:2;max-width:520px;margin:0 auto;padding:40px 24px 80px}
-.card{background:rgba(255,255,255,.04);backdrop-filter:blur(22px) saturate(150%);
-  -webkit-backdrop-filter:blur(22px) saturate(150%);
-  border:1px solid rgba(255,255,255,.09);border-radius:20px;padding:26px;
-  box-shadow:0 30px 80px -40px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.07)}
-h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.02em;margin:0 0 4px}
-.sub{margin:0 0 22px;color:var(--dim);font-size:13.5px}
-.art{width:100%;aspect-ratio:1;border-radius:14px;background:#0c0a14;
-  border:1px solid rgba(255,255,255,.06);display:block;image-rendering:pixelated;object-fit:cover}
-/* `hidden` works through a UA display:none, and the author display:block above
-   silently wins over it — so the hidden img rendered as a second empty frame.
-   Author rule vs author rule, attribute wins on specificity. */
-.art[hidden]{display:none}
-.artwrap{position:relative;margin-bottom:20px}
-.row{display:flex;justify-content:space-between;padding:9px 0;font-size:13.5px;
-  border-bottom:1px solid rgba(255,255,255,.07)}
-.row .k{color:var(--dim)}
-.bar{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin:16px 0 4px}
+.who{display:flex;flex-direction:column;gap:14px;min-width:0}
+.who .ava{width:84px;height:84px;border-radius:12px;background:var(--raise);
+  border:1px solid rgba(255,255,255,.22);overflow:hidden;display:grid;place-items:center;
+  color:var(--faint);font:800 26px Archivo}
+.who .ava img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated;display:block}
+.who h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
+  letter-spacing:-.02em;margin:0;background:var(--grad);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.who .by{font-size:13px;color:var(--dim)}
+.who .by .mono{color:var(--faint)}
+.who .desc{margin:0;color:var(--dim);font-size:14px;max-width:56ch;
+  display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.links{display:flex;gap:8px;flex-wrap:wrap}
+.links a{padding:7px 14px;border:1px solid rgba(255,255,255,.22);border-radius:99px;
+  font-size:12px;color:var(--dim);background:rgba(0,0,0,.4);transition:color .2s,border-color .2s}
+.links a:hover{color:var(--ink);border-color:var(--faint)}
+
+/* ---- sale panel ---- */
+.sale{background:rgba(10,10,10,.88);backdrop-filter:blur(14px);
+  border:1px solid transparent;border-radius:14px;padding:20px;
+  background:linear-gradient(rgba(12,12,12,.92),rgba(12,12,12,.92)) padding-box,
+             var(--grad) border-box}
+.sale .tt{display:flex;justify-content:space-between;align-items:baseline;
+  font-size:13px;color:var(--dim)}
+.sale .tt b{font:600 13px "IBM Plex Mono",monospace;color:var(--ink)}
+.bar{height:7px;border-radius:99px;background:var(--raise);overflow:hidden;margin:10px 0 4px}
 .bar i{display:block;height:100%;width:0;transition:width .4s ease;
   background-image:var(--grad);background-repeat:no-repeat;
   background-size:calc(100% + 2px) 100%;background-position:-1px 0}
-.btn{display:block;width:100%;margin-top:20px;padding:15px;border-radius:999px;border:1px solid transparent;
-  font:600 15px "Space Grotesk",sans-serif;cursor:pointer;color:var(--accent-ink);
+.pctline{display:flex;justify-content:space-between;font:400 11px "IBM Plex Mono",monospace;
+  color:var(--faint);margin-bottom:8px}
+
+.ph{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-top:8px;
+  border:1px solid var(--line);border-radius:10px;font-size:12.5px;color:var(--dim);
+  background:rgba(255,255,255,.02)}
+.ph b{font:600 11.5px "IBM Plex Mono",monospace;letter-spacing:.06em;flex:none}
+.ph .st{margin-left:auto;flex:none;font:500 10.5px "IBM Plex Mono",monospace;color:var(--faint)}
+.ph.open .st{color:var(--accent)}
+.ph.mine{border-color:rgba(20,241,149,.5)}
+.ph.mine b{color:var(--accent)}
+
+.btn{display:block;width:100%;margin-top:16px;padding:15px;border-radius:999px;border:1px solid transparent;
+  font:700 15px Archivo,sans-serif;cursor:pointer;color:var(--accent-ink);
   background-image:var(--grad);background-repeat:no-repeat;
   background-size:calc(100% + 2px) 100%;background-position:-1px 0}
 .btn:disabled{opacity:.4;cursor:default}
-.btn.quiet{background:transparent;border-color:rgba(255,255,255,.14);color:var(--ink)}
-/* mint phases: one row per wave, the buyer's own row highlighted */
-.phases{margin-top:16px}
-.ph{display:flex;align-items:center;gap:10px;padding:9px 12px;margin-top:6px;
-  border:1px solid rgba(255,255,255,.08);border-radius:10px;font-size:12.5px;
-  color:var(--dim)}
-.ph b{font:600 12px "IBM Plex Mono",monospace;letter-spacing:.06em;flex:none}
-.ph .st{margin-left:auto;flex:none;font:500 11px "IBM Plex Mono",monospace;color:var(--faint)}
-.ph.open .st{color:var(--accent)}
-.ph.mine{border-color:rgba(20,241,149,.45)}
-.ph.mine b{color:var(--accent)}
-.msg{margin-top:14px;font-size:12.5px;padding:11px 12px;border-radius:8px;display:none}
+.msg{margin-top:12px;font-size:12.5px;padding:11px 12px;border-radius:8px;display:none}
 .msg.err{display:block;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ffb3b3}
 .msg.ok{display:block;background:rgba(20,241,149,.08);border:1px solid rgba(20,241,149,.3);color:#8ff5cd}
 .msg a{color:inherit}
-.foot{text-align:center;margin-top:18px;font-size:11.5px;color:var(--faint)}
+.sale .foot{text-align:center;margin-top:12px;font-size:11px;color:var(--faint)}
+
+/* ---- below: the pieces ---- */
+main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
+.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.tab{font-family:Archivo;font-size:18px;font-weight:800;letter-spacing:-.01em;
+  padding:0 2px 12px;border:0;background:transparent;cursor:pointer;color:var(--faint);
+  border-bottom:2px solid transparent}
+.tab[aria-selected="true"]{color:transparent;background:var(--grad);
+  -webkit-background-clip:text;background-clip:text;border-bottom-color:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:16px}
+.piece{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  overflow:hidden;transition:border-color .2s}
+.piece:hover{border-color:var(--faint)}
+.piece img{width:100%;aspect-ratio:1;object-fit:cover;image-rendering:pixelated;display:block;
+  background:var(--bg)}
+.piece .nm{padding:10px 12px;font:700 13px Archivo}
+.none{border:1px dashed var(--line2);border-radius:8px;padding:40px 24px;text-align:center;
+  color:var(--faint);font-size:13px}
 </style>
 </head>
 <body>
 
-<div class="aur" aria-hidden="true"><i class="a1"></i><i class="a2"></i></div>
+<header class="hero">
+  <div class="bg"><img id="banner" alt="" hidden></div>
+  <div class="hero-in">
+    <div class="who">
+      <div class="ava" id="ava">?</div>
+      <h1 class="disp" id="name">Loading…</h1>
+      <div class="by">created by <span class="mono" id="creator">—</span></div>
+      <p class="desc" id="desc" hidden></p>
+      <div class="links" id="links"></div>
+    </div>
 
-<div class="wrap">
-  <div class="card">
-    <div class="artwrap"><img class="art" id="art" alt="" hidden><div class="art" id="artph"></div></div>
-    <h1 class="disp" id="name">Loading…</h1>
-    <p class="sub mono" id="addr">—</p>
-
-    <div class="row"><span class="k">Price</span><b id="price">—</b></div>
-    <div class="row"><span class="k">Minted</span><b id="minted">—</b></div>
-
-    <div class="bar"><i id="bar"></i></div>
-    <p class="foot mono" id="pct">—</p>
-
-    <div class="phases" id="phases" hidden></div>
-
-    <button class="btn" id="go" disabled>Loading…</button>
-    <div class="msg" id="msg"></div>
+    <div class="sale">
+      <div class="tt"><span>Total</span><b id="minted">—</b></div>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="pctline"><span id="pct">—</span><span class="mono" id="addr">—</span></div>
+      <div id="phases"></div>
+      <button class="btn" id="go" disabled>Loading…</button>
+      <div class="msg" id="msg"></div>
+      <p class="foot">Runs on Metaplex Core. Nothing custom in the middle.</p>
+    </div>
   </div>
-  <p class="foot">Runs on Metaplex Core. Nothing custom in the middle.</p>
-</div>
+</header>
+
+<main>
+  <div class="tabs" role="tablist">
+    <button class="tab" id="t-minted" role="tab" aria-selected="true">Minted</button>
+    <button class="tab" id="t-all" role="tab" aria-selected="false">Full collection</button>
+  </div>
+  <div class="grid" id="pieces"></div>
+  <div class="none" id="pieces-none" hidden>The art appears here as pieces mint.</div>
+</main>
 
 <script src="/brand.js"></script>
 <script src="/ui.js"></script>
@@ -98,6 +148,7 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
 <script>
 (function () {
   "use strict";
+  var esc = UI.esc, shortAddr = UI.shortAddr;
   var $ = function (id) { return document.getElementById(id); };
 
   // /mint/<address> in production, ?cm=<address> when opened as a file or on
@@ -114,6 +165,8 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
   var state = null;
   var lists = null;                                // _allowlist.json phases, by label
   var myPhase = null;                              // {group, wallets} for mintOne
+  var metaDir = null;                              // arweave dir the metadata lives in
+  var tab = "minted";
 
   function say(kind, html) {
     var m = $("msg");
@@ -121,12 +174,37 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
     m.innerHTML = html;
   }
 
+  /* ---- identity, from the files pinned at launch ---- */
+  function loadIdentity() {
+    if (!metaDir) return;
+    fetch(metaDir + "_collection.json").then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (col) {
+        if (!col) return;
+        if (col.name) { $("name").textContent = col.name; document.title = col.name + " — Mint"; }
+        if (col.description) { $("desc").textContent = col.description; $("desc").hidden = false; }
+        if (col.image) $("ava").innerHTML = '<img alt="" src="' + esc(col.image) + '">';
+        if (col.banner) { $("banner").src = col.banner; $("banner").hidden = false; }
+      }).catch(function () {});
+    fetch(metaDir + "_links.json").then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (links) {
+        if (!links) return;
+        var order = [["website", "Website"], ["x", "X"], ["telegram", "Telegram"], ["discord", "Discord"]];
+        $("links").innerHTML = order.map(function (kv) {
+          var v = links[kv[0]];
+          if (!v) return "";
+          var href = /^https?:/.test(v) ? v
+            : kv[0] === "x" ? "https://x.com/" + v.replace(/^@/, "")
+            : "https://" + v;
+          return '<a href="' + esc(href) + '" target="_blank" rel="noopener">' + kv[1] + "</a>";
+        }).join("");
+      }).catch(function () {});
+  }
+
   /* The pinned wallet lists behind the merkle roots. Public by design —
    * an allowlist you cannot audit is not an allowlist. */
   function loadLists() {
-    if (!state.firstItemUri) return Promise.resolve(null);
-    var uri = state.firstItemUri.replace(/[^/]+$/, "_allowlist.json");
-    return fetch(uri).then(function (r) { return r.ok ? r.json() : null; })
+    if (!metaDir) return Promise.resolve(null);
+    return fetch(metaDir + "_allowlist.json").then(function (r) { return r.ok ? r.json() : null; })
       .catch(function () { return null; });
   }
 
@@ -158,10 +236,16 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
 
   function renderPhases() {
     var box = $("phases");
-    if (!state.groups.length) { box.hidden = true; return; }
     var w = window.Wallet.current();
     var now = Date.now();
-    box.hidden = false;
+    if (!state.groups.length) {
+      box.innerHTML = '<div class="ph open"><b>Public</b><span>everyone · ' +
+        (state.priceSol == null ? "free" : state.priceSol + " SOL") +
+        '</span><span class="st">' +
+        (state.opensAt && state.opensAt > now
+          ? "opens " + new Date(state.opensAt).toLocaleString() : "open") + "</span></div>";
+      return;
+    }
     box.innerHTML = state.groups.map(function (g) {
       var open = !g.opensAt || g.opensAt <= now;
       var mine = myPhase && myPhase.group === g.label;
@@ -182,13 +266,59 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
     }).join("");
   }
 
+  /* ---- the pieces below ---- */
+  var pieceCache = {};
+  function renderPieces() {
+    var grid = $("pieces"), none = $("pieces-none");
+    var count = tab === "minted" ? state.redeemed : state.loaded;
+    if (!metaDir || !count) {
+      grid.innerHTML = ""; none.hidden = false;
+      none.textContent = tab === "minted"
+        ? "The art appears here as pieces mint."
+        : "The collection's art could not be loaded.";
+      return;
+    }
+    none.hidden = true;
+    var show = Math.min(count, 48);
+    grid.innerHTML = "";
+    for (var i = 1; i <= show; i++) (function (id) {
+      var cell = document.createElement("div");
+      cell.className = "piece";
+      cell.innerHTML = '<img alt="" loading="lazy"><div class="nm">#' + id + "</div>";
+      grid.appendChild(cell);
+      var done = function (meta) {
+        if (!meta) return;
+        if (meta.image) cell.querySelector("img").src = meta.image;
+        if (meta.name) cell.querySelector(".nm").textContent = meta.name;
+      };
+      if (pieceCache[id]) return done(pieceCache[id]);
+      fetch(metaDir + id + ".json").then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (meta) {
+          if (meta && meta.image && !/^https?:/.test(meta.image)) {
+            meta.image = metaDir.replace("/arweave.net/", "/arweave.net/") + meta.image;
+          }
+          pieceCache[id] = meta; done(meta);
+        }).catch(function () {});
+    })(i);
+  }
+
+  function setTab(t) {
+    tab = t;
+    $("t-minted").setAttribute("aria-selected", String(t === "minted"));
+    $("t-all").setAttribute("aria-selected", String(t === "all"));
+    renderPieces();
+  }
+  $("t-minted").onclick = function () { setTab("minted"); };
+  $("t-all").onclick = function () { setTab("all"); };
+
+  /* ---- load + arm ---- */
   async function load() {
     if (!CM) {
       $("name").textContent = "No collection";
       say("err", "This link is missing a candy machine address.");
       return;
     }
-    $("addr").textContent = CM.slice(0, 6) + "…" + CM.slice(-6);
+    $("addr").textContent = shortAddr(CM, 5);
     try {
       state = await window.Launch.readMachine(CM);
     } catch (e) {
@@ -197,34 +327,45 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
                  "It may be on a different network.");
       return;
     }
-
-    // Item 1's metadata gives a name and a picture without needing an indexer.
-    // Read-only, so it is fetched before any wallet is connected.
-    try {
-      var meta = await fetch("https://arweave.net/" + state.collection).then(function () { return null; });
-    } catch (e) { /* best effort only */ }
-
+    if (state.firstItemUri && /^https?:/.test(state.firstItemUri)) {
+      metaDir = state.firstItemUri.replace(/[^/]+$/, "");
+    }
     $("name").textContent = "Mint";
-    $("price").textContent = state.priceSol == null ? "free" : state.priceSol + " SOL";
+    $("creator").textContent = shortAddr(state.authority, 5);
+    loadIdentity();
 
     if (state.groups.length) lists = await loadLists();
     resolvePhase();
     renderPhases();
     render();
+    renderPieces();
     arm();
     // countdowns and phase openings resolve themselves without a reload
-    if (state.groups.length) setInterval(function () {
+    setInterval(function () {
       resolvePhase(); renderPhases();
       if (!$("go").dataset.busy) arm();
     }, 30000);
   }
 
+  function render() {
+    var pct = state.available ? (state.redeemed / state.available) * 100 : 0;
+    $("minted").textContent = state.redeemed.toLocaleString() + " / " + state.available.toLocaleString();
+    $("bar").style.width = pct.toFixed(1) + "%";
+    $("pct").textContent = pct.toFixed(1) + "% minted";
+  }
+
   function arm() {
     var w = window.Wallet.current();
     var go = $("go");
-    if (state.redeemed >= state.available) return;   // render() said sold out
+    if (state.redeemed >= state.available) {
+      go.disabled = true; go.textContent = "Sold out"; return;
+    }
     if (!w) { go.disabled = false; go.textContent = "Connect wallet"; go.onclick = connect; return; }
     if (!state.groups.length) {
+      var now = Date.now();
+      if (state.opensAt && state.opensAt > now) {
+        go.disabled = true; go.textContent = "Opens soon"; return;
+      }
       go.disabled = false; go.textContent = "Mint"; go.onclick = mint; return;
     }
     if (myPhase) {
@@ -233,22 +374,9 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
       go.onclick = mint;
       return;
     }
-    // nothing mintable for this wallet yet: say why, honestly
-    var now = Date.now();
-    var anyOpen = state.groups.some(function (g) { return !g.opensAt || g.opensAt <= now; });
+    var anyOpen = state.groups.some(function (g) { return !g.opensAt || g.opensAt <= Date.now(); });
     go.disabled = true;
     go.textContent = anyOpen ? "Not on an open allowlist yet" : "Opens soon";
-  }
-
-  function render() {
-    var pct = state.available ? (state.redeemed / state.available) * 100 : 0;
-    $("minted").textContent = state.redeemed + " / " + state.available;
-    $("bar").style.width = pct.toFixed(1) + "%";
-    $("pct").textContent = pct.toFixed(1) + "% minted";
-    if (state.redeemed >= state.available) {
-      $("go").disabled = true;
-      $("go").textContent = "Sold out";
-    }
   }
 
   async function connect() {
@@ -257,9 +385,10 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
   }
 
   async function mint() {
-    $("go").disabled = true;
-    $("go").dataset.busy = "1";
-    $("go").textContent = "Minting…";
+    var go = $("go");
+    go.disabled = true;
+    go.dataset.busy = "1";
+    go.textContent = "Minting…";
     say("", "");
     try {
       var r = await window.Launch.mintOne(CM, myPhase || {});
@@ -267,10 +396,10 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
                 (window.Launch.cluster() === "devnet" ? "?cluster=devnet" : "");
       say("ok", 'Minted. <a href="' + url + '" target="_blank" rel="noopener">View it ↗</a>');
       state = await window.Launch.readMachine(CM);
-      render();
-      delete $("go").dataset.busy;
-      $("go").disabled = false;
-      $("go").textContent = "Mint another";
+      render(); renderPieces();
+      delete go.dataset.busy;
+      go.disabled = false;
+      go.textContent = "Mint another";
     } catch (e) {
       // Guard failures arrive as program errors and read like nonsense to a
       // buyer, so the common ones are translated.
@@ -280,9 +409,9 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
       else if (/CandyMachineEmpty|0x1785/i.test(m)) m = "Sold out.";
       else if (/User rejected|rejected the request/i.test(m)) m = "You cancelled the transaction.";
       say("err", m);
-      delete $("go").dataset.busy;
-      $("go").disabled = false;
-      $("go").textContent = "Try again";
+      delete go.dataset.busy;
+      go.disabled = false;
+      go.textContent = "Try again";
     }
   }
 
