@@ -204,13 +204,21 @@
             window.LaunchPanel.openMode(mode);
             return;
           }
-          // Everywhere else: collection and pair go to the fork page, where
-          // the art source is chosen — the editor is a choice, never a default.
+          // Collection and pair go to the fork page, where the art source is
+          // chosen — the editor is a choice, never a default.
           if (mode === "collection" || mode === "pair") {
             e.preventDefault();
             location.href = "/launch?mode=" + mode;
+            return;
           }
-          // token falls through to the normal navigation
+          // Token opens right here. A token launch involves no art and no
+          // editor, so navigating to the editor page to show a modal over it
+          // put the wrong product in the background. The launch stack loads
+          // on demand and the window opens over the current page.
+          e.preventDefault();
+          ensureLaunchStack().then(function () {
+            window.LaunchPanel.openMode("token");
+          });
         });
       });
     }
@@ -365,5 +373,27 @@
     });
   }
 
-  window.Shell = { mount: mount, connect: connectModal };
+  /* Load the launch machinery on pages that did not ship it. Sequential,
+   * because launchpanel.js reads the globals the earlier files define. ui.js
+   * and wallet.js are already on every shell page. */
+  var stackP = null;
+  function ensureLaunchStack() {
+    if (window.LaunchPanel) return Promise.resolve();
+    if (stackP) return stackP;
+    stackP = ["/storage.js", "/launch.js", "/token.js", "/launchpanel.js"]
+      .reduce(function (p, src) {
+        return p.then(function () {
+          return new Promise(function (res, rej) {
+            var el = document.createElement("script");
+            el.src = src;
+            el.onload = res;
+            el.onerror = function () { rej(new Error("failed to load " + src)); };
+            document.head.appendChild(el);
+          });
+        });
+      }, Promise.resolve());
+    return stackP;
+  }
+
+  window.Shell = { mount: mount, connect: connectModal, ensureLaunchStack: ensureLaunchStack };
 })();
