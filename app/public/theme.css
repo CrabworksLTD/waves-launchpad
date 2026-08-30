@@ -15,14 +15,17 @@
  * of the surface rather than pasted onto a neutral grey app. */
 
 :root{
-  /* surfaces — near-black through raised panel */
-  --void:   #07060b;
-  --bg:     #0a0810;
-  --panel:  #13111c;
-  --panel2: #191622;
-  --raise:  #221d2c;
-  --line:   #2c2637;
-  --line2:  #3a3348;
+  /* surfaces — TRUE black through raised panel, neutral.
+     The violet-tinted greys were the single biggest reason the site read as
+     muddy next to the reference. Pure neutrals let the art carry the colour;
+     the accent is the only voice. */
+  --void:   #000000;
+  --bg:     #0a0a0a;
+  --panel:  #111111;
+  --panel2: #181818;
+  --raise:  #212121;
+  --line:   #262626;
+  --line2:  #343434;
 
   /* type
      Measured against --panel, which is what most of this sits on:
@@ -33,9 +36,9 @@
      25 elements — most of them 10-11px uppercase with wide tracking, which is
      the worst thing to under-contrast. Small, tracked-out and dim compounds:
      each alone is survivable, together it is unreadable. */
-  --ink:    #ece9f2;
-  --dim:    #ada6c2;
-  --faint:  #938caa;
+  --ink:    #f2f2f2;
+  --dim:    #b8b8b8;
+  --faint:  #8f8f8f;
 
   /* primary accent — Solana green */
   --accent:      #14F195;
