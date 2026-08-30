@@ -758,9 +758,12 @@
         <div><label>Discord</label><input id="tk-dc" value="${flow.dc || ""}" placeholder="discord.gg/…"></div>
       </div>
 
+      ${window.Token.configKey() ? "" : raw(
+        '<p class="err">Token launches are not configured on this deployment yet — ' +
+        "the form is a preview and the launch button is disabled.</p>")}
       <div id="lp-err"></div>
       <div class="acts"><button id="lp-x">${nft ? "Skip token" : "Back"}</button>
-      <button class="go" id="lp-next">Continue</button></div>
+      <button class="go" id="lp-next" ${window.Token.configKey() ? "" : raw("disabled")}>Continue</button></div>
     `);
 
     // live economics, read from the chain config — not hardcoded copy
@@ -1010,8 +1013,10 @@
    * Modes that need something missing fall back to the mode select, which
    * already explains what is missing instead of failing silently. */
   function openMode(mode) {
-    var tokenReady = !!(window.Token && window.Token.configKey());
-    if (mode === "token") return tokenReady ? tokenDetails(null) : modeSelect();
+    // straight into the token window either way — if the deployment has no
+    // partner config the window says so and holds the launch button, which
+    // beats bouncing the creator to a chooser they did not ask for
+    if (mode === "token") return tokenDetails(null);
     // arriving from the shell's chooser with the source already decided
     if (mode === "files-collection") return ownFiles("collection");
     if (mode === "files-pair") return ownFiles("pair");
