@@ -32,7 +32,14 @@
       // { "<mint>": { config, symbol, decimals } }, signed via
       // /config-create?quote=rwa&mint=<address>
       "mainnet-beta": { sol: "DdHWKSqE7gvKrCUvcAnEVT7R1YWKY2SknBYFLUKxxsCN",
-                        usdc: "9xHSsPYmRuJJtGA3TYB7Q5P2oHWy4zpeugTf9EZ1S491", rwa: {} },
+                        usdc: "9xHSsPYmRuJJtGA3TYB7Q5P2oHWy4zpeugTf9EZ1S491",
+                        // ⚠️ only classic-SPL mints can quote (DBC rejects
+                        // Token-2022): XAUt0 / GOLD / VNXAU of the 526
+                        rwa: {
+                          "AymATz4TCL9sWNEEV9Kvyz45CHVhDZ6kUgjTJPzLpU9P":
+                            { config: "AWar1Y1GALnT3TjL3d4K1qjH2ZLB5KiqrSw3gmaR9EGA",
+                              symbol: "XAUt0", decimals: 6 }
+                        } },
       devnet: { sol: "97FsuYAZrY1HxSokdSz1GnPVsLWNdpVgdczt3bLqXv8J", usdc: "", rwa: {} }
     },
 
