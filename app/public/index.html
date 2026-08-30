@@ -116,7 +116,9 @@ h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:te
 /* ranked top-10 lists, side by side */
 .ranked{display:grid;grid-template-columns:1fr 1fr;gap:0 56px;align-items:start}
 @media (max-width:960px){.ranked{grid-template-columns:1fr}}
-.ranks{list-style:none;margin:0;padding:0}
+.ranks{list-style:none;margin:0;padding:0;display:grid;
+  grid-template-rows:repeat(5,auto);grid-auto-flow:column;gap:2px 28px}
+.ranks .none{grid-row:1/-1}
 .rrow{display:flex;align-items:center;gap:14px;padding:9px 6px;border-radius:8px;
   transition:background .15s}
 .rrow:hover{background:var(--panel)}
@@ -370,8 +372,9 @@ footer{border-top:1px solid var(--line);margin-top:90px;padding:26px 0 60px;
   function rankRow(href, name, thumb, stat) {
     return '<li><a class="rrow" data-name="' + esc(name) + '" href="' + esc(href) + '">' +
       '<span class="rk"></span>' + thumb +
-      '<span class="who"><b>' + esc(name) + "</b><span>" + MINI +
-      '<i class="st" style="font-style:normal">' + esc(stat) + "</i></span></span></a></li>";
+      '<span class="who"><b>' + esc(name) + "</b>" +
+      (stat ? "<span>" + MINI + '<i class="st" style="font-style:normal">' +
+        esc(stat) + "</i></span>" : "") + "</span></a></li>";
   }
   function number(ol) {
     [].forEach.call(ol.querySelectorAll(".rk"), function (el, i) {
@@ -386,8 +389,7 @@ footer{border-top:1px solid var(--line);margin-top:90px;padding:26px 0 60px;
     if (!live) {
       var tps = templates.slice().sort(function (a, b) { return b.traits - a.traits; });
       ol.innerHTML = tps.map(function (x) {
-        return rankRow("/app", x.name, '<span class="th"><canvas></canvas></span>',
-          x.traits + " traits · " + x.categories + " categories");
+        return rankRow("/app", x.name, '<span class="th"><canvas></canvas></span>', null);
       }).join("");
       number(ol);
       tps.forEach(function (x, i) {
