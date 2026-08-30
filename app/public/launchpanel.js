@@ -254,6 +254,19 @@
       });
 
       busy = false;
+
+      // Record the launch for the homepage listing. Fire-and-forget: the
+      // collection is already on chain, and a launch must never look failed
+      // because a listing endpoint was down.
+      fetch("/api/collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candyMachine: res.candyMachine, collection: res.collection,
+          name: cfg.name, cluster: res.cluster
+        })
+      }).catch(function () {});
+
       done(cfg, res, up);
     } catch (e) {
       busy = false;

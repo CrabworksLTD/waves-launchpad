@@ -18,12 +18,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/theme.css">
 <style>
-/* Homepage: the collections, and a bar to get anywhere else.
- *
- * Three-zone top bar — mark and search left, links centred, wallet right. The
- * centre stays optically centred rather than being squeezed by whatever the
- * two ends happen to weigh, which is why the outer zones are equal-width flex
- * rather than auto. */
+/* Homepage: two ranked lists — collections and tokens — and the shared shell.
+   Page-level chrome (the bar, wallet, search) lives in shell.js, not here. */
 
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%}
@@ -34,55 +30,25 @@ body{background:var(--void);color:var(--ink);
 .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
 a{color:inherit;text-decoration:none}
 
-/* ---- top bar ---- */
-.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;
-  padding:0 20px;height:60px;background:var(--void);
-  border-bottom:1px solid var(--line)}
-.top .end{flex:1 1 0;display:flex;align-items:center;gap:12px;min-width:0}
-.top .end.r{justify-content:flex-end}
-.mark{width:30px;height:30px;border-radius:9px;background:var(--grad);flex:none;
-  display:grid;place-items:center;font-family:"Space Grotesk";font-weight:700;
-  font-size:14px;color:var(--accent-ink)}
-.iconbtn{width:34px;height:34px;border-radius:9px;border:0;background:transparent;
-  color:var(--faint);display:grid;place-items:center;cursor:pointer;flex:none;
+main{max-width:1240px;margin:0 auto;padding:28px 20px 90px}
+
+/* ---- category tabs ---- */
+.tabs{display:flex;align-items:center;gap:6px;margin-bottom:22px}
+.tab{font:600 15px "Space Grotesk",sans-serif;letter-spacing:-.01em;cursor:pointer;
+  padding:9px 16px;border-radius:10px;border:0;background:transparent;color:var(--faint);
   transition:color .18s,background .18s}
-.iconbtn:hover{color:var(--ink);background:var(--panel2)}
-.iconbtn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.9;
-  stroke-linecap:round;stroke-linejoin:round}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink);background:var(--panel2)}
+.tabs .count{margin-left:auto;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);border:1px solid var(--line);border-radius:99px;
+  padding:5px 11px;white-space:nowrap}
 
-nav.mid{display:flex;align-items:center;gap:4px;flex:none}
-nav.mid a{padding:8px 14px;border-radius:8px;font-size:14px;color:var(--dim);
-  transition:color .18s,background .18s}
-nav.mid a:hover{color:var(--ink);background:var(--panel2)}
-nav.mid a.on{color:var(--ink)}
-
-#connect{font:600 13.5px "Space Grotesk",sans-serif;cursor:pointer;
-  padding:9px 16px;border-radius:999px;border:1px solid var(--line2);
-  background:var(--raise);color:var(--ink);white-space:nowrap;
-  transition:background .2s,border-color .2s}
-#connect:hover{background:var(--panel2);border-color:var(--faint)}
-#connect.linked{background:transparent;color:var(--dim);font-family:"IBM Plex Mono",monospace;
-  font-weight:400;font-size:12.5px}
-
-/* search opens in place — a whole page for it is more than this needs */
-.searchwrap{display:none;flex:1;min-width:0}
-.searchwrap.open{display:block}
-.searchwrap input{width:100%;max-width:320px;background:var(--bg);color:var(--ink);
-  border:1px solid var(--line2);border-radius:8px;padding:8px 11px;font:inherit;font-size:13.5px}
-.searchwrap input:focus{outline:none;border-color:var(--faint)}
-
-/* ---- collections ---- */
-main{max-width:1240px;margin:0 auto;padding:32px 20px 90px}
-.colhead{display:flex;align-items:baseline;justify-content:space-between;
-  gap:20px;margin-bottom:20px}
-h1{font-family:"Space Grotesk";font-size:21px;font-weight:600;letter-spacing:-.015em;margin:0}
-.pill{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
-  border:1px solid var(--line);border-radius:99px;padding:5px 11px;white-space:nowrap}
+/* ---- cards ---- */
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:16px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
   overflow:hidden;display:block;transition:border-color .2s,transform .2s}
 .card:hover{border-color:var(--line2);transform:translateY(-2px)}
-.card .thumb{aspect-ratio:1;background:var(--bg);display:block}
+.card .thumb{aspect-ratio:1;background:var(--bg);display:block;position:relative}
 .card .thumb canvas{width:100%;height:100%;display:block;image-rendering:pixelated;
   transition:opacity .3s ease}
 .card .thumb canvas.swap{opacity:.15}
@@ -91,200 +57,247 @@ h1{font-family:"Space Grotesk";font-size:21px;font-weight:600;letter-spacing:-.0
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card .meta span{display:block;margin-top:3px;font-size:12px;color:var(--faint)}
 .card.hide{display:none}
-.none{color:var(--faint);font-size:13.5px;padding:40px 0}
 
-@media (max-width:860px){
-  nav.mid{display:none}
-  .top{gap:10px}
-}
+/* token tiles: same card, typographic thumb — a token has no art of its own,
+   and inventing some would make fake art the face of real money */
+.card .tok{position:absolute;inset:0;display:grid;place-items:center}
+.card .tok b{font-family:"Space Grotesk";font-size:26px;font-weight:700;
+  letter-spacing:-.02em;color:var(--dim)}
+.card .tok i{position:absolute;left:14px;bottom:12px;font-style:normal;
+  font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+
+/* ---- empty state: honest, not decorated ---- */
+.none{grid-column:1/-1;border:1px dashed var(--line2);border-radius:14px;
+  padding:48px 24px;text-align:center}
+.none p{margin:0 0 6px;font-family:"Space Grotesk";font-size:16px;font-weight:600}
+.none span{color:var(--faint);font-size:13px}
+.none a{display:inline-block;margin-top:18px;padding:11px 22px;border-radius:999px;
+  font:600 13.5px "Space Grotesk",sans-serif;background:var(--raise);
+  border:1px solid var(--line2);transition:background .2s,border-color .2s}
+.none a:hover{background:var(--panel2);border-color:var(--faint)}
+.nomatch{grid-column:1/-1;color:var(--faint);font-size:13.5px;padding:32px 0;text-align:center}
+
+footer{border-top:1px solid var(--line);margin-top:90px;padding:26px 0 60px;
+  display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;
+  font-size:12.5px;color:var(--faint)}
 </style>
 </head>
 <body>
 
-<header class="top">
-  <div class="end">
-    <a class="mark" href="/" aria-label="Sunpad home">S</a>
-    <button class="iconbtn" id="searchbtn" aria-label="Search collections" title="Search">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
-    </button>
-    <div class="searchwrap" id="searchwrap">
-      <input id="q" type="search" placeholder="Search collections" autocomplete="off">
-    </div>
-  </div>
-
-  <nav class="mid">
-    <a class="on" href="/">Collections</a>
-    <a href="/app">Launch</a>
-    <a href="#" id="tools">Tools</a>
-    <a href="#" id="docs">Docs</a>
-    <a href="#" id="faq">FAQ</a>
-  </nav>
-
-  <div class="end r">
-    <button id="connect">Connect wallet</button>
-  </div>
-</header>
-
 <main>
-  <div class="colhead">
-    <h1 class="disp">Collections</h1>
-    <span class="pill mono" id="colcount">—</span>
+  <div class="tabs" role="tablist" aria-label="Categories">
+    <button class="tab" id="tab-collections" role="tab" aria-selected="true"
+            aria-controls="cards">Top Collections</button>
+    <button class="tab" id="tab-tokens" role="tab" aria-selected="false"
+            aria-controls="cards">Top Tokens</button>
+    <span class="count mono" id="count">—</span>
   </div>
-  <div class="cards" id="cards"></div>
-  <p class="none" id="none" hidden>Nothing matches that.</p>
+
+  <div class="cards" id="cards" role="tabpanel"></div>
+
+  <footer>
+    <span>Built on Metaplex Core and Meteora. We take no cut of your mint.</span>
+    <span><a href="/app">Editor</a></span>
+  </footer>
 </main>
 
 <script src="/brand.js"></script>
+<script src="/ui.js"></script>
 <script src="/wallet.js"></script>
+<script src="/shell.js"></script>
 <script>
-/* Composite one random token from a template — real generated art on every
-   card rather than a placeholder. Cards reroll one at a time on a slow
-   stagger; together strobes, and fast enough to consciously notice reads as a
-   broken carousel rather than as work. */
-function loadTemplate(file) {
-  return fetch("/templates/" + file).then(function (r) { return r.json(); })
-    .then(function (doc) {
-      return Promise.all(doc.project.categories.map(function (c) {
-        return Promise.all(c.traits.map(function (t) {
-          return new Promise(function (res) {
-            var im = new Image();
-            im.onload = function () { res({ img: im, w: t.weight || 1 }); };
-            im.onerror = function () { res(null); };
-            im.src = t.image;
-          });
-        })).then(function (l) { return l.filter(Boolean); });
-      })).then(function (loaded) {
-        return { cats: loaded.filter(function (c) { return c.length; }),
-                 cell: (doc.project.canvas && doc.project.canvas.pixel) || 24 };
+(function () {
+  "use strict";
+  var H = UI.html, raw = UI.raw, render = UI.render, on = UI.on,
+      shortAddr = UI.shortAddr;
+
+  Shell.mount({ active: "collections", search: true });
+
+  var cards = document.getElementById("cards");
+  var count = document.getElementById("count");
+  var state = {
+    tab: location.hash === "#tokens" ? "tokens" : "collections",
+    query: "",
+    collections: null,   // null = loading, [] = confirmed empty
+    tokens: null,
+    templates: null,
+    rerolls: []          // live-generated template canvases
+  };
+
+  /* ---------------- template art (collections empty-state) ---------------- */
+
+  function loadTemplate(file) {
+    return fetch("/templates/" + file).then(function (r) { return r.json(); })
+      .then(function (doc) {
+        return Promise.all(doc.project.categories.map(function (c) {
+          return Promise.all(c.traits.map(function (t) {
+            return new Promise(function (res) {
+              var im = new Image();
+              im.onload = function () { res({ img: im, w: t.weight || 1 }); };
+              im.onerror = function () { res(null); };
+              im.src = t.image;
+            });
+          })).then(function (l) { return l.filter(Boolean); });
+        })).then(function (loaded) {
+          return { cats: loaded.filter(function (c) { return c.length; }),
+                   cell: (doc.project.canvas && doc.project.canvas.pixel) || 24 };
+        });
       });
-    });
-}
-function pickFrom(list) {
-  var total = 0, i;
-  for (i = 0; i < list.length; i++) total += list[i].w;
-  var r = Math.random() * total;
-  for (i = 0; i < list.length; i++) { r -= list[i].w; if (r <= 0) return list[i].img; }
-  return list[list.length - 1].img;
-}
-function paint(cv, t) {
-  cv.width = cv.height = t.cell;
-  var g = cv.getContext("2d");
-  g.imageSmoothingEnabled = false;
-  g.clearRect(0, 0, t.cell, t.cell);
-  for (var i = 0; i < t.cats.length; i++) g.drawImage(pickFrom(t.cats[i]), 0, 0, t.cell, t.cell);
-}
-function esc(s) {
-  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
-    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-  });
-}
+  }
+  function pickFrom(list) {
+    var total = 0, i;
+    for (i = 0; i < list.length; i++) total += list[i].w;
+    var r = Math.random() * total;
+    for (i = 0; i < list.length; i++) { r -= list[i].w; if (r <= 0) return list[i].img; }
+    return list[list.length - 1].img;
+  }
+  function paint(cv, t) {
+    cv.width = cv.height = t.cell;
+    var g = cv.getContext("2d");
+    g.imageSmoothingEnabled = false;
+    g.clearRect(0, 0, t.cell, t.cell);
+    for (var i = 0; i < t.cats.length; i++) g.drawImage(pickFrom(t.cats[i]), 0, 0, t.cell, t.cell);
+  }
 
-/* ---- wallet ---- */
-(function () {
-  var btn = document.getElementById("connect");
-  function paintBtn() {
-    var w = window.Wallet.current();
-    if (w) {
-      btn.className = "linked";
-      btn.textContent = w.publicKey.slice(0, 4) + "…" + w.publicKey.slice(-4);
-      btn.title = w.name + " — click to disconnect";
+  // One reroll loop for the life of the page. Cards register into
+  // state.rerolls when drawn; hidden or removed canvases are skipped, so tab
+  // switches and searches never leave the timer painting into nothing.
+  setInterval(function () {
+    var live = state.rerolls.filter(function (r) {
+      return r.cv.isConnected && !r.cv.closest(".card").classList.contains("hide");
+    });
+    if (!live.length) return;
+    var pick = live[(Math.random() * live.length) | 0];
+    pick.cv.classList.add("swap");
+    setTimeout(function () {
+      if (pick.cv.isConnected) { paint(pick.cv, pick.tp); pick.cv.classList.remove("swap"); }
+    }, 300);
+  }, 1400);
+
+  /* ---------------- data ---------------- */
+
+  function getJson(url, key) {
+    return fetch(url).then(function (r) { return r.json(); })
+      .then(function (j) { return (j && j[key]) || []; })
+      .catch(function () { return []; });
+  }
+
+  Promise.all([
+    getJson("/api/collections", "collections"),
+    getJson("/api/tokens", "tokens"),
+    getJson("/templates/index.json", "templates")
+  ]).then(function (r) {
+    state.collections = r[0];
+    state.tokens = r[1];
+    state.templates = r[2];
+    draw();
+  });
+
+  /* ---------------- render ---------------- */
+
+  function collectionCard(c) {
+    return H`<a class="card" data-name="${c.name}" href="/mint/${c.candyMachine}">
+      <div class="thumb"></div>
+      <div class="meta"><b>${c.name}</b>
+      <span class="mono">${shortAddr(c.candyMachine)}</span></div></a>`;
+  }
+
+  function templateCard(t) {
+    return H`<a class="card" data-name="${t.name}" data-tpl="${t.file}" href="/app">
+      <div class="thumb"><canvas></canvas></div>
+      <div class="meta"><b>${t.name}</b>
+      <span>${t.traits} traits · ${t.categories} categories</span></div></a>`;
+  }
+
+  function tokenCard(t) {
+    // Jupiter link: real and useful today. A /token/<mint> page can replace
+    // the href later without touching the card.
+    return H`<a class="card" data-name="${t.name + " " + t.symbol}"
+        href="https://jup.ag/swap/SOL-${t.mint}" target="_blank" rel="noopener">
+      <div class="thumb"><div class="tok"><b>${"$" + (t.symbol || "?")}</b>
+        <i>token</i></div></div>
+      <div class="meta"><b>${t.name}</b>
+      <span class="mono">${shortAddr(t.mint)}</span></div></a>`;
+  }
+
+  function emptyTokens() {
+    return H`<div class="none">
+      <p class="disp">No tokens launched yet</p>
+      <span>The first token launched here gets this whole page to itself.</span><br>
+      <a href="/app">Launch the first →</a></div>`;
+  }
+
+  function draw() {
+    var isTok = state.tab === "tokens";
+    document.getElementById("tab-collections").setAttribute("aria-selected", String(!isTok));
+    document.getElementById("tab-tokens").setAttribute("aria-selected", String(isTok));
+    state.rerolls = [];
+
+    if (isTok) {
+      if (!state.tokens || !state.tokens.length) {
+        count.textContent = "0 tokens";
+        render(cards, emptyTokens());
+      } else {
+        count.textContent = state.tokens.length + (state.tokens.length === 1 ? " token" : " tokens");
+        render(cards, H`${state.tokens.map(tokenCard)}`);
+      }
     } else {
-      btn.className = "";
-      btn.textContent = "Connect wallet";
-      btn.title = "";
-    }
-  }
-  btn.onclick = async function () {
-    if (window.Wallet.current()) { await window.Wallet.disconnect(); return paintBtn(); }
-    var found = window.Wallet.list();
-    if (!found.length) { btn.textContent = "No wallet found"; return; }
-    try { await window.Wallet.connect(found[0].id); } catch (e) {}
-    paintBtn();
-  };
-  window.Wallet.on("change", paintBtn);
-  // wallets can register after load, so recheck briefly
-  paintBtn();
-  var n = 0, t = setInterval(function () { if (++n > 6) clearInterval(t); }, 400);
-})();
-
-/* ---- search ---- */
-(function () {
-  var wrap = document.getElementById("searchwrap");
-  var input = document.getElementById("q");
-  document.getElementById("searchbtn").onclick = function () {
-    wrap.classList.toggle("open");
-    if (wrap.classList.contains("open")) input.focus();
-    else { input.value = ""; filter(""); }
-  };
-  input.addEventListener("input", function () { filter(input.value); });
-  input.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") { input.value = ""; filter(""); wrap.classList.remove("open"); }
-  });
-  function filter(q) {
-    q = q.trim().toLowerCase();
-    var cards = document.querySelectorAll("#cards .card"), shown = 0;
-    cards.forEach(function (c) {
-      var hit = !q || (c.dataset.name || "").toLowerCase().indexOf(q) >= 0;
-      c.classList.toggle("hide", !hit);
-      if (hit) shown++;
-    });
-    document.getElementById("none").hidden = shown > 0 || !cards.length;
-  }
-})();
-
-/* ---- collections: real launches when there are any, templates when not ---- */
-(function () {
-  var cards = document.getElementById("cards"), count = document.getElementById("colcount");
-
-  fetch("/api/collections").then(function (r) { return r.json(); })
-    .then(function (j) { return (j && j.collections) || []; })
-    .catch(function () { return []; })
-    .then(function (list) { list.length ? live(list) : starters(); });
-
-  function live(list) {
-    count.textContent = list.length + (list.length === 1 ? " collection" : " collections");
-    cards.innerHTML = list.map(function (c) {
-      return '<a class="card" data-name="' + esc(c.name) + '" href="/mint/' + esc(c.candyMachine) + '">' +
-        '<div class="thumb"></div><div class="meta"><b>' + esc(c.name) + "</b>" +
-        '<span class="mono">' + esc(c.candyMachine.slice(0, 4)) + "…" +
-        esc(c.candyMachine.slice(-4)) + "</span></div></a>";
-    }).join("");
-  }
-
-  function starters() {
-    count.textContent = "starting points";
-    fetch("/templates/index.json").then(function (r) { return r.json(); })
-      .then(function (j) {
-        var t = j.templates || [];
-        cards.innerHTML = t.map(function (x) {
-          return '<a class="card" data-name="' + esc(x.name) + '" href="/app">' +
-            '<div class="thumb"><canvas></canvas></div>' +
-            '<div class="meta"><b>' + esc(x.name) + "</b><span>" +
-            esc(x.traits) + " traits · " + esc(x.categories) + " categories</span></div></a>";
-        }).join("");
-
-        var loaded = [];
+      var live = state.collections && state.collections.length;
+      if (live) {
+        count.textContent = state.collections.length +
+          (state.collections.length === 1 ? " collection" : " collections");
+        render(cards, H`${state.collections.map(collectionCard)}`);
+      } else {
+        // Ranked list with nothing to rank: show the starting points rather
+        // than an empty grid — the most damaging thing a launchpad homepage
+        // can display is nothing.
+        count.textContent = "starting points";
+        var t = state.templates || [];
+        render(cards, H`${t.map(templateCard)}`);
         t.forEach(function (x, i) {
           var cv = cards.children[i] && cards.children[i].querySelector("canvas");
           if (!cv) return;
           loadTemplate(x.file).then(function (tp) {
             paint(cv, tp);
-            loaded.push({ cv: cv, tp: tp });
+            state.rerolls.push({ cv: cv, tp: tp });
           }).catch(function () {});
         });
-
-        setInterval(function () {
-          if (!loaded.length) return;
-          var pick = loaded[(Math.random() * loaded.length) | 0];
-          if (pick.cv.closest(".card").classList.contains("hide")) return;
-          pick.cv.classList.add("swap");
-          setTimeout(function () {
-            paint(pick.cv, pick.tp);
-            pick.cv.classList.remove("swap");
-          }, 300);
-        }, 1400);
-      }).catch(function () { cards.innerHTML = ""; });
+      }
+    }
+    applyFilter();
   }
+
+  /* ---------------- tabs + search ---------------- */
+
+  function setTab(tab) {
+    if (state.tab === tab) return;
+    state.tab = tab;
+    // deep-linkable without polluting history on every switch
+    history.replaceState(null, "", tab === "tokens" ? "#tokens" : location.pathname);
+    draw();
+  }
+  document.getElementById("tab-collections").addEventListener("click", function () { setTab("collections"); });
+  document.getElementById("tab-tokens").addEventListener("click", function () { setTab("tokens"); });
+
+  function applyFilter() {
+    var q = state.query.trim().toLowerCase();
+    var all = cards.querySelectorAll(".card");
+    var shown = 0;
+    all.forEach(function (c) {
+      var hit = !q || (c.dataset.name || "").toLowerCase().indexOf(q) >= 0;
+      c.classList.toggle("hide", !hit);
+      if (hit) shown++;
+    });
+    var prev = cards.querySelector(".nomatch");
+    if (prev) prev.remove();
+    if (all.length && !shown) {
+      cards.insertAdjacentHTML("beforeend", '<p class="nomatch">Nothing matches that.</p>');
+    }
+  }
+  document.addEventListener("shell:search", function (e) {
+    state.query = e.detail.query || "";
+    applyFilter();
+  });
 })();
 </script>
 </body>

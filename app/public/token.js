@@ -152,6 +152,17 @@
     var sig = await send(c, { transaction: tx, signers: [baseMint] });
     progress({ step: "pool", state: "done", mint: String(baseMint.publicKey) });
 
+    // Record for the homepage token listing — fire-and-forget, same contract
+    // as the collections listing: the pool exists regardless.
+    fetch("/api/tokens", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mint: String(baseMint.publicKey), name: opts.name, symbol: opts.symbol,
+        cluster: window.Launch ? window.Launch.cluster() : "mainnet-beta"
+      })
+    }).catch(function () {});
+
     return {
       mint: String(baseMint.publicKey),
       signature: sig,

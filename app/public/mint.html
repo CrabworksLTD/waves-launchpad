@@ -21,7 +21,7 @@ body{background:#07060b;color:var(--ink);
 .a1{width:44vw;height:44vw;right:4%;top:-12%;background:#9945FF;opacity:.3}
 .a2{width:36vw;height:36vw;left:-6%;bottom:-8%;background:#14F195;opacity:.16}
 
-.wrap{position:relative;z-index:2;max-width:520px;margin:0 auto;padding:64px 24px 80px}
+.wrap{position:relative;z-index:2;max-width:520px;margin:0 auto;padding:40px 24px 80px}
 .card{background:rgba(255,255,255,.04);backdrop-filter:blur(22px) saturate(150%);
   -webkit-backdrop-filter:blur(22px) saturate(150%);
   border:1px solid rgba(255,255,255,.09);border-radius:20px;padding:26px;
@@ -30,6 +30,10 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
 .sub{margin:0 0 22px;color:var(--dim);font-size:13.5px}
 .art{width:100%;aspect-ratio:1;border-radius:14px;background:#0c0a14;
   border:1px solid rgba(255,255,255,.06);display:block;image-rendering:pixelated;object-fit:cover}
+/* `hidden` works through a UA display:none, and the author display:block above
+   silently wins over it — so the hidden img rendered as a second empty frame.
+   Author rule vs author rule, attribute wins on specificity. */
+.art[hidden]{display:none}
 .artwrap{position:relative;margin-bottom:20px}
 .row{display:flex;justify-content:space-between;padding:9px 0;font-size:13.5px;
   border-bottom:1px solid rgba(255,255,255,.07)}
@@ -70,7 +74,10 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
 </div>
 
 <script src="/brand.js"></script>
+<script src="/ui.js"></script>
 <script src="/wallet.js"></script>
+<script src="/shell.js"></script>
+<script>Shell.mount({ search: false });</script>
 <script src="/launch.js"></script>
 <script>
 (function () {
