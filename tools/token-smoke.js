@@ -67,7 +67,7 @@ const RPC = process.env.SOLANA_RPC || "http://127.0.0.1:8899";
   }
 
   /* ---- 1. the partner config: this IS the launchpad ---- */
-  step("1/6", "create partner config (SOL quote, 40/40/20)");
+  step("1/6", "create partner config (SOL quote, 60/20/20)");
   const curve = buildCurveWithMarketCap({
     initialMarketCap: 28,          // ~$5k at $180 SOL — per-quote units, not dollars
     migrationMarketCap: 385,       // ~$69k, near pump.fun's graduation
@@ -87,7 +87,7 @@ const RPC = process.env.SOLANA_RPC || "http://127.0.0.1:8899";
       },
       dynamicFeeEnabled: true,
       collectFeeMode: CollectFeeMode.QuoteToken,
-      creatorTradingFeePercentage: 50,
+      creatorTradingFeePercentage: 25,   // 60% platform / 20% creator of the total fee
       poolCreationFee: 0,
       enableFirstSwapWithMinFee: false
     },
@@ -169,12 +169,16 @@ const RPC = process.env.SOLANA_RPC || "http://127.0.0.1:8899";
     console.error("  FAIL — fees did not accrue on both sides");
     process.exit(1);
   }
-  // 50/50 of the LP share means the two must be equal
-  if (partnerQuote.toString() !== creatorQuote.toString()) {
-    console.error("  FAIL — split is not 50/50: " + partnerQuote + " vs " + creatorQuote);
+  // creator gets 25% of the LP share, partner 75% — partner must be 3x the
+  // creator to the lamport (integer division can leave a 1-2 lamport rounding
+  // remainder on the partner side, tolerated)
+  const p = BigInt(partnerQuote.toString()), c = BigInt(creatorQuote.toString());
+  const drift = p > c * 3n ? p - c * 3n : c * 3n - p;
+  if (drift > 2n) {
+    console.error("  FAIL — split is not 75/25: " + partnerQuote + " vs " + creatorQuote);
     process.exit(1);
   }
-  ok("split verified 50/50");
+  ok("split verified 75/25 of LP share (60/20 of total fee)");
 
   /* ---- 5. creator fees -> a vault address (the rewards hook) ---- */
   step("5/6", "claim creator fees straight to a vault");

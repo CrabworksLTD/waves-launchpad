@@ -10,10 +10,10 @@
  * and tokens already launched keep the old terms. Read the numbers below
  * before running this against mainnet.
  *
- * Fee split, 50/50 as decided:
+ * Fee split, 60 platform / 20 creator as decided 2026-08-30:
  *   20%  Meteora, fixed by the protocol
  *   80%  LP fee, of which creatorTradingFeePercentage goes to the creator
- *        -> 50 means 40% platform / 40% creator of the total trading fee
+ *        -> 25 means 60% platform / 20% creator of the total trading fee
  *
  * The wallet that signs this owns the config and is the address that claims the
  * platform's share forever. Use a key you are willing to still control in two
@@ -57,7 +57,7 @@ const DRY = process.argv.includes("--dry-run");
 const TERMS = {
   totalTokenSupply: 1_000_000_000,   // 1B, the memecoin convention
   baseFeeBps: 100,                   // 1% trading fee, industry standard
-  creatorTradingFeePercentage: 50,   // 50/50 of the 80% LP share
+  creatorTradingFeePercentage: 25,   // 25% of the 80% LP share -> 20% of the total fee
   poolCreationFee: 0                 // free to launch; storage margin is our revenue
 };
 

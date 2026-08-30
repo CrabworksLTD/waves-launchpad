@@ -714,7 +714,7 @@
 
       <div class="fold2" id="tk-econ">
         <div class="row"><span class="k">Total supply</span><b>1,000,000,000 · fixed</b></div>
-        <div class="row"><span class="k">Trading fee</span><b id="tk-fee">1% — 40% you / 40% platform / 20% Meteora</b></div>
+        <div class="row"><span class="k">Trading fee</span><b id="tk-fee">1% — 20% you / 60% platform / 20% Meteora</b></div>
         <div class="row"><span class="k">Graduates at</span><b id="tk-grad">reading the curve…</b></div>
         <div class="row" style="border-bottom:0"><span class="k">Migrates to</span><b>Meteora DAMM v2, LP locked</b></div>
         <p class="note" style="margin-top:6px">Locked in the launchpad's config — identical
@@ -741,7 +741,7 @@
       <label>Creator fee wallet</label>
       <input id="tk-feewallet" value="${flow.feeWallet || ""}"
         placeholder="optional — defaults to your wallet">
-      <p class="note">Where your 40% of trading fees claims to. A treasury, a
+      <p class="note">Where your 20% of trading fees claims to. A treasury, a
       multisig, or the reward vault.</p>
 
       <label class="tick"><input type="checkbox" disabled>
@@ -904,7 +904,7 @@
       ${flow.feeWallet ? H`<div class="row"><span class="k">Fees claim to</span><b>${shortAddr(flow.feeWallet)}</b></div>` : ""}
       <div class="row"><span class="k">Metadata storage</span><b id="lp-fee">quoting…</b></div>
       <div class="row"><span class="k">Wallet</span><b>${w ? w.name + " · " + shortAddr(w.publicKey) : "not connected"}</b></div>
-      <p class="note">Fee split on every trade: 40% you, 40% platform, 20% Meteora.
+      <p class="note">Fee split on every trade: 20% you, 60% platform, 20% Meteora.
       Your share claims straight to any address — including a reward vault.</p>
       <div id="lp-err"></div>
       <div class="acts"><button id="lp-back">Back</button>
