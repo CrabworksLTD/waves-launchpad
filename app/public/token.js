@@ -65,7 +65,8 @@
   }
 
   var CLUSTERS = {
-    "mainnet-beta": "https://api.mainnet-beta.solana.com",
+    // NOT api.mainnet-beta.solana.com — it 403s browser-origin requests
+    "mainnet-beta": "https://solana-rpc.publicnode.com",
     devnet: "https://api.devnet.solana.com",
     localnet: "http://127.0.0.1:8899"
   };

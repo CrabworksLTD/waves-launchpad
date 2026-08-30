@@ -16,7 +16,9 @@
    */
 
   var CLUSTERS = {
-    "mainnet-beta": { rpc: "https://api.mainnet-beta.solana.com", label: "Mainnet", explorer: "" },
+    // NOT api.mainnet-beta.solana.com — Solana's public endpoint 403s
+    // browser-origin requests; publicnode serves them
+    "mainnet-beta": { rpc: "https://solana-rpc.publicnode.com", label: "Mainnet", explorer: "" },
     devnet:         { rpc: "https://api.devnet.solana.com",       label: "Devnet",  explorer: "?cluster=devnet" },
     // the local mainnet-clone validator (see memory: sunpad-chain-testing)
     localnet:       { rpc: "http://127.0.0.1:8899",               label: "Localnet", explorer: "?cluster=custom&customUrl=http%3A%2F%2F127.0.0.1%3A8899" }
