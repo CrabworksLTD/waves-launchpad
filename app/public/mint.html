@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:#07060b;color:var(--ink);
+  font:400 15px/1.6 Inter,ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.disp{font-family:"Space Grotesk",ui-sans-serif,sans-serif}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+
+.aur{position:fixed;inset:-20%;z-index:0;pointer-events:none;filter:blur(100px);opacity:.7}
+.aur i{position:absolute;display:block;border-radius:50%;mix-blend-mode:screen}
+.a1{width:44vw;height:44vw;right:4%;top:-12%;background:#9945FF;opacity:.3}
+.a2{width:36vw;height:36vw;left:-6%;bottom:-8%;background:#14F195;opacity:.16}
+
+.wrap{position:relative;z-index:2;max-width:520px;margin:0 auto;padding:64px 24px 80px}
+.card{background:rgba(255,255,255,.04);backdrop-filter:blur(22px) saturate(150%);
+  -webkit-backdrop-filter:blur(22px) saturate(150%);
+  border:1px solid rgba(255,255,255,.09);border-radius:20px;padding:26px;
+  box-shadow:0 30px 80px -40px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.07)}
+h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.02em;margin:0 0 4px}
+.sub{margin:0 0 22px;color:var(--dim);font-size:13.5px}
+.art{width:100%;aspect-ratio:1;border-radius:14px;background:#0c0a14;
+  border:1px solid rgba(255,255,255,.06);display:block;image-rendering:pixelated;object-fit:cover}
+.artwrap{position:relative;margin-bottom:20px}
+.row{display:flex;justify-content:space-between;padding:9px 0;font-size:13.5px;
+  border-bottom:1px solid rgba(255,255,255,.07)}
+.row .k{color:var(--dim)}
+.bar{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin:16px 0 4px}
+.bar i{display:block;height:100%;background:var(--grad);width:0;transition:width .4s ease}
+.btn{display:block;width:100%;margin-top:20px;padding:15px;border-radius:999px;border:1px solid transparent;
+  font:600 15px "Space Grotesk",sans-serif;cursor:pointer;background:var(--grad);color:var(--accent-ink)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.quiet{background:transparent;border-color:rgba(255,255,255,.14);color:var(--ink)}
+.msg{margin-top:14px;font-size:12.5px;padding:11px 12px;border-radius:8px;display:none}
+.msg.err{display:block;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ffb3b3}
+.msg.ok{display:block;background:rgba(20,241,149,.08);border:1px solid rgba(20,241,149,.3);color:#8ff5cd}
+.msg a{color:inherit}
+.foot{text-align:center;margin-top:18px;font-size:11.5px;color:var(--faint)}
+</style>
+</head>
+<body>
+
+<div class="aur" aria-hidden="true"><i class="a1"></i><i class="a2"></i></div>
+
+<div class="wrap">
+  <div class="card">
+    <div class="artwrap"><img class="art" id="art" alt="" hidden><div class="art" id="artph"></div></div>
+    <h1 class="disp" id="name">Loading…</h1>
+    <p class="sub mono" id="addr">—</p>
+
+    <div class="row"><span class="k">Price</span><b id="price">—</b></div>
+    <div class="row"><span class="k">Minted</span><b id="minted">—</b></div>
+
+    <div class="bar"><i id="bar"></i></div>
+    <p class="foot mono" id="pct">—</p>
+
+    <button class="btn" id="go" disabled>Loading…</button>
+    <div class="msg" id="msg"></div>
+  </div>
+  <p class="foot">Runs on Metaplex Core. Nothing custom in the middle.</p>
+</div>
+
+<script src="/brand.js"></script>
+<script src="/wallet.js"></script>
+<script src="/launch.js"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+
+  // /mint/<address> in production, ?cm=<address> when opened as a file or on
+  // the dev server, which has no rewrite rules.
+  function machineAddress() {
+    var m = location.pathname.match(/\/mint\/([1-9A-HJ-NP-Za-km-z]{32,44})/);
+    if (m) return m[1];
+    return new URLSearchParams(location.search).get("cm") || "";
+  }
+
+  var CM = machineAddress();
+  var state = null;
+
+  function say(kind, html) {
+    var m = $("msg");
+    m.className = "msg " + kind;
+    m.innerHTML = html;
+  }
+
+  async function load() {
+    if (!CM) {
+      $("name").textContent = "No collection";
+      say("err", "This link is missing a candy machine address.");
+      return;
+    }
+    $("addr").textContent = CM.slice(0, 6) + "…" + CM.slice(-6);
+    try {
+      state = await window.Launch.readMachine(CM);
+    } catch (e) {
+      $("name").textContent = "Not found";
+      say("err", "Could not read that candy machine on " + window.Launch.cluster() + ". " +
+                 "It may be on a different network.");
+      return;
+    }
+
+    // Item 1's metadata gives a name and a picture without needing an indexer.
+    // Read-only, so it is fetched before any wallet is connected.
+    try {
+      var meta = await fetch("https://arweave.net/" + state.collection).then(function () { return null; });
+    } catch (e) { /* best effort only */ }
+
+    $("name").textContent = "Mint";
+    $("price").textContent = state.priceSol == null ? "free" : state.priceSol + " SOL";
+    render();
+
+    var w = window.Wallet.current();
+    $("go").disabled = false;
+    $("go").textContent = w ? "Mint" : "Connect wallet";
+    $("go").onclick = w ? mint : connect;
+  }
+
+  function render() {
+    var pct = state.available ? (state.redeemed / state.available) * 100 : 0;
+    $("minted").textContent = state.redeemed + " / " + state.available;
+    $("bar").style.width = pct.toFixed(1) + "%";
+    $("pct").textContent = pct.toFixed(1) + "% minted";
+    if (state.redeemed >= state.available) {
+      $("go").disabled = true;
+      $("go").textContent = "Sold out";
+    }
+  }
+
+  async function connect() {
+    var found = window.Wallet.list();
+    if (!found.length) return say("err", "No Solana wallet found. Install Phantom or Solflare.");
+    try {
+      await window.Wallet.connect(found[0].id);
+      load();
+    } catch (e) { say("err", e.message); }
+  }
+
+  async function mint() {
+    $("go").disabled = true;
+    $("go").textContent = "Minting…";
+    say("", "");
+    try {
+      var r = await window.Launch.mintOne(CM);
+      var url = "https://explorer.solana.com/address/" + r.asset +
+                (window.Launch.cluster() === "devnet" ? "?cluster=devnet" : "");
+      say("ok", 'Minted. <a href="' + url + '" target="_blank" rel="noopener">View it ↗</a>');
+      state = await window.Launch.readMachine(CM);
+      render();
+      $("go").disabled = false;
+      $("go").textContent = "Mint another";
+    } catch (e) {
+      // Guard failures arrive as program errors and read like nonsense to a
+      // buyer, so the common ones are translated.
+      var m = String(e.message || e);
+      if (/0x1770|NotEnoughSOL|insufficient/i.test(m)) m = "Not enough SOL in your wallet.";
+      else if (/0x1784|MintNotLive|StartDate/i.test(m)) m = "The mint has not opened yet.";
+      else if (/CandyMachineEmpty|0x1785/i.test(m)) m = "Sold out.";
+      else if (/User rejected|rejected the request/i.test(m)) m = "You cancelled the transaction.";
+      say("err", m);
+      $("go").disabled = false;
+      $("go").textContent = "Try again";
+    }
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

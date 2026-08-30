@@ -167,11 +167,13 @@
 <script src="app.js"></script>
 <script src="tour.js"></script>
 
-<!-- The chain layer used to load here: chains, contract, registry, launch,
-     storage, pons, vault, launchpanel. None of it is ported yet. The editor
-     runs standalone without it — every call site is guarded on
-     window.LaunchPanel, so the Launch button simply stays hidden until a
-     Solana panel registers itself. That guard is the seam phase 2 plugs into;
-     don't remove it. -->
+<!-- The chain layer. Order matters: wallet before launch, launch before the
+     panel. Every call site in app.js is still guarded on window.LaunchPanel,
+     so deleting these four lines leaves a working standalone editor — that
+     guard is worth keeping even now that the panel exists. -->
+<script src="wallet.js"></script>
+<script src="storage.js"></script>
+<script src="launch.js"></script>
+<script src="launchpanel.js"></script>
 </body>
 </html>

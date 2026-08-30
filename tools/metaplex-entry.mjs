@@ -52,6 +52,7 @@ export {
 export {
   setComputeUnitLimit,
   setComputeUnitPrice,
+  transferSol,
 } from "@metaplex-foundation/mpl-toolbox";
 
 /* Bridges our wallet layer into umi. walletAdapterIdentity wants a
