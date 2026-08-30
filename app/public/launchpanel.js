@@ -141,7 +141,7 @@
         <button class="mode" id="m-nft" ${hasRun ? "" : raw("disabled")}>
           <span class="mi">🖼</span>
           <span><b>NFT collection</b>
-          <span>${hasRun ? run.count + " generated pieces, a candy machine, a mint page." :
+          <span>${hasRun ? run.count + " generated pieces, a candy machine, a mint page — pair a token inside." :
                            "Draw and generate a collection first."}</span></span>
         </button>
         <button class="mode" id="m-token" ${tokenReady ? "" : raw("disabled")}>
@@ -150,19 +150,12 @@
           <span>A bonding-curve token. Trades on Jupiter immediately, graduates to a real pool.</span>
           ${tokenReady ? "" : raw('<span class="why">Token launches are not configured on this deployment yet.</span>')}</span>
         </button>
-        <button class="mode" id="m-pair" ${hasRun && tokenReady ? "" : raw("disabled")}>
-          <span class="mi">⬡</span>
-          <span><b>Pair — collection + token</b>
-          <span>Launch both together. The token's trading fees can reward the collection's holders.</span>
-          ${hasRun ? "" : raw('<span class="why">Needs a generated collection.</span>')}</span>
-        </button>
       </div>
       <div class="acts"><button id="lp-x">Cancel</button></div>
     `);
     box.querySelector("#lp-x").onclick = close;
     if (hasRun) box.querySelector("#m-nft").onclick = function () { nftDetails(null); };
     if (tokenReady) box.querySelector("#m-token").onclick = function () { tokenDetails(null); };
-    if (hasRun && tokenReady) box.querySelector("#m-pair").onclick = function () { nftDetails({ pair: true }); };
   }
 
   /* ================= NFT flow ================= */
