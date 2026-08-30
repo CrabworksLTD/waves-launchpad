@@ -26,7 +26,9 @@
     // ⚠️ devnet config is owned by the throwaway smoke key — mainnet's owner
     // must be the real platform wallet, it claims the 60% forever.
     dbcConfigs: {
-      "mainnet-beta": { sol: "", usdc: "" },
+      // mainnet sol: created 2026-08-30, signed in-browser; owner (fee
+      // claimer, forever): BU9dYi7fGw5G3Wd54CUTmt1Y58jEJaPq8LKiL72ydeKJ
+      "mainnet-beta": { sol: "DdHWKSqE7gvKrCUvcAnEVT7R1YWKY2SknBYFLUKxxsCN", usdc: "" },
       devnet: { sol: "97FsuYAZrY1HxSokdSz1GnPVsLWNdpVgdczt3bLqXv8J", usdc: "" }
     },
 
