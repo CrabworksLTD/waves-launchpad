@@ -19,10 +19,16 @@
     chain: "Solana",
     domain: "",                       // set once a domain is registered
 
-    // DBC partner configs, one per quote currency. Created once each by
-    // tools/create-dbc-config.js; a missing entry disables that currency in
-    // the token launch window rather than hiding the field.
-    dbcConfigs: { sol: "", usdc: "" },
+    // DBC partner configs, one per cluster per quote currency. Created once
+    // each by tools/create-dbc-config.js; a missing entry disables that
+    // currency in the token launch window rather than hiding the field.
+    // Keyed by cluster so a devnet key can never quietly serve mainnet.
+    // ⚠️ devnet config is owned by the throwaway smoke key — mainnet's owner
+    // must be the real platform wallet, it claims the 60% forever.
+    dbcConfigs: {
+      "mainnet-beta": { sol: "", usdc: "" },
+      devnet: { sol: "97FsuYAZrY1HxSokdSz1GnPVsLWNdpVgdczt3bLqXv8J", usdc: "" }
+    },
 
     // Save files. `fileKind` is written into new saves; `readKinds` is what we
     // accept when opening, so Moonpad projects and the bundled templates

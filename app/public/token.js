@@ -80,11 +80,18 @@
   function configKey(quote) {
     quote = quote || "sol";
     var B = window.BRAND || {};
-    var c = (B.dbcConfigs && B.dbcConfigs[quote]) ||
-            (quote === "sol" ? B.dbcConfig : null);   // legacy single-config field
+    var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
+    var m = B.dbcConfigs || {};
+    // cluster-keyed map is the current shape; a flat {sol,usdc} map or the
+    // legacy dbcConfig string only ever meant mainnet
+    var c = (m[cluster] && m[cluster][quote]) ||
+            (cluster === "mainnet-beta" &&
+              (typeof m[quote] === "string" && m[quote] ||
+               (quote === "sol" ? B.dbcConfig : null))) || null;
     if (!c) throw new Error(
-      "No DBC config for " + quote.toUpperCase() + ". Run tools/create-dbc-config.js " +
-      "with QUOTE=" + quote + ", then put the address in brand.js dbcConfigs." + quote + ".");
+      "No DBC config for " + quote.toUpperCase() + " on " + cluster +
+      ". Run tools/create-dbc-config.js with QUOTE=" + quote +
+      ", then put the address in brand.js dbcConfigs[cluster]." + quote + ".");
     return c;
   }
 
