@@ -61,5 +61,5 @@ export {
    the most eyes on it. PublicKey and VersionedTransaction come along because
    the injected-provider path signs transaction objects, not bytes. */
 export { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
-export { PublicKey, VersionedTransaction } from "@solana/web3.js";
+export { PublicKey, VersionedTransaction, Connection, Keypair, Transaction } from "@solana/web3.js";
 export { percentAmount, createSignerFromKeypair } from "@metaplex-foundation/umi";

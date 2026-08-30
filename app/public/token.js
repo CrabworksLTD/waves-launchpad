@@ -1,0 +1,185 @@
+(function () {
+  "use strict";
+  /* Token launches on Meteora's Dynamic Bonding Curve.
+   *
+   * We are the launch *partner*, not a user of somebody else's launchpad. That
+   * means a one-time config key (tools/create-dbc-config.js) that fixes the
+   * quote mint, the curve, the fee split and the migration rules — and then
+   * every creator launch is a pool against that config.
+   *
+   * Nobody provides liquidity. The curve is the liquidity, and at the migration
+   * threshold Meteora moves it into a real DAMM pool on its own. Both partner
+   * and creator keep claiming fees from the locked LP afterwards.
+   *
+   * Fee split, fixed by the protocol:
+   *   20%  Meteora
+   *   80%  split partner/creator by creatorTradingFeePercentage on the config
+   *
+   * The reward routing is the interesting part: claimCreatorTradingFeeToReceiver
+   * pays a creator's share straight to an address, so a collection's reward
+   * vault can be the receiver and no intermediate custody exists.
+   */
+
+  /* ---- reward assets ----
+   * What a creator's fees get paid out in. SOL needs no swap; everything else
+   * is a Jupiter swap by the keeper before distribution.
+   *
+   * ⚠️ Every mint here must be checked with getAccountInfo, not by eye and not
+   * by length. A one-character typo in the USDC mint below still decoded to a
+   * valid 32-byte address and passed every format check — it simply pointed at
+   * an account that does not exist. Paying rewards into a wrong mint is
+   * unrecoverable. tools/check-mints.js does the on-chain check. */
+  var REWARDS = {
+    sol:  { label: "SOL",  mint: "So11111111111111111111111111111111111111112", verified: true },
+    usdc: { label: "USDC", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", verified: true },
+    // RWA — tokenised equities, filled in once mints are confirmed
+    rwa:  { label: "Tokenised stock", mint: null, verified: false,
+            note: "Pick a specific xStock (TSLAx, NVDAx, SPYx…) — mint list not yet verified" }
+  };
+
+  var CLUSTERS = {
+    "mainnet-beta": "https://api.mainnet-beta.solana.com",
+    devnet: "https://api.devnet.solana.com"
+  };
+
+  var dbcMod = null, mxMod = null;
+  function dbc() { if (!dbcMod) dbcMod = import("/vendor/dbc.esm.js"); return dbcMod; }
+  function mx()  { if (!mxMod)  mxMod  = import("/vendor/metaplex.esm.js"); return mxMod; }
+
+  /* The config key is ours and is created once per quote asset. Without one
+   * there is no launchpad — a creator cannot launch into a config that does
+   * not exist, which is why this reads from BRAND rather than being derived. */
+  function configKey() {
+    var c = window.BRAND && window.BRAND.dbcConfig;
+    if (!c) throw new Error(
+      "No DBC config key set. Run tools/create-dbc-config.js once, then put the " +
+      "resulting address in brand.js as dbcConfig.");
+    return c;
+  }
+
+  async function client() {
+    var w = window.Wallet.current();
+    if (!w) throw new Error("Connect a wallet first");
+    var M = await dbc(), X = await mx();
+    var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
+    // web3.js Connection, which is what the DBC SDK expects — it predates umi
+    // and takes a raw connection plus signers rather than an identity.
+    var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
+    return {
+      M: M, X: X, conn: conn, wallet: w,
+      cli: new M.DynamicBondingCurveClient(conn, "confirmed"),
+      owner: new X.PublicKey(w.publicKey)
+    };
+  }
+
+  async function send(c, txish) {
+    var tx = txish.transaction ? txish.transaction : txish;
+    tx.feePayer = c.owner;
+    tx.recentBlockhash = (await c.conn.getLatestBlockhash("confirmed")).blockhash;
+    // Extra keypairs the SDK needs to sign for (the new mint, usually) are
+    // returned alongside the transaction and have to be applied before the
+    // wallet signs, or the wallet's signature covers the wrong message.
+    if (txish.signers && txish.signers.length) tx.partialSign.apply(tx, txish.signers);
+    var signed = await c.wallet.signTransaction(tx);
+    var sig = await c.conn.sendRawTransaction(signed.serialize(), { skipPreflight: false });
+    await c.conn.confirmTransaction(sig, "confirmed");
+    return sig;
+  }
+
+  /* Launch a token. `firstBuySol` > 0 uses createPoolWithFirstBuy so the
+   * creator's own buy lands in the same transaction as the pool — otherwise a
+   * sniper can be first in line between the two. */
+  async function launchToken(opts) {
+    var c = await client();
+    var progress = opts.onProgress || function () {};
+
+    var baseMint = c.X.Keypair.generate();
+    progress({ step: "pool", state: "signing" });
+
+    var args = {
+      config: new c.X.PublicKey(configKey()),
+      baseMint: baseMint.publicKey,
+      name: opts.name,
+      symbol: opts.symbol,
+      uri: opts.uri,
+      payer: c.owner,
+      poolCreator: c.owner
+    };
+
+    var built;
+    if (opts.firstBuySol > 0) {
+      built = await c.cli.pool.createPoolWithFirstBuy({
+        createPoolParam: args,
+        firstBuyParam: {
+          buyer: c.owner,
+          buyAmount: c.M.convertToLamports(opts.firstBuySol, 9),
+          minimumAmountOut: 1,        // creator buying their own launch, slippage is theirs
+          referralTokenAccount: null
+        }
+      });
+    } else {
+      built = await c.cli.pool.createPool(args);
+    }
+
+    var tx = built.createPoolTx || built.transaction || built;
+    var sig = await send(c, { transaction: tx, signers: [baseMint] });
+    progress({ step: "pool", state: "done", mint: String(baseMint.publicKey) });
+
+    return {
+      mint: String(baseMint.publicKey),
+      signature: sig,
+      cluster: window.Launch ? window.Launch.cluster() : "mainnet-beta"
+    };
+  }
+
+  /* Live pool state for a launched token — curve progress, fees earned so far.
+   * Read-only, so no wallet needed. */
+  async function readPool(baseMint) {
+    var M = await dbc(), X = await mx();
+    var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
+    var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
+    var cli = new M.DynamicBondingCurveClient(conn, "confirmed");
+
+    var pool = await cli.state.getPoolByBaseMint(new X.PublicKey(baseMint));
+    if (!pool) return null;
+    var progress = await cli.state.getPoolQuoteTokenCurveProgress(pool.publicKey)
+      .catch(function () { return null; });
+    var fees = await cli.state.getPoolFeeMetrics(pool.publicKey)
+      .catch(function () { return null; });
+
+    return {
+      pool: String(pool.publicKey),
+      baseMint: baseMint,
+      // 0..1 toward the migration threshold; past 1 it has graduated to DAMM
+      curveProgress: progress == null ? null : Number(progress),
+      migrated: !!(pool.account && pool.account.isMigrated),
+      fees: fees || null
+    };
+  }
+
+  /* Claim a creator's accrued trading fees straight into a receiver — the
+   * collection's reward vault. This is what makes the rewards loop work without
+   * us ever holding creator funds. */
+  async function claimCreatorFeesTo(baseMint, receiver) {
+    var c = await client();
+    var pool = await c.cli.state.getPoolByBaseMint(new c.X.PublicKey(baseMint));
+    if (!pool) throw new Error("No pool for that mint");
+
+    var tx = await c.cli.creator.claimCreatorTradingFeeToReceiver({
+      creator: c.owner,
+      pool: pool.publicKey,
+      receiver: new c.X.PublicKey(receiver),
+      maxBaseAmount: null,
+      maxQuoteAmount: null
+    });
+    return await send(c, tx);
+  }
+
+  window.Token = {
+    launchToken: launchToken,
+    readPool: readPool,
+    claimCreatorFeesTo: claimCreatorFeesTo,
+    rewards: REWARDS,
+    configKey: function () { try { return configKey(); } catch (e) { return null; } }
+  };
+})();
