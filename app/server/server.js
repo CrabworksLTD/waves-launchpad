@@ -112,6 +112,21 @@ const server = http.createServer(async function (req, res) {
   // the editor mirrors these so it can warn before a generate is attempted
   if (url.pathname === "/api/limits") return json(200, gen.LIMITS);
 
+  // Dev-only: the brand lab POSTs generated PNGs here so they land in art/
+  // without fighting the browser's download permissions. Never deployed —
+  // this file is the dev server, Vercel serves api/ functions instead.
+  if (url.pathname === "/api/dev-save" && req.method === "POST") {
+    try {
+      const b = await body(req);
+      if (!/^[a-z0-9-]+\.png$/.test(b.name || "")) return json(400, { error: "bad name" });
+      const png = Buffer.from(String(b.dataUrl).replace(/^data:image\/png;base64,/, ""), "base64");
+      const dir = path.join(PUBLIC, "art");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, b.name), png);
+      return json(200, { ok: true, bytes: png.length });
+    } catch (e) { return json(400, { error: e.message }); }
+  }
+
   // In production these are Vercel KV functions. Locally, an optional
   // .dev-records.json at the repo root feeds the marketplace/homepage so the
   // listing UI can be developed without deploying: { collections: [], tokens: [] }

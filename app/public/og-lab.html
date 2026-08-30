@@ -8,7 +8,11 @@
 canvas{width:900px;height:472px;border:1px solid #444}</style>
 </head>
 <body>
+<div style="display:grid;gap:20px;justify-items:center;padding:30px 0">
 <canvas id="c" width="1200" height="630"></canvas>
+<canvas id="x" width="1500" height="500" style="width:900px;height:300px"></canvas>
+<canvas id="p" width="400" height="400" style="width:200px;height:200px;border-radius:50%"></canvas>
+</div>
 <script>
 /* The share card, per Kyle: black, the mark huge running bottom-left to the
  * top edge, WAVES in the middle, gradient leaking in at bottom-right.
@@ -60,6 +64,40 @@ async function draw() {
   g.fillText("DEPLOY… EVERYTHING.", 600, 427);
 }
 draw();
+
+/* X banner: black, WAVES wall to wall */
+async function drawBanner() {
+  await document.fonts.load("900 400px Archivo");
+  await document.fonts.ready;
+  var g = document.getElementById("x").getContext("2d");
+  g.fillStyle = "#000";
+  g.fillRect(0, 0, 1500, 500);
+  // X lays its circular PFP over the banner's bottom-left — ride high so
+  // the word clears it
+  g.fillStyle = "#fff";
+  g.font = "900 340px Archivo";
+  g.textBaseline = "middle";
+  g.textAlign = "center";
+  g.letterSpacing = "-12px";
+  g.fillText("WAVES", 750, 185);
+}
+drawBanner();
+
+/* PFP: the mark on black, sized to survive X's circle crop */
+function drawPfp() {
+  var g = document.getElementById("p").getContext("2d");
+  g.fillStyle = "#000";
+  g.fillRect(0, 0, 400, 400);
+  var S = 78, x0 = 200 - 1.5 * S, y0 = 200 + 1.5 * S - S;
+  var mg = g.createLinearGradient(x0, y0 + S, x0 + 3 * S, y0 - 2 * S);
+  mg.addColorStop(0, "#9945FF");
+  mg.addColorStop(1, "#14F195");
+  g.fillStyle = mg;
+  [[x0, y0], [x0 + S, y0 - S], [x0 + 2 * S, y0 - 2 * S]].forEach(function (pt) {
+    g.fillRect(pt[0], pt[1], S, S);
+  });
+}
+drawPfp();
 </script>
 </body>
 </html>
