@@ -4,178 +4,375 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUNPAD — NFT design and deployment on Solana</title>
-<meta name="description" content="NFT editor and launchpad on Solana.">
+<meta name="description" content="Draw the traits, generate the collection, launch it on Solana. We take no cut of your mint.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SUNPAD">
 <meta property="og:title" content="SUNPAD">
-<meta property="og:description" content="NFT editor and launchpad on Solana.">
+<meta property="og:description" content="Draw the traits, generate the collection, launch it on Solana. We take no cut of your mint.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="SUNPAD">
-<meta name="twitter:description" content="NFT editor and launchpad on Solana.">
+<meta name="twitter:description" content="Draw the traits, generate the collection, launch it on Solana.">
 <meta name="theme-color" content="#0a0810">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800&family=Instrument+Sans:wght@400;500;600&family=Silkscreen:wght@400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/theme.css">
-<link rel="stylesheet" href="/landing.css">
+<style>
+/* Landing page. Flat and calm — the aurora is one wash behind the hero rather
+   than three drifting fields, because a simplified layout with a busy
+   background is two ideas fighting. Content carries the page. */
+
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--ink);
+  font:400 15px/1.65 Inter,ui-sans-serif,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
+.disp{font-family:"Space Grotesk",ui-sans-serif,system-ui,sans-serif}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+a{color:inherit}
+
+.aur{position:absolute;top:-34vh;right:-14vw;width:78vw;height:92vh;z-index:0;
+  pointer-events:none;filter:blur(110px);opacity:.45;
+  background:
+    radial-gradient(closest-side,rgba(var(--accent-2-rgb),.55),transparent 70%) 32% 42%/58% 68% no-repeat,
+    radial-gradient(closest-side,rgba(var(--accent-rgb),.3),transparent 70%) 70% 62%/54% 62% no-repeat}
+
+/* ---- rail ---- */
+.rail{position:fixed;left:0;top:0;bottom:0;width:60px;z-index:5;
+  display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0;
+  background:var(--void);border-right:1px solid var(--line)}
+.mark{width:32px;height:32px;border-radius:10px;background:var(--grad);
+  display:grid;place-items:center;margin-bottom:14px;flex:none;
+  font-family:"Space Grotesk";font-weight:700;font-size:15px;color:var(--accent-ink);
+  text-decoration:none}
+.rail a.ico{position:relative;width:40px;height:40px;border-radius:11px;flex:none;
+  display:grid;place-items:center;color:var(--faint);text-decoration:none;
+  transition:color .18s,background .18s}
+.rail a.ico:hover{color:var(--ink);background:var(--panel2)}
+.rail a.ico.cta{background:var(--grad);color:var(--accent-ink);margin:10px 0}
+.rail a.ico.cta:hover{background:var(--grad-hi);color:var(--accent-ink)}
+.rail a.ico svg{width:19px;height:19px;stroke:currentColor;fill:none;
+  stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+/* label lives in data-label so the tooltip and the aria-label are one string */
+.rail a.ico::after{content:attr(data-label);position:absolute;left:calc(100% + 12px);
+  padding:7px 11px;border-radius:9px;white-space:nowrap;font-size:12.5px;
+  background:var(--raise);border:1px solid var(--line2);color:var(--ink);
+  opacity:0;transform:translateX(-4px);pointer-events:none;
+  transition:opacity .16s,transform .16s}
+.rail a.ico:hover::after{opacity:1;transform:translateX(0)}
+.rail .spacer{flex:1}
+
+.wrap{position:relative;z-index:2;max-width:1120px;margin:0 auto;padding:0 32px 0 92px}
+section{position:relative}
+.eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--faint);margin:0 0 18px;display:flex;align-items:center;gap:9px}
+.eyebrow b{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+h2{font-family:"Space Grotesk";font-size:clamp(24px,3vw,34px);font-weight:600;
+  letter-spacing:-.025em;margin:0 0 8px}
+.lede{color:var(--dim);max-width:52ch;margin:0}
+
+/* ---- hero ---- */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,440px);
+  gap:52px;align-items:center;padding:80px 0 96px}
+h1{font-family:"Space Grotesk";font-size:clamp(34px,4.2vw,54px);line-height:1.06;
+  font-weight:600;letter-spacing:-.035em;margin:0;text-wrap:balance}
+h1 em{font-style:normal;white-space:nowrap;background:var(--grad);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero .lede{margin-top:20px;font-size:16px}
+.cta{display:flex;gap:12px;margin-top:30px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:9px;padding:14px 25px;border-radius:999px;
+  font:600 14.5px "Space Grotesk",sans-serif;text-decoration:none;cursor:pointer;
+  border:1px solid transparent;transition:transform .2s,background .2s}
+.btn-fill{background:var(--grad);color:var(--accent-ink)}
+.btn-fill:hover{transform:translateY(-2px)}
+.btn-quiet{color:var(--ink);border-color:var(--line2)}
+.btn-quiet:hover{background:var(--panel2)}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+.panel-head{display:flex;justify-content:space-between;padding:2px 4px 13px;
+  font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.live{display:inline-flex;align-items:center;gap:7px;color:var(--accent)}
+.live i{width:6px;height:6px;border-radius:50%;background:var(--accent);
+  animation:blink 1.6s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+#grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+#grid canvas{width:100%;aspect-ratio:1;display:block;border-radius:9px;
+  image-rendering:pixelated;background:var(--void);
+  transition:opacity .32s ease,transform .32s ease}
+#grid canvas.swap{opacity:.12;transform:scale(.94)}
+.panel-foot{padding:13px 4px 2px;font-size:11.5px;color:var(--faint);text-align:center}
+
+/* ---- steps ---- */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);
+  border-top:1px solid var(--line);margin:0 0 110px}
+.step{padding:26px 24px 30px;border-right:1px solid var(--line)}
+.step:last-child{border-right:0}
+.step .n{font-size:11.5px;letter-spacing:.12em;color:var(--faint)}
+.step h3{font-family:"Space Grotesk";font-size:16px;font-weight:600;margin:11px 0 7px}
+.step p{margin:0;color:var(--dim);font-size:13.5px}
+
+/* ---- collections ---- */
+.colhead{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:24px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  overflow:hidden;text-decoration:none;display:block;transition:border-color .2s,transform .2s}
+.card:hover{border-color:var(--line2);transform:translateY(-2px)}
+.card .thumb{aspect-ratio:1;background:var(--void);display:block}
+.card .thumb canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
+.card .meta{padding:13px 14px 15px}
+.card .meta b{display:block;font-family:"Space Grotesk";font-size:14.5px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .meta span{display:block;margin-top:3px;font-size:12px;color:var(--faint)}
+.pill{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+  border:1px solid var(--line2);border-radius:99px;padding:5px 11px;white-space:nowrap}
+
+/* ---- pricing ---- */
+.price{border-top:1px solid var(--line);margin-top:110px;padding:56px 0 0;
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,380px);gap:52px;align-items:start}
+.big{font-family:"Space Grotesk";font-size:clamp(30px,4vw,44px);line-height:1.08;
+  font-weight:600;letter-spacing:-.03em;margin:0}
+.big em{font-style:normal;background:var(--grad);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.facts{margin:0;padding:0;list-style:none}
+.facts li{display:flex;justify-content:space-between;gap:16px;padding:13px 0;
+  border-bottom:1px solid var(--line);font-size:14px}
+.facts li span{color:var(--dim)}
+.facts li b{font-weight:600;text-align:right}
+
+footer{border-top:1px solid var(--line);margin-top:110px;padding:26px 0 60px;
+  display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;
+  font-size:12.5px;color:var(--faint)}
+
+@media (max-width:900px){
+  .hero{grid-template-columns:1fr;gap:38px;padding:48px 0 64px}
+  .steps{grid-template-columns:1fr 1fr}
+  .step{border-bottom:1px solid var(--line)}
+  .price{grid-template-columns:1fr;gap:36px}
+}
+@media (max-width:720px){
+  .rail{top:auto;right:0;bottom:0;width:auto;height:58px;flex-direction:row;
+    justify-content:center;gap:6px;padding:0 10px;border-right:0;border-top:1px solid var(--line)}
+  .mark{margin:0 8px 0 0}
+  .rail .spacer{display:none}
+  .rail a.ico.cta{margin:0 4px}
+  .rail a.ico::after{left:50%;bottom:calc(100% + 10px);transform:translate(-50%,4px)}
+  .rail a.ico:hover::after{transform:translate(-50%,0)}
+  .wrap{padding:0 20px 78px}
+  .steps{grid-template-columns:1fr}
+}
+</style>
 </head>
 <body>
 
-<canvas id="moon-canvas" aria-hidden="true"></canvas>
-<div class="grain" aria-hidden="true"></div>
-<div class="bg-grid" aria-hidden="true"></div>
-
-<!-- ================= NAV ================= -->
-<nav class="nav" id="nav">
-  <div class="nav-inner">
-    <!-- Nav only lists what exists. Marketplace, the pass and the token were
-         Robinhood-side; Connect wallet waits for the Solana chain layer. -->
-    <a class="logo" href="/" aria-label="Sunpad home">SUNPAD</a>
-    <div class="nav-links">
-      <a href="/app">Editor</a>
-    </div>
-    <div class="nav-cta">
-      <a class="btn btn-solid" href="/app">Open the editor</a>
-    </div>
-    <button class="nav-burger" id="navBurger" aria-label="Open menu" aria-expanded="false">
-      <span></span><span></span>
-    </button>
-  </div>
+<nav class="rail" aria-label="Main">
+  <a class="mark" href="/" aria-label="Sunpad home">S</a>
+  <a class="ico" href="/app" data-label="Editor" aria-label="Editor">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+  </a>
+  <a class="ico" href="#collections" data-label="Collections" aria-label="Collections">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+  </a>
+  <a class="ico" href="#how" data-label="How it works" aria-label="How it works">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 0 1 4.7 1.1c0 1.7-2.3 2.2-2.3 3.7"/><path d="M12 17.2h.01"/></svg>
+  </a>
+  <a class="ico cta" href="/app" data-label="New collection" aria-label="New collection">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+  </a>
+  <span class="spacer"></span>
 </nav>
 
-<!-- full-screen mobile menu -->
-<div class="nav-overlay" id="navOverlay" hidden aria-hidden="true">
-  <div class="nav-ov-links">
-    <a href="/app">Editor</a>
-    <a href="/app" class="nav-ov-cta">Start drawing &rarr;</a>
-  </div>
+<div class="wrap">
+
+  <section class="hero">
+    <div class="aur" aria-hidden="true"></div>
+    <div>
+      <p class="eyebrow mono"><b></b> Solana &middot; NFT Editor</p>
+      <h1 class="disp">Draw thirty traits.<br><em>Ship ten thousand.</em></h1>
+      <p class="lede">Every other generator assumes you turn up with a folder of
+         finished art. This one starts at the blank canvas — draw each piece,
+         weight the odds, and watch the collection assemble itself.</p>
+      <div class="cta">
+        <a class="btn btn-fill" href="/app">Start drawing →</a>
+        <a class="btn btn-quiet" href="#how">How it works</a>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head mono">
+        <span>Chain Punks &middot; 34 traits</span>
+        <span class="live"><i></i>Generating</span>
+      </div>
+      <div id="grid" aria-hidden="true"></div>
+      <p class="panel-foot mono">56,000 possible combinations</p>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="steps">
+      <div class="step">
+        <span class="n mono">01 — DRAW</span>
+        <h3 class="disp">Nothing to upload</h3>
+        <p>Pixel grid or pressure-sensitive brush. Every trait gets its own layer stack.</p>
+      </div>
+      <div class="step">
+        <span class="n mono">02 — WEIGHT</span>
+        <h3 class="disp">Decide what's scarce</h3>
+        <p>Give each trait a weight. Rules catch combinations that shouldn't exist.</p>
+      </div>
+      <div class="step">
+        <span class="n mono">03 — GENERATE</span>
+        <h3 class="disp">In your own tab</h3>
+        <p>The whole set assembles locally. No queue, no server doing it for you.</p>
+      </div>
+      <div class="step">
+        <span class="n mono">04 — LAUNCH</span>
+        <h3 class="disp">Straight to Solana</h3>
+        <p>Art to Arweave, collection on chain, and a mint page people can buy from.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="collections">
+    <div class="colhead">
+      <div>
+        <p class="eyebrow mono"><b></b> Live on Solana</p>
+        <h2 class="disp">Collections</h2>
+      </div>
+      <span class="pill mono" id="colcount">—</span>
+    </div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section class="price">
+    <div>
+      <p class="eyebrow mono"><b></b> Pricing</p>
+      <h2 class="big disp">We take <em>none</em> of your mint.</h2>
+      <p class="lede" style="margin-top:18px">Every other launchpad takes a cut of
+        every sale. We charge once, before your collection is even live, for the
+        permanent storage your art actually needs. After that, what people pay
+        goes to you.</p>
+      <div class="cta"><a class="btn btn-fill" href="/app">Start drawing →</a></div>
+    </div>
+    <ul class="facts">
+      <li><span>Using the editor</span><b>Free</b></li>
+      <li><span>Cut of your mint</span><b>0%</b></li>
+      <li><span>Storage, 5,000 pieces</span><b>~0.02 SOL</b></li>
+      <li><span>Solana rent &amp; fees</span><b>At cost</b></li>
+      <li><span>Royalties</span><b>Yours, on chain</b></li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>Built on Metaplex Core. No custom contracts in the middle.</span>
+    <span><a href="/app">Editor</a> &middot; <a href="#how">How it works</a></span>
+  </footer>
 </div>
 
-<!-- ================= HERO ================= -->
-<header class="hero" id="top">
-  <div class="moon-halo" aria-hidden="true"></div>
+<script src="/brand.js"></script>
+<script>
+/* Shared: composite one random token from a loaded template. Used by the hero
+   grid and by the collection card thumbnails, so both show real generated art
+   rather than a placeholder rectangle. */
+function loadTemplate(file) {
+  return fetch("/templates/" + file).then(function (r) { return r.json(); })
+    .then(function (doc) {
+      return Promise.all(doc.project.categories.map(function (c) {
+        return Promise.all(c.traits.map(function (t) {
+          return new Promise(function (res) {
+            var im = new Image();
+            im.onload = function () { res({ img: im, w: t.weight || 1 }); };
+            im.onerror = function () { res(null); };
+            im.src = t.image;
+          });
+        })).then(function (l) { return l.filter(Boolean); });
+      })).then(function (loaded) {
+        return { cats: loaded.filter(function (c) { return c.length; }),
+                 cell: (doc.project.canvas && doc.project.canvas.pixel) || 24 };
+      });
+    });
+}
+function pickFrom(list) {
+  var total = 0, i;
+  for (i = 0; i < list.length; i++) total += list[i].w;
+  var r = Math.random() * total;
+  for (i = 0; i < list.length; i++) { r -= list[i].w; if (r <= 0) return list[i].img; }
+  return list[list.length - 1].img;
+}
+function paint(cv, t) {
+  cv.width = cv.height = t.cell;
+  var g = cv.getContext("2d");
+  g.imageSmoothingEnabled = false;
+  g.clearRect(0, 0, t.cell, t.cell);
+  for (var i = 0; i < t.cats.length; i++) g.drawImage(pickFrom(t.cats[i]), 0, 0, t.cell, t.cell);
+}
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
 
-  <div class="hero-content">
-    <p class="eyebrow will-reveal" data-hero="eyebrow">Solana &middot; NFT Editor</p>
-    <h1 class="h-xl">
-      <span class="line"><span data-hero="line">Draw it.</span></span>
-      <span class="line"><span data-hero="line">Generate it.</span></span>
-      <span class="line"><span data-hero="line"><em>Mint it on Solana.</em></span></span>
-    </h1>
-    <p class="lede will-reveal" data-hero="lede">
-      A real drawing tool, not an upload box. Build the art trait by trait,
-      set the rarities, generate the whole collection in your browser
-      &mdash; then take it on-chain.
-    </p>
-    <div class="hero-actions will-reveal" data-hero="actions">
-      <a class="btn btn-solid" href="/app">Open the editor <span class="arrow">&rarr;</span></a>
-      <a class="btn btn-ghost" href="#design-suite">See how it works</a>
-    </div>
-  </div>
+/* Hero grid — the real generator, picking by each trait's actual weight and
+   compositing in category order, the same stacking the editor uses. One tile
+   rerolls at a time; the whole grid at once strobes and reads as a loading
+   state rather than as generation. */
+(function () {
+  var TILES = 16, grid = document.getElementById("grid"), tiles = [], tpl = null;
+  loadTemplate("chain-punks.moonpad.json").then(function (t) {
+    tpl = t;
+    for (var i = 0; i < TILES; i++) {
+      var cv = document.createElement("canvas");
+      grid.appendChild(cv); tiles.push(cv); paint(cv, tpl);
+    }
+    setInterval(function () {
+      var cv = tiles[(Math.random() * tiles.length) | 0];
+      cv.classList.add("swap");
+      setTimeout(function () { paint(cv, tpl); cv.classList.remove("swap"); }, 320);
+    }, 620);
+  }).catch(function () {});
+})();
 
-  <div class="hero-ticker" aria-hidden="true">
-    <div class="ticker-track">
-      <span>Draw <i>&#9632;</i> Trait <i>&#9632;</i> Rarity <i>&#9632;</i> Generate <i>&#9632;</i> Mint <i>&#9632;</i></span>
-      <span>Draw <i>&#9632;</i> Trait <i>&#9632;</i> Rarity <i>&#9632;</i> Generate <i>&#9632;</i> Mint <i>&#9632;</i></span>
-    </div>
-  </div>
-</header>
+/* Collections. One component, two sources: real launches when there are any,
+   bundled templates when there are not. An empty grid is the most damaging
+   thing a launchpad homepage can show, and on day one there will be none. */
+(function () {
+  var cards = document.getElementById("cards"), count = document.getElementById("colcount");
 
-<!-- ================= HOW IT WORKS ================= -->
-<section class="section" id="launchpad">
-  <div class="section-head">
-    <p class="eyebrow will-reveal">How it works</p>
-    <h2 class="h-lg will-reveal">Three steps and it's live.</h2>
-  </div>
+  fetch("/api/collections").then(function (r) { return r.json(); })
+    .then(function (j) { return (j && j.collections) || []; })
+    .catch(function () { return []; })
+    .then(function (list) { list.length ? live(list) : starters(); });
 
-  <div class="steps" id="steps">
-    <div class="step">
-      <div class="step-top"><span class="step-num">01</span><h3>Design</h3></div>
-      <p>Draw or import the pieces and set the rarity. Pixel or brush, layers, colorways &mdash; the whole kit.</p>
-    </div>
-    <div class="step">
-      <div class="step-top"><span class="step-num">02</span><h3>Assemble</h3></div>
-      <p>Choose the supply of your collection and we generate it with the metadata to match.</p>
-    </div>
-    <div class="step">
-      <div class="step-top"><span class="step-num">03</span><h3>Deploy</h3></div>
-      <p>Your art goes to permanent storage and the collection goes on-chain from your own wallet.</p>
-    </div>
-  </div>
-</section>
+  function live(list) {
+    count.textContent = list.length + (list.length === 1 ? " collection" : " collections");
+    cards.innerHTML = list.slice(0, 8).map(function (c) {
+      return '<a class="card" href="/mint/' + esc(c.candyMachine) + '">' +
+        '<div class="thumb"></div><div class="meta"><b>' + esc(c.name) + "</b>" +
+        '<span class="mono">' + esc(c.candyMachine.slice(0, 4)) + "…" +
+        esc(c.candyMachine.slice(-4)) + "</span></div></a>";
+    }).join("");
+  }
 
-<div class="hr"></div>
-
-<!-- ================= EDITOR ================= -->
-<section class="section" id="design-suite">
-  <div class="section-head">
-    <p class="eyebrow will-reveal">The editor</p>
-    <h2 class="h-lg will-reveal">A real drawing tool, not just an upload box.</h2>
-  </div>
-
-  <div class="features">
-    <div class="feature will-reveal">
-      <div class="feature-dot"></div>
-      <h3>Pixel or paint</h3>
-      <p>Pixel mode snaps to a grid for crisp, blocky art. Brush mode gives you a soft pencil, marker, chalk and airbrush &mdash; and it follows the pressure of a stylus if you draw on a tablet.</p>
-    </div>
-    <div class="feature will-reveal">
-      <div class="feature-dot"></div>
-      <h3>See the whole character</h3>
-      <p>While you draw a hat, the rest of the character sits faintly underneath &mdash; so it lands on the head instead of floating above it.</p>
-    </div>
-    <div class="feature will-reveal">
-      <div class="feature-dot"></div>
-      <h3>One hat, six colors</h3>
-      <p>Draw a hat once, then add colorways. Each one is a real drawing you can keep tweaking, so it can have a gradient or a pattern rather than just a hue slider dragged across it.</p>
-    </div>
-    <div class="feature will-reveal">
-      <div class="feature-dot"></div>
-      <h3>Trace over anything</h3>
-      <p>Drop a photo or a sketch behind the canvas and draw on top of it. It never ends up in your collection.</p>
-    </div>
-    <div class="feature will-reveal">
-      <div class="feature-dot"></div>
-      <h3>Rules that stop the weird ones</h3>
-      <p>No hoods over long hair, no glasses under a helmet. Set it once and every bad pairing gets thrown out and rerolled.</p>
-    </div>
-    <div class="feature will-reveal">
-      <div class="feature-dot"></div>
-      <h3>Your work stays yours</h3>
-      <p>Save the whole project &mdash; art and all &mdash; as one file on your machine, and open it again whenever. Nothing is held on a server.</p>
-    </div>
-  </div>
-</section>
-
-<div class="hr"></div>
-
-<!-- ================= FINAL CTA ================= -->
-<section class="section final">
-  <div class="final-halo" aria-hidden="true"></div>
-  <p class="eyebrow will-reveal">Ready when you are</p>
-  <h2 class="h-xl will-reveal">Blank canvas<br>to full collection.</h2>
-  <p class="lede will-reveal">Draw the traits, set the rarities, generate the set. It all runs in your browser.</p>
-  <div class="final-actions will-reveal">
-    <a class="btn btn-solid" href="/app">Open the editor <span class="arrow">&rarr;</span></a>
-  </div>
-</section>
-
-<!-- ================= FOOTER ================= -->
-<footer>
-  <div class="footer-inner">
-    <a class="logo" href="#top" style="font-size:13px">SUNPAD</a>
-    <div class="footer-links">
-      <a href="#launchpad">How it works</a>
-      <a href="#design-suite">Editor</a>
-    </div>
-    <p class="mono-note">Built for Solana</p>
-  </div>
-</footer>
-
-
-<script src="/vendor/three.min.js"></script>
-<script src="/vendor/gsap.min.js"></script>
-<script src="/vendor/ScrollTrigger.min.js"></script>
-<script src="/landing.js"></script>
+  function starters() {
+    count.textContent = "starting points";
+    fetch("/templates/index.json").then(function (r) { return r.json(); })
+      .then(function (j) {
+        var t = (j.templates || []).slice(0, 8);
+        cards.innerHTML = t.map(function (x) {
+          return '<a class="card" href="/app"><div class="thumb"><canvas></canvas></div>' +
+            '<div class="meta"><b>' + esc(x.name) + "</b><span>" +
+            esc(x.traits) + " traits · " + esc(x.categories) + " categories</span></div></a>";
+        }).join("");
+        // Real generated art on each card, not a grey box. Only the small
+        // templates — the large ones carry hundreds of KB of trait images and
+        // the homepage does not need them.
+        t.forEach(function (x, i) {
+          var cv = cards.children[i] && cards.children[i].querySelector("canvas");
+          if (!cv) return;
+          loadTemplate(x.file).then(function (tp) { paint(cv, tp); }).catch(function () {});
+        });
+      }).catch(function () { cards.innerHTML = ""; });
+  }
+})();
+</script>
 </body>
 </html>
