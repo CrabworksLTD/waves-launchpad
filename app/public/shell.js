@@ -78,6 +78,11 @@
     "  color:var(--ink);text-decoration:none}",
     ".shl-dd .menu a:hover{background:var(--panel2)}",
     ".shl-dd.r .menu{left:auto;right:0;transform:none}",
+    /* the connected wallet's Profile/Disconnect menu matches the pill: hollow
+     * gradient border via the same double background */
+    "#shl-wmenu .menu{border:1px solid transparent;",
+    "  background:linear-gradient(var(--panel),var(--panel)) padding-box,",
+    "    var(--grad) border-box}",
     /* Hollow pill: the gradient runs through a transparent 1px border via the
      * padding-box/border-box double background, and through the lettering via
      * background-clip on an inner span — it cannot sit on the button itself,
