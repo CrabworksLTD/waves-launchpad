@@ -203,6 +203,8 @@
     (function () {
       var gh = window.BRAND && window.BRAND.gate;
       if (!gh || /^(localhost|127\.)/.test(location.hostname)) return;
+      // the lock is on the front door only — inner pages stay open
+      if (location.pathname !== "/" && location.pathname !== "/index.html") return;
       try { if (sessionStorage.getItem("shl.gate") === gh) return; } catch (e) {}
       var ov = document.createElement("div");
       ov.id = "shl-gate";
