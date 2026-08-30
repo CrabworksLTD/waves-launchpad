@@ -46,10 +46,13 @@
     "  height:68px;padding:0 24px;background:var(--void);border-bottom:1px solid var(--line)}",
     ".shl .zone{flex:1 1 0;display:flex;align-items:center;gap:10px;min-width:0}",
     ".shl .zone.r{justify-content:flex-end}",
-    ".shl-mark{width:38px;height:38px;flex:none;display:grid;place-items:center;",
+    ".shl-mark{flex:none;display:flex;align-items:center;gap:10px;",
     "  text-decoration:none;transition:transform .2s}",
     ".shl-mark svg{width:30px;height:30px;display:block}",
+    ".shl-mark b{font:800 19px Archivo,'Space Grotesk',sans-serif;letter-spacing:-.02em;",
+    "  color:var(--ink)}",
     ".shl-mark:hover{transform:translateY(-1px)}",
+    "@media (max-width:560px){.shl-mark b{display:none}}",
     ".shl-ico{width:40px;height:40px;border-radius:9px;border:0;background:transparent;",
     "  color:var(--faint);display:grid;place-items:center;cursor:pointer;flex:none;",
     "  transition:color .18s,background .18s}",
@@ -161,6 +164,11 @@
       '<stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>' +
       "</linearGradient></defs>" +
       '<path fill="url(#shl-g)" d="M0 16h8v8H0ZM8 8h8v8H8Zm8-8h8v8h-8Z"/></svg>';
+    // the name rides in every browser tab; pages keep their own first word
+    var NM = (window.BRAND && window.BRAND.name) || "WAVES";
+    if (document.title.indexOf(NM) < 0) {
+      document.title = document.title ? document.title + " — " + NM : NM;
+    }
     // favicon rides along on every page the shell mounts on
     if (!document.querySelector('link[rel="icon"]')) {
       var fav = document.createElement("link");
@@ -170,7 +178,8 @@
 
     render(host, H`
       <div class="zone">
-        <a class="shl-mark" href="/" aria-label="Home">${raw(markSvg)}</a>
+        <a class="shl-mark" href="/" aria-label="Home">${raw(markSvg)}<b>${
+          (window.BRAND && window.BRAND.name) || "WAVES"}</b></a>
         ${opts.search === false ? "" : raw(
           '<button class="shl-ico" id="shl-searchbtn" aria-label="Search" title="Search">' +
           '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/>' +
