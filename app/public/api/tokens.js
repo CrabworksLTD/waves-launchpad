@@ -40,9 +40,12 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-    const { mint, name, symbol, cluster } = body;
+    const { mint, name, symbol, cluster, rewardMint, collection } = body;
 
     if (!B58.test(mint || "")) return res.status(400).json({ error: "bad mint" });
+    // both optional; validated when present so a bad value is dropped loudly
+    if (rewardMint && !B58.test(rewardMint)) return res.status(400).json({ error: "bad rewardMint" });
+    if (collection && !B58.test(collection)) return res.status(400).json({ error: "bad collection" });
     // Mainnet only — a devnet token on the homepage is a bug dressed as a scam.
     if (cluster && cluster !== "mainnet-beta") return res.status(200).json({ ok: true, skipped: "not mainnet" });
 
@@ -55,6 +58,10 @@ export default async function handler(req, res) {
         mint,
         name: String(name || "Untitled").slice(0, 40),
         symbol: String(symbol || "").slice(0, 12),
+        // the reward asset the creator picked, and the collection this token
+        // is paired with — consumed by the staking keeper later, displayed now
+        rewardMint: rewardMint || null,
+        collection: collection || null,
         at: Date.now()
       }));
       await db.ltrim(KEY, 0, MAX - 1);

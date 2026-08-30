@@ -52,7 +52,7 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-    const { candyMachine, collection, name, cluster } = body;
+    const { candyMachine, collection, name, cluster, tokenMint } = body;
 
     if (!B58.test(candyMachine || "")) return res.status(400).json({ error: "bad candyMachine" });
     if (!B58.test(collection || "")) return res.status(400).json({ error: "bad collection" });
@@ -70,6 +70,7 @@ export default async function handler(req, res) {
         candyMachine,
         collection,
         name: String(name || "Untitled").slice(0, 40),
+        tokenMint: (tokenMint && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(tokenMint)) ? tokenMint : null,
         at: Date.now()
       }));
       await db.ltrim(KEY, 0, MAX - 1);

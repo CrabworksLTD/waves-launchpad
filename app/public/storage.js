@@ -333,8 +333,49 @@
     };
   }
 
+  /* One small folder for a token launch: token.json plus an optional icon.
+   * Reuses the exact quote -> payment -> approval -> upload path a collection
+   * takes, so the payment gate and its replay guard apply unchanged. The icon
+   * rides in the same folder because the metadata needs an absolute url and
+   * one manifest covers both. */
+  async function uploadTokenMeta(opts) {
+    var files = [];
+    if (opts.icon) files.push({ id: "_icon", name: "icon.png", bytes: opts.icon });
+
+    function buildJson(cid) {
+      var j = {
+        name: opts.name,
+        symbol: opts.symbol,
+        description: opts.description || ""
+      };
+      if (opts.icon) j.image = "https://arweave.net/" + cid + "/icon.png";
+      return JSON.stringify(j, null, 2);
+    }
+
+    var PLACEHOLDER = "0000000000000000000000000000000000000000000";
+    var probe = files.concat([{ id: "_t", name: "token.json", text: buildJson(PLACEHOLDER) }]);
+    var totalBytes = bytesOf(probe);
+    var totalCount = probe.length;
+
+    var auth = { address: opts.address, sig: opts.sig, ts: opts.ts };
+    if (!auth.sig && opts.payer) {
+      var q = await quoteUpload(totalBytes, totalCount);
+      auth.signature = await opts.payer(q);
+      if (!auth.signature) throw new Error("Storage fee was not paid — launch cancelled.");
+    }
+
+    var up = await prepareUploader(totalBytes, totalCount, auth, opts.onProgress);
+    var set = files.concat([{ id: "_t", name: "token.json", text: buildJson(PLACEHOLDER) }]);
+    // Single folder: upload once, then the json inside points at the same
+    // manifest for the icon — an Arweave manifest id is 43 chars, so the
+    // placeholder-sized upload matches the final bytes exactly.
+    var cid = await uploadWith(up, set, "token metadata", opts.onProgress);
+    return { uri: "https://arweave.net/" + cid + "/token.json", cid: cid };
+  }
+
   window.Storage = {
     uploadCollection: uploadCollection,
+    uploadTokenMeta: uploadTokenMeta,
     quoteUpload: quoteUpload,
     repoint: repoint,
     buildIndex: buildIndex

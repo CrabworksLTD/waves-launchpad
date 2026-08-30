@@ -66,7 +66,8 @@
 
   var CLUSTERS = {
     "mainnet-beta": "https://api.mainnet-beta.solana.com",
-    devnet: "https://api.devnet.solana.com"
+    devnet: "https://api.devnet.solana.com",
+    localnet: "http://127.0.0.1:8899"
   };
 
   var dbcMod = null, mxMod = null;
@@ -159,6 +160,8 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         mint: String(baseMint.publicKey), name: opts.name, symbol: opts.symbol,
+        rewardMint: opts.rewardMint || null,
+        collection: opts.collection || null,
         cluster: window.Launch ? window.Launch.cluster() : "mainnet-beta"
       })
     }).catch(function () {});

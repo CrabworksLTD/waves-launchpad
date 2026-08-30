@@ -17,7 +17,9 @@
 
   var CLUSTERS = {
     "mainnet-beta": { rpc: "https://api.mainnet-beta.solana.com", label: "Mainnet", explorer: "" },
-    devnet:         { rpc: "https://api.devnet.solana.com",       label: "Devnet",  explorer: "?cluster=devnet" }
+    devnet:         { rpc: "https://api.devnet.solana.com",       label: "Devnet",  explorer: "?cluster=devnet" },
+    // the local mainnet-clone validator (see memory: sunpad-chain-testing)
+    localnet:       { rpc: "http://127.0.0.1:8899",               label: "Localnet", explorer: "?cluster=custom&customUrl=http%3A%2F%2F127.0.0.1%3A8899" }
   };
   // Overridable so a self-hosted or paid RPC can be dropped in without a build.
   var cluster = (window.BRAND && window.BRAND.cluster) || "mainnet-beta";
