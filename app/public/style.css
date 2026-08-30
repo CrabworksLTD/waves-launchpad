@@ -137,7 +137,7 @@ input[type=checkbox]{accent-color:var(--lime);width:16px;height:16px}
 }
 
 .lbl{
-  font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);
+  font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);
   font-weight:700;margin:20px 0 9px;display:flex;align-items:center;gap:9px;
 }
 .lbl:first-child{margin-top:0}
@@ -331,7 +331,7 @@ body.pixelmode canvas#surface{image-rendering:pixelated}
 
 /* ---------- right rail ---------- */
 .row{display:flex;align-items:center;gap:9px;margin-bottom:8px}
-.row label{flex:0 0 64px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+.row label{flex:0 0 64px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
   color:var(--faint);font-weight:700}
 .row input[type=range]{flex:1;min-width:0}
 .row output{flex:0 0 32px;text-align:right;font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;

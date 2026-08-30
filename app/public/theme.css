@@ -24,10 +24,18 @@
   --line:   #2c2637;
   --line2:  #3a3348;
 
-  /* type */
+  /* type
+     Measured against --panel, which is what most of this sits on:
+       --ink    15.6:1
+       --dim     8.0:1
+       --faint   5.8:1
+     --faint was #635c73 at 2.94:1, well under the 4.5 AA floor, and it carries
+     25 elements — most of them 10-11px uppercase with wide tracking, which is
+     the worst thing to under-contrast. Small, tracked-out and dim compounds:
+     each alone is survivable, together it is unreadable. */
   --ink:    #ece9f2;
-  --dim:    #948da6;
-  --faint:  #635c73;
+  --dim:    #ada6c2;
+  --faint:  #938caa;
 
   /* primary accent — Solana green */
   --accent:      #14F195;
