@@ -46,11 +46,10 @@
     "  height:60px;padding:0 20px;background:var(--void);border-bottom:1px solid var(--line)}",
     ".shl .zone{flex:1 1 0;display:flex;align-items:center;gap:10px;min-width:0}",
     ".shl .zone.r{justify-content:flex-end}",
-    ".shl-mark{width:30px;height:30px;border-radius:9px;flex:none;",
-    "  background-image:var(--grad);background-repeat:no-repeat;",
-    "  background-size:calc(100% + 2px) 100%;background-position:-1px 0;",
-    "  display:grid;place-items:center;font:700 14px 'Space Grotesk',sans-serif;",
-    "  color:var(--accent-ink);text-decoration:none}",
+    ".shl-mark{width:30px;height:30px;flex:none;display:grid;place-items:center;",
+    "  text-decoration:none;transition:transform .2s}",
+    ".shl-mark svg{width:24px;height:24px;display:block}",
+    ".shl-mark:hover{transform:translateY(-1px)}",
     ".shl-ico{width:34px;height:34px;border-radius:9px;border:0;background:transparent;",
     "  color:var(--faint);display:grid;place-items:center;cursor:pointer;flex:none;",
     "  transition:color .18s,background .18s}",
@@ -148,11 +147,24 @@
     }
     host.className = "shl";
 
-    var markChar = (window.BRAND && window.BRAND.name || "S").slice(0, 1);
+    // The mark: three squares climbing up-and-right (Kyle's, drawn in the
+    // editor). Inline so it never flashes; /mark.svg is the same art for
+    // favicons and anything external.
+    var markSvg = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+      '<defs><linearGradient id="shl-g" x1="0" y1="1" x2="1" y2="0">' +
+      '<stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>' +
+      "</linearGradient></defs>" +
+      '<path fill="url(#shl-g)" d="M0 16h8v8H0ZM8 8h8v8H8Zm8-8h8v8h-8Z"/></svg>';
+    // favicon rides along on every page the shell mounts on
+    if (!document.querySelector('link[rel="icon"]')) {
+      var fav = document.createElement("link");
+      fav.rel = "icon"; fav.type = "image/svg+xml"; fav.href = "/mark.svg";
+      document.head.appendChild(fav);
+    }
 
     render(host, H`
       <div class="zone">
-        <a class="shl-mark" href="/" aria-label="Home">${markChar}</a>
+        <a class="shl-mark" href="/" aria-label="Home">${raw(markSvg)}</a>
         ${opts.search === false ? "" : raw(
           '<button class="shl-ico" id="shl-searchbtn" aria-label="Search" title="Search">' +
           '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/>' +

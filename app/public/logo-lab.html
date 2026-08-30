@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Logo lab</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+/* Internal scratch page, never linked: name + mark candidates side by side,
+ * each shown at hero size, top-bar size and favicon size — a mark that only
+ * works big is not a mark. */
+*{box-sizing:border-box}
+body{margin:0;background:var(--void);color:var(--ink);font:400 15px/1.6 Inter,sans-serif}
+main{max-width:1240px;margin:0 auto;padding:40px 24px 90px}
+h1{font-family:Archivo;font-weight:800;font-size:30px;margin:0 0 30px}
+.cand{border:1px solid var(--line);border-radius:10px;padding:26px;margin-bottom:26px;
+  display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:26px;align-items:center}
+.cand .small{display:flex;align-items:center;gap:18px;justify-content:flex-end}
+.cand .why{grid-column:1/-1;color:var(--dim);font-size:13px;max-width:75ch;margin:0}
+.big{display:flex;align-items:center;gap:18px}
+.big .wm{font-family:Archivo;font-weight:900;font-size:40px;letter-spacing:-.03em}
+.vars{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;
+  grid-column:1/-1}
+.v{border:1px solid var(--line);border-radius:8px;padding:18px 10px 12px;text-align:center}
+.v svg{margin:0 auto 10px}
+.v span{display:block;font:500 10.5px "IBM Plex Mono",monospace;color:var(--faint);
+  letter-spacing:.06em}
+.v.lt{background:#e9e9e9}
+.v.lt span{color:#555}
+.wm .g{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.bar{display:flex;align-items:center;gap:10px;background:#0b0b0b;border:1px solid var(--line);
+  border-radius:8px;padding:8px 14px;font-family:Archivo;font-weight:800;font-size:14px}
+.fav{width:32px;height:32px;border-radius:7px;display:grid;place-items:center;
+  background:#0b0b0b;border:1px solid var(--line)}
+svg{display:block}
+</style>
+</head>
+<body>
+<main>
+  <h1>Name + mark candidates</h1>
+
+  <!-- 0 · KYLE'S MARK — drawn in the editor: two interleaved step-diagonals -->
+  <div class="cand">
+    <div class="big">
+      <svg width="72" height="72" viewBox="0 0 24 24">
+        <defs><linearGradient id="gk" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>
+        </linearGradient></defs>
+        <path fill="url(#gk)" d="M0 0h8v8H0Zm8 8h8v8H8Zm8 8h8v8h-8Z"/>
+        <path fill="#fff" d="M0 8h8v8H0Zm8 8h8v8H8Z"/>
+      </svg>
+      <svg width="72" height="72" viewBox="0 0 24 24" style="margin-left:8px">
+        <path fill="#000" d="M0 0h8v8H0Zm8 8h8v8H8Zm8 8h8v8h-8Z"/>
+        <path fill="#fff" d="M0 8h8v8H0Zm8 8h8v8H8Z"/>
+      </svg>
+      <svg width="72" height="72" viewBox="0 0 24 24" style="margin-left:8px">
+        <path fill="#fff" d="M0 0h8v8H0Zm8 8h8v8H8Zm8 8h8v8h-8Z"/>
+        <path fill="url(#gk)" d="M0 8h8v8H0Zm8 8h8v8H8Z"/>
+      </svg>
+    </div>
+    <div class="small">
+      <span class="bar"><svg width="20" height="20" viewBox="0 0 24 24">
+        <path fill="url(#gk)" d="M0 0h8v8H0Zm8 8h8v8H8Zm8 8h8v8h-8Z"/>
+        <path fill="#fff" d="M0 8h8v8H0Zm8 8h8v8H8Z"/></svg>
+        WAVES</span>
+      <span class="fav"><svg width="18" height="18" viewBox="0 0 24 24">
+        <path fill="url(#gk)" d="M0 0h8v8H0Zm8 8h8v8H8Zm8 8h8v8h-8Z"/>
+        <path fill="#fff" d="M0 8h8v8H0Zm8 8h8v8H8Z"/></svg></span>
+    </div>
+    <p class="why">Kyle's, drawn in the editor itself — which is the whole pitch in one
+    fact. Two step-diagonals falling out of phase: a pixel wave. No letters, so it
+    survives any rename. Variations below.</p>
+
+    <div class="vars">
+      <div class="v"><svg width="64" height="64" viewBox="0 0 24 24">
+        <path fill="url(#gk)" d="M0 0h8v8H0Zm8 8h8v8H8Zm8 8h8v8h-8Z"/>
+        <path fill="#fff" d="M0 8h8v8H0Zm8 8h8v8H8Z"/></svg>
+        <span>1 · gradient + white</span></div>
+
+      <div class="v"><svg width="64" height="64" viewBox="0 0 24 24">
+        <path fill="#fff" d="M0 0h8v8H0Zm8 8h8v8H8Zm8 8h8v8h-8Z"/>
+        <path fill="url(#gk)" d="M0 8h8v8H0Zm8 8h8v8H8Z"/></svg>
+        <span>2 · white + gradient</span></div>
+
+      <div class="v"><svg width="64" height="64" viewBox="0 0 24 24">
+        <path fill="#14F195" d="M0 0h8v8H0Zm8 8h8v8H8Zm8 8h8v8h-8Z"/>
+        <path fill="#fff" d="M0 8h8v8H0Zm8 8h8v8H8Z"/></svg>
+        <span>3 · flat green + white</span></div>
+
+      <div class="v"><svg width="64" height="64" viewBox="0 0 24 24">
+        <path fill="#9945FF" d="M0 0h8v8H0Zm8 8h8v8H8Zm8 8h8v8h-8Z"/>
+        <path fill="#14F195" d="M0 8h8v8H0Zm8 8h8v8H8Z"/></svg>
+        <span>4 · purple + green</span></div>
+
+      <div class="v"><svg width="64" height="64" viewBox="0 0 24 24">
+        <path fill="url(#gk)" d="M0 0h8v8H0Zm8 8h8v8H8Zm8 8h8v8h-8Z"/>
+        <path fill="url(#gk)" opacity=".38" d="M0 8h8v8H0Zm8 8h8v8H8Z"/></svg>
+        <span>5 · gradient + ghost</span></div>
+
+      <div class="v"><svg width="64" height="64" viewBox="0 0 24 24">
+        <path fill="url(#gk)" d="M16 0h8v8h-8ZM8 8h8v8H8ZM0 16h8v8H0Z"/>
+        <path fill="#fff" d="M16 8h8v8h-8ZM8 16h8v8H8Z"/></svg>
+        <span>6 · ascending ↗</span></div>
+
+      <div class="v"><svg width="64" height="64" viewBox="0 0 30 30">
+        <path fill="url(#gk)" d="M0 0h6v6H0Zm6 6h6v6H6Zm6 6h6v6h-6Zm6 6h6v6h-6Zm6 6h6v6h-6Z"/>
+        <path fill="#fff" d="M0 6h6v6H0Zm6 6h6v6H6Zm6 6h6v6h-6Zm6 6h6v6h-6Z"/></svg>
+        <span>7 · five steps (finer)</span></div>
+
+      <div class="v"><svg width="64" height="64" viewBox="0 0 24 24">
+        <rect width="24" height="24" rx="5" fill="#111"/>
+        <path fill="url(#gk)" d="M3 3h6v6H3Zm6 6h6v6H9Zm6 6h6v6h-6Z"/>
+        <path fill="#fff" d="M3 9h6v6H3Zm6 6h6v6H9Z"/></svg>
+        <span>8 · on app tile</span></div>
+
+      <div class="v lt"><svg width="64" height="64" viewBox="0 0 24 24">
+        <path fill="#000" d="M0 0h8v8H0Zm8 8h8v8H8Zm8 8h8v8h-8Z"/>
+        <path fill="#fff" stroke="#000" stroke-width=".8" d="M.4.4h7.2v7.2H.4z" opacity="0"/>
+        <path fill="#fff" d="M0 8h8v8H0Zm8 8h8v8H8Z"/></svg>
+        <span>9 · original b/w (light bg)</span></div>
+
+      <div class="v"><svg width="64" height="64" viewBox="0 0 24 24">
+        <path fill="none" stroke="url(#gk)" stroke-width="1.6" d="M.8.8h6.4v6.4H.8Zm8 8h6.4v6.4H8.8Zm8 8h6.4v6.4h-6.4Z"/>
+        <path fill="#fff" d="M0 8h8v8H0Zm8 8h8v8H8Z"/></svg>
+        <span>10 · hollow + white</span></div>
+
+      <div class="v"><svg width="64" height="64" viewBox="0 0 24 24">
+        <path fill="url(#gk)" d="M0 0h8v8H0Zm8 8h8v8H8Zm8 8h8v8h-8Z"/>
+        <path fill="#fff" d="M8 0h8v8H8Zm8 8h8v8h-8Z"/></svg>
+        <span>11 · white above (wake)</span></div>
+
+      <div class="v"><svg width="64" height="64" viewBox="0 0 24 24">
+        <path fill="url(#gk)" d="M0 4h6v6H0Zm6 6h6v6H6Zm6 6h6v6h-6Z"/>
+        <path fill="#fff" d="M6 4h6v6H6Zm6 6h6v6h-6Zm6 6h6v6h-6Z"/></svg>
+        <span>12 · paired steps</span></div>
+    </div>
+  </div>
+
+  <!-- 1 · THE JPEG EXCHANGE — pixel frame with the arrow breaking out -->
+  <div class="cand">
+    <div class="big">
+      <svg width="72" height="72" viewBox="0 0 24 24">
+        <defs><linearGradient id="g1" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>
+        </linearGradient></defs>
+        <path fill="url(#g1)" d="M3 5h9v3H6v10h10v-6h3v9H3Z"/>
+        <path fill="#14F195" d="M14 3h7v7h-3V8.1L13.6 12 11 9.4 14.9 6H14Z"/>
+      </svg>
+      <span class="wm">THE <span class="g">JPEG</span> EXCHANGE</span>
+    </div>
+    <div class="small">
+      <span class="bar"><svg width="20" height="20" viewBox="0 0 24 24">
+        <path fill="url(#g1)" d="M3 5h9v3H6v10h10v-6h3v9H3Z"/>
+        <path fill="#14F195" d="M14 3h7v7h-3V8.1L13.6 12 11 9.4 14.9 6H14Z"/></svg>
+        THE JPEG EXCHANGE</span>
+      <span class="fav"><svg width="18" height="18" viewBox="0 0 24 24">
+        <path fill="url(#g1)" d="M3 5h9v3H6v10h10v-6h3v9H3Z"/>
+        <path fill="#14F195" d="M14 3h7v7h-3V8.1L13.6 12 11 9.4 14.9 6H14Z"/></svg></span>
+    </div>
+    <p class="why">Your "Exchange" instinct, made ownable. The mark is a picture frame
+    with the chunky arrow escaping it — the .jpeg leaving for the chain. Reads at every
+    size, matches the hero line word for word.</p>
+  </div>
+
+  <!-- 1b · WAVES — a blocky wave stepping upward -->
+  <div class="cand">
+    <div class="big">
+      <svg width="72" height="72" viewBox="0 0 24 24">
+        <defs><linearGradient id="gw" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>
+        </linearGradient></defs>
+        <path fill="url(#gw)" d="M0 16h8v8H0ZM8 8h8v8H8Zm8-8h8v8h-8Z"/>
+      </svg>
+      <svg width="72" height="72" viewBox="0 0 24 24" style="margin-left:6px">
+        <path fill="url(#gw)" d="M0 17h7v7H0Zm8.5-8.5h7v7h-7ZM17 0h7v7h-7Z"/>
+      </svg>
+      <svg width="72" height="72" viewBox="0 0 24 24" style="margin-left:6px">
+        <path fill="url(#gw)" d="M1 18h6v6H1Zm8-9h6v6H9Zm8-9h6v6h-6Z"/>
+      </svg>
+      <span class="wm" style="margin-left:10px">WA<span class="g">VES</span></span>
+    </div>
+    <div class="small">
+      <span class="bar"><svg width="20" height="20" viewBox="0 0 24 24">
+        <path fill="url(#gw)" d="M0 16h8v8H0ZM8 8h8v8H8Zm8-8h8v8h-8Z"/></svg>
+        WAVES</span>
+      <span class="fav"><svg width="18" height="18" viewBox="0 0 24 24">
+        <path fill="url(#gw)" d="M0 16h8v8H0ZM8 8h8v8H8Zm8-8h8v8h-8Z"/></svg></span>
+    </div>
+    <p class="why">Kyle's pick. The mark is a wave AND a staircase going up-right —
+    same energy as the arrow — and the product literally sells allowlist WAVES, so the
+    name describes a real feature. Collision: the Waves blockchain and waves.exchange
+    exist (faded since 2022, but they hold the $WAVES ticker and the good domains).
+    WAVEPAD is the escape hatch — keeps the Moonpad lineage.</p>
+  </div>
+
+  <!-- 2 · SUNPAD — pixel sun -->
+  <div class="cand">
+    <div class="big">
+      <svg width="72" height="72" viewBox="0 0 24 24">
+        <defs><linearGradient id="g2" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#FFD54A"/><stop offset="1" stop-color="#14F195"/>
+        </linearGradient></defs>
+        <path fill="url(#g2)" d="M9 6h6v3h3v6h-3v3H9v-3H6V9h3Z"/>
+        <path fill="url(#g2)" d="M11 1h2v3h-2Zm0 19h2v3h-2ZM1 11h3v2H1Zm19 0h3v2h-3ZM4 4h2v2H4Zm14 14h2v2h-2ZM4 18h2v2H4ZM18 4h2v2h-2Z" opacity=".85"/>
+      </svg>
+      <span class="wm">SUN<span class="g">PAD</span></span>
+    </div>
+    <div class="small">
+      <span class="bar"><svg width="20" height="20" viewBox="0 0 24 24">
+        <path fill="url(#g2)" d="M9 6h6v3h3v6h-3v3H9v-3H6V9h3Z"/>
+        <path fill="url(#g2)" d="M11 1h2v3h-2Zm0 19h2v3h-2ZM1 11h3v2H1Zm19 0h3v2h-3ZM4 4h2v2H4Zm14 14h2v2h-2ZM4 18h2v2H4ZM18 4h2v2h-2Z" opacity=".85"/></svg>
+        SUNPAD</span>
+      <span class="fav"><svg width="18" height="18" viewBox="0 0 24 24">
+        <path fill="url(#g2)" d="M9 6h6v3h3v6h-3v3H9v-3H6V9h3Z"/></svg></span>
+    </div>
+    <p class="why">The incumbent placeholder, kept honest: Moonpad's sibling — moon on
+    Robinhood, sun on Solana. Pixel sun in the drawn-here style. The kinship is the story.</p>
+  </div>
+
+  <!-- 3 · UPLOAD (arrow-as-name) -->
+  <div class="cand">
+    <div class="big">
+      <svg width="72" height="72" viewBox="0 0 24 24">
+        <path fill="#14F195" d="M7 3h14v14h-5V11.5L6.5 21 3 17.5 12.5 8H7Z"/>
+      </svg>
+      <span class="wm">UP<span class="g">ONLY</span></span>
+    </div>
+    <div class="small">
+      <span class="bar"><svg width="20" height="20" viewBox="0 0 24 24">
+        <path fill="#14F195" d="M7 3h14v14h-5V11.5L6.5 21 3 17.5 12.5 8H7Z"/></svg>
+        UPONLY</span>
+      <span class="fav"><svg width="18" height="18" viewBox="0 0 24 24">
+        <path fill="#14F195" d="M7 3h14v14h-5V11.5L6.5 21 3 17.5 12.5 8H7Z"/></svg></span>
+    </div>
+    <p class="why">The arrow you already liked, promoted to the whole identity. "Up only"
+    is the oldest joke in the market and the arrow IS the logo — zero explanation needed.
+    Risk: the phrase is heavily memed, hard to domain cleanly.</p>
+  </div>
+
+  <!-- 4 · SUNFORGE — sun being hammered out of blocks -->
+  <div class="cand">
+    <div class="big">
+      <svg width="72" height="72" viewBox="0 0 24 24">
+        <defs><linearGradient id="g4" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>
+        </linearGradient></defs>
+        <path fill="url(#g4)" d="M4 20h16v-3H4Zm2-5h5V4h3v11h5v-2h3l-4-5V4h-2L9 4v4L5 13Z" opacity="0"/>
+        <path fill="url(#g4)" d="M3 20h18v-3H3Zm3-5h12l-3-3V6h3V3H6v3h3v6Z"/>
+      </svg>
+      <span class="wm">SUN<span class="g">FORGE</span></span>
+    </div>
+    <div class="small">
+      <span class="bar"><svg width="20" height="20" viewBox="0 0 24 24">
+        <path fill="url(#g4)" d="M3 20h18v-3H3Zm3-5h12l-3-3V6h3V3H6v3h3v6Z"/></svg>
+        SUNFORGE</span>
+      <span class="fav"><svg width="18" height="18" viewBox="0 0 24 24">
+        <path fill="url(#g4)" d="M3 20h18v-3H3Zm3-5h12l-3-3V6h3V3H6v3h3v6Z"/></svg></span>
+    </div>
+    <p class="why">The making angle — an anvil in the same blocky language. You forge the
+    collection here. Solid, cheap domain, but the least memeable of the four.</p>
+  </div>
+</main>
+</body>
+</html>
