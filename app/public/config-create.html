@@ -100,6 +100,17 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
     var list = await fetch("/rwa.json").then(function (r) { return r.json(); });
     var t = (list.tokens || []).find(function (x) { return x.mint === mint; });
     if (!t) throw new Error("That mint is not on the verified RWA list.");
+    // The DBC program rejects Token-2022 quote mints (InvalidQuoteMint, 0x1778)
+    // — which is every xStock, every Ondo token and PAXG. Refuse here with a
+    // real sentence instead of letting the wallet fail with a hex code.
+    var X = await import("/vendor/metaplex.esm.js");
+    var rpc = window.Launch.clusters[CLUSTER].rpc;
+    var ai = await new X.Connection(rpc, "confirmed").getAccountInfo(new X.PublicKey(mint));
+    if (!ai || ai.owner.toBase58().indexOf("Tokenkeg") !== 0) {
+      throw new Error(t.symbol + " is a Token-2022 mint — Meteora's curve cannot use it " +
+        "as a quote currency yet. Quotable today: classic SPL assets only " +
+        "(XAUt0, GOLD, VNXAU). Token-2022 assets still work as REWARD payouts.");
+    }
     var px = null;
     try {
       var j = await fetch("https://lite-api.jup.ag/price/v3?ids=" + mint)
