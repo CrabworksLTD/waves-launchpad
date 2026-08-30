@@ -35,22 +35,23 @@ a{color:inherit;text-decoration:none}
 
 main{max-width:1400px;margin:0 auto;padding:0 24px 90px}
 
-/* ---- hero: statement + one pill ---- */
-.hero{text-align:center;padding:84px 0 56px}
+/* ---- hero: the statement carries the gradient now, no button ---- */
+.hero{text-align:center;padding:84px 0 40px}
 h1{font-family:Archivo;font-size:clamp(36px,5.4vw,64px);font-weight:800;
-  letter-spacing:-.025em;line-height:1.04;margin:0;color:var(--ink)}
-.pillbtn{display:inline-block;margin-top:30px;padding:13px 34px;border-radius:999px;
-  font:700 14.5px Archivo,sans-serif;color:var(--accent-ink);
-  background-image:var(--grad);background-repeat:no-repeat;
-  background-size:calc(100% + 2px) 100%;background-position:-1px 0;
-  transition:filter .2s,transform .2s}
-.pillbtn:hover{filter:brightness(1.1);transform:translateY(-1px)}
+  letter-spacing:-.025em;line-height:1.08;margin:0;color:var(--ink)}
+h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:text;
+  color:transparent}
+/* the way in: one chunky blocky arrow straight to the editor */
+.goarrow{display:inline-block;width:.58em;height:.58em;margin-left:18px;
+  vertical-align:.34em;transition:transform .2s}
+.goarrow svg{width:100%;height:100%;display:block}
+.goarrow:hover{transform:translate(4px,-4px)}
 
-/* ---- featured: wide banner tiles, name inside ---- */
-.feature{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:40px}
+/* ---- spotlight: wide banner tiles, name inside, visible borders ---- */
+.feature{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px}
 .feature .wide3{grid-template-columns:1fr 1fr 1fr}
-.ban{position:relative;display:block;border:1px solid var(--line);border-radius:4px;
-  overflow:hidden;background:var(--panel);aspect-ratio:41/14;
+.ban{position:relative;display:block;border:1px solid rgba(255,255,255,.22);
+  border-radius:6px;overflow:hidden;background:var(--panel);aspect-ratio:41/14;
   transition:border-color .2s}
 .ban:hover{border-color:var(--faint)}
 .ban canvas{position:absolute;inset:0;width:100%;height:100%;display:block;
@@ -69,6 +70,32 @@ h1{font-family:Archivo;font-size:clamp(36px,5.4vw,64px);font-weight:800;
   background-size:calc(100% + 2px) 100%;background-position:-1px 0}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:20px}
 @media (max-width:900px){.feature,.row3{grid-template-columns:1fr}}
+
+/* a token in the spotlight — deliberately NOT a banner: no art strip, a coin
+ * mark, the ticker huge, a curve underline, and a TOKEN tag so nobody reads
+ * it as a collection */
+.tokban{position:relative;display:flex;align-items:center;gap:18px;
+  border:1px solid rgba(255,255,255,.22);border-radius:6px;overflow:hidden;
+  background:var(--panel);aspect-ratio:41/14;padding:0 22px;
+  transition:border-color .2s}
+.tokban:hover{border-color:var(--faint)}
+.tokban::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 160% at 0% 100%,rgba(153,69,255,.16),transparent 55%),
+             radial-gradient(120% 160% at 100% 0%,rgba(20,241,149,.12),transparent 55%)}
+.tokban .coin{width:52px;height:52px;flex:none;border-radius:50%;
+  border:2px solid transparent;display:grid;place-items:center;
+  background:linear-gradient(var(--panel2),var(--panel2)) padding-box,
+             var(--grad) border-box;
+  font:800 20px Archivo;color:var(--ink)}
+.tokban .tinfo{min-width:0;position:relative}
+.tokban .tinfo b{display:block;font:800 24px Archivo;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tokban .tinfo span{display:block;font-size:12.5px;color:var(--dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tokban .curve{position:absolute;right:18px;bottom:14px;opacity:.9}
+.tokban .tag{position:absolute;top:12px;right:14px;
+  font:600 10px "IBM Plex Mono",monospace;letter-spacing:.16em;color:var(--accent);
+  border:1px solid rgba(20,241,149,.4);border-radius:99px;padding:3px 9px}
 
 /* ---- section rows ---- */
 .sechead{display:flex;align-items:center;justify-content:space-between;
@@ -109,12 +136,18 @@ footer{border-top:1px solid var(--line);margin-top:90px;padding:26px 0 60px;
 
 <main>
   <header class="hero">
-    <h1 class="disp">Draw thirty traits.<br>Ship ten thousand.</h1>
-    <a class="pillbtn" href="/app">Start drawing</a>
+    <h1 class="disp">Draw thirty traits.<br><span class="gship">Ship ten thousand.</span><a
+      class="goarrow" href="/app" aria-label="Open the editor" title="Open the editor"><svg
+      viewBox="0 0 24 24" aria-hidden="true">
+      <defs><linearGradient id="ag" x1="0" y1="1" x2="1" y2="0">
+        <stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>
+      </linearGradient></defs>
+      <path fill="url(#ag)" d="M7 3h14v14h-5V11.5L6.5 21 3 17.5 12.5 8H7Z"/></svg></a></h1>
   </header>
 
-  <!-- featured banners: 2 wide, then 3 -->
-  <section aria-label="Featured">
+  <!-- spotlight: 2 wide collection banners, then a row of 3 that tokens share -->
+  <section aria-label="Spotlight">
+    <div class="sechead" style="margin-top:24px"><h2 class="disp">Spotlight</h2></div>
     <div class="feature" id="feat2"></div>
     <div class="row3" id="feat3"></div>
   </section>
@@ -228,6 +261,22 @@ footer{border-top:1px solid var(--line);margin-top:90px;padding:26px 0 60px;
     return '<a class="ban" data-name="' + esc(name) + '" href="' + esc(href) + '">' +
       '<canvas></canvas><span class="nm"><i></i>' + esc(name) + "</span></a>";
   }
+  /* a token's spotlight card — reads as a token, never as a collection */
+  function tokenTile(t) {
+    var sym = (t.symbol || "?").toUpperCase();
+    return '<a class="tokban" data-name="' + esc(t.name + " " + sym) +
+      '" href="/token/' + esc(t.mint) + '">' +
+      '<span class="coin">' + esc(sym.slice(0, 1)) + "</span>" +
+      '<span class="tinfo"><b>$' + esc(sym) + "</b><span>" + esc(t.name) +
+        ' · <span class="mono">' + esc(shortAddr(t.mint)) + "</span></span></span>" +
+      '<svg class="curve" width="86" height="30" viewBox="0 0 86 30" aria-hidden="true">' +
+        '<path d="M2 27 Q 46 25 66 14 T 84 3" fill="none" stroke="url(#tg)" stroke-width="2"/>' +
+        '<defs><linearGradient id="tg" x1="0" y1="1" x2="1" y2="0">' +
+        '<stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>' +
+        "</linearGradient></defs>" +
+        '<circle cx="84" cy="3" r="2.6" fill="#14F195"/></svg>' +
+      '<span class="tag">TOKEN</span></a>';
+  }
   function squareCard(x, href, sub) {
     return '<a class="card" data-name="' + esc(x.name) + '" href="' + esc(href) + '">' +
       '<div class="thumb"><canvas></canvas></div>' +
@@ -249,19 +298,23 @@ footer{border-top:1px solid var(--line);margin-top:90px;padding:26px 0 60px;
 
   function draw(collections, tokens, templates) {
     var live = collections && collections.length;
-    var feat = (live ? collections : templates).slice(0, 5);
-    var rest = (live ? collections : templates).slice(5);
+    // spotlight tokens claim up to 3 slots of the bottom row; collections
+    // (or templates while nothing is live) fill whatever tokens leave open
+    var spotTok = tokens.slice(0, 3);
+    var needCol = 2 + (3 - spotTok.length);
+    var feat = (live ? collections : templates).slice(0, needCol);
+    var rest = (live ? collections : templates).slice(needCol);
 
-    // featured banners: 2 + 3, art compos­ited per tile
     var f2 = document.getElementById("feat2"), f3 = document.getElementById("feat3");
     f2.innerHTML = feat.slice(0, 2).map(function (x) {
       return bannerTile(x.name, live ? "/mint/" + x.candyMachine : "/app");
     }).join("");
-    f3.innerHTML = feat.slice(2, 5).map(function (x) {
-      return bannerTile(x.name, live ? "/mint/" + x.candyMachine : "/app");
-    }).join("");
+    f3.innerHTML = spotTok.map(tokenTile).join("") +
+      feat.slice(2).map(function (x) {
+        return bannerTile(x.name, live ? "/mint/" + x.candyMachine : "/app");
+      }).join("");
     feat.forEach(function (x, i) {
-      var host = i < 2 ? f2.children[i] : f3.children[i - 2];
+      var host = i < 2 ? f2.children[i] : f3.children[spotTok.length + i - 2];
       var cv = host && host.querySelector("canvas");
       if (!cv || live) return;                      // live banners need real art; later
       loadTemplate(x.file).then(function (tp) {

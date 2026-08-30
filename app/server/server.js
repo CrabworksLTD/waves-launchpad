@@ -112,6 +112,17 @@ const server = http.createServer(async function (req, res) {
   // the editor mirrors these so it can warn before a generate is attempted
   if (url.pathname === "/api/limits") return json(200, gen.LIMITS);
 
+  // In production these are Vercel KV functions. Locally, an optional
+  // .dev-records.json at the repo root feeds the marketplace/homepage so the
+  // listing UI can be developed without deploying: { collections: [], tokens: [] }
+  if (url.pathname === "/api/collections" || url.pathname === "/api/tokens") {
+    const key = url.pathname.slice(5);
+    try {
+      const fx = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", ".dev-records.json"), "utf8"));
+      return json(200, { [key]: fx[key] || [] });
+    } catch (e) { return json(200, { [key]: [] }); }
+  }
+
   if (url.pathname === "/api/project" && req.method === "POST") {
     try {
       const p = migrate(await body(req));

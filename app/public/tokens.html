@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tokens</title>
+<meta name="description" content="Every token launched here, with live curve progress.">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+/* The token marketplace. Cards read as TOKENS — coin mark, ticker first,
+ * curve progress toward graduation — never as collections. Raised/price
+ * stream in from the live pools after first paint. */
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{margin:0;min-height:100%}
+body{background:var(--void);color:var(--ink);font:400 15px/1.6 Inter,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono",monospace}
+a{color:inherit;text-decoration:none}
+main{max-width:1400px;margin:0 auto;padding:44px 24px 90px}
+
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
+  flex-wrap:wrap;margin-bottom:26px}
+h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
+  letter-spacing:-.02em;margin:0 0 6px}
+.lede{color:var(--dim);margin:0;max-width:56ch;font-size:14.5px}
+.filters{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:8px 16px;border:1px solid var(--line2);background:transparent;
+  color:var(--dim);font:600 12.5px Inter;cursor:pointer;border-radius:999px;
+  transition:color .2s,border-color .2s}
+.chip:hover{color:var(--ink)}
+.chip.on{color:var(--accent);border-color:rgba(20,241,149,.45)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px}
+.tk{position:relative;display:block;border:1px solid rgba(255,255,255,.16);
+  border-radius:6px;overflow:hidden;background:var(--panel);padding:18px;
+  transition:border-color .25s,transform .25s}
+.tk:hover{border-color:var(--faint);transform:translateY(-3px)}
+.tk::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(130% 170% at 0% 100%,rgba(153,69,255,.13),transparent 55%),
+             radial-gradient(130% 170% at 100% 0%,rgba(20,241,149,.10),transparent 55%)}
+.tk .top{display:flex;align-items:center;gap:14px;position:relative}
+.tk .coin{width:46px;height:46px;flex:none;border-radius:50%;
+  border:2px solid transparent;display:grid;place-items:center;
+  background:linear-gradient(var(--panel2),var(--panel2)) padding-box,
+             var(--grad) border-box;
+  font:800 18px Archivo;color:var(--ink)}
+.tk .who{min-width:0;flex:1}
+.tk .who b{display:block;font:800 20px Archivo;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tk .who span{display:block;font-size:12px;color:var(--dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tk .tag{flex:none;font:600 9.5px "IBM Plex Mono",monospace;letter-spacing:.16em;
+  border-radius:99px;padding:4px 10px;text-transform:uppercase}
+.tk .tag.curve{color:var(--accent);border:1px solid rgba(20,241,149,.4)}
+.tk .tag.grad{color:#c9b2ff;border:1px solid rgba(153,69,255,.5)}
+.tk .bar{display:block;height:5px;border-radius:99px;background:var(--raise);
+  overflow:hidden;margin-top:16px;position:relative}
+.tk .top{display:flex}
+.tk .bar i{display:block;height:100%;width:0;
+  background-image:var(--grad);background-repeat:no-repeat;
+  background-size:calc(100% + 2px) 100%;background-position:-1px 0;
+  transition:width .5s}
+.tk .nums{display:flex;justify-content:space-between;gap:10px;margin-top:9px;
+  font:400 11px "IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  color:var(--faint);position:relative}
+.tk .nums b{color:var(--ink);font-weight:600}
+
+.skel{border:1px solid var(--line);border-radius:6px;background:var(--panel);
+  height:132px;overflow:hidden}
+.skel .s{height:100%;
+  background:linear-gradient(100deg,var(--panel) 30%,var(--panel2) 50%,var(--panel) 70%);
+  background-size:220% 100%;animation:sh 1.5s linear infinite}
+@keyframes sh{to{background-position:-220% 0}}
+@media (prefers-reduced-motion:reduce){.skel .s{animation:none}.tk{transition:none}}
+
+.empty{border:1px dashed var(--line2);border-radius:8px;padding:52px 26px;text-align:center}
+.empty h3{margin:0 0 8px;font-family:Archivo;font-size:20px;font-weight:800;letter-spacing:-.015em}
+.empty p{margin:0 auto 22px;color:var(--dim);font-size:14px;max-width:46ch}
+.empty a{display:inline-block;padding:12px 26px;border-radius:999px;
+  font:700 13.5px Archivo;color:var(--accent-ink);
+  background-image:var(--grad);background-repeat:no-repeat;
+  background-size:calc(100% + 2px) 100%;background-position:-1px 0}
+.note{margin-top:28px;color:var(--faint);font:400 12px "IBM Plex Mono",monospace;text-align:center}
+</style>
+</head>
+<body>
+<main>
+  <div class="head">
+    <div>
+      <h1 class="disp">Tokens</h1>
+      <p class="lede">Every token launched here. Raised and graduation progress are
+      read from the live bonding curves — trade on the curve, or on Jupiter after
+      graduation.</p>
+    </div>
+    <div class="filters" id="filters">
+      <button class="chip on" data-f="all">All</button>
+      <button class="chip" data-f="curve">On the curve</button>
+      <button class="chip" data-f="grad">Graduated</button>
+    </div>
+  </div>
+
+  <div class="grid" id="skel">
+    <div class="skel"><div class="s"></div></div>
+    <div class="skel"><div class="s"></div></div>
+    <div class="skel"><div class="s"></div></div>
+  </div>
+
+  <div class="grid" id="grid" hidden></div>
+
+  <div class="empty" id="empty" hidden>
+    <h3>No tokens yet</h3>
+    <p>Nothing has launched on this deployment. A launch is free — the curve is
+    the liquidity, and trading fees pay you from the first buy.</p>
+    <a href="/app?launch=token" id="empty-launch">Launch the first →</a>
+  </div>
+  <p class="note" id="note" hidden></p>
+</main>
+
+<script src="/brand.js"></script>
+<script src="/ui.js"></script>
+<script src="/wallet.js"></script>
+<script src="/shell.js"></script>
+<script src="/launch.js"></script>
+<script src="/token.js"></script>
+<script>
+(function () {
+  "use strict";
+  var esc = UI.esc, shortAddr = UI.shortAddr;
+  Shell.mount({ active: "explore", search: true });
+  var qs = new URLSearchParams(location.search);
+  if (qs.get("cluster")) window.Launch.cluster(qs.get("cluster"));
+
+  var $ = function (id) { return document.getElementById(id); };
+  var state = [];                                  // {rec, mkt|null}
+  var filter = "all";
+
+  fetch("/api/tokens").then(function (r) { return r.json(); })
+    .then(function (j) { return (j.tokens || []); })
+    .catch(function () { return []; })
+    .then(load);
+
+  function load(records) {
+    $("skel").hidden = true;
+    if (!records.length) { $("empty").hidden = false; return; }
+    state = records.map(function (rec) { return { rec: rec, mkt: null }; });
+    $("grid").hidden = false;
+    draw();
+    state.forEach(function (row) {
+      window.Token.readMarket(row.rec.mint).then(function (m) {
+        row.mkt = m; draw();
+      }).catch(function () {});
+    });
+  }
+
+  function visible(row) {
+    if (filter === "all") return true;
+    if (!row.mkt) return filter === "curve";       // unknown counts as on-curve
+    return filter === "grad" ? row.mkt.migrated : !row.mkt.migrated;
+  }
+
+  function draw() {
+    $("grid").innerHTML = state.filter(visible).map(function (row) {
+      var r = row.rec, m = row.mkt;
+      var sym = (r.symbol || "?").toUpperCase();
+      var pct = m ? Math.min(100, m.progress * 100) : 0;
+      return '<a class="tk" data-name="' + esc(r.name + " " + sym) +
+        '" href="/token/' + esc(r.mint) + '">' +
+        '<span class="top">' +
+          '<span class="coin">' + esc(sym.slice(0, 1)) + "</span>" +
+          '<span class="who"><b>$' + esc(sym) + "</b><span>" + esc(r.name) +
+            ' · <span class="mono">' + esc(shortAddr(r.mint)) + "</span></span></span>" +
+          (m ? '<span class="tag ' + (m.migrated ? "grad" : "curve") + '">' +
+                (m.migrated ? "Graduated" : "On the curve") + "</span>" : "") +
+        "</span>" +
+        '<span class="bar"><i style="width:' + pct.toFixed(1) + '%"></i></span>' +
+        '<span class="nums"><span>' +
+          (m ? "<b>" + UI.fmt(m.raised, 2) + "</b> / " + UI.fmt(m.threshold, 0) +
+               " " + esc(m.quote) + " raised"
+             : "reading the curve…") +
+        "</span><span>" + (m && !m.migrated ? pct.toFixed(1) + "%" : "") +
+        "</span></span></a>";
+    }).join("");
+    if (!$("grid").innerHTML) {
+      $("grid").innerHTML = '<p class="note" style="grid-column:1/-1">Nothing matches that filter.</p>';
+    }
+  }
+
+  $("filters").addEventListener("click", function (e) {
+    var b = e.target.closest(".chip"); if (!b) return;
+    filter = b.dataset.f;
+    document.querySelectorAll(".chip").forEach(function (x) {
+      x.classList.toggle("on", x === b);
+    });
+    draw();
+  });
+
+  // the empty-state launch button opens the token window right here
+  $("empty-launch").addEventListener("click", function (e) {
+    e.preventDefault();
+    Shell.ensureLaunchStack().then(function () { window.LaunchPanel.openMode("token"); });
+  });
+
+  document.addEventListener("shell:search", function (e) {
+    var q = (e.detail.query || "").trim().toLowerCase();
+    document.querySelectorAll("[data-name]").forEach(function (c) {
+      c.style.display = !q || (c.dataset.name || "").toLowerCase().indexOf(q) >= 0 ? "" : "none";
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Docs</title>
+<meta name="description" content="How the editor, the launchpad, tokens and rewards actually work.">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+/* Docs: a sticky section rail on the left, readable measure on the right.
+ * Everything stated here is checked against what the code actually does —
+ * docs that flatter the product are worse than none. */
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+html,body{margin:0;min-height:100%}
+body{background:var(--void);color:var(--ink);font:400 15px/1.7 Inter,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono",monospace}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+main{max-width:1200px;margin:0 auto;padding:44px 24px 120px;
+  display:grid;grid-template-columns:220px minmax(0,1fr);gap:48px}
+@media (max-width:860px){main{grid-template-columns:1fr}.rail{display:none}}
+
+.rail{position:sticky;top:84px;align-self:start;font-size:13px}
+.rail a{display:block;padding:6px 10px;border-left:2px solid var(--line);
+  color:var(--dim);text-decoration:none;transition:color .15s,border-color .15s}
+.rail a:hover{color:var(--ink)}
+
+h1{font-family:Archivo;font-size:clamp(30px,4vw,46px);font-weight:800;
+  letter-spacing:-.02em;margin:0 0 10px}
+.lede{color:var(--dim);font-size:16px;max-width:62ch;margin:0 0 40px}
+h2{font-family:Archivo;font-size:23px;font-weight:800;letter-spacing:-.015em;
+  margin:56px 0 12px;padding-top:16px;border-top:1px solid var(--line)}
+h3{font-family:Archivo;font-size:16px;font-weight:700;margin:26px 0 8px}
+p{margin:0 0 14px;max-width:70ch;color:var(--dim)}
+p b,li b{color:var(--ink)}
+ul{margin:0 0 14px;padding-left:20px;max-width:68ch;color:var(--dim)}
+li{margin-bottom:6px}
+code{font:500 13px ui-monospace,monospace;background:var(--panel2);
+  padding:2px 6px;border-radius:5px;color:var(--ink)}
+.callout{border:1px solid var(--line2);border-left:3px solid var(--accent);
+  border-radius:6px;background:var(--panel);padding:14px 16px;margin:0 0 16px;
+  max-width:68ch;font-size:14px;color:var(--dim)}
+table{border-collapse:collapse;margin:0 0 16px;font-size:14px}
+th,td{text-align:left;padding:8px 16px 8px 0;border-bottom:1px solid var(--line);
+  color:var(--dim)}
+th{color:var(--faint);font:600 11px "IBM Plex Mono",monospace;letter-spacing:.12em;
+  text-transform:uppercase}
+td b{color:var(--ink)}
+</style>
+</head>
+<body>
+<main>
+  <nav class="rail" aria-label="Sections">
+    <a href="#what">What this is</a>
+    <a href="#editor">The editor</a>
+    <a href="#files">Your own files</a>
+    <a href="#launch">Launching a collection</a>
+    <a href="#mint">Minting</a>
+    <a href="#storage">Storage &amp; costs</a>
+    <a href="#tokens">Tokens</a>
+    <a href="#pairs">Pairs &amp; rewards</a>
+    <a href="#fees">Fees</a>
+    <a href="#safety">Wallets &amp; safety</a>
+  </nav>
+
+  <article>
+    <h1 class="disp">Docs</h1>
+    <p class="lede">Everything on this page describes what the site actually does on
+    chain. If something here disagrees with what you see, the docs are wrong —
+    <a href="/faq">tell us</a>, or read the plain-English version on the
+    <a href="/faq">FAQ</a>.</p>
+
+    <h2 id="what">What this is</h2>
+    <p>Three things in one place, in the order most people use them:</p>
+    <ul>
+      <li><b>An editor</b> that runs in the browser. You draw the traits — backgrounds,
+      bodies, eyes, hats — set how rare each one is, and it generates the whole
+      collection with metadata.</li>
+      <li><b>A launchpad</b> that deploys your collection to Solana as a
+      <b>Metaplex Core</b> collection with a <b>Candy Machine</b> handling the mint —
+      price, supply, allowlist waves, team splits, the lot. Tokens launch on a
+      <b>Meteora bonding curve</b> from the same Launch menu.</li>
+      <li><b>A marketplace</b> that lists what launched here. Supply, minted and
+      price are read from the chain when the page loads — there is no listing
+      fee, no approval queue and no database of numbers we could edit.</li>
+    </ul>
+    <p>Everything deploys from <b>your</b> wallet. We never hold your art, your keys,
+    your funds or your collection.</p>
+
+    <h2 id="editor">The editor</h2>
+    <p>Open it from <b>Launch → Collection → Draw it here</b>. The canvas draws in
+    layers, one layer per trait category. The first category is the background —
+    it renders furthest back, every later category stacks on top.</p>
+    <h3>Traits and rarity</h3>
+    <p>Each category holds any number of traits, and every trait has a
+    <b>weight</b>. Weights are relative odds, not percentages: a weight-5 hat
+    shows up five times as often as a weight-1 hat in the same category. The
+    generator rolls one trait per category for each piece.</p>
+    <h3>Generating</h3>
+    <p>When you generate, the editor assembles the full set — art plus a metadata
+    file per piece with the trait names your rarity tools and marketplaces read.
+    You can regenerate as many times as you like before launching; nothing
+    touches the chain until you say launch.</p>
+
+    <h2 id="files">Bring your own files</h2>
+    <p>Already have finished art? <b>Launch → Collection → I already have the
+    files</b>, then drop the PNGs in the box (or click it to browse).</p>
+    <ul>
+      <li>Files are ordered <b>naturally</b> — <code>2.png</code> comes before
+      <code>10.png</code>, the way your file manager shows them — and renamed
+      <code>1.png</code> upward.</li>
+      <li>Metadata is optional. If you bring it, it is one <code>.json</code> per
+      image with a matching name: <code>4.png</code> pairs with <code>4.json</code>.</li>
+      <li>If <b>any</b> json comes along, <b>every</b> image must have its pair. A
+      half-paired collection silently loses half its traits, so we refuse it
+      up front instead of letting you find out at reveal.</li>
+      <li>No metadata? We generate a clean file per piece so wallets and
+      marketplaces render your collection properly.</li>
+    </ul>
+
+    <h2 id="launch">Launching a collection</h2>
+    <p>The launch window is the same whether the art came from the editor or a
+    folder. Everything below is deployed in your transaction, owned by your
+    wallet:</p>
+    <ul>
+      <li><b>Price and supply</b> — mint price in SOL (zero is allowed) and how
+      many exist. Supply is fixed at launch.</li>
+      <li><b>Per-wallet cap</b> — a hard on-chain limit per minting wallet.</li>
+      <li><b>Allowlist waves</b> — paste wallet lists and give each wave its own
+      start time and price. Waves are enforced by the chain with Merkle proofs,
+      not by our server; the public phase opens whenever the last wave ends.</li>
+      <li><b>Team splits</b> — reserve pieces that mint to teammates' addresses at
+      deploy time, before the public sees the machine.</li>
+      <li><b>Royalties</b> — a percentage and the address it pays to.</li>
+      <li><b>Schedule</b> — open at launch, or at a time you pick.</li>
+    </ul>
+    <div class="callout"><b>Bot protection is on by default.</b> A wallet that tries
+    to mint against the rules pays a small tax and receives nothing. That is the
+    machine defending your drop, not a bug.</div>
+
+    <h2 id="mint">Minting</h2>
+    <p>Every launch gets a mint page at <code>/mint/&lt;machine&gt;</code> the moment
+    it is live — share that link and people can mint with a connected wallet.
+    The page reads supply, minted count and price from the chain on load.</p>
+
+    <h2 id="storage">Storage &amp; costs</h2>
+    <p>Art and metadata go to <b>Arweave</b>, permanent storage the collection's
+    metadata points at forever. You pay the storage cost in SOL at launch —
+    the exact number is quoted in the confirm window before you sign anything.
+    Storage is priced by the byte, so it scales with your art, not with your
+    supply of nerves.</p>
+    <p>Launching is otherwise free: no listing fee, no platform cut of your mint
+    revenue. Solana network fees (fractions of a cent per transaction) apply as
+    they do everywhere.</p>
+
+    <h2 id="tokens">Tokens</h2>
+    <p>A token launches on a <b>bonding curve</b> — Meteora's Dynamic Bonding
+    Curve. There is no liquidity pool to create and no LP to manage: the curve
+    itself is the liquidity, buys push the price up it, sells push it down.</p>
+    <ul>
+      <li><b>Supply</b> is fixed: 1,000,000,000 per token, no exceptions, metadata
+      immutable — nobody can rename or re-image a token after launch.</li>
+      <li><b>Priced in</b> SOL, USDC, or a real-world asset (a tokenised stock or
+      commodity) where a curve config exists for it.</li>
+      <li><b>Your first buy</b> can ride in the same transaction that creates the
+      pool, so a sniper cannot get in front of your own launch.</li>
+      <li><b>Graduation</b> — when the curve raises its target, liquidity migrates
+      automatically to a Meteora DAMM v2 pool and the LP is permanently locked.
+      Trading continues on Jupiter and every major aggregator.</li>
+    </ul>
+    <p>Curve targets are locked in the launchpad's config — identical for every
+    launch, so nobody negotiates a better curve than you. The launch window
+    reads them from the chain and shows them before you sign.</p>
+
+    <h2 id="pairs">Pairs &amp; rewards</h2>
+    <p>A <b>pair</b> is a collection and a token launched together. The point is the
+    fee loop: the token's trading generates fees, the creator's share of those
+    fees can pay straight to a reward vault, and that vault funds rewards for
+    the collection's holders — in SOL, USDC, or real-world assets like
+    tokenised stocks and gold, chosen from a verified list at launch.</p>
+    <p>The staking side — holders burning the token to activate their NFTs and
+    claim rewards — is in development and will say so on every screen until it
+    is live and audited. Nothing on this site pretends otherwise.</p>
+
+    <h2 id="fees">Fees</h2>
+    <table>
+      <tr><th>Action</th><th>Cost</th></tr>
+      <tr><td>Using the editor</td><td><b>Free</b></td></tr>
+      <tr><td>Launching a collection</td><td><b>Storage only</b> — quoted in SOL before you sign</td></tr>
+      <tr><td>Launching a token</td><td><b>Free</b> (tiny metadata storage + network fees)</td></tr>
+      <tr><td>Minting</td><td>The creator's mint price + network fee</td></tr>
+      <tr><td>Trading a token</td><td><b>1%</b> of each swap</td></tr>
+    </table>
+    <p>The 1% trading fee splits <b>20% to the creator, 60% to the platform, 20% to
+    Meteora</b> — on the curve and, after graduation, from the locked LP forever.
+    The creator's share is the stream that funds holder rewards on a pair.</p>
+
+    <h2 id="safety">Wallets &amp; safety</h2>
+    <ul>
+      <li>We support Solana wallets through Wallet Standard — Phantom, Solflare,
+      Backpack and friends, including Ledger through those wallets.</li>
+      <li>Every deploy, mint and trade is a transaction <b>you</b> sign in
+      <b>your</b> wallet. There is no deposit step and no account to fund.</li>
+      <li>We never ask for a seed phrase or private key. Anyone who does is not us.</li>
+      <li>Your collection, its update authority and its mint revenue belong to
+      the wallet that launched it. If this site vanished tomorrow, your
+      collection, art and token would keep working — the art is on Arweave,
+      the logic is on Solana.</li>
+    </ul>
+  </article>
+</main>
+
+<script src="/brand.js"></script>
+<script src="/ui.js"></script>
+<script src="/wallet.js"></script>
+<script src="/shell.js"></script>
+<script>Shell.mount({ active: "docs", search: false });</script>
+</body>
+</html>

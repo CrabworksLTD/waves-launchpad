@@ -591,7 +591,7 @@
         return;
       }
 
-      recordCollection(cfg, res, null);
+      recordCollection(cfg, res, null, up);
       nftDone(cfg, res, up);
     } catch (e) {
       busy = false;
@@ -602,7 +602,7 @@
     }
   }
 
-  function recordCollection(cfg, res, tokenMint) {
+  function recordCollection(cfg, res, tokenMint, up) {
     // Fire-and-forget: the collection is already on chain, and a launch must
     // never look failed because a listing endpoint was down.
     fetch("/api/collections", {
@@ -611,6 +611,7 @@
       body: JSON.stringify({
         candyMachine: res.candyMachine, collection: res.collection,
         name: cfg.name, cluster: res.cluster, tokenMint: tokenMint || null,
+        avatar: (up && up.avatarUri) || null,
         creator: (window.Wallet.current() || {}).publicKey || null
       })
     }).catch(function () {});
@@ -825,7 +826,7 @@
       if (b) box.querySelector("#lp-tbuy").value = b.dataset.v;
     });
     box.querySelector("#lp-x").onclick = function () {
-      if (nft) { recordCollection(nft.cfg, nft.res, null); nftDone(nft.cfg, nft.res, nft.up); }
+      if (nft) { recordCollection(nft.cfg, nft.res, null, nft.up); nftDone(nft.cfg, nft.res, nft.up); }
       else modeSelect();
     };
     box.querySelector("#lp-reward").onclick = function () { collect(); rewardPicker(flow); };
@@ -1016,7 +1017,7 @@
       mark("pool", "done");
 
       // Link the records both ways for a pair.
-      if (flow.nft) recordCollection(flow.nft.cfg, flow.nft.res, res.mint);
+      if (flow.nft) recordCollection(flow.nft.cfg, flow.nft.res, res.mint, flow.nft.up);
 
       busy = false;
       tokenDone(flow, res);

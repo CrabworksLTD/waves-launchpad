@@ -32,8 +32,12 @@
       { label: "Token",      mode: "token" },
       { label: "Pair",       mode: "pair" }
     ]},
-    { id: "docs",        label: "Docs",        href: "#" },
-    { id: "faq",         label: "FAQ",         href: "#" }
+    { id: "explore", label: "Explore", menu: [
+      { label: "Collections", href: "/collections" },
+      { label: "Tokens",      href: "/tokens" }
+    ]},
+    { id: "docs",        label: "Docs",        href: "/docs" },
+    { id: "faq",         label: "FAQ",         href: "/faq" }
   ];
 
   var CSS = [
@@ -160,8 +164,10 @@
               '<button aria-haspopup="true" aria-expanded="false">' +
               window.UI.esc(n.label) + " <i>▾</i></button><div class=\"menu\">" +
               n.menu.map(function (m) {
-                return '<a href="/app?launch=' + m.mode + '" data-mode="' + m.mode + '">' +
-                  window.UI.esc(m.label) + "</a>";
+                return m.href
+                  ? '<a href="' + m.href + '">' + window.UI.esc(m.label) + "</a>"
+                  : '<a href="/app?launch=' + m.mode + '" data-mode="' + m.mode + '">' +
+                    window.UI.esc(m.label) + "</a>";
               }).join("") + "</div></div>";
           }
           return '<a href="' + n.href + '"' +
@@ -180,9 +186,8 @@
       </div>
     `);
 
-    /* ---- launch dropdown ---- */
-    var dd = document.getElementById("shl-dd-launch");
-    if (dd) {
+    /* ---- nav dropdowns (Launch, Explore) ---- */
+    document.querySelectorAll(".shl-nav .shl-dd").forEach(function (dd) {
       var trig = dd.querySelector("button");
       function setOpen(v) {
         dd.classList.toggle("open", v);
@@ -200,6 +205,7 @@
         a.addEventListener("click", function (e) {
           var mode = a.dataset.mode;
           setOpen(false);
+          if (!mode) return;                      // plain link (Explore items)
           // On the editor page itself the panel handles everything directly.
           if (window.LaunchPanel && window.LaunchPanel.openMode) {
             e.preventDefault();
@@ -223,7 +229,7 @@
           });
         });
       });
-    }
+    });
 
     /* ---- search ---- */
     if (opts.search !== false) {
