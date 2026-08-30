@@ -145,12 +145,8 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
   }
 
   async function connect() {
-    var found = window.Wallet.list();
-    if (!found.length) return say("err", "No Solana wallet found. Install Phantom or Solflare.");
-    try {
-      await window.Wallet.connect(found[0].id);
-      load();
-    } catch (e) { say("err", e.message); }
+    var w = await (window.Shell ? Shell.connect() : Promise.resolve(null));
+    if (w) load();
   }
 
   async function mint() {

@@ -69,6 +69,30 @@
     "  border:1px solid var(--line2);border-radius:8px;padding:8px 11px;",
     "  font:400 13.5px Inter,sans-serif}",
     ".shl-search input:focus{outline:none;border-color:var(--faint)}",
+    /* connect popup */
+    ".shl-back{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);",
+    "  backdrop-filter:blur(5px);display:grid;place-items:center;padding:24px}",
+    ".shl-card{width:min(400px,100%);background:var(--panel);border:1px solid var(--line2);",
+    "  border-radius:14px;padding:20px}",
+    ".shl-card .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}",
+    ".shl-card .hd b{font:700 15px Archivo,sans-serif}",
+    ".shl-card .hd button{width:30px;height:30px;border:0;border-radius:8px;background:transparent;",
+    "  color:var(--faint);font-size:17px;cursor:pointer}",
+    ".shl-card .hd button:hover{background:var(--panel2);color:var(--ink)}",
+    ".shl-w{display:flex;align-items:center;gap:12px;width:100%;padding:10px;margin-top:6px;",
+    "  border:1px solid var(--line);border-radius:10px;background:transparent;cursor:pointer;",
+    "  text-align:left;font:inherit;color:var(--ink);text-decoration:none;",
+    "  transition:border-color .15s,background .15s}",
+    ".shl-w:hover{border-color:var(--faint);background:var(--panel2)}",
+    ".shl-w .ic{width:34px;height:34px;border-radius:9px;flex:none;display:grid;",
+    "  place-items:center;font:700 15px Archivo,sans-serif;color:#fff;overflow:hidden}",
+    ".shl-w .ic img{width:100%;height:100%;display:block}",
+    ".shl-w b{font:600 13.5px Inter,sans-serif;flex:1}",
+    ".shl-w .st{font-size:11.5px;color:var(--faint)}",
+    ".shl-w.busy{pointer-events:none;border-color:var(--accent)}",
+    ".shl-w.busy .st{color:var(--accent)}",
+    ".shl-werr{margin-top:10px;font-size:12px;color:#ffb3b3;background:rgba(255,107,107,.1);",
+    "  border:1px solid rgba(255,107,107,.35);border-radius:8px;padding:9px 11px}",
     "@media (max-width:860px){.shl-nav{display:none}.shl{gap:10px}}"
   ].join("\n");
 
@@ -154,9 +178,7 @@
         window.Wallet.disconnect().then(paint);
         return;
       }
-      var found = window.Wallet.list();
-      if (!found.length) { btn.innerHTML = "<span>No wallet found</span>"; return; }
-      window.Wallet.connect(found[0].id).then(paint).catch(function () { paint(); });
+      connectModal().then(paint);
     });
     if (window.Wallet) window.Wallet.on("change", paint);
     paint();
@@ -164,5 +186,97 @@
     var n = 0, t = setInterval(function () { paint(); if (++n > 5) clearInterval(t); }, 450);
   }
 
-  window.Shell = { mount: mount };
+  /* The connect popup, after Moonpad's: the full roster of known wallets,
+   * whether or not they answered the roll call. Installed ones connect and
+   * hold a "confirm in your wallet" state until the extension answers — a
+   * popup that vanishes mid-handshake reads as a failure. Missing ones link
+   * to their install page. Detected wallets bring their own icon (Wallet
+   * Standard ships one as a data URI); the roster fallback is a brand tile. */
+  var KNOWN = [
+    { match: /phantom/i,  name: "Phantom",  bg: "#ab9ff2", url: "https://phantom.com/download" },
+    { match: /solflare/i, name: "Solflare", bg: "#fc7227", url: "https://solflare.com/download" },
+    { match: /backpack/i, name: "Backpack", bg: "#e33e3f", url: "https://backpack.app/download" },
+    { match: /metamask/i, name: "MetaMask", bg: "#f6851b", url: "https://metamask.io/download/" },
+    { match: /okx/i,      name: "OKX Wallet", bg: "#111111", url: "https://web3.okx.com/download" },
+    { match: /coinbase/i, name: "Coinbase Wallet", bg: "#0052ff", url: "https://www.coinbase.com/wallet" }
+  ];
+  var LAST_KEY = (window.BRAND ? window.BRAND.key("wallet") : "wallet.last");
+
+  function connectModal() {
+    return new Promise(function (resolve) {
+      var old = document.getElementById("shl-pick");
+      if (old) old.remove();
+
+      var back = document.createElement("div");
+      back.className = "shl-back";
+      back.id = "shl-pick";
+      back.addEventListener("click", function (e) {
+        if (e.target === back) { back.remove(); resolve(null); }
+      });
+
+      var detected = window.Wallet ? window.Wallet.list() : [];
+      var last = null;
+      try { last = localStorage.getItem(LAST_KEY); } catch (e) {}
+
+      var rows = KNOWN.map(function (k) {
+        var hit = detected.find(function (d) { return k.match.test(d.name); });
+        return { known: k, det: hit || null, recent: hit && hit.name === last };
+      });
+      // detected wallets the roster does not know still get a row
+      detected.forEach(function (d) {
+        if (!rows.some(function (r) { return r.det && r.det.id === d.id; })) {
+          rows.push({ known: { name: d.name, bg: "#333" }, det: d, recent: d.name === last });
+        }
+      });
+      rows.sort(function (a, b) {
+        return (b.recent - a.recent) || (!!b.det - !!a.det);
+      });
+
+      var card = document.createElement("div");
+      card.className = "shl-card";
+      card.innerHTML = '<div class="hd"><b>Connect a wallet</b>' +
+        '<button aria-label="Close">×</button></div>' +
+        rows.map(function (r, i) {
+          var ic = r.det && r.det.icon
+            ? '<span class="ic"><img alt="" src="' + window.UI.esc(r.det.icon) + '"></span>'
+            : '<span class="ic" style="background:' + r.known.bg + '">' +
+              window.UI.esc(r.known.name.slice(0, 1)) + "</span>";
+          if (r.det) {
+            return '<button class="shl-w" data-i="' + i + '">' + ic +
+              "<b>" + window.UI.esc(r.det.name) + "</b>" +
+              '<span class="st">' + (r.recent ? "Recent" : "Detected") + "</span></button>";
+          }
+          return '<a class="shl-w" href="' + r.known.url + '" target="_blank" rel="noopener">' +
+            ic + "<b>" + window.UI.esc(r.known.name) + '</b><span class="st">Install ↗</span></a>';
+        }).join("") +
+        '<div id="shl-werr" hidden class="shl-werr"></div>';
+      back.appendChild(card);
+      document.body.appendChild(back);
+
+      card.querySelector(".hd button").addEventListener("click", function () {
+        back.remove(); resolve(null);
+      });
+      card.querySelectorAll("button.shl-w").forEach(function (b) {
+        b.addEventListener("click", function () {
+          var r = rows[+b.dataset.i];
+          b.classList.add("busy");
+          b.querySelector(".st").textContent = "Confirm in your wallet…";
+          window.Wallet.connect(r.det.id).then(function (w) {
+            try { localStorage.setItem(LAST_KEY, r.det.name); } catch (e) {}
+            back.remove(); resolve(w);
+          }).catch(function (e) {
+            b.classList.remove("busy");
+            b.querySelector(".st").textContent = r.recent ? "Recent" : "Detected";
+            var err = card.querySelector("#shl-werr");
+            err.hidden = false;
+            err.textContent = /reject/i.test(String(e && e.message))
+              ? "You declined in the wallet."
+              : String(e && e.message || "Could not connect.").slice(0, 120);
+          });
+        });
+      });
+    });
+  }
+
+  window.Shell = { mount: mount, connect: connectModal };
 })();

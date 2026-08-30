@@ -450,10 +450,8 @@
     go.onclick = w
       ? function () { doNftLaunch(cfg, flow); }
       : async function () {
-          var found = window.Wallet.list();
-          if (!found.length) return fail(box, "No Solana wallet found. Install Phantom or Solflare.");
-          try { await window.Wallet.connect(found[0].id); nftConfirm(cfg, flow); }
-          catch (e) { fail(box, e.message); }
+          var w2 = await (window.Shell ? Shell.connect() : Promise.resolve(null));
+          if (w2) nftConfirm(cfg, flow);
         };
   }
 
@@ -784,10 +782,8 @@
     go.onclick = w
       ? function () { doTokenLaunch(flow); }
       : async function () {
-          var found = window.Wallet.list();
-          if (!found.length) return fail(box, "No Solana wallet found.");
-          try { await window.Wallet.connect(found[0].id); tokenConfirm(flow); }
-          catch (e) { fail(box, e.message); }
+          var w2 = await (window.Shell ? Shell.connect() : Promise.resolve(null));
+          if (w2) tokenConfirm(flow);
         };
   }
 
