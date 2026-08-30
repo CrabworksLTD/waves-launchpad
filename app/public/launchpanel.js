@@ -287,7 +287,7 @@
     var w = window.Wallet.current();
     if (!q.feeTo) throw new Error("Storage fees are not configured on this deployment");
 
-    var umi = mx.createUmi(window.Launch.clusters[window.Launch.cluster()].rpc)
+    var umi = mx.createUmi(window.Launch.clusters[window.Launch.cluster()].rpc, "confirmed")
       .use(mx.walletAdapterIdentity({
         publicKey: new mx.PublicKey(w.publicKey),
         signMessage: function (b) { return w.signMessage(b); },

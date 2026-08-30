@@ -52,7 +52,7 @@
   // metaplex bundle is loaded by the launch flow anyway.
   async function throwawayKey() {
     var mx = await metaplex();
-    var umi = mx.createUmi("https://api.mainnet-beta.solana.com");
+    var umi = mx.createUmi("https://api.mainnet-beta.solana.com", "confirmed");   // never used for rpc, consistent anyway
     var kp = mx.generateSigner(umi);
     var secret = kp.secretKey;                       // 64 bytes: seed || pubkey
     if (!secret || secret.length !== 64) throw new Error("bad throwaway keypair");

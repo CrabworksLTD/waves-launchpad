@@ -38,7 +38,13 @@ const SUPPLY = 5;                 // small: every config line is a transaction s
   const step = (n, s) => console.log("\n  " + n + "  " + s);
   const ok = (s) => console.log("      ok   " + s);
 
-  const umi = createUmi(RPC).use(mplCore()).use(mplCandyMachine());
+  // "confirmed", explicitly. createUmi defaults to "finalized", which makes
+  // every simulation run against the finalized bank — a transaction confirmed
+  // one second ago is invisible there for ~13-30s, so any strictly sequential
+  // flow (create collection -> create candy machine over it) fails with the
+  // second tx reading a zero-length account. On devnet that panics
+  // intermittently; on a local validator, always.
+  const umi = createUmi(RPC, "confirmed").use(mplCore()).use(mplCandyMachine());
 
   /* ---- wallet ----
      The keypair is persisted so a funded one survives reruns. Devnet faucets

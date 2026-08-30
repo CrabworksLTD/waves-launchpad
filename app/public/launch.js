@@ -63,7 +63,10 @@
     if (!w) throw new Error("Connect a wallet first");
     var mx = await metaplex();
     var conf = CLUSTERS[cluster] || CLUSTERS["mainnet-beta"];
-    var umi = mx.createUmi(conf.rpc)
+    // "confirmed", not umi's "finalized" default — at finalized, a strictly
+    // sequential deploy (collection then machine) simulates against a bank
+    // where its own previous step does not exist yet. See devnet-smoke.js.
+    var umi = mx.createUmi(conf.rpc, "confirmed")
       .use(mx.mplCore())
       .use(mx.mplCandyMachine())
       .use(mx.walletAdapterIdentity(asAdapter(mx, w)));
@@ -221,7 +224,7 @@
       // The mint page has to show supply and price before anyone connects.
       var mx = await metaplex();
       var conf = CLUSTERS[cluster] || CLUSTERS["mainnet-beta"];
-      return { mx: mx, umi: mx.createUmi(conf.rpc).use(mx.mplCore()).use(mx.mplCandyMachine()), conf: conf };
+      return { mx: mx, umi: mx.createUmi(conf.rpc, "confirmed").use(mx.mplCore()).use(mx.mplCandyMachine()), conf: conf };
     });
     var mx = c.mx, umi = c.umi;
     var cm = await mx.fetchCandyMachine(umi, mx.publicKey(candyMachineAddress));
