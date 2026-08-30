@@ -22,8 +22,9 @@
   var H = window.UI.html, raw = window.UI.raw, render = window.UI.render,
       on = window.UI.on, shortAddr = window.UI.shortAddr;
 
+  // No "Collections" home link — the logo mark is the way home, and the
+  // Explore menu is the way to the marketplaces.
   var NAV = [
-    { id: "collections", label: "Collections", href: "/" },
     // Launch is a menu, not a link: the three launch modes, reachable from any
     // page. On /app the items open the panel directly; elsewhere they carry
     // the mode in the query and the panel opens itself on arrival.
