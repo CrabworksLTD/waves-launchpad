@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Profile</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+/* Profile, after the reference: centered avatar, the address in gradient type,
+ * Collections/Portfolio tabs, and the two action cards as the empty state.
+ * Corner mosaics are decoration and stay out of the DOM's way. */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--void);color:var(--ink);font:400 15px/1.6 Inter,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono",monospace}
+a{color:inherit;text-decoration:none}
+
+.mosaic{position:fixed;z-index:0;pointer-events:none;opacity:.9}
+.mosaic.tl{top:60px;left:0}
+.mosaic.tr{top:60px;right:0;transform:scaleX(-1)}
+
+main{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:44px 24px 90px}
+
+.idbox{text-align:center;margin-bottom:44px}
+.avatar{width:96px;height:96px;margin:0 auto 20px;border-radius:10px;background:var(--raise);
+  border:1px solid var(--line2);display:grid;place-items:center;cursor:pointer;
+  color:var(--faint);overflow:hidden;transition:border-color .2s}
+.avatar:hover{border-color:var(--faint)}
+.avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.avatar svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round}
+.who{display:flex;align-items:center;justify-content:center;gap:10px}
+.who b{font-family:Archivo;font-size:clamp(26px,4vw,40px);font-weight:800;
+  letter-spacing:-.02em;background:var(--grad);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.who button{border:0;background:transparent;color:var(--faint);cursor:pointer;
+  font-size:15px;padding:6px}
+.who button:hover{color:var(--ink)}
+.who input{font-family:Archivo;font-size:24px;font-weight:800;background:var(--void);
+  color:var(--ink);border:1px solid var(--line2);border-radius:8px;padding:6px 12px;
+  text-align:center;max-width:260px}
+
+.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin-bottom:30px}
+.tab{font-family:Archivo;font-size:17px;font-weight:800;letter-spacing:-.01em;
+  padding:0 2px 12px;border:0;background:transparent;cursor:pointer;color:var(--faint);
+  border-bottom:2px solid transparent;transition:color .18s}
+.tab[aria-selected="true"]{color:transparent;background:var(--grad);
+  -webkit-background-clip:text;background-clip:text;border-bottom-color:var(--accent)}
+.tab:hover{color:var(--dim)}
+.tab[aria-selected="true"]:hover{color:transparent}
+
+.actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,340px));
+  gap:22px;justify-content:center;padding:20px 0}
+.act{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:34px 28px;text-align:center}
+.act svg{width:64px;height:64px;stroke:var(--accent);fill:none;stroke-width:1.4;
+  stroke-linecap:round;stroke-linejoin:round;margin-bottom:18px}
+.act h3{font-family:Archivo;font-size:18px;font-weight:800;margin:0 0 8px}
+.act p{color:var(--dim);font-size:13.5px;margin:0 0 20px}
+.act a{display:inline-block;padding:10px 20px;border-radius:999px;
+  font:700 13px Archivo,sans-serif;background:var(--raise);border:1px solid var(--line2);
+  transition:background .2s,border-color .2s}
+.act a:hover{background:var(--panel2);border-color:var(--faint)}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:4px;
+  overflow:hidden;display:block;transition:border-color .2s}
+.card:hover{border-color:var(--faint)}
+.card .meta{padding:11px 13px 13px}
+.card .meta b{display:block;font-family:Archivo;font-size:14px;font-weight:700}
+.card .meta span{display:block;margin-top:2px;font-size:12px;color:var(--faint)}
+.none{border:1px dashed var(--line2);border-radius:6px;padding:44px 24px;text-align:center}
+.none p{margin:0 0 4px;font-family:Archivo;font-weight:700}
+.none span{color:var(--faint);font-size:13px}
+input[type=file]{display:none}
+</style>
+</head>
+<body>
+
+<svg class="mosaic tl" width="150" height="220" viewBox="0 0 150 220" aria-hidden="true">
+  <defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>
+  </linearGradient></defs>
+  <g fill="url(#g1)">
+    <rect x="0" y="0" width="50" height="50"/><rect x="50" y="50" width="50" height="50"/>
+    <rect x="0" y="50" width="50" height="50" opacity=".45"/>
+    <rect x="100" y="100" width="50" height="50" opacity=".7"/>
+    <rect x="50" y="150" width="50" height="50" opacity=".3"/>
+  </g>
+</svg>
+<svg class="mosaic tr" width="150" height="220" viewBox="0 0 150 220" aria-hidden="true">
+  <g fill="url(#g1)">
+    <rect x="0" y="20" width="50" height="50" opacity=".8"/>
+    <rect x="50" y="70" width="50" height="50"/>
+    <rect x="0" y="120" width="50" height="50" opacity=".4"/>
+    <rect x="100" y="0" width="50" height="50" opacity=".55"/>
+  </g>
+</svg>
+
+<main>
+  <div class="idbox">
+    <div class="avatar" id="avatar" title="Set a profile picture">
+      <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.4"/><path d="M18 5v-2m0 0h2m-2 0h-2" opacity=".7"/></svg>
+    </div>
+    <input type="file" id="avatar-file" accept="image/*">
+    <div class="who" id="who">
+      <b id="who-name">—</b>
+      <button id="who-edit" aria-label="Edit name" title="Edit display name">✎</button>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" id="t-col" role="tab" aria-selected="true">Collections</button>
+    <button class="tab" id="t-port" role="tab" aria-selected="false">Portfolio</button>
+  </div>
+
+  <div id="panel"></div>
+</main>
+
+<script src="/brand.js"></script>
+<script src="/ui.js"></script>
+<script src="/wallet.js"></script>
+<script src="/shell.js"></script>
+<script>
+(function () {
+  "use strict";
+  var esc = UI.esc, shortAddr = UI.shortAddr;
+  Shell.mount({ search: false });
+
+  var K_AVATAR = BRAND.key("profile.avatar");
+  var K_NAME = BRAND.key("profile.name");
+  var panel = document.getElementById("panel");
+  var tab = "col";
+
+  /* ---- identity: local, honest — nothing here pretends to be on-chain ---- */
+  function paintWho() {
+    var w = window.Wallet.current();
+    var name = null;
+    try { name = localStorage.getItem(K_NAME); } catch (e) {}
+    document.getElementById("who-name").textContent =
+      name || (w ? shortAddr(w.publicKey, 6) : "Connect a wallet");
+  }
+  document.getElementById("who-edit").addEventListener("click", function () {
+    var who = document.getElementById("who");
+    var cur = "";
+    try { cur = localStorage.getItem(K_NAME) || ""; } catch (e) {}
+    who.innerHTML = '<input id="who-in" maxlength="24" value="' + esc(cur) + '" placeholder="Display name">';
+    var inp = document.getElementById("who-in");
+    inp.focus();
+    function save() {
+      try {
+        if (inp.value.trim()) localStorage.setItem(K_NAME, inp.value.trim());
+        else localStorage.removeItem(K_NAME);
+      } catch (e) {}
+      location.reload();
+    }
+    inp.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") save();
+      if (e.key === "Escape") location.reload();
+    });
+    inp.addEventListener("blur", save);
+  });
+
+  var av = document.getElementById("avatar");
+  var avFile = document.getElementById("avatar-file");
+  try {
+    var saved = localStorage.getItem(K_AVATAR);
+    if (saved) av.innerHTML = '<img alt="" src="' + saved + '">';
+  } catch (e) {}
+  av.addEventListener("click", function () { avFile.click(); });
+  avFile.addEventListener("change", function () {
+    var f = avFile.files && avFile.files[0];
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      try { localStorage.setItem(K_AVATAR, r.result); } catch (e) {}
+      av.innerHTML = '<img alt="" src="' + r.result + '">';
+    };
+    r.readAsDataURL(f);
+  });
+
+  /* ---- tabs ---- */
+  function setTab(t) {
+    tab = t;
+    document.getElementById("t-col").setAttribute("aria-selected", String(t === "col"));
+    document.getElementById("t-port").setAttribute("aria-selected", String(t === "port"));
+    draw();
+  }
+  document.getElementById("t-col").addEventListener("click", function () { setTab("col"); });
+  document.getElementById("t-port").addEventListener("click", function () { setTab("port"); });
+
+  /* ---- content ---- */
+  function actionCards() {
+    return '<div class="actions">' +
+      '<div class="act"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" transform="rotate(45 12 12)"/><path d="M12 5.5 13 8l2.5 1L13 10l-1 2.5L11 10l-2.5-1L11 8Z"/><path d="M18 14l.6 1.5L20 16l-1.4.5L18 18l-.6-1.5L16 16l1.4-.5Z"/></svg>' +
+      "<h3>New Collection</h3><p>Already have your NFT assets? Upload and launch your collection.</p>" +
+      '<a href="/app?launch=files-collection">New Collection</a></div>' +
+      '<div class="act"><svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="4.5"/><path d="M9 4.5v-2M9 15.5v-2M4.5 9h-2M15.5 9h-2M6 6 4.6 4.6M13.4 13.4 12 12M12 6l1.4-1.4M4.6 13.4 6 12"/><circle cx="16.5" cy="16.5" r="3.4"/><path d="M16.5 13.1v-1.6M16.5 21.5v-1.6M13.1 16.5h-1.6M21.5 16.5h-1.6"/></svg>' +
+      "<h3>Generate Collection</h3><p>Create and launch a randomly generated collection from your traits.</p>" +
+      '<a href="/app">Generate Collection</a></div></div>';
+  }
+
+  function draw() {
+    var w = window.Wallet.current();
+    if (tab === "port") {
+      panel.innerHTML = '<div class="none"><p>Portfolio</p>' +
+        "<span>The assets this wallet holds — coming with the collection indexer.</span></div>";
+      return;
+    }
+    if (!w) { panel.innerHTML = actionCards(); return; }
+    fetch("/api/collections").then(function (r) { return r.json(); })
+      .then(function (j) { return (j.collections || []).filter(function (c) {
+        return c.creator === w.publicKey;
+      }); })
+      .catch(function () { return []; })
+      .then(function (mine) {
+        if (!mine.length) { panel.innerHTML = actionCards(); return; }
+        panel.innerHTML = '<div class="cards">' + mine.map(function (c) {
+          return '<a class="card" href="/mint/' + esc(c.candyMachine) + '">' +
+            '<div class="meta"><b>' + esc(c.name) + '</b><span class="mono">' +
+            esc(shortAddr(c.candyMachine)) + "</span></div></a>";
+        }).join("") + "</div>";
+      });
+  }
+
+  paintWho(); draw();
+  var n = 0, t = setInterval(function () {
+    paintWho(); if (window.Wallet.current()) { draw(); clearInterval(t); }
+    if (++n > 10) clearInterval(t);
+  }, 500);
+})();
+</script>
+</body>
+</html>

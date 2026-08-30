@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Launch — where are you starting from?</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+/* The fork page, after Moonpad's: a question, two cards, a trust line.
+ * The editor is one of two equal choices, never the default destination. */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--void);color:var(--ink);font:400 15px/1.6 Inter,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono",monospace}
+main{max-width:1240px;margin:0 auto;padding:56px 24px 90px}
+.eyebrow{display:flex;align-items:center;gap:10px;font:500 12px "IBM Plex Mono",monospace;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--accent);margin:0 0 22px}
+.eyebrow::before{content:"";width:26px;height:1px;background:var(--accent)}
+h1{font-family:Archivo;font-size:clamp(34px,4.6vw,58px);font-weight:800;
+  letter-spacing:-.025em;margin:0 0 14px}
+.lede{color:var(--dim);max-width:60ch;margin:0 0 44px;font-size:16px}
+.forks{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+@media (max-width:860px){.forks{grid-template-columns:1fr}}
+.fork{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  padding:22px 24px 26px;display:flex;flex-direction:column}
+.fork .art{border:1px solid var(--line);border-radius:4px;background:var(--bg);
+  padding:26px;display:grid;place-items:center;margin-bottom:22px}
+.fork h2{font-family:Archivo;font-size:19px;font-weight:700;margin:0 0 8px}
+.fork p{margin:0 0 14px;color:var(--dim);font-size:13.5px}
+.fork ul{margin:0 0 22px;padding:0;list-style:none;flex:1}
+.fork li{font:400 12px "IBM Plex Mono",monospace;color:var(--faint);
+  padding:3px 0;letter-spacing:.02em}
+.fork li::before{content:"—  ";color:var(--line2)}
+.cta{align-self:flex-start;display:inline-block;padding:12px 22px;border-radius:6px;
+  font:700 13.5px Archivo,sans-serif;text-decoration:none;
+  background:var(--grad);color:var(--accent-ink);transition:filter .2s}
+.cta:hover{filter:brightness(1.12)}
+.cta.ghost{background:var(--raise);color:var(--ink);border:1px solid var(--line2)}
+.trust{margin-top:40px;text-align:center;font:400 12px "IBM Plex Mono",monospace;
+  color:var(--faint);letter-spacing:.03em}
+svg .ln{stroke:var(--line2);fill:none;stroke-width:1.5}
+svg .ac{stroke:var(--accent);fill:none;stroke-width:1.5}
+svg .df{stroke:var(--accent);stroke-dasharray:3 4}
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow" id="eyebrow">Launch a collection</p>
+  <h1 class="disp">Where are you starting from?</h1>
+  <p class="lede">Either way you end up in the same place — your collection on
+  Solana, your art in permanent storage, and a mint page people can buy from.</p>
+
+  <div class="forks">
+    <section class="fork">
+      <div class="art" aria-hidden="true">
+        <svg width="220" height="72" viewBox="0 0 220 72">
+          <rect class="ln" x="12"  y="18" width="34" height="34" rx="3"/>
+          <rect class="ln" x="24"  y="12" width="34" height="34" rx="3"/>
+          <rect class="ln" x="36"  y="22" width="34" height="34" rx="3"/>
+          <path class="df" d="M92 36h34m0 0-7-6m7 6-7 6"/>
+          <rect class="ac" x="150" y="14" width="44" height="44" rx="6"/>
+          <rect fill="var(--accent)" x="162" y="28" width="6" height="6"/>
+          <rect fill="var(--accent)" x="176" y="28" width="6" height="6"/>
+          <rect fill="var(--accent)" x="164" y="42" width="16" height="4"/>
+        </svg>
+      </div>
+      <h2>Draw it here</h2>
+      <p>Start from a blank canvas. Draw each piece — backgrounds, bodies, eyes,
+      hats — set the odds, and the generator shuffles them into a whole collection.</p>
+      <ul>
+        <li>pixel or paint drawing, layers, rarity</li>
+        <li>generates every character for you with metadata</li>
+        <li>nothing to install</li>
+      </ul>
+      <a class="cta" href="/app">Open the editor →</a>
+    </section>
+
+    <section class="fork">
+      <div class="art" aria-hidden="true">
+        <svg width="220" height="72" viewBox="0 0 220 72">
+          <rect class="ln" x="18" y="12" width="22" height="22" rx="3"/>
+          <rect class="ln" x="46" y="12" width="22" height="22" rx="3"/>
+          <rect class="ln" x="18" y="40" width="22" height="22" rx="3"/>
+          <rect class="ln" x="46" y="40" width="22" height="22" rx="3"/>
+          <path class="df" d="M96 36h30m0 0-7-6m7 6-7 6"/>
+          <path class="ac" d="M168 54V22m0 0-11 11m11-11 11 11M148 60h40"/>
+        </svg>
+      </div>
+      <h2>I already have the files</h2>
+      <p>Bring your finished images — and their metadata if you have it, one json
+      per image, named to match. We don't write your json; we check every pair,
+      store both and deploy the collection.</p>
+      <ul>
+        <li>png images, plus an optional .json each</li>
+        <li>4.png needs 4.json — traits come from your files</li>
+        <li>no storage account, no keys</li>
+      </ul>
+      <a class="cta ghost" id="upload-cta" href="/app?launch=files-collection">Upload files →</a>
+    </section>
+  </div>
+
+  <p class="trust">Both paths deploy the same Metaplex Core collection from your own
+  wallet. We never hold your art, your money or your collection.</p>
+</main>
+
+<script src="/brand.js"></script>
+<script src="/ui.js"></script>
+<script src="/wallet.js"></script>
+<script src="/shell.js"></script>
+<script>
+Shell.mount({ active: "launch", search: false });
+// ?mode=pair keeps the choice through to the panel
+(function () {
+  var mode = new URLSearchParams(location.search).get("mode") === "pair" ? "pair" : "collection";
+  if (mode === "pair") {
+    document.getElementById("eyebrow").textContent = "Launch a pair";
+    document.getElementById("upload-cta").href = "/app?launch=files-pair";
+  }
+})();
+</script>
+</body>
+</html>

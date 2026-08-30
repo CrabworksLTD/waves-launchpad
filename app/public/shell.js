@@ -24,8 +24,14 @@
 
   var NAV = [
     { id: "collections", label: "Collections", href: "/" },
-    { id: "launch",      label: "Launch",      href: "/app" },
-    { id: "tools",       label: "Tools",       href: "#" },
+    // Launch is a menu, not a link: the three launch modes, reachable from any
+    // page. On /app the items open the panel directly; elsewhere they carry
+    // the mode in the query and the panel opens itself on arrival.
+    { id: "launch", label: "Launch", menu: [
+      { label: "Collection", mode: "collection" },
+      { label: "Token",      mode: "token" },
+      { label: "Pair",       mode: "pair" }
+    ]},
     { id: "docs",        label: "Docs",        href: "#" },
     { id: "faq",         label: "FAQ",         href: "#" }
   ];
@@ -49,6 +55,20 @@
     "  text-decoration:none;transition:color .18s,background .18s}",
     ".shl-nav a:hover{color:var(--ink);background:var(--panel2)}",
     ".shl-nav a.on{color:var(--ink)}",
+    ".shl-dd{position:relative}",
+    ".shl-dd>button{padding:8px 14px;border:0;border-radius:8px;font:400 14px Inter,sans-serif;",
+    "  color:var(--dim);background:transparent;cursor:pointer;display:flex;gap:6px;",
+    "  align-items:center;transition:color .18s,background .18s}",
+    ".shl-dd>button:hover,.shl-dd.open>button{color:var(--ink);background:var(--panel2)}",
+    ".shl-dd>button i{font-style:normal;font-size:9px;transform:translateY(1px)}",
+    ".shl-dd .menu{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);",
+    "  min-width:150px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;",
+    "  padding:6px;display:none;box-shadow:0 18px 50px -20px rgba(0,0,0,.9)}",
+    ".shl-dd.open .menu{display:block}",
+    ".shl-dd .menu a{display:block;padding:9px 12px;border-radius:7px;font-size:13.5px;",
+    "  color:var(--ink);text-decoration:none}",
+    ".shl-dd .menu a:hover{background:var(--panel2)}",
+    ".shl-dd.r .menu{left:auto;right:0;transform:none}",
     /* Hollow pill: the gradient runs through a transparent 1px border via the
      * padding-box/border-box double background, and through the lettering via
      * background-clip on an inner span — it cannot sit on the button itself,
@@ -93,6 +113,9 @@
     ".shl-w.busy .st{color:var(--accent)}",
     ".shl-werr{margin-top:10px;font-size:12px;color:#ffb3b3;background:rgba(255,107,107,.1);",
     "  border:1px solid rgba(255,107,107,.35);border-radius:8px;padding:9px 11px}",
+    ".shl-w .tx{flex:1;min-width:0}",
+    ".shl-w .tx b{display:block}",
+    ".shl-w .tx small{display:block;color:var(--faint);font-size:11.5px;margin-top:1px}",
     "@media (max-width:860px){.shl-nav{display:none}.shl{gap:10px}}"
   ].join("\n");
 
@@ -130,15 +153,67 @@
       </div>
       <nav class="shl-nav" aria-label="Main">
         ${raw(NAV.map(function (n) {
+          if (n.menu) {
+            return '<div class="shl-dd" id="shl-dd-' + n.id + '">' +
+              '<button aria-haspopup="true" aria-expanded="false">' +
+              window.UI.esc(n.label) + " <i>▾</i></button><div class=\"menu\">" +
+              n.menu.map(function (m) {
+                return '<a href="/app?launch=' + m.mode + '" data-mode="' + m.mode + '">' +
+                  window.UI.esc(m.label) + "</a>";
+              }).join("") + "</div></div>";
+          }
           return '<a href="' + n.href + '"' +
             (n.id === opts.active ? ' class="on" aria-current="page"' : "") + ">" +
             window.UI.esc(n.label) + "</a>";
         }).join(""))}
       </nav>
       <div class="zone r">
-        <button class="shl-wallet" id="shl-wallet"><span>Connect wallet</span></button>
+        <div class="shl-dd r" id="shl-wmenu">
+          <button class="shl-wallet" id="shl-wallet"><span>Connect wallet</span></button>
+          <div class="menu">
+            <a href="/profile" id="shl-profile">Profile</a>
+            <a href="#" id="shl-disconnect">Disconnect</a>
+          </div>
+        </div>
       </div>
     `);
+
+    /* ---- launch dropdown ---- */
+    var dd = document.getElementById("shl-dd-launch");
+    if (dd) {
+      var trig = dd.querySelector("button");
+      function setOpen(v) {
+        dd.classList.toggle("open", v);
+        trig.setAttribute("aria-expanded", String(v));
+      }
+      trig.addEventListener("click", function (e) {
+        e.stopPropagation();
+        setOpen(!dd.classList.contains("open"));
+      });
+      document.addEventListener("click", function () { setOpen(false); });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") setOpen(false);
+      });
+      dd.querySelectorAll(".menu a").forEach(function (a) {
+        a.addEventListener("click", function (e) {
+          var mode = a.dataset.mode;
+          setOpen(false);
+          // On the editor page itself the panel handles everything directly.
+          if (window.LaunchPanel && window.LaunchPanel.openMode) {
+            e.preventDefault();
+            window.LaunchPanel.openMode(mode);
+            return;
+          }
+          // Everywhere else: collection and pair go to the fork page, where
+          // the art source is chosen — the editor is a choice, never a default.
+          if (mode === "collection" || mode === "pair") {
+            e.preventDefault();
+            location.href = "/launch?mode=" + mode;
+          }
+          // token falls through to the normal navigation
+        });
+      });
+    }
 
     /* ---- search ---- */
     if (opts.search !== false) {
@@ -158,27 +233,39 @@
       });
     }
 
-    /* ---- wallet ---- */
+    /* ---- wallet ----
+     * Disconnected: the button opens the connect popup. Connected: it opens a
+     * menu — Profile and Disconnect. The old behaviour, disconnecting on the
+     * spot with no warning, read as the button being broken. */
     var btn = document.getElementById("shl-wallet");
+    var wmenu = document.getElementById("shl-wmenu");
+    function setWOpen(v) { wmenu.classList.toggle("open", v); }
     function paint() {
       var w = window.Wallet && window.Wallet.current();
       if (w) {
         btn.className = "shl-wallet linked";
-        btn.innerHTML = "<span>" + window.UI.esc(shortAddr(w.publicKey)) + "</span>";
-        btn.title = w.name + " — click to disconnect";
+        btn.innerHTML = "<span>" + window.UI.esc(shortAddr(w.publicKey)) + " ▾</span>";
+        btn.title = w.name;
       } else {
         btn.className = "shl-wallet";
         btn.innerHTML = "<span>Connect wallet</span>";
         btn.title = "";
+        setWOpen(false);
       }
     }
-    btn.addEventListener("click", function () {
+    btn.addEventListener("click", function (e) {
       if (!window.Wallet) return;
+      e.stopPropagation();
       if (window.Wallet.current()) {
-        window.Wallet.disconnect().then(paint);
+        setWOpen(!wmenu.classList.contains("open"));
         return;
       }
       connectModal().then(paint);
+    });
+    document.addEventListener("click", function () { setWOpen(false); });
+    document.getElementById("shl-disconnect").addEventListener("click", function (e) {
+      e.preventDefault();
+      window.Wallet.disconnect().then(paint);
     });
     if (window.Wallet) window.Wallet.on("change", paint);
     paint();

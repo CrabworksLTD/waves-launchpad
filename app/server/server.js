@@ -155,6 +155,9 @@ const server = http.createServer(async function (req, res) {
   let rel = url.pathname;
   if (rel === "/") rel = "/index.html";
   else if (rel === "/app" || rel === "/app/") rel = "/app.html";
+  // generic cleanUrls, matching how Vercel serves /launch -> launch.html —
+  // one rule here instead of a mapping to keep in sync per page
+  else if (/^\/[a-z-]+$/.test(rel) && fs.existsSync(path.join(PUBLIC, rel + ".html"))) rel = rel + ".html";
   const file = path.join(PUBLIC, path.normalize(rel).replace(/^(\.\.[/\\])+/, ""));
   if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
     res.writeHead(404, { "Content-Type": "text/plain" });

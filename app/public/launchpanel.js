@@ -579,7 +579,8 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         candyMachine: res.candyMachine, collection: res.collection,
-        name: cfg.name, cluster: res.cluster, tokenMint: tokenMint || null
+        name: cfg.name, cluster: res.cluster, tokenMint: tokenMint || null,
+        creator: (window.Wallet.current() || {}).publicKey || null
       })
     }).catch(function () {});
   }
@@ -860,8 +861,173 @@
 
   /* ---------- public surface ---------- */
 
+  /* Direct mode entry, used by the shell's Launch menu and the ?launch= query.
+   * Modes that need something missing fall back to the mode select, which
+   * already explains what is missing instead of failing silently. */
+  function openMode(mode) {
+    var tokenReady = !!(window.Token && window.Token.configKey());
+    if (mode === "token") return tokenReady ? tokenDetails(null) : modeSelect();
+    // arriving from the shell's chooser with the source already decided
+    if (mode === "files-collection") return ownFiles("collection");
+    if (mode === "files-pair") return ownFiles("pair");
+    if (mode === "collection" || mode === "pair") return sourceSelect(mode);
+    modeSelect();
+  }
+
+  /* Where does the art come from? The editor behind this window, or a folder
+   * the creator already has — the same fork Moonpad offered. A generated run,
+   * when one exists, is the first card. */
+  function sourceSelect(mode) {
+    var hasRun = !!(run && run.files);
+    var flow = mode === "pair" ? { pair: true } : null;
+    var box = shell(H`
+      <h2>${mode === "pair" ? "Launch a pair" : "Launch a collection"}</h2>
+      <p class="sub">Where is the art coming from?</p>
+      <div class="modes">
+        ${hasRun ? H`<button class="mode" id="src-run">
+          <span class="mi">✓</span>
+          <span><b>Use what you generated</b>
+          <span>${run.count} pieces, ready to go.</span></span>
+        </button>` : ""}
+        <button class="mode" id="src-editor">
+          <span class="mi">✎</span>
+          <span><b>Draw it in the editor</b>
+          <span>Trait by trait, right behind this window — then generate and launch.</span></span>
+        </button>
+        <button class="mode" id="src-files">
+          <span class="mi">⤒</span>
+          <span><b>Bring your own files</b>
+          <span>Already have the art? A folder of PNGs becomes the collection, numbered in order.</span></span>
+        </button>
+      </div>
+      <div id="lp-err"></div>
+      <div class="acts"><button id="lp-x">Cancel</button></div>
+    `);
+    box.querySelector("#lp-x").onclick = close;
+    var r = box.querySelector("#src-run");
+    if (r) r.onclick = function () { nftDetails(flow); };
+    box.querySelector("#src-editor").onclick = function () {
+      // The editor IS this page — get out of its way. From another page the
+      // shell menu already routed here first.
+      close();
+    };
+    box.querySelector("#src-files").onclick = function () { ownFiles(mode); };
+  }
+
+  /* Bring your own files: PNGs in, numbered collection out. Natural sort, so
+   * 2.png lands before 10.png the way every file manager shows them — a
+   * lexicographic sort here silently shuffles the collection and nobody
+   * notices until token #2 has the art of #10. Metadata is generated per
+   * piece; a hand-made collection gets working metadata without hand-writing
+   * five thousand json files. */
+  function ownFiles(mode) {
+    var flow = mode === "pair" ? { pair: true } : null;
+    var box = shell(H`
+      <h2>Your files</h2>
+      <p class="sub">Pick the images — PNGs, one per piece. They become 1.png upward
+      in natural order.</p>
+      <div class="acts" style="margin-top:0"><button class="go" id="of-pick">Choose files…</button></div>
+      <input type="file" id="of-input" accept="image/png,application/json" multiple hidden>
+      <p class="note" id="of-note"></p>
+      <div id="lp-err"></div>
+      <div class="acts"><button id="lp-x">Back</button>
+      <button class="go" id="of-go" disabled>Continue</button></div>
+    `);
+    box.querySelector("#lp-x").onclick = function () { sourceSelect(mode); };
+    var input = box.querySelector("#of-input");
+    box.querySelector("#of-pick").onclick = function () { input.click(); };
+
+    var staged = null;
+    input.addEventListener("change", function () {
+      var all = [].slice.call(input.files || []);
+      if (!all.length) return;
+      var pngs = all.filter(function (f) { return /\.png$/i.test(f.name); });
+      var jsons = all.filter(function (f) { return /\.json$/i.test(f.name); });
+      var other = all.length - pngs.length - jsons.length;
+      if (other) return fail(box, other + " of those are neither PNG nor JSON.");
+      if (!pngs.length) return fail(box, "No images in that selection.");
+
+      // Metadata pairing, as promised on the fork page: 4.png needs 4.json.
+      // If ANY json comes along, EVERY image must have its pair — a half-paired
+      // collection means half the traits silently vanish, which nobody notices
+      // until reveal. We check every pair; we never write their json.
+      var stem = function (n) { return n.replace(/\.(png|json)$/i, ""); };
+      var jmap = {};
+      jsons.forEach(function (j) { jmap[stem(j.name)] = j; });
+      if (jsons.length) {
+        var missing = pngs.filter(function (p) { return !jmap[stem(p.name)]; });
+        if (missing.length) return fail(box, missing.length + " image(s) have no matching .json — first: " +
+          missing[0].name + " needs " + stem(missing[0].name) + ".json");
+        var orphans = jsons.filter(function (j) {
+          return !pngs.some(function (p) { return stem(p.name) === stem(j.name); });
+        });
+        if (orphans.length) return fail(box, orphans[0].name + " has no matching image.");
+      }
+
+      // natural sort: "2.png" before "10.png" — lexicographic silently shuffles
+      // the collection and nobody notices until token #2 wears #10's art
+      pngs.sort(function (a, b) {
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+      });
+
+      Promise.all(pngs.map(function (f) { return f.arrayBuffer(); })).then(function (bufs) {
+        var reads = pngs.map(function (p) {
+          var j = jmap[stem(p.name)];
+          return j ? j.text() : Promise.resolve(null);
+        });
+        return Promise.all(reads).then(function (texts) {
+          var images = [], metaplex = [], badJson = null;
+          for (var i = 0; i < pngs.length; i++) {
+            var id = i + 1;
+            images.push({ id: id, name: id + ".png", bytes: new Uint8Array(bufs[i]) });
+            var meta;
+            if (texts[i] != null) {
+              try {
+                meta = JSON.parse(texts[i]);
+                if (!meta || typeof meta !== "object") throw new Error("not an object");
+              } catch (e) { badJson = badJson || (stem(pngs[i].name) + ".json is not valid JSON"); continue; }
+              if (!meta.name) meta.name = "#" + id;
+              meta.image = id + ".png";
+              meta.properties = meta.properties || {};
+              meta.properties.files = [{ uri: id + ".png", type: "image/png" }];
+              meta.properties.category = "image";
+            } else {
+              meta = { name: "#" + id, symbol: "", image: id + ".png", attributes: [],
+                properties: { files: [{ uri: id + ".png", type: "image/png" }], category: "image" } };
+            }
+            metaplex.push({ id: id, name: id + ".json", text: JSON.stringify(meta, null, 2) });
+          }
+          if (badJson) return fail(box, badJson);
+          staged = { images: images, metaplex: metaplex, count: pngs.length };
+          box.querySelector("#of-note").textContent =
+            pngs.length + " pieces staged" + (jsons.length ? " with your metadata" : "") +
+            " — " + pngs[0].name + " becomes 1.png, " +
+            pngs[pngs.length - 1].name + " becomes " + pngs.length + ".png.";
+          box.querySelector("#of-go").disabled = false;
+        });
+      });
+    });
+
+    box.querySelector("#of-go").onclick = function () {
+      if (!staged) return;
+      run = { files: { images: staged.images, metaplex: staged.metaplex }, count: staged.count };
+      nftDetails(flow);
+    };
+  }
+
   window.LaunchPanel = {
     setRun: function (files, count) { run = { files: files, count: count }; },
-    open: function () { modeSelect(); }
+    open: function () { modeSelect(); },
+    openMode: openMode
   };
+
+  // Arriving with ?launch=token (from the shell menu on another page) opens
+  // the panel once the page is up. The param is consumed so a reload does not
+  // resurrect the panel.
+  (function () {
+    var m = new URLSearchParams(location.search).get("launch");
+    if (!m) return;
+    history.replaceState(null, "", location.pathname);
+    setTimeout(function () { openMode(m); }, 60);
+  })();
 })();

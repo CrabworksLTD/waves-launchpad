@@ -162,6 +162,7 @@
         mint: String(baseMint.publicKey), name: opts.name, symbol: opts.symbol,
         rewardMint: opts.rewardMint || null,
         collection: opts.collection || null,
+        creator: String(c.owner),
         cluster: window.Launch ? window.Launch.cluster() : "mainnet-beta"
       })
     }).catch(function () {});

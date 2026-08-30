@@ -40,7 +40,7 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-    const { mint, name, symbol, cluster, rewardMint, collection } = body;
+    const { mint, name, symbol, cluster, rewardMint, collection, creator } = body;
 
     if (!B58.test(mint || "")) return res.status(400).json({ error: "bad mint" });
     // both optional; validated when present so a bad value is dropped loudly
@@ -62,6 +62,7 @@ export default async function handler(req, res) {
         // is paired with — consumed by the staking keeper later, displayed now
         rewardMint: rewardMint || null,
         collection: collection || null,
+        creator: (creator && B58.test(creator)) ? creator : null,
         at: Date.now()
       }));
       await db.ltrim(KEY, 0, MAX - 1);
