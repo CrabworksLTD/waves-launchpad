@@ -230,6 +230,8 @@
       body: JSON.stringify({
         mint: String(baseMint.publicKey), name: opts.name, symbol: opts.symbol,
         rewardMint: opts.rewardMint || null,
+        icon: opts.icon || null,
+        banner: opts.banner || null,
         collection: opts.collection || null,
         creator: String(c.owner),
         quote: opts.quote || "sol",

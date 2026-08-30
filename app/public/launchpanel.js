@@ -697,6 +697,11 @@
       <span id="tk-logoname">${flow.iconName || "square png — shown in wallets and on Jupiter"}</span></div>
       <input type="file" id="tk-logo" accept="image/png" hidden>
 
+      <label>Banner</label>
+      <div class="filebtn"><button id="tk-bannerbtn" type="button">Choose…</button>
+      <span id="tk-bannername">${flow.bannerName || "wide png — tops your token's trading page"}</span></div>
+      <input type="file" id="tk-banner" accept="image/png" hidden>
+
       <div class="two">
         <div><label>Name</label>
         <input id="lp-tname" value="${flow.tname || defName}" maxlength="30" placeholder="My Token"></div>
@@ -803,6 +808,18 @@
         flow.icon = new Uint8Array(buf);
         flow.iconName = f.name;
         box.querySelector("#tk-logoname").textContent = f.name;
+      });
+    });
+    box.querySelector("#tk-bannerbtn").onclick = function () {
+      box.querySelector("#tk-banner").click();
+    };
+    box.querySelector("#tk-banner").addEventListener("change", function () {
+      var f = box.querySelector("#tk-banner").files[0];
+      if (!f) return;
+      f.arrayBuffer().then(function (buf) {
+        flow.banner = new Uint8Array(buf);
+        flow.bannerName = f.name;
+        box.querySelector("#tk-bannername").textContent = f.name;
       });
     });
     box.querySelector("#tk-quotes").addEventListener("click", function (e) {
@@ -957,7 +974,10 @@
     box.querySelector("#lp-back").onclick = function () { tokenDetails(flow); };
 
     try {
-      var quote = await window.Storage.quoteUpload(300, 2);   // token.json is tiny
+      var upBytes = 300 + (flow.icon ? flow.icon.length : 0) +
+        (flow.banner ? flow.banner.length : 0);
+      var upCount = 2 + (flow.icon ? 1 : 0) + (flow.banner ? 1 : 0);
+      var quote = await window.Storage.quoteUpload(upBytes, upCount);
       box.querySelector("#lp-fee").textContent = Number(quote.feeSol).toFixed(4) + " SOL";
     } catch (e) {
       box.querySelector("#lp-fee").textContent = "unavailable";
@@ -998,6 +1018,7 @@
         symbol: flow.tsym,
         description: flow.tdesc || (flow.nft ? "Paired with " + flow.nft.cfg.name : ""),
         icon: flow.icon || null,
+        banner: flow.banner || null,
         links: { website: flow.web, x: flow.x, telegram: flow.tg },
         payer: function (q) { return payStorage(q); }
       });
@@ -1012,6 +1033,8 @@
         firstBuySol: flow.tbuy,
         rewardMint: flow.reward.mint,
         feeWallet: flow.feeWallet || null,
+        icon: meta.iconUri || null,
+        banner: meta.bannerUri || null,
         collection: flow.nft ? flow.nft.res.collection : null
       });
       mark("pool", "done");

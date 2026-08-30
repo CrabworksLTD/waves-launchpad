@@ -40,7 +40,7 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-    const { mint, name, symbol, cluster, rewardMint, collection, creator } = body;
+    const { mint, name, symbol, cluster, rewardMint, collection, creator, icon, banner } = body;
 
     if (!B58.test(mint || "")) return res.status(400).json({ error: "bad mint" });
     // both optional; validated when present so a bad value is dropped loudly
@@ -54,6 +54,8 @@ export default async function handler(req, res) {
       const first = await db.set("tok:" + mint, 1, { nx: true });
       if (first !== "OK") return res.status(200).json({ ok: true, duplicate: true });
 
+      const okArt = (u) => (typeof u === "string" &&
+        /^https:\/\/arweave\.net\/[\w\-\/\.]+$/.test(u)) ? u : null;
       await db.lpush(KEY, JSON.stringify({
         mint,
         name: String(name || "Untitled").slice(0, 40),
@@ -61,6 +63,8 @@ export default async function handler(req, res) {
         // the reward asset the creator picked, and the collection this token
         // is paired with — consumed by the staking keeper later, displayed now
         rewardMint: rewardMint || null,
+        // only arweave art, never an arbitrary URL someone POSTs at us
+        icon: okArt(icon), banner: okArt(banner),
         collection: collection || null,
         creator: (creator && B58.test(creator)) ? creator : null,
         at: Date.now()

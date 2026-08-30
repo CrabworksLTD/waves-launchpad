@@ -342,6 +342,7 @@
   async function uploadTokenMeta(opts) {
     var files = [];
     if (opts.icon) files.push({ id: "_icon", name: "icon.png", bytes: opts.icon });
+    if (opts.banner) files.push({ id: "_banner", name: "banner.png", bytes: opts.banner });
 
     function buildJson(cid) {
       var j = {
@@ -350,6 +351,7 @@
         description: opts.description || ""
       };
       if (opts.icon) j.image = "https://arweave.net/" + cid + "/icon.png";
+      if (opts.banner) j.banner = "https://arweave.net/" + cid + "/banner.png";
       // the extensions shape Jupiter and the explorers read socials from
       if (opts.links) {
         var ext = {};
@@ -379,7 +381,11 @@
     // manifest for the icon — an Arweave manifest id is 43 chars, so the
     // placeholder-sized upload matches the final bytes exactly.
     var cid = await uploadWith(up, set, "token metadata", opts.onProgress);
-    return { uri: "https://arweave.net/" + cid + "/token.json", cid: cid };
+    return {
+      uri: "https://arweave.net/" + cid + "/token.json", cid: cid,
+      iconUri: opts.icon ? "https://arweave.net/" + cid + "/icon.png" : null,
+      bannerUri: opts.banner ? "https://arweave.net/" + cid + "/banner.png" : null
+    };
   }
 
   window.Storage = {
