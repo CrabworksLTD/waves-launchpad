@@ -53,3 +53,12 @@ export {
   setComputeUnitLimit,
   setComputeUnitPrice,
 } from "@metaplex-foundation/mpl-toolbox";
+
+/* Bridges our wallet layer into umi. walletAdapterIdentity wants a
+   wallet-adapter shaped object, so wallet.js is adapted to that shape in
+   launch.js rather than umi being adapted to ours — this is the interface with
+   the most eyes on it. PublicKey and VersionedTransaction come along because
+   the injected-provider path signs transaction objects, not bytes. */
+export { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
+export { PublicKey, VersionedTransaction } from "@solana/web3.js";
+export { percentAmount, createSignerFromKeypair } from "@metaplex-foundation/umi";
