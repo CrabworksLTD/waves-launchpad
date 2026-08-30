@@ -106,17 +106,34 @@
         icon: w.icon || "",
         publicKey: acct.address,
         _account: acct,
+        /* Wallet Standard signs BYTES and returns bytes — handing it a
+         * Transaction object makes the wallet try to iterate it ("e is not
+         * iterable" from Phantom). Callers may pass either form; they get
+         * back the form they spoke. The object form returns a {serialize}
+         * shim because that is the only method our senders call. */
         signTransaction: function (tx) {
-          return feat["solana:signTransaction"]
-            .signTransaction({ account: acct, transaction: tx })
-            .then(function (r) { return r[0].signedTransaction; });
+          var f = feat["solana:signTransaction"];
+          var isBytes = tx instanceof Uint8Array;
+          var bytes = isBytes ? tx
+            : tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+          return f.signTransaction({ account: acct, transaction: bytes })
+            .then(function (r) {
+              var sb = r[0].signedTransaction;
+              return isBytes ? sb : { serialize: function () { return sb; } };
+            });
         },
         signAllTransactions: function (txs) {
-          return feat["solana:signTransaction"]
-            .signTransaction.apply(null, txs.map(function (t) {
-              return { account: acct, transaction: t };
-            }))
-            .then(function (r) { return r.map(function (x) { return x.signedTransaction; }); });
+          var f = feat["solana:signTransaction"];
+          var isBytes = txs.length && txs[0] instanceof Uint8Array;
+          var inputs = txs.map(function (t) {
+            return { account: acct, transaction: isBytes ? t
+              : t.serialize({ requireAllSignatures: false, verifySignatures: false }) };
+          });
+          return f.signTransaction.apply(f, inputs)
+            .then(function (r) { return r.map(function (x) {
+              var sb = x.signedTransaction;
+              return isBytes ? sb : { serialize: function () { return sb; } };
+            }); });
         },
         signMessage: function (bytes) {
           var f = feat["solana:signMessage"];
