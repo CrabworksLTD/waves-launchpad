@@ -42,6 +42,26 @@ h1{font-family:Archivo;font-size:clamp(34px,4.6vw,58px);font-weight:800;
 .cta.ghost{background:var(--raise);color:var(--ink);border:1px solid var(--line2)}
 .trust{margin-top:40px;text-align:center;font:400 12px "IBM Plex Mono",monospace;
   color:var(--faint);letter-spacing:.03em}
+.threeup{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:8px}
+@media (max-width:960px){.threeup{grid-template-columns:1fr}}
+.opt{position:relative;overflow:hidden;text-decoration:none;color:inherit;
+  background:var(--panel);border:1px solid rgba(255,255,255,.16);border-radius:12px;
+  padding:34px 30px 32px;display:flex;flex-direction:column;align-items:flex-start;
+  transition:border-color .25s,transform .25s}
+.opt::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;
+  transition:opacity .3s;
+  background:radial-gradient(130% 120% at 50% 115%,rgba(153,69,255,.18),transparent 55%),
+             radial-gradient(120% 110% at 85% -10%,rgba(20,241,149,.14),transparent 50%)}
+.opt:hover{border-color:var(--faint);transform:translateY(-4px)}
+.opt:hover::before{opacity:1}
+.opt .ic{width:64px;height:64px;border-radius:14px;flex:none;
+  border:1px solid transparent;display:grid;place-items:center;margin-bottom:22px;
+  background:linear-gradient(var(--bg),var(--bg)) padding-box,
+             linear-gradient(135deg,rgba(153,69,255,.55),rgba(20,241,149,.55)) border-box}
+.opt h2{font-family:Archivo;font-size:23px;font-weight:800;letter-spacing:-.015em;
+  margin:0 0 10px;color:var(--ink);text-decoration:none}
+.opt p{margin:0 0 26px;color:var(--dim);font-size:14px;line-height:1.6;flex:1}
+.opt .cta{position:relative}
 svg .ln{stroke:var(--line2);fill:none;stroke-width:1.5}
 svg .ac{stroke:var(--accent);fill:none;stroke-width:1.5}
 svg .df{stroke:var(--accent);stroke-dasharray:3 4}
@@ -49,6 +69,48 @@ svg .df{stroke:var(--accent);stroke-dasharray:3 4}
 </head>
 <body>
 <main>
+  <div id="choose" hidden>
+    <p class="eyebrow">Launch</p>
+    <h1 class="disp">What goes on chain today?</h1>
+    <p class="lede">Three ways in — a collection drawn or uploaded, a bonding-curve
+    token, or both launched together with the fees wired to your holders.</p>
+    <div class="threeup">
+      <a class="opt" href="/launch?mode=collection">
+        <span class="ic"><svg width="30" height="30" viewBox="0 0 24 24">
+          <rect class="ac" x="3" y="3" width="8" height="8"/>
+          <rect class="ln" x="13" y="3" width="8" height="8"/>
+          <rect class="ln" x="3" y="13" width="8" height="8"/>
+          <rect class="ac" x="13" y="13" width="8" height="8"/></svg></span>
+        <h2>Collection</h2>
+        <p>Draw the traits here or bring finished art. Metaplex Core, allowlist
+        waves, team splits, a mint page the moment it's live.</p>
+        <span class="cta">Launch a collection →</span>
+      </a>
+      <a class="opt" href="#" id="opt-token">
+        <span class="ic"><svg width="30" height="30" viewBox="0 0 24 24">
+          <path class="ac" d="M3 20 Q 12 19 16 12 T 21 4"/>
+          <circle fill="var(--accent)" cx="21" cy="4" r="2.2"/></svg></span>
+        <h2>Token</h2>
+        <p>A bonding-curve token priced in SOL, USDC or gold. No liquidity to
+        manage — the curve is the market, graduation locks the LP.</p>
+        <span class="cta">Launch a token →</span>
+      </a>
+      <a class="opt" href="/launch?mode=pair">
+        <span class="ic"><svg width="30" height="30" viewBox="0 0 24 24">
+          <rect class="ac" x="3" y="8" width="8" height="8"/>
+          <path class="ac" d="M13 16 Q 17 14 19 9 T 21 4"/>
+          <circle fill="var(--accent)" cx="21" cy="4" r="2"/></svg></span>
+        <h2>Pair</h2>
+        <p>Collection and token together — the token's trading fees can reward
+        your holders in 400+ tokenized stocks and commodities.</p>
+        <span class="cta">Launch a pair →</span>
+      </a>
+    </div>
+    <p class="trust">Everything deploys from your own wallet. We never hold your
+    art, your money or your collection.</p>
+  </div>
+
+  <div id="fork">
   <p class="eyebrow" id="eyebrow">Launch a collection</p>
   <h1 class="disp">Where are you starting from?</h1>
   <p class="lede">Either way you end up in the same place — your collection on
@@ -105,6 +167,7 @@ svg .df{stroke:var(--accent);stroke-dasharray:3 4}
 
   <p class="trust">Both paths deploy the same Metaplex Core collection from your own
   wallet. We never hold your art, your money or your collection.</p>
+  </div>
 </main>
 
 <script src="/brand.js"></script>
@@ -114,7 +177,20 @@ svg .df{stroke:var(--accent);stroke-dasharray:3 4}
 <script>
 Shell.mount({ active: "launch", search: false });
 (function () {
-  var mode = new URLSearchParams(location.search).get("mode") === "pair" ? "pair" : "collection";
+  var raw = new URLSearchParams(location.search).get("mode");
+  // no mode at all: this page is the three-way chooser
+  if (!raw) {
+    document.getElementById("fork").hidden = true;
+    document.getElementById("choose").hidden = false;
+    document.getElementById("opt-token").addEventListener("click", function (e) {
+      e.preventDefault();
+      Shell.ensureLaunchStack().then(function () {
+        window.LaunchPanel.openMode("token");
+      });
+    });
+    return;
+  }
+  var mode = raw === "pair" ? "pair" : "collection";
   if (mode === "pair") {
     document.getElementById("eyebrow").textContent = "Launch a pair";
     document.getElementById("upload-cta").href = "/app?launch=files-pair";
