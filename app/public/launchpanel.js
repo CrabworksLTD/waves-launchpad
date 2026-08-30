@@ -853,7 +853,7 @@
     var box = shell(H`
       <h2>Reward asset</h2>
       <p class="sub">Trading fees are converted into this before distribution.</p>
-      <input id="lp-q" type="search" placeholder="Search 500+ assets" autocomplete="off">
+      <input id="lp-q" type="search" placeholder="Search the verified assets" autocomplete="off">
       <div class="ptabs" id="lp-tabs">
         <button data-t="all" class="on">All</button>
         <button data-t="native">SOL &amp; USDC</button>
