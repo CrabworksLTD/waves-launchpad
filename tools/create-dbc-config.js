@@ -174,14 +174,22 @@ const TERMS = {
     return;
   }
 
-  if (!process.env.CONFIG_SECRET) {
-    console.error("  CONFIG_SECRET is not set.\n");
+  // CONFIG_KEYFILE (a solana-keygen JSON file) is preferred: the secret never
+  // appears in the shell environment or history, only a path does.
+  let secret = null;
+  if (process.env.CONFIG_KEYFILE) {
+    secret = Uint8Array.from(JSON.parse(fs.readFileSync(process.env.CONFIG_KEYFILE, "utf8")));
+  } else if (process.env.CONFIG_SECRET) {
+    secret = bs58.decode(process.env.CONFIG_SECRET);
+  } else {
+    console.error("  Set CONFIG_KEYFILE=<path to solana-keygen json> (preferred)");
+    console.error("  or CONFIG_SECRET=<base58 secret key>.\n");
     console.error("  This wallet permanently owns the config and claims the platform's");
     console.error("  fee share. Use a key you will still control in two years.");
     process.exit(1);
   }
 
-  const payer = Keypair.fromSecretKey(bs58.decode(process.env.CONFIG_SECRET));
+  const payer = Keypair.fromSecretKey(secret);
   const conn = new Connection(CLUSTERS[CLUSTER], "confirmed");
   const client = new DynamicBondingCurveClient(conn, "confirmed");
   const config = Keypair.generate();
