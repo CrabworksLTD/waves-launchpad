@@ -632,18 +632,35 @@
     { symbol: "USDC", name: "USD Coin", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", kind: "native" }
   ];
 
+  /* The token window, grown to FLAP's shape on DBC rails. What a creator
+   * controls here is identity, quote currency, first buy, rewards, fee wallet
+   * and links. The economics — supply, curve, fee, split — are locked in the
+   * partner config so every launch gets identical terms, and they are SHOWN,
+   * read from chain, rather than dressed up as choices. The tax section
+   * (buy/sell rates, burn/dividend allocation) is FLAP's transfer-fee
+   * machinery: ours arrives with the rewards program, and the section says so
+   * instead of pretending. */
   function tokenDetails(flow) {
     flow = flow || {};
     var nft = flow.nft;
     var defName = nft ? nft.cfg.name : "";
     var defSym = defName ? defName.replace(/[^A-Za-z]/g, "").slice(0, 5).toUpperCase() : "";
     flow.reward = flow.reward || BUILTIN_REWARDS[0];
+    flow.quote = flow.quote || "sol";
+    var quotes = window.Token.quotes();
+    var qLabel = flow.quote === "usdc" ? "USDC" : "SOL";
 
     var box = shell(H`
       <h2>${nft ? "2 of 2 — the token" : "Launch token"}</h2>
       <p class="sub">${nft
         ? "Paired with " + nft.cfg.name + ". Its trading fees can reward the collection's holders."
         : "A bonding-curve token. No liquidity to manage — the curve is the liquidity."}</p>
+
+      <label>Logo</label>
+      <div class="filebtn"><button id="tk-logobtn" type="button">Choose…</button>
+      <span id="tk-logoname">${flow.iconName || "square png — shown in wallets and on Jupiter"}</span></div>
+      <input type="file" id="tk-logo" accept="image/png" hidden>
+
       <div class="two">
         <div><label>Name</label>
         <input id="lp-tname" value="${flow.tname || defName}" maxlength="30" placeholder="My Token"></div>
@@ -651,40 +668,129 @@
         <input id="lp-tsym" value="${flow.tsym || defSym}" maxlength="8" placeholder="TKN"
           style="text-transform:uppercase"></div>
       </div>
-      <label>Your first buy (SOL) — optional</label>
+      <label>Description</label>
+      <textarea id="tk-desc" rows="2" placeholder="Shown on Jupiter and explorers">${flow.tdesc || ""}</textarea>
+
+      <label>Priced in</label>
+      <div class="ptabs" id="tk-quotes">
+        <button data-q="sol" ${flow.quote === "sol" ? raw('class="on"') : ""}
+          ${quotes.indexOf("sol") < 0 ? raw("disabled") : ""}>SOL</button>
+        <button data-q="usdc" ${flow.quote === "usdc" ? raw('class="on"') : ""}
+          ${quotes.indexOf("usdc") < 0 ? raw("disabled") : ""}>USDC</button>
+        <button disabled title="A stock or commodity as the trading pair — its curve config is coming">RWA soon</button>
+      </div>
+
+      <div class="fold2" id="tk-econ">
+        <div class="row"><span class="k">Total supply</span><b>1,000,000,000 · fixed</b></div>
+        <div class="row"><span class="k">Trading fee</span><b id="tk-fee">1% — 40% you / 40% platform / 20% Meteora</b></div>
+        <div class="row"><span class="k">Graduates at</span><b id="tk-grad">reading the curve…</b></div>
+        <div class="row" style="border-bottom:0"><span class="k">Migrates to</span><b>Meteora DAMM v2, LP locked</b></div>
+        <p class="note" style="margin-top:6px">Locked in the launchpad's config — identical
+        for every launch, so nobody negotiates a better curve than you.</p>
+      </div>
+
+      <label>Your first buy (${qLabel}) — optional</label>
       <input id="lp-tbuy" type="number" min="0" step="0.1" value="${flow.tbuy || 0}">
-      <p class="note">A first buy lands in the same transaction as the pool, so nobody
-      can snipe the opening price ahead of you.</p>
+      <div class="ptabs" id="tk-chips">
+        <button data-v="0.1">0.1</button><button data-v="0.5">0.5</button>
+        <button data-v="1">1</button><button data-v="5">5</button>
+      </div>
+      <p class="note">Lands in the same transaction as the pool, so nobody can snipe
+      the opening price ahead of you.</p>
+
       <label>Holder rewards paid in</label>
       <button class="pick" id="lp-reward">
         <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
         <span class="k2 mono">${shortAddr(flow.reward.mint)}</span>
       </button>
-      <p class="note">What trading fees are converted into before being paid to
-      ${nft ? "this collection's stakers" : "holders"}. SOL and USDC need no conversion;
-      a stock or commodity is swapped at distribution time.</p>
+      <p class="note">What the fee keeper converts trading fees into before paying
+      ${nft ? "this collection's stakers" : "holders"}.</p>
+
+      <label>Creator fee wallet</label>
+      <input id="tk-feewallet" value="${flow.feeWallet || ""}"
+        placeholder="optional — defaults to your wallet">
+      <p class="note">Where your 40% of trading fees claims to. A treasury, a
+      multisig, or the reward vault.</p>
+
+      <label class="tick"><input type="checkbox" disabled>
+        <span><b>Tax settings — buy/sell rates, burn, dividends</b>
+        <span>Transfer-tax mechanics arrive with the rewards program. The reward
+        asset above already decides what holders get paid in.</span></span></label>
+
+      <div class="two">
+        <div><label>Website</label><input id="tk-web" value="${flow.web || ""}" placeholder="site.xyz"></div>
+        <div><label>X</label><input id="tk-x" value="${flow.x || ""}" placeholder="@handle"></div>
+      </div>
+      <div class="two">
+        <div><label>Telegram</label><input id="tk-tg" value="${flow.tg || ""}" placeholder="t.me/…"></div>
+        <div><label>Discord</label><input id="tk-dc" value="${flow.dc || ""}" placeholder="discord.gg/…"></div>
+      </div>
+
       <div id="lp-err"></div>
       <div class="acts"><button id="lp-x">${nft ? "Skip token" : "Back"}</button>
       <button class="go" id="lp-next">Continue</button></div>
     `);
 
+    // live economics, read from the chain config — not hardcoded copy
+    window.Token.describeConfig(flow.quote).then(function (d) {
+      var el = box.querySelector("#tk-grad");
+      if (!el) return;
+      if (!d) { el.textContent = "shown at launch"; return; }
+      el.textContent = UI.fmt(d.graduation) + " " + qLabel + " raised";
+      if (d.feePct) box.querySelector("#tk-fee").textContent =
+        d.feePct + "% — " + Math.round(80 * d.creatorShare / 100) + "% you / " +
+        Math.round(80 * (100 - d.creatorShare) / 100) + "% platform / 20% Meteora";
+    });
+
+    function collect() {
+      flow.tname = box.querySelector("#lp-tname").value;
+      flow.tsym = box.querySelector("#lp-tsym").value;
+      flow.tbuy = box.querySelector("#lp-tbuy").value;
+      flow.tdesc = box.querySelector("#tk-desc").value;
+      flow.feeWallet = box.querySelector("#tk-feewallet").value.trim();
+      flow.web = box.querySelector("#tk-web").value.trim();
+      flow.x = box.querySelector("#tk-x").value.trim();
+      flow.tg = box.querySelector("#tk-tg").value.trim();
+      flow.dc = box.querySelector("#tk-dc").value.trim();
+    }
+
+    box.querySelector("#tk-logobtn").onclick = function () { box.querySelector("#tk-logo").click(); };
+    box.querySelector("#tk-logo").addEventListener("change", function (e) {
+      var f = e.target.files && e.target.files[0];
+      if (!f) return;
+      f.arrayBuffer().then(function (buf) {
+        flow.icon = new Uint8Array(buf);
+        flow.iconName = f.name;
+        box.querySelector("#tk-logoname").textContent = f.name;
+      });
+    });
+    box.querySelector("#tk-quotes").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-q]");
+      if (!b || b.disabled) return;
+      collect();
+      flow.quote = b.dataset.q;
+      tokenDetails(flow);                          // re-render with the new currency
+    });
+    box.querySelector("#tk-chips").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-v]");
+      if (b) box.querySelector("#lp-tbuy").value = b.dataset.v;
+    });
     box.querySelector("#lp-x").onclick = function () {
       if (nft) { recordCollection(nft.cfg, nft.res, null); nftDone(nft.cfg, nft.res, nft.up); }
       else modeSelect();
     };
-    box.querySelector("#lp-reward").onclick = function () {
-      flow.tname = box.querySelector("#lp-tname").value;
-      flow.tsym = box.querySelector("#lp-tsym").value;
-      flow.tbuy = box.querySelector("#lp-tbuy").value;
-      rewardPicker(flow);
-    };
+    box.querySelector("#lp-reward").onclick = function () { collect(); rewardPicker(flow); };
     box.querySelector("#lp-next").onclick = function () {
-      var name = box.querySelector("#lp-tname").value.trim();
-      var sym = box.querySelector("#lp-tsym").value.trim().toUpperCase();
+      collect();
+      var name = flow.tname.trim();
+      var sym = flow.tsym.trim().toUpperCase();
       if (!name) return fail(box, "The token needs a name.");
       if (!/^[A-Z0-9]{2,8}$/.test(sym)) return fail(box, "Symbol: 2-8 letters or digits.");
+      if (flow.feeWallet && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(flow.feeWallet)) {
+        return fail(box, "The fee wallet is not a valid address.");
+      }
       flow.tname = name; flow.tsym = sym;
-      flow.tbuy = parseFloat(box.querySelector("#lp-tbuy").value) || 0;
+      flow.tbuy = parseFloat(flow.tbuy) || 0;
       tokenConfirm(flow);
     };
   }
@@ -757,8 +863,10 @@
       <p class="sub">One small metadata upload, then the pool. The curve is the liquidity.</p>
       <div class="row"><span class="k">Token</span><b>${flow.tname} · $${flow.tsym}</b></div>
       ${nft ? H`<div class="row"><span class="k">Paired with</span><b>${nft.cfg.name}</b></div>` : ""}
+      <div class="row"><span class="k">Priced in</span><b>${flow.quote === "usdc" ? "USDC" : "SOL"}</b></div>
       <div class="row"><span class="k">Rewards in</span><b>${flow.reward.symbol}</b></div>
-      <div class="row"><span class="k">First buy</span><b>${flow.tbuy > 0 ? flow.tbuy + " SOL" : "none"}</b></div>
+      <div class="row"><span class="k">First buy</span><b>${flow.tbuy > 0 ? flow.tbuy + " " + (flow.quote === "usdc" ? "USDC" : "SOL") : "none"}</b></div>
+      ${flow.feeWallet ? H`<div class="row"><span class="k">Fees claim to</span><b>${shortAddr(flow.feeWallet)}</b></div>` : ""}
       <div class="row"><span class="k">Metadata storage</span><b id="lp-fee">quoting…</b></div>
       <div class="row"><span class="k">Wallet</span><b>${w ? w.name + " · " + shortAddr(w.publicKey) : "not connected"}</b></div>
       <p class="note">Fee split on every trade: 40% you, 40% platform, 20% Meteora.
@@ -809,7 +917,9 @@
       var meta = await window.Storage.uploadTokenMeta({
         name: flow.tname,
         symbol: flow.tsym,
-        description: flow.nft ? "Paired with " + flow.nft.cfg.name : "",
+        description: flow.tdesc || (flow.nft ? "Paired with " + flow.nft.cfg.name : ""),
+        icon: flow.icon || null,
+        links: { website: flow.web, x: flow.x, telegram: flow.tg },
         payer: function (q) { return payStorage(q); }
       });
       mark("meta", "done");
@@ -819,8 +929,10 @@
         name: flow.tname,
         symbol: flow.tsym,
         uri: meta.uri,
+        quote: flow.quote,
         firstBuySol: flow.tbuy,
         rewardMint: flow.reward.mint,
+        feeWallet: flow.feeWallet || null,
         collection: flow.nft ? flow.nft.res.collection : null
       });
       mark("pool", "done");

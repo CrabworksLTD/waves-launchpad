@@ -19,6 +19,11 @@
     chain: "Solana",
     domain: "",                       // set once a domain is registered
 
+    // DBC partner configs, one per quote currency. Created once each by
+    // tools/create-dbc-config.js; a missing entry disables that currency in
+    // the token launch window rather than hiding the field.
+    dbcConfigs: { sol: "", usdc: "" },
+
     // Save files. `fileKind` is written into new saves; `readKinds` is what we
     // accept when opening, so Moonpad projects and the bundled templates
     // (which are still "moonpad-project") keep working. Never drop an entry

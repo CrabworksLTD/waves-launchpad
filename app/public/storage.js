@@ -350,6 +350,14 @@
         description: opts.description || ""
       };
       if (opts.icon) j.image = "https://arweave.net/" + cid + "/icon.png";
+      // the extensions shape Jupiter and the explorers read socials from
+      if (opts.links) {
+        var ext = {};
+        if (opts.links.website) ext.website = opts.links.website;
+        if (opts.links.x) ext.twitter = opts.links.x;
+        if (opts.links.telegram) ext.telegram = opts.links.telegram;
+        if (Object.keys(ext).length) j.extensions = ext;
+      }
       return JSON.stringify(j, null, 2);
     }
 

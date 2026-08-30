@@ -77,12 +77,42 @@
   /* The config key is ours and is created once per quote asset. Without one
    * there is no launchpad — a creator cannot launch into a config that does
    * not exist, which is why this reads from BRAND rather than being derived. */
-  function configKey() {
-    var c = window.BRAND && window.BRAND.dbcConfig;
+  function configKey(quote) {
+    quote = quote || "sol";
+    var B = window.BRAND || {};
+    var c = (B.dbcConfigs && B.dbcConfigs[quote]) ||
+            (quote === "sol" ? B.dbcConfig : null);   // legacy single-config field
     if (!c) throw new Error(
-      "No DBC config key set. Run tools/create-dbc-config.js once, then put the " +
-      "resulting address in brand.js as dbcConfig.");
+      "No DBC config for " + quote.toUpperCase() + ". Run tools/create-dbc-config.js " +
+      "with QUOTE=" + quote + ", then put the address in brand.js dbcConfigs." + quote + ".");
     return c;
+  }
+
+  // which quote currencies this deployment can actually launch in
+  function quotes() {
+    var out = [];
+    try { configKey("sol"); out.push("sol"); } catch (e) {}
+    try { configKey("usdc"); out.push("usdc"); } catch (e) {}
+    return out;
+  }
+
+  /* The locked economics of a quote's config, read from chain rather than
+   * hardcoded — display copy that drifts from the real config is worse than
+   * none. Falls back to null and the UI says "shown at launch". */
+  async function describeConfig(quote) {
+    try {
+      var M = await dbc(), X = await mx();
+      var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
+      var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
+      var cli = new M.DynamicBondingCurveClient(conn, "confirmed");
+      var cfg = await cli.state.getPoolConfig(new X.PublicKey(configKey(quote)));
+      var dec = quote === "sol" ? 9 : 6;
+      return {
+        graduation: Number(cfg.migrationQuoteThreshold) / Math.pow(10, dec),
+        feePct: Number(cfg.poolFees.baseFee.cliffFeeNumerator) / 1e7,
+        creatorShare: Number(cfg.creatorTradingFeePercentage)
+      };
+    } catch (e) { return null; }
   }
 
   async function client() {
@@ -125,7 +155,7 @@
     progress({ step: "pool", state: "signing" });
 
     var args = {
-      config: new c.X.PublicKey(configKey()),
+      config: new c.X.PublicKey(configKey(opts.quote)),
       baseMint: baseMint.publicKey,
       name: opts.name,
       symbol: opts.symbol,
@@ -163,6 +193,8 @@
         rewardMint: opts.rewardMint || null,
         collection: opts.collection || null,
         creator: String(c.owner),
+        quote: opts.quote || "sol",
+        feeWallet: opts.feeWallet || null,
         cluster: window.Launch ? window.Launch.cluster() : "mainnet-beta"
       })
     }).catch(function () {});
@@ -228,6 +260,8 @@
     rewards: REWARDS,
     rwa: loadRwa,
     commodities: loadCommodities,
+    quotes: quotes,
+    describeConfig: describeConfig,
     configKey: function () { try { return configKey(); } catch (e) { return null; } }
   };
 })();
