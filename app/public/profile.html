@@ -195,10 +195,11 @@ input[type=file]{display:none}
   function actionCards() {
     return '<div class="actions">' +
       '<div class="act"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" transform="rotate(45 12 12)"/><path d="M12 5.5 13 8l2.5 1L13 10l-1 2.5L11 10l-2.5-1L11 8Z"/><path d="M18 14l.6 1.5L20 16l-1.4.5L18 18l-.6-1.5L16 16l1.4-.5Z"/></svg>' +
-      "<h3>New Collection</h3><p>Already have your NFT assets? Upload and launch your collection.</p>" +
-      '<a href="/app?launch=files-collection">New Collection</a></div>' +
+      "<h3>New Collection</h3><p>Start from scratch — draw every trait in the editor, " +
+      "pixel or brush, and it generates the whole set. Or bring finished files.</p>" +
+      '<a href="/launch?mode=collection">New Collection</a></div>' +
       '<div class="act"><svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="4.5"/><path d="M9 4.5v-2M9 15.5v-2M4.5 9h-2M15.5 9h-2M6 6 4.6 4.6M13.4 13.4 12 12M12 6l1.4-1.4M4.6 13.4 6 12"/><circle cx="16.5" cy="16.5" r="3.4"/><path d="M16.5 13.1v-1.6M16.5 21.5v-1.6M13.1 16.5h-1.6M21.5 16.5h-1.6"/></svg>' +
-      "<h3>Generate Collection</h3><p>Create and launch a randomly generated collection from your traits.</p>" +
+      "<h3>Generate Collection</h3><p>Traits already drawn? Open the editor and generate the collection with rarity and rules.</p>" +
       '<a href="/app">Generate Collection</a></div></div>';
   }
 
