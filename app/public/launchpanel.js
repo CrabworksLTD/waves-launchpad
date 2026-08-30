@@ -88,7 +88,21 @@
       "  font-family:ui-monospace,monospace}",
       ".lp .pick{display:flex;justify-content:space-between;align-items:center;gap:10px;",
       "  width:100%;text-align:left;padding:11px 12px}",
-      ".lp .pick .k2{color:var(--faint);font-size:11px}"
+      ".lp .pick .k2{color:var(--faint);font-size:11px}",
+      /* long form */
+      ".lp .four{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}",
+      ".lp .tick{display:flex;gap:10px;align-items:flex-start;margin:16px 0 4px;cursor:pointer}",
+      ".lp .tick input{width:16px;height:16px;margin-top:2px;flex:none;accent-color:var(--accent)}",
+      ".lp .tick b{font-size:13px;display:block}",
+      ".lp .tick span{display:block;color:var(--dim);font-size:12px;margin-top:1px}",
+      ".lp .fold2{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:8px}",
+      ".lp .srow{display:grid;grid-template-columns:1fr 84px 30px;gap:8px;margin-top:6px}",
+      ".lp .srow button{flex:none;padding:6px}",
+      ".lp .filebtn{display:flex;gap:8px;align-items:center}",
+      ".lp .filebtn button{flex:none;padding:8px 12px;font-size:12px}",
+      ".lp .filebtn span{color:var(--faint);font-size:11.5px;overflow:hidden;",
+      "  text-overflow:ellipsis;white-space:nowrap}",
+      ".lp textarea.walls{font-family:ui-monospace,monospace;font-size:11.5px;min-height:74px}"
     ].join("\n");
     document.head.appendChild(s);
   }
@@ -153,57 +167,266 @@
 
   /* ================= NFT flow ================= */
 
+  /* The Moonpad launch window, ported: one long form. Sections in its order —
+   * identity, art, pricing, creator supply with splits, royalties, links —
+   * then toggles for the allowlist ladder and the paired token. Staking shows
+   * but stays disabled until the rewards program exists; a control that lies
+   * is worse than one that says "not yet". */
   function nftDetails(flow) {
+    flow = flow || {};
     var P = window.__project || {};
     var supply = run ? run.count : (P.supply || 0);
+    var d = flow.d = flow.d || {
+      name: P.name || "Untitled collection", symbol: "", desc: "",
+      price: 0, maxPer: 0, dev: 0, roy: 5, royTo: "",
+      site: "", x: "", tg: "", dc: "",
+      openAt: "", splits: [], allowOn: false, phases: [""], wave: 30,
+      pairOn: !!flow.pair, avatar: null, avatarName: "", banner: null, bannerName: ""
+    };
+
     var box = shell(H`
-      <h2>${flow && flow.pair ? "1 of 2 — the collection" : "Launch collection"}</h2>
+      <h2>Launch collection</h2>
       <p class="sub">${supply} pieces, generated and ready. Nothing is on chain until you confirm.</p>
-      <label>Collection name</label>
-      <input id="lp-name" value="${P.name || "Untitled collection"}" maxlength="28">
-      <label>Description</label>
-      <textarea id="lp-desc" rows="2" placeholder="Shown on marketplaces"></textarea>
+
       <div class="two">
-        <div><label>Mint price (SOL)</label>
-        <input id="lp-price" type="number" min="0" step="0.01" value="0"></div>
-        <div><label>Royalty %</label>
-        <input id="lp-roy" type="number" min="0" max="50" step="0.5" value="5"></div>
+        <div><label>Name</label><input id="f-name" value="${d.name}" maxlength="28"></div>
+        <div><label>Symbol</label><input id="f-sym" value="${d.symbol}" maxlength="8"
+          placeholder="OPTIONAL" style="text-transform:uppercase"></div>
       </div>
-      <label>Network</label>
-      <input id="lp-cluster" value="${window.Launch.cluster()}" readonly>
-      <p class="note">Name is capped at 28 characters because Candy Machine stores it as a
-      fixed-length prefix on chain, and the token number has to fit after it.</p>
-      <div class="acts"><button id="lp-x">${flow && flow.pair ? "Back" : "Cancel"}</button>
+      <label>Description</label>
+      <textarea id="f-desc" rows="2" placeholder="Shown on marketplaces">${d.desc}</textarea>
+
+      <div class="two">
+        <div><label>Collection avatar</label>
+          <div class="filebtn"><button id="f-pfpbtn" type="button">Choose…</button>
+          <span id="f-pfpname">${d.avatarName || "1:1 png — defaults to token #1"}</span></div></div>
+        <div><label>Banner</label>
+          <div class="filebtn"><button id="f-banbtn" type="button">Choose…</button>
+          <span id="f-banname">${d.bannerName || "wide png — optional"}</span></div></div>
+      </div>
+      <input type="file" id="f-pfp" accept="image/png" hidden>
+      <input type="file" id="f-ban" accept="image/png" hidden>
+
+      <div class="four">
+        <div><label>Mint price ◎</label><input id="f-price" type="number" min="0" step="0.01" value="${d.price}"></div>
+        <div><label>Max / wallet</label><input id="f-max" type="number" min="0" step="1" value="${d.maxPer}" placeholder="0 = ∞"></div>
+        <div><label>Creator supply</label><input id="f-dev" type="number" min="0" step="1" value="${d.dev}"></div>
+        <div><label>Royalty %</label><input id="f-roy" type="number" min="0" max="50" step="0.5" value="${d.roy}"></div>
+      </div>
+      <p class="note">Creator supply is minted to you before the sale opens, taking ids
+      from the machine first — free, before price and limits exist.</p>
+
+      <label>Royalty wallet</label>
+      <input id="f-royto" value="${d.royTo}" placeholder="optional — defaults to your wallet">
+
+      <label class="tick"><input type="checkbox" id="f-splitOn" ${d.splits.length ? raw("checked") : ""}>
+        <span><b>Split the creator supply</b>
+        <span>Mint parts of it straight to teammates' wallets.</span></span></label>
+      <div class="fold2" id="f-splitbox" ${d.splits.length ? "" : raw("hidden")}>
+        <div id="f-splitrows"></div>
+        <div class="acts" style="margin-top:10px"><button id="f-splitadd" type="button">+ Teammate</button></div>
+      </div>
+
+      <div class="four">
+        <div><label>Website</label><input id="f-site" value="${d.site}" placeholder="site.xyz"></div>
+        <div><label>X</label><input id="f-x" value="${d.x}" placeholder="@handle"></div>
+        <div><label>Telegram</label><input id="f-tg" value="${d.tg}" placeholder="t.me/…"></div>
+        <div><label>Discord</label><input id="f-dc" value="${d.dc}" placeholder="discord.gg/…"></div>
+      </div>
+
+      <label>Sale opens</label>
+      <input id="f-open" type="datetime-local" value="${d.openAt}">
+      <p class="note">Empty means the moment you launch. Allowlist waves count from here.</p>
+
+      <label class="tick"><input type="checkbox" id="f-allowOn" ${d.allowOn ? raw("checked") : ""}>
+        <span><b>Allowlist first</b>
+        <span>Listed wallets mint in waves before the public. The list is pinned with the
+        collection, so it cannot be quietly edited afterwards.</span></span></label>
+      <div class="fold2" id="f-allowbox" ${d.allowOn ? "" : raw("hidden")}>
+        <div id="f-phases"></div>
+        <div class="acts" style="margin-top:10px">
+          <button id="f-phaseadd" type="button">+ Wave</button>
+          <div style="flex:1;display:flex;gap:8px;align-items:center">
+            <label style="margin:0;flex:none">Wave lasts</label>
+            <input id="f-wave" type="number" min="1" value="${d.wave}" style="width:70px"> min
+          </div>
+        </div>
+      </div>
+
+      <label class="tick"><input type="checkbox" id="f-pairOn" ${d.pairOn ? raw("checked") : ""}
+        ${window.Token && window.Token.configKey() ? "" : raw("disabled")}>
+        <span><b>Pair a token</b>
+        <span>${window.Token && window.Token.configKey()
+          ? "Launch a bonding-curve token after the collection — its trading fees can reward your holders."
+          : "Not configured on this deployment yet."}</span></span></label>
+
+      <label class="tick"><input type="checkbox" disabled>
+        <span><b>Enable staking</b>
+        <span>Burn-to-stake rewards are coming — pick the reward asset in the token step meanwhile.</span></span></label>
+
+      <div id="lp-err"></div>
+      <div class="acts"><button id="lp-x">Cancel</button>
       <button class="go" id="lp-next">Continue</button></div>
     `);
 
-    box.querySelector("#lp-x").onclick = flow && flow.pair ? modeSelect : close;
+    /* files */
+    function bindFile(btn, input, nameEl, keyBytes, keyName) {
+      box.querySelector(btn).onclick = function () { box.querySelector(input).click(); };
+      box.querySelector(input).addEventListener("change", function (e) {
+        var f = e.target.files && e.target.files[0];
+        if (!f) return;
+        f.arrayBuffer().then(function (buf) {
+          d[keyBytes] = new Uint8Array(buf);
+          d[keyName] = f.name;
+          box.querySelector(nameEl).textContent = f.name;
+        });
+      });
+    }
+    bindFile("#f-pfpbtn", "#f-pfp", "#f-pfpname", "avatar", "avatarName");
+    bindFile("#f-banbtn", "#f-ban", "#f-banname", "banner", "bannerName");
+
+    /* splits */
+    function drawSplits() {
+      var rows = box.querySelector("#f-splitrows");
+      rows.innerHTML = d.splits.map(function (r, i) {
+        return '<div class="srow">' +
+          '<input data-i="' + i + '" data-f="to" value="' + esc(r.to) + '" placeholder="teammate address">' +
+          '<input data-i="' + i + '" data-f="count" type="number" min="1" value="' + esc(r.count) + '">' +
+          '<button type="button" data-del="' + i + '">×</button></div>';
+      }).join("") || '<p class="note">Whatever is not assigned here mints to you.</p>';
+      rows.querySelectorAll("input").forEach(function (inp) {
+        inp.addEventListener("input", function () {
+          d.splits[+inp.dataset.i][inp.dataset.f] =
+            inp.dataset.f === "count" ? (parseInt(inp.value, 10) || 0) : inp.value.trim();
+        });
+      });
+      rows.querySelectorAll("[data-del]").forEach(function (b) {
+        b.onclick = function () { d.splits.splice(+b.dataset.del, 1); drawSplits(); };
+      });
+    }
+    box.querySelector("#f-splitOn").addEventListener("change", function (e) {
+      box.querySelector("#f-splitbox").hidden = !e.target.checked;
+      if (e.target.checked && !d.splits.length) { d.splits.push({ to: "", count: 1 }); }
+      drawSplits();
+    });
+    box.querySelector("#f-splitadd").onclick = function () {
+      d.splits.push({ to: "", count: 1 }); drawSplits();
+    };
+    drawSplits();
+
+    /* allowlist waves */
+    function drawPhases() {
+      var ph = box.querySelector("#f-phases");
+      ph.innerHTML = d.phases.map(function (txt, i) {
+        return '<label style="margin-top:' + (i ? 10 : 0) + 'px">Wave ' + (i + 1) +
+          " — one wallet per line" + (d.phases.length > 1 ?
+          ' <button type="button" data-pdel="' + i + '" style="float:right;padding:2px 8px">×</button>' : "") +
+          '</label><textarea class="walls" data-p="' + i + '">' + esc(txt) + "</textarea>";
+      }).join("");
+      ph.querySelectorAll("textarea").forEach(function (t) {
+        t.addEventListener("input", function () { d.phases[+t.dataset.p] = t.value; });
+      });
+      ph.querySelectorAll("[data-pdel]").forEach(function (b) {
+        b.onclick = function () { d.phases.splice(+b.dataset.pdel, 1); drawPhases(); };
+      });
+    }
+    box.querySelector("#f-allowOn").addEventListener("change", function (e) {
+      d.allowOn = e.target.checked;
+      box.querySelector("#f-allowbox").hidden = !d.allowOn;
+    });
+    box.querySelector("#f-phaseadd").onclick = function () {
+      if (d.phases.length >= 8) return;         // labels w1..w8 + pub, 6-char cap
+      d.phases.push(""); drawPhases();
+    };
+    drawPhases();
+
+    box.querySelector("#lp-x").onclick = close;
     box.querySelector("#lp-next").onclick = function () {
-      var name = box.querySelector("#lp-name").value.trim();
-      if (!name) return;
+      // collect
+      d.name = box.querySelector("#f-name").value.trim();
+      d.symbol = box.querySelector("#f-sym").value.trim().toUpperCase();
+      d.desc = box.querySelector("#f-desc").value.trim();
+      d.price = parseFloat(box.querySelector("#f-price").value) || 0;
+      d.maxPer = parseInt(box.querySelector("#f-max").value, 10) || 0;
+      d.dev = parseInt(box.querySelector("#f-dev").value, 10) || 0;
+      d.roy = parseFloat(box.querySelector("#f-roy").value) || 0;
+      d.royTo = box.querySelector("#f-royto").value.trim();
+      d.site = box.querySelector("#f-site").value.trim();
+      d.x = box.querySelector("#f-x").value.trim();
+      d.tg = box.querySelector("#f-tg").value.trim();
+      d.dc = box.querySelector("#f-dc").value.trim();
+      d.openAt = box.querySelector("#f-open").value;
+      d.wave = parseInt(box.querySelector("#f-wave").value, 10) || 30;
+      d.allowOn = box.querySelector("#f-allowOn").checked;
+      d.pairOn = box.querySelector("#f-pairOn").checked;
+      if (!box.querySelector("#f-splitOn").checked) d.splits = [];
+
+      // validate
+      var B58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+      if (!d.name) return fail(box, "The collection needs a name.");
+      if (d.royTo && !B58.test(d.royTo)) return fail(box, "The royalty wallet is not a valid address.");
+      if (d.dev > supply) return fail(box, "Creator supply exceeds the collection.");
+      var assigned = 0;
+      for (var i = 0; i < d.splits.length; i++) {
+        var r = d.splits[i];
+        if (!B58.test(r.to)) return fail(box, "Split row " + (i + 1) + " is not a valid address.");
+        if (!(r.count > 0)) return fail(box, "Split row " + (i + 1) + " needs a count.");
+        assigned += r.count;
+      }
+      if (assigned > d.dev) return fail(box, "Splits assign " + assigned +
+        " but creator supply is " + d.dev + ".");
+      var phases = [];
+      if (d.allowOn) {
+        for (var pi = 0; pi < d.phases.length; pi++) {
+          var wallets = d.phases[pi].split(/[\s,]+/).map(function (w) { return w.trim(); })
+            .filter(Boolean);
+          if (!wallets.length) return fail(box, "Wave " + (pi + 1) + " has no wallets — remove it or fill it.");
+          for (var wi = 0; wi < wallets.length; wi++) {
+            if (!B58.test(wallets[wi])) return fail(box,
+              "Wave " + (pi + 1) + ", line " + (wi + 1) + " is not a valid address.");
+          }
+          phases.push({ label: "w" + (pi + 1), wallets: wallets });
+        }
+      }
+
+      flow.pair = d.pairOn;
       nftConfirm({
-        name: name,
-        description: box.querySelector("#lp-desc").value.trim(),
-        priceSol: parseFloat(box.querySelector("#lp-price").value) || 0,
-        royaltyPercent: parseFloat(box.querySelector("#lp-roy").value) || 0,
-        supply: supply
+        name: d.name, symbol: d.symbol, description: d.desc,
+        priceSol: d.price, maxPerWallet: d.maxPer, royaltyPercent: d.roy,
+        royaltyTo: d.royTo || null,
+        supply: supply,
+        devMints: d.dev > 0 ? d.splits.concat([{ to: null, count: d.dev - assigned }])
+          .filter(function (r) { return r.count > 0; }) : [],
+        devTotal: d.dev,
+        links: { website: d.site, x: d.x, telegram: d.tg, discord: d.dc },
+        avatar: d.avatar, banner: d.banner,
+        openAt: d.openAt ? new Date(d.openAt).toISOString() : null,
+        waves: phases.length ? { minutes: d.wave, phases: phases } : null
       }, flow);
     };
   }
 
   async function nftConfirm(cfg, flow) {
     var w = window.Wallet.current();
+    var waveTxt = cfg.waves
+      ? cfg.waves.phases.map(function (p) { return p.wallets.length; }).join(" + ") +
+        " wallets · " + cfg.waves.minutes + " min waves"
+      : "no — public from open";
     var box = shell(H`
       <h2>Confirm</h2>
       <p class="sub">Two things get paid for: permanent storage, and Solana rent plus fees.</p>
-      <div class="row"><span class="k">Collection</span><b>${cfg.name}</b></div>
-      <div class="row"><span class="k">Supply</span><b>${cfg.supply}</b></div>
-      <div class="row"><span class="k">Mint price</span><b>${cfg.priceSol} SOL</b></div>
-      <div class="row"><span class="k">Royalty</span><b>${cfg.royaltyPercent}%</b></div>
+      <div class="row"><span class="k">Collection</span><b>${cfg.name}${cfg.symbol ? " · " + cfg.symbol : ""}</b></div>
+      <div class="row"><span class="k">Supply</span><b>${cfg.supply}${cfg.devTotal ? " (" + cfg.devTotal + " to the team first)" : ""}</b></div>
+      <div class="row"><span class="k">Mint price</span><b>${cfg.priceSol} SOL${cfg.maxPerWallet ? " · max " + cfg.maxPerWallet + "/wallet" : ""}</b></div>
+      <div class="row"><span class="k">Royalty</span><b>${cfg.royaltyPercent}%${cfg.royaltyTo ? " → " + shortAddr(cfg.royaltyTo) : ""}</b></div>
+      <div class="row"><span class="k">Allowlist</span><b>${waveTxt}</b></div>
+      <div class="row"><span class="k">Opens</span><b>${cfg.openAt ? new Date(cfg.openAt).toLocaleString() : "immediately"}</b></div>
+      ${flow && flow.pair ? H`<div class="row"><span class="k">Then</span><b>a paired token</b></div>` : ""}
       <div class="row"><span class="k">Storage fee</span><b id="lp-fee">quoting…</b></div>
       <div class="row"><span class="k">Wallet</span><b>${w ? w.name + " · " + shortAddr(w.publicKey) : "not connected"}</b></div>
       <p class="note">Storage is a one-off payment to Arweave for permanent hosting,
-      quoted live at the moment you launch so it tracks the real cost.</p>
+      quoted live at the moment you launch. The allowlist is pinned alongside the art,
+      so the list minting ahead of the public is on the record forever.</p>
       <div id="lp-err"></div>
       <div class="acts"><button id="lp-back">Back</button>
       <button class="go" id="lp-go" disabled>${w ? "Launch" : "Connect a wallet"}</button></div>
@@ -211,9 +434,8 @@
 
     box.querySelector("#lp-back").onclick = function () { nftDetails(flow); };
 
-    // Quote before enabling the button — nobody confirms an unshown price.
     try {
-      var probe = estimateBytes();
+      var probe = estimateBytes(cfg);
       await window.Storage.quoteUpload(probe.bytes, probe.count).then(function (quote) {
         box.querySelector("#lp-fee").textContent = Number(quote.feeSol).toFixed(4) + " SOL";
       });
@@ -238,7 +460,7 @@
   /* Sizing probe for the pre-launch quote. storage.js sizes properly against
    * the real file set at upload time; this must not drift from it or the
    * quoted fee will not match the charged fee. */
-  function estimateBytes() {
+  function estimateBytes(cfg) {
     var f = run.files;
     var bytes = 0, count = 0;
     ["images", "metaplex"].forEach(function (k) {
@@ -247,6 +469,9 @@
         count++;
       });
     });
+    // avatar and banner ride in BOTH folders (see storage.js on why)
+    if (cfg && cfg.avatar) { bytes += cfg.avatar.byteLength * 2; count += 2; }
+    if (cfg && cfg.banner) { bytes += cfg.banner.byteLength * 2; count += 2; }
     return { bytes: bytes, count: count + 6 };    // +6 for _index, _collection etc.
   }
 
@@ -270,6 +495,8 @@
       ["machine", "Creating candy machine"],
       ["lines", "Loading items"]
     ];
+    if (cfg.devTotal > 0) stages.push(["dev", "Minting the creator supply"]);
+    stages.push(["guard", "Arming the sale rules"]);
     var box = shell(H`
       <h2>Launching${flow && flow.pair ? " — collection" : ""}</h2>
       <p class="sub">Leave this tab open. Each step needs a signature.</p>
@@ -284,7 +511,14 @@
       var up = await window.Storage.uploadCollection({
         files: run.files,
         name: cfg.name,
+        symbol: cfg.symbol,
         description: cfg.description,
+        avatar: cfg.avatar,
+        banner: cfg.banner,
+        links: cfg.links,
+        allowlist: cfg.waves
+          ? { waveMinutes: cfg.waves.minutes, phases: cfg.waves.phases }
+          : null,
         onProgress: function (p) {
           if (p.phase === "images" && p.state === "quoting") mark("storage", "on");
           if (p.phase === "images") mark("images", p.state === "done" ? "done" : "on");
@@ -302,12 +536,18 @@
         name: cfg.name,
         supply: cfg.supply,
         priceSol: cfg.priceSol,
+        maxPerWallet: cfg.maxPerWallet,
         royaltyPercent: cfg.royaltyPercent,
+        royaltyTo: cfg.royaltyTo,
+        devMints: cfg.devMints,
+        openAt: cfg.openAt,
+        waves: cfg.waves,
         baseUri: up.baseUri,
         collectionUri: up.collectionUri,
         onProgress: function (p) {
-          if (p.step === "lines" && p.state === "uploading") {
-            mark("lines", "on", "Loading items — batch " + p.batch + " of " + p.batches);
+          if ((p.step === "lines" || p.step === "dev") && p.state === "uploading") {
+            mark(p.step, "on", (p.step === "dev" ? "Minting the creator supply — " : "Loading items — batch ") +
+              p.batch + " of " + p.batches);
           } else {
             mark(p.step, p.state === "done" ? "done" : "on");
           }
@@ -317,8 +557,6 @@
       busy = false;
 
       if (flow && flow.pair) {
-        // Straight into part two, carrying the collection along. Its record is
-        // POSTed at the end of the token flow so the entries link both ways.
         flow.nft = { cfg: cfg, res: res, up: up };
         tokenDetails(flow);
         return;

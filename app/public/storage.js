@@ -283,6 +283,7 @@
       // collection asset — what a marketplace reads for the collection's name,
       // logo and banner.
       var col = { name: opts.name || "Collection" };
+      if (opts.symbol) col.symbol = opts.symbol;
       if (opts.description) col.description = opts.description;
       // No uploaded picture does not mean no picture: the collection's own
       // first token stands in.

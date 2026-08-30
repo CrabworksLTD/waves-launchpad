@@ -40,11 +40,19 @@ export {
 
 export {
   mplCandyMachine,
-  create as createCandyMachine,
+  create as createCandyMachineWithGuard,
+  createCandyMachine,          // machine only — no guard, mintAuthority stays ours
+  createCandyGuard,
+  wrap,                        // hands mint authority to the guard
   addConfigLines,
   fetchCandyMachine,
   fetchCandyGuard,
+  findCandyGuardPda,
   mintV1,
+  mintAssetFromCandyMachine,   // authority mint, takes assetOwner — creator supply
+  route,                       // allowList proof validation before a gated mint
+  getMerkleRoot,
+  getMerkleProof,
   updateCandyGuard,
   deleteCandyMachine,
 } from "@metaplex-foundation/mpl-core-candy-machine";
