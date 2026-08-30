@@ -49,12 +49,19 @@
     "  text-decoration:none;transition:color .18s,background .18s}",
     ".shl-nav a:hover{color:var(--ink);background:var(--panel2)}",
     ".shl-nav a.on{color:var(--ink)}",
-    ".shl-wallet{font:600 13.5px 'Space Grotesk',sans-serif;cursor:pointer;",
-    "  padding:9px 16px;border-radius:999px;border:1px solid var(--line2);",
-    "  background:var(--raise);color:var(--ink);white-space:nowrap;",
-    "  transition:background .2s,border-color .2s}",
-    ".shl-wallet:hover{background:var(--panel2);border-color:var(--faint)}",
-    ".shl-wallet.linked{background:transparent;color:var(--dim);",
+    /* Hollow pill: the gradient runs through a transparent 1px border via the
+     * padding-box/border-box double background, and through the lettering via
+     * background-clip on an inner span — it cannot sit on the button itself,
+     * because that background is already busy being the border. */
+    ".shl-wallet{font:700 13.5px Archivo,'Space Grotesk',sans-serif;cursor:pointer;",
+    "  padding:9px 18px;border-radius:999px;border:1px solid transparent;",
+    "  background:linear-gradient(var(--void),var(--void)) padding-box,",
+    "    var(--grad) border-box;",
+    "  white-space:nowrap;transition:filter .2s}",
+    ".shl-wallet span{background:var(--grad);-webkit-background-clip:text;",
+    "  background-clip:text;color:transparent}",
+    ".shl-wallet:hover{filter:brightness(1.18)}",
+    ".shl-wallet.linked span{background:none;color:var(--dim);",
     "  font:400 12.5px 'IBM Plex Mono',monospace}",
     ".shl-search{display:none;flex:1;min-width:0}",
     ".shl-search.open{display:block}",
@@ -105,7 +112,7 @@
         }).join(""))}
       </nav>
       <div class="zone r">
-        <button class="shl-wallet" id="shl-wallet">Connect wallet</button>
+        <button class="shl-wallet" id="shl-wallet"><span>Connect wallet</span></button>
       </div>
     `);
 
@@ -133,11 +140,11 @@
       var w = window.Wallet && window.Wallet.current();
       if (w) {
         btn.className = "shl-wallet linked";
-        btn.textContent = shortAddr(w.publicKey);
+        btn.innerHTML = "<span>" + window.UI.esc(shortAddr(w.publicKey)) + "</span>";
         btn.title = w.name + " — click to disconnect";
       } else {
         btn.className = "shl-wallet";
-        btn.textContent = "Connect wallet";
+        btn.innerHTML = "<span>Connect wallet</span>";
         btn.title = "";
       }
     }
@@ -148,7 +155,7 @@
         return;
       }
       var found = window.Wallet.list();
-      if (!found.length) { btn.textContent = "No wallet found"; return; }
+      if (!found.length) { btn.innerHTML = "<span>No wallet found</span>"; return; }
       window.Wallet.connect(found[0].id).then(paint).catch(function () { paint(); });
     });
     if (window.Wallet) window.Wallet.on("change", paint);
