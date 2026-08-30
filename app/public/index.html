@@ -9,7 +9,11 @@
 <meta property="og:site_name" content="WAVES">
 <meta property="og:title" content="WAVES">
 <meta property="og:description" content="Solana's one-stop shop for deploying everything — collections, tokens, pairs.">
+<meta property="og:image" content="https://waves-launchpad-crabworksltd.vercel.app/art/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://waves-launchpad-crabworksltd.vercel.app/art/og.png">
 <meta name="twitter:title" content="WAVES">
 <meta name="twitter:description" content="Solana's one-stop shop for deploying everything — collections, tokens, pairs.">
 <meta name="theme-color" content="#000000">
@@ -109,6 +113,28 @@ h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:te
   border:1px solid var(--line2);color:var(--ink);transition:background .2s}
 .sechead a:hover{background:var(--panel2)}
 
+/* ranked top-10 lists, side by side */
+.ranked{display:grid;grid-template-columns:1fr 1fr;gap:0 56px;align-items:start}
+@media (max-width:960px){.ranked{grid-template-columns:1fr}}
+.ranks{list-style:none;margin:0;padding:0}
+.rrow{display:flex;align-items:center;gap:14px;padding:9px 6px;border-radius:8px;
+  transition:background .15s}
+.rrow:hover{background:var(--panel)}
+.rrow .rk{flex:none;width:26px;text-align:right;font:800 15px Archivo;color:var(--ink)}
+.rrow .th{width:56px;height:56px;flex:none;border-radius:8px;overflow:hidden;
+  background:var(--panel2);border:1px solid var(--line)}
+.rrow .th canvas,.rrow .th img{width:100%;height:100%;display:block;object-fit:cover;
+  image-rendering:pixelated}
+.rrow .th.coin{border-radius:50%;border:2px solid transparent;display:grid;place-items:center;
+  background:linear-gradient(var(--panel2),var(--panel2)) padding-box,var(--grad) border-box;
+  font:800 20px Archivo;color:var(--ink)}
+.rrow .who{min-width:0;flex:1}
+.rrow .who b{display:block;font:700 15px Archivo;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rrow .who span{display:flex;align-items:center;gap:6px;margin-top:3px;
+  font:400 12px "IBM Plex Mono",monospace;color:var(--faint)}
+.rrow .who span svg{width:11px;height:11px;flex:none}
+
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:16px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:4px;
   overflow:hidden;display:block;transition:border-color .2s}
@@ -153,15 +179,18 @@ footer{border-top:1px solid var(--line);margin-top:90px;padding:26px 0 60px;
     <div class="row3" id="feat3"></div>
   </section>
 
-  <section aria-label="Collections">
-    <div class="sechead"><h2 class="disp">Popular Collections</h2><a href="/app">View all</a></div>
-    <div class="cards" id="cards"></div>
-  </section>
-
-  <section aria-label="Tokens">
-    <div class="sechead"><h2 class="disp">Popular Tokens</h2><a href="/app">Launch one</a></div>
-    <div class="cards" id="tokens"></div>
-  </section>
+  <!-- ranked top-10s, side by side, after the reference: rank, thumb, name,
+       the one number that matters -->
+  <div class="ranked">
+    <section aria-label="Collections">
+      <div class="sechead"><h2 class="disp">Popular Collections</h2><a href="/collections">View all</a></div>
+      <ol class="ranks" id="cards"></ol>
+    </section>
+    <section aria-label="Tokens">
+      <div class="sechead"><h2 class="disp">Popular Tokens</h2><a href="/tokens">View all</a></div>
+      <ol class="ranks" id="tokens"></ol>
+    </section>
+  </div>
 
   <footer>
     <span>Built on Metaplex Core and Meteora. We take no cut of your mint.</span>
@@ -173,11 +202,15 @@ footer{border-top:1px solid var(--line);margin-top:90px;padding:26px 0 60px;
 <script src="/ui.js"></script>
 <script src="/wallet.js"></script>
 <script src="/shell.js"></script>
+<script src="/launch.js"></script>
+<script src="/token.js"></script>
 <script>
 (function () {
   "use strict";
   var esc = UI.esc, shortAddr = UI.shortAddr;
   Shell.mount({ active: "collections", search: true });
+  var qcl = new URLSearchParams(location.search).get("cluster");
+  if (qcl) window.Launch.cluster(qcl);
 
   /* ---------------- template loading + compositing ---------------- */
 
@@ -323,36 +356,98 @@ footer{border-top:1px solid var(--line);margin-top:90px;padding:26px 0 60px;
       }).catch(function () {});
     });
 
-    // hot collections: the remaining templates as square cards, rerolling
-    var cards = document.getElementById("cards");
-    cards.innerHTML = rest.map(function (x) {
-      return squareCard(x, live ? "/mint/" + x.candyMachine : "/app",
-        live ? shortAddr(x.candyMachine) : x.traits + " traits · " + x.categories + " categories");
-    }).join("");
-    rest.forEach(function (x, i) {
-      var cv = cards.children[i] && cards.children[i].querySelector("canvas");
-      if (!cv || live) return;
-      loadTemplate(x.file).then(function (tp) {
-        paint(cv, tp);
-        rerolls.push({ cv: cv, tp: tp });
+    drawRankedCollections(live ? collections.slice(0, 10) : null,
+                          live ? null : templates.slice(0, 10));
+    drawRankedTokens(tokens.slice(0, 10));
+  }
+
+  var MINI = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<defs><linearGradient id="rg" x1="0" y1="1" x2="1" y2="0">' +
+    '<stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>' +
+    '</linearGradient></defs>' +
+    '<path fill="url(#rg)" d="M0 16h8v8H0ZM8 8h8v8H8Zm8-8h8v8h-8Z"/></svg>';
+
+  function rankRow(href, name, thumb, stat) {
+    return '<li><a class="rrow" data-name="' + esc(name) + '" href="' + esc(href) + '">' +
+      '<span class="rk"></span>' + thumb +
+      '<span class="who"><b>' + esc(name) + "</b><span>" + MINI +
+      '<i class="st" style="font-style:normal">' + esc(stat) + "</i></span></span></a></li>";
+  }
+  function number(ol) {
+    [].forEach.call(ol.querySelectorAll(".rk"), function (el, i) {
+      el.textContent = i + 1;
+    });
+  }
+
+  /* Top 10 collections, ranked by minted. Live rows re-sort as machines
+   * answer; template rows (nothing launched yet) rank by trait count. */
+  function drawRankedCollections(live, templates) {
+    var ol = document.getElementById("cards");
+    if (!live) {
+      var tps = templates.slice().sort(function (a, b) { return b.traits - a.traits; });
+      ol.innerHTML = tps.map(function (x) {
+        return rankRow("/app", x.name, '<span class="th"><canvas></canvas></span>',
+          x.traits + " traits · " + x.categories + " categories");
+      }).join("");
+      number(ol);
+      tps.forEach(function (x, i) {
+        var cv = ol.children[i].querySelector("canvas");
+        loadTemplate(x.file).then(function (tp) { paint(cv, tp); }).catch(function () {});
+      });
+      return;
+    }
+    var rows = live.map(function (r) { return { r: r, m: null }; });
+    function paintList() {
+      rows.sort(function (a, b) {
+        return (b.m ? b.m.redeemed : -1) - (a.m ? a.m.redeemed : -1);
+      });
+      ol.innerHTML = rows.map(function (x) {
+        return rankRow("/mint/" + x.r.candyMachine, x.r.name,
+          '<span class="th">' + (x.r.avatar
+            ? '<img alt="" loading="lazy" src="' + esc(x.r.avatar) + '">' : "") + "</span>",
+          x.m ? x.m.redeemed.toLocaleString() + "/" + x.m.available.toLocaleString() + " minted"
+              : "reading chain…");
+      }).join("");
+      number(ol);
+    }
+    paintList();
+    rows.forEach(function (row) {
+      window.Launch.readMachine(row.r.candyMachine).then(function (m) {
+        row.m = m; paintList();
       }).catch(function () {});
     });
+  }
 
-    // tokens
-    var tok = document.getElementById("tokens");
-    if (tokens.length) {
-      tok.innerHTML = tokens.map(function (t) {
-        return '<a class="card" data-name="' + esc(t.name + " " + t.symbol) +
-          '" href="/token/' + esc(t.mint) + '">' +
-          '<div class="tok"><b>$' + esc(t.symbol || "?") + '</b></div>' +
-          '<div class="meta"><b>' + esc(t.name) + '</b><span class="mono">' +
-          esc(shortAddr(t.mint)) + "</span></div></a>";
-      }).join("");
-    } else {
-      tok.innerHTML = '<div class="none" style="grid-column:1/-1">' +
-        "<p class='disp'>No tokens launched yet</p>" +
-        "<span>The first one gets this whole row to itself.</span></div>";
+  /* Top 10 tokens, ranked by raised on the curve. */
+  function drawRankedTokens(tokens) {
+    var ol = document.getElementById("tokens");
+    if (!tokens.length) {
+      ol.innerHTML = '<div class="none"><p class="disp">No tokens launched yet</p>' +
+        "<span>The first one tops this list by default.</span></div>";
+      return;
     }
+    var rows = tokens.map(function (t) { return { t: t, m: null }; });
+    function paintList() {
+      rows.sort(function (a, b) {
+        return (b.m ? b.m.raised : -1) - (a.m ? a.m.raised : -1);
+      });
+      ol.innerHTML = rows.map(function (x) {
+        var sym = (x.t.symbol || "?").toUpperCase();
+        return rankRow("/token/" + x.t.mint, "$" + sym + " · " + x.t.name,
+          '<span class="th coin">' + esc(sym.slice(0, 1)) + "</span>",
+          x.m ? (x.m.migrated ? "graduated"
+                : UI.fmt(x.m.raised, 2) + "/" + UI.fmt(x.m.threshold, 0) + " " +
+                  x.m.quote + " raised")
+              : "reading the curve…");
+      }).join("");
+      number(ol);
+    }
+    paintList();
+    rows.forEach(function (row) {
+      window.Token.readMarket(row.t.mint).then(function (m) {
+        row.m = m; paintList();
+      }).catch(function () {});
+    });
   }
 
   /* search filters every named tile, banners included */

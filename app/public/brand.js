@@ -23,8 +23,8 @@
     // blurred page behind a password card (shell.js). Empty string = open.
     // This keeps HUMANS out during the build — it is client-side, so anyone
     // reading source can bypass it; that is fine for a curtain, remove it
-    // before pretending otherwise. Current password: "makewaves".
-    gate: "d80f153f648b19e03ac4538a259a44c5de08cecb9d75e96a32d9f42fa51a8023",
+    // before pretending otherwise. Password is with Kyle.
+    gate: "53d3ecce08c0327fbcce4ee44ffcb3e8f0f02e2c486f840dc561427377c6bc5e",
 
     // DBC partner configs, one per cluster per quote currency. Created once
     // each by tools/create-dbc-config.js; a missing entry disables that

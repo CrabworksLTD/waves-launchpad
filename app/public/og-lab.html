@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OG card lab</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@800;900&display=swap" rel="stylesheet">
+<style>body{background:#222;margin:0;display:grid;place-items:center;min-height:100vh}
+canvas{width:900px;height:472px;border:1px solid #444}</style>
+</head>
+<body>
+<canvas id="c" width="1200" height="630"></canvas>
+<script>
+/* The share card, per Kyle: black, the mark huge running bottom-left to the
+ * top edge, WAVES in the middle, gradient leaking in at bottom-right.
+ * Drawn at exact OG size; the lab page exists so the PNG can be pulled out
+ * pixel-perfect instead of screenshotting a scaled window. */
+async function draw() {
+  await document.fonts.load("900 160px Archivo");
+  await document.fonts.ready;
+  var g = document.getElementById("c").getContext("2d");
+
+  g.fillStyle = "#000";
+  g.fillRect(0, 0, 1200, 630);
+
+  // gradient leak, bottom-right corner
+  var leak = g.createRadialGradient(1200, 630, 0, 1200, 630, 620);
+  leak.addColorStop(0, "rgba(20,241,149,.34)");
+  leak.addColorStop(.45, "rgba(153,69,255,.16)");
+  leak.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = leak;
+  g.fillRect(0, 0, 1200, 630);
+
+  // the mark, giant: three squares climbing from the bottom-left corner off
+  // the top edge, gradient running along the climb
+  // flush: first square sits ON the bottom-left corner, third ends exactly
+  // at the top edge — 3 x 210 spans the full 630
+  var S = 210, GAP = 0;
+  var steps = [
+    [0, 630 - S],
+    [S, 630 - 2 * S],
+    [2 * S, 0]
+  ];
+  var mg = g.createLinearGradient(steps[0][0], steps[0][1] + S, steps[2][0] + S, steps[2][1]);
+  mg.addColorStop(0, "#9945FF");
+  mg.addColorStop(1, "#14F195");
+  g.fillStyle = mg;
+  steps.forEach(function (p) { g.fillRect(p[0], p[1], S, S); });
+
+  // WAVES dead centre of the card
+  g.fillStyle = "#fff";
+  g.font = "900 168px Archivo";
+  g.textBaseline = "middle";
+  g.textAlign = "center";
+  g.letterSpacing = "-6px";
+  g.fillText("WAVES", 600, 315);
+
+  g.font = "600 30px Archivo";
+  g.letterSpacing = "2px";
+  g.fillStyle = "rgba(255,255,255,.62)";
+  g.fillText("DEPLOY… EVERYTHING.", 600, 427);
+}
+draw();
+</script>
+</body>
+</html>

@@ -219,7 +219,7 @@
       document.body.appendChild(ov);
       var inp = ov.querySelector("#shl-gate-in");
       async function tryPass() {
-        var buf = new TextEncoder().encode(inp.value.trim().toLowerCase());
+        var buf = new TextEncoder().encode(inp.value.trim());
         var d = await crypto.subtle.digest("SHA-256", buf);
         var hex = [].map.call(new Uint8Array(d), function (b) {
           return b.toString(16).padStart(2, "0");
