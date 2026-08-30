@@ -135,7 +135,7 @@
 
     var built;
     if (opts.firstBuySol > 0) {
-      built = await c.cli.pool.createPoolWithFirstBuy({
+      built = await c.cli.creator.createPoolWithFirstBuy({
         createPoolParam: args,
         firstBuyParam: {
           buyer: c.owner,
@@ -145,7 +145,7 @@
         }
       });
     } else {
-      built = await c.cli.pool.createPool(args);
+      built = await c.cli.creator.createPool(args);
     }
 
     var tx = built.createPoolTx || built.transaction || built;
@@ -203,12 +203,16 @@
     var pool = await c.cli.state.getPoolByBaseMint(new c.X.PublicKey(baseMint));
     if (!pool) throw new Error("No pool for that mint");
 
+    // u64 max as BN: "claim everything". The SDK types these as BN, not
+    // nullable — null builds an instruction the program rejects.
+    var U64MAX = "18446744073709551615";
     var tx = await c.cli.creator.claimCreatorTradingFeeToReceiver({
       creator: c.owner,
+      payer: c.owner,
       pool: pool.publicKey,
       receiver: new c.X.PublicKey(receiver),
-      maxBaseAmount: null,
-      maxQuoteAmount: null
+      maxBaseAmount: new c.M.BN(U64MAX),
+      maxQuoteAmount: new c.M.BN(U64MAX)
     });
     return await send(c, tx);
   }

@@ -22,3 +22,7 @@ export {
   MigrationFeeOption,
   TokenType,
 } from "@meteora-ag/dynamic-bonding-curve-sdk";
+
+/* BN for fee-claim maxima — the claim instructions type their limits as BN and
+ * reject null; u64::MAX as a BN is how "claim everything" is spelled. */
+export { default as BN } from "bn.js";
