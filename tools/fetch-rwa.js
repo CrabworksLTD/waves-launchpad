@@ -1,22 +1,30 @@
 #!/usr/bin/env node
-/* Build the xStocks reward-asset list into app/public/xstocks.json.
+/* Build the RWA reward-asset list into app/public/rwa.json.
  *
- *   node tools/fetch-xstocks.js
+ *   node tools/fetch-rwa.js
  *
  * Not hand-typed, deliberately. Searching Jupiter for "TSLAx" returns five
  * different tokens with that exact symbol — four of them pump.fun impostors
  * with the same name. Choosing a reward asset by symbol would pay a
- * collection's holders in a fake, and it would look completely correct in
- * review.
+ * collection's holders in a fake, and it would look correct in review.
  *
- * Three filters, all of which must pass:
- *   1. Jupiter's `xstocks` tag        — the issuer's own tokens
- *   2. an `Xs` address prefix         — Backed uses vanity mints; every real
- *                                       one starts with it, no impostor did
- *   3. getAccountInfo says it is a live mint account
+ * Covers three issuers, because the first version only knew about one and
+ * silently excluded the other two:
  *
- * Any of the three alone is defeatable. Together they are not worth attacking
- * for the size of reward pool this routes.
+ *   Backed xStocks   `x` suffix, `Xs` vanity mint prefix   AAPLx, GLDx, SLVx
+ *   Ondo Global      `on` suffix, no common prefix          USOon, BNOon, SLVon
+ *   standalone       tokenised commodities                  PAXG, XAUt0
+ *
+ * Requiring the `xstocks` tag AND an Xs prefix — the original filter — dropped
+ * Ondo's entire catalogue and every commodity token that is not an ETF wrapper.
+ * That is how crude oil went missing.
+ *
+ * Filters, both required:
+ *   1. Jupiter `verified` tag, plus at least one asset-class tag
+ *   2. getAccountInfo says it is a live mint account
+ *
+ * The issuer is recorded rather than used as a gate, so a UI can group by it
+ * and a human can see what they are picking.
  */
 "use strict";
 
@@ -25,7 +33,7 @@ const path = require("path");
 
 const RPC = process.env.SOLANA_RPC || "https://api.mainnet-beta.solana.com";
 const SEARCH = "https://lite-api.jup.ag/tokens/v2/search?query=";
-const OUT = path.join(__dirname, "../app/public/xstocks.json");
+const OUT = path.join(__dirname, "../app/public/rwa.json");
 
 // Jupiter's search pages at 20, so one query will not enumerate 100+ tickers.
 // Three passes over the alphabet: the shared name, each letter alone (matches
@@ -33,9 +41,18 @@ const OUT = path.join(__dirname, "../app/public/xstocks.json");
 // form is the only match). Overlapping on purpose — the set is deduped by mint
 // and a missed ticker is a reward asset a creator cannot choose.
 const AZ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-const QUERIES = ["xStock", "xStocks"]
-  .concat(AZ)
-  .concat(AZ.map((c) => c + "x"));
+const COMMODITY = ["gold", "silver", "oil", "crude", "brent", "platinum", "palladium",
+                   "copper", "uranium", "natural gas", "wheat", "corn", "commodity",
+                   "PAXG", "XAUT", "bullion"];
+const QUERIES = ["xStock", "xStocks", "Ondo"]
+  .concat(AZ)                       // symbols and company names
+  .concat(AZ.map((c) => c + "x"))   // Backed tickers
+  .concat(AZ.map((c) => c + "on"))  // Ondo tickers
+  .concat(COMMODITY);               // commodities are not named after letters
+
+const ASSET_TAGS = ["xstocks", "stocks", "equities", "rwa", "commodities"];
+const COMMODITY_WORDS = ["gold", "silver", "oil", "crude", "brent", "platinum",
+  "palladium", "copper", "uranium", "natural gas", "bullion", "metal", "commodity"];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -102,11 +119,22 @@ async function verifyBatch(addresses) {
     for (const t of rows) {
       const tags = t.tags || [];
       const id = t.id || t.address;
+      const sym = t.symbol || "";
       if (!id) continue;
-      if (!tags.includes("xstocks")) continue;            // filter 1
-      if (!id.startsWith("Xs")) continue;                 // filter 2
+      // filter 1: Jupiter-verified AND carries an asset-class tag. `verified`
+      // alone is too broad; an asset-class tag alone lets an impostor through
+      // by self-declaring.
+      if (!tags.includes("verified")) continue;
+      if (!ASSET_TAGS.some((x) => tags.includes(x))) continue;
+
+      const issuer = id.startsWith("Xs") ? "backed"
+                   : /on$/.test(sym) ? "ondo"
+                   : "other";
+      const name = (t.name || "").toLowerCase();
+      const kind = COMMODITY_WORDS.some((w) => name.includes(w)) ? "commodity" : "equity";
+
       if (!found.has(id)) {
-        found.set(id, { symbol: t.symbol, name: t.name, mint: id });
+        found.set(id, { symbol: sym, name: t.name, mint: id, issuer: issuer, kind: kind });
       }
     }
     process.stdout.write(".");
@@ -135,8 +163,8 @@ async function verifyBatch(addresses) {
   verified.sort((a, b) => a.symbol.localeCompare(b.symbol));
 
   fs.writeFileSync(OUT, JSON.stringify({
-    note: "Generated by tools/fetch-xstocks.js. Do not hand-edit — a mistyped " +
-          "mint decodes to a valid address and pays rewards into nothing.",
+    note: "Generated by tools/fetch-rwa.js. Do not hand-edit — a mistyped mint " +
+          "decodes to a valid address and pays rewards into nothing.",
     generatedAt: new Date().toISOString(),
     count: verified.length,
     tokens: verified
@@ -146,6 +174,13 @@ async function verifyBatch(addresses) {
   if (rejected.length) {
     console.log("  rejected (not a live mint): " + rejected.map((r) => r.symbol).join(", "));
   }
-  console.log("\n  " + verified.map((t) => t.symbol).join(" "));
+  const byKind = { commodity: [], equity: [] };
+  verified.forEach((t) => byKind[t.kind].push(t.symbol));
+  const byIssuer = {};
+  verified.forEach((t) => { byIssuer[t.issuer] = (byIssuer[t.issuer] || 0) + 1; });
+  console.log("  issuers: " + Object.entries(byIssuer).map(([k, v]) => k + "=" + v).join("  "));
+  console.log("\n  commodities (" + byKind.commodity.length + "): " + byKind.commodity.join(" "));
+  console.log("\n  equities (" + byKind.equity.length + "): " + byKind.equity.slice(0, 60).join(" ") +
+              (byKind.equity.length > 60 ? " …" : ""));
   console.log("\n  wrote " + path.relative(path.join(__dirname, ".."), OUT));
 })();
