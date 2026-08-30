@@ -8,7 +8,7 @@
  * Nothing else in the codebase should contain the product name. If you find
  * yourself typing it in another file, add a field here instead. */
 (function () {
-  var NAME = "SUNPAD";
+  var NAME = "WAVES";
   var lower = NAME.toLowerCase();
 
   window.BRAND = {

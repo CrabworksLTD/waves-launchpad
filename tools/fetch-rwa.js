@@ -134,7 +134,8 @@ async function verifyBatch(addresses) {
       const kind = COMMODITY_WORDS.some((w) => name.includes(w)) ? "commodity" : "equity";
 
       if (!found.has(id)) {
-        found.set(id, { symbol: sym, name: t.name, mint: id, issuer: issuer, kind: kind });
+        found.set(id, { symbol: sym, name: t.name, mint: id, issuer: issuer, kind: kind,
+                        liquidity: Number(t.liquidity) || 0 });
       }
     }
     process.stdout.write(".");
