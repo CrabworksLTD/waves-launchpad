@@ -28,8 +28,12 @@
     dbcConfigs: {
       // mainnet sol: created 2026-08-30, signed in-browser; owner (fee
       // claimer, forever): BU9dYi7fGw5G3Wd54CUTmt1Y58jEJaPq8LKiL72ydeKJ
-      "mainnet-beta": { sol: "DdHWKSqE7gvKrCUvcAnEVT7R1YWKY2SknBYFLUKxxsCN", usdc: "" },
-      devnet: { sol: "97FsuYAZrY1HxSokdSz1GnPVsLWNdpVgdczt3bLqXv8J", usdc: "" }
+      // rwa: configs priced in a tokenised asset, keyed by quote mint —
+      // { "<mint>": { config, symbol, decimals } }, signed via
+      // /config-create?quote=rwa&mint=<address>
+      "mainnet-beta": { sol: "DdHWKSqE7gvKrCUvcAnEVT7R1YWKY2SknBYFLUKxxsCN",
+                        usdc: "9xHSsPYmRuJJtGA3TYB7Q5P2oHWy4zpeugTf9EZ1S491", rwa: {} },
+      devnet: { sol: "97FsuYAZrY1HxSokdSz1GnPVsLWNdpVgdczt3bLqXv8J", usdc: "", rwa: {} }
     },
 
     // Save files. `fileKind` is written into new saves; `readKinds` is what we

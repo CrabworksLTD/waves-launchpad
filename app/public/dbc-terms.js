@@ -35,12 +35,29 @@
     }
   };
 
+  /* An RWA as the quote currency (a token priced in TSLAx, PAXG, …).
+   * Same DOLLAR targets as the USDC curve — $5k initial, $69k graduation —
+   * converted into quote-token units at the asset's price WHEN THE CONFIG IS
+   * CREATED. The config stores absolute unit thresholds, so if gold doubles
+   * later, new launches against this config graduate at a higher dollar
+   * value; that drift is inherent to an immutable config and is fine. */
+  function rwaQuote(mint, decimals, symbol, priceUsd) {
+    if (!(priceUsd > 0)) throw new Error("rwaQuote needs a positive USD price");
+    return {
+      mint: mint, decimals: decimals, label: symbol,
+      initialMarketCap: 5000 / priceUsd,
+      migrationMarketCap: 69000 / priceUsd,
+      priceUsdAtCreation: priceUsd
+    };
+  }
+
   /* The full buildCurveWithMarketCap argument, given the DBC SDK module (its
    * enums differ by build, so the caller passes its own). See the tool's
    * comment block for why each choice: Immutable metadata, QuoteToken fees,
-   * flat fee schedule, LP locked 50/50 permanently. */
+   * flat fee schedule, LP locked 50/50 permanently.
+   * `quote` is "sol"/"usdc" or a QUOTES-shaped object from rwaQuote(). */
   function buildParams(sdk, quote) {
-    var Q = QUOTES[quote];
+    var Q = typeof quote === "string" ? QUOTES[quote] : quote;
     return {
       initialMarketCap: Q.initialMarketCap,
       migrationMarketCap: Q.migrationMarketCap,
@@ -49,7 +66,8 @@
       token: {
         tokenType: sdk.TokenType.SPLToken,
         tokenBaseDecimal: sdk.TokenDecimal.SIX,
-        tokenQuoteDecimal: Q.decimals === 9 ? sdk.TokenDecimal.NINE : sdk.TokenDecimal.SIX,
+        tokenQuoteDecimal: Q.decimals === 9 ? sdk.TokenDecimal.NINE
+          : Q.decimals === 8 ? sdk.TokenDecimal.EIGHT : sdk.TokenDecimal.SIX,
         tokenAuthorityOption: sdk.TokenAuthorityOption.Immutable,
         totalTokenSupply: TERMS.totalTokenSupply,
         leftover: 0
@@ -95,5 +113,5 @@
     };
   }
 
-  return { TERMS: TERMS, QUOTES: QUOTES, buildParams: buildParams };
+  return { TERMS: TERMS, QUOTES: QUOTES, rwaQuote: rwaQuote, buildParams: buildParams };
 });

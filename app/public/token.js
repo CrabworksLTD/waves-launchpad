@@ -78,22 +78,49 @@
   /* The config key is ours and is created once per quote asset. Without one
    * there is no launchpad — a creator cannot launch into a config that does
    * not exist, which is why this reads from BRAND rather than being derived. */
+  function clusterConfigs() {
+    var B = window.BRAND || {};
+    var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
+    return (B.dbcConfigs || {})[cluster] || {};
+  }
+
+  /* `quote` is "sol", "usdc", or an RWA quote MINT address (only mints with a
+   * signed config appear in rwaQuotes(), so an unknown mint is a bug). */
   function configKey(quote) {
     quote = quote || "sol";
     var B = window.BRAND || {};
     var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
-    var m = B.dbcConfigs || {};
-    // cluster-keyed map is the current shape; a flat {sol,usdc} map or the
-    // legacy dbcConfig string only ever meant mainnet
-    var c = (m[cluster] && m[cluster][quote]) ||
-            (cluster === "mainnet-beta" &&
-              (typeof m[quote] === "string" && m[quote] ||
-               (quote === "sol" ? B.dbcConfig : null))) || null;
+    var m = clusterConfigs();
+    var c = null;
+    if (quote === "sol" || quote === "usdc") {
+      c = m[quote] ||
+          (cluster === "mainnet-beta" &&
+            (quote === "sol" ? B.dbcConfig : null)) || null;   // legacy field
+    } else if (m.rwa && m.rwa[quote]) {
+      c = m.rwa[quote].config;
+    }
     if (!c) throw new Error(
-      "No DBC config for " + quote.toUpperCase() + " on " + cluster +
-      ". Run tools/create-dbc-config.js with QUOTE=" + quote +
-      ", then put the address in brand.js dbcConfigs[cluster]." + quote + ".");
+      "No DBC config for " + quote + " on " + cluster +
+      ". Sign one at /config-create, then add it to brand.js dbcConfigs.");
     return c;
+  }
+
+  // raw-unit decimals of a quote currency ("sol"/"usdc"/rwa mint address)
+  function quoteDecimals(quote) {
+    if (!quote || quote === "sol") return 9;
+    if (quote === "usdc") return 6;
+    var r = (clusterConfigs().rwa || {})[quote];
+    return r ? r.decimals : 6;
+  }
+
+  // RWA quote currencies this deployment can launch in: only mints whose
+  // config the platform wallet has actually signed
+  function rwaQuotes() {
+    var m = clusterConfigs().rwa || {};
+    return Object.keys(m).map(function (mint) {
+      return { mint: mint, symbol: m[mint].symbol, decimals: m[mint].decimals,
+               config: m[mint].config };
+    });
   }
 
   // which quote currencies this deployment can actually launch in
@@ -114,7 +141,9 @@
       var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
       var cli = new M.DynamicBondingCurveClient(conn, "confirmed");
       var cfg = await cli.state.getPoolConfig(new X.PublicKey(configKey(quote)));
-      var dec = quote === "sol" ? 9 : 6;
+      var dec = quote === "sol" ? 9
+        : quote === "usdc" ? 6
+        : ((clusterConfigs().rwa || {})[quote] || { decimals: 6 }).decimals;
       return {
         graduation: Number(cfg.migrationQuoteThreshold) / Math.pow(10, dec),
         feePct: Number(cfg.poolFees.baseFee.cliffFeeNumerator) / 1e7,
@@ -178,7 +207,9 @@
         createPoolParam: args,
         firstBuyParam: {
           buyer: c.owner,
-          buyAmount: c.M.convertToLamports(opts.firstBuySol, 9),
+          // decimals follow the QUOTE currency — 9 here once spent 1000x on
+          // a USDC first buy (10^9 raw units = 1,000 USDC, not 1)
+          buyAmount: c.M.convertToLamports(opts.firstBuySol, quoteDecimals(opts.quote)),
           minimumAmountOut: 1,        // creator buying their own launch, slippage is theirs
           referralTokenAccount: null
         }
@@ -277,9 +308,14 @@
     var vpool = pool.account.poolState ? pool.account : { poolState: pool.account };
     var cfg = await cli.state.getPoolConfig(acct.config);
     // no decimal field on the config for the quote side — it follows the mint
-    var quoteDec = String(cfg.quoteMint) === "So11111111111111111111111111111111111111112" ? 9 : 6;
+    var qm = String(cfg.quoteMint), quoteDec = 6, quoteSym = "USDC";
+    if (qm === "So11111111111111111111111111111111111111112") { quoteDec = 9; quoteSym = "SOL"; }
+    else {
+      var r = (clusterConfigs().rwa || {})[qm];
+      if (r) { quoteDec = r.decimals; quoteSym = r.symbol; }
+    }
     return { M: M, X: X, conn: conn, cli: cli, pool: pool, acct: acct,
-             vpool: vpool, cfg: cfg, quoteDec: quoteDec };
+             vpool: vpool, cfg: cfg, quoteDec: quoteDec, quoteSym: quoteSym };
   }
 
   /* Everything the trading page shows, in one read. Price is quoted from the
@@ -314,7 +350,7 @@
       threshold: threshold,
       progress: threshold > 0 ? Math.min(1, raised / threshold) : 0,
       price: price,
-      quote: quoteDec === 9 ? "SOL" : "USDC",
+      quote: c.quoteSym,
       creator: String(acct.creator)
     };
   }
@@ -391,6 +427,7 @@
     rwa: loadRwa,
     commodities: loadCommodities,
     quotes: quotes,
+    rwaQuotes: rwaQuotes,
     describeConfig: describeConfig,
     configKey: function () { try { return configKey(); } catch (e) { return null; } }
   };

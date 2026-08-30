@@ -680,7 +680,10 @@
     flow.reward = flow.reward || BUILTIN_REWARDS[0];
     flow.quote = flow.quote || "sol";
     var quotes = window.Token.quotes();
-    var qLabel = flow.quote === "usdc" ? "USDC" : "SOL";
+    var rwas = window.Token.rwaQuotes();
+    var qLabel = flow.quote === "usdc" ? "USDC"
+      : flow.quote === "sol" ? "SOL"
+      : (flow.quoteSym || "RWA");
 
     var box = shell(H`
       <h2>${nft ? "2 of 2 — the token" : "Launch token"}</h2>
@@ -709,7 +712,9 @@
           ${quotes.indexOf("sol") < 0 ? raw("disabled") : ""}>SOL</button>
         <button data-q="usdc" ${flow.quote === "usdc" ? raw('class="on"') : ""}
           ${quotes.indexOf("usdc") < 0 ? raw("disabled") : ""}>USDC</button>
-        <button disabled title="A stock or commodity as the trading pair — its curve config is coming">RWA soon</button>
+        <button data-q="rwa" ${flow.quote !== "sol" && flow.quote !== "usdc" ? raw('class="on"') : ""}
+          ${rwas.length ? "" : raw('disabled title="A stock or commodity as the trading pair — no RWA curve config signed yet"')}
+          >${flow.quote !== "sol" && flow.quote !== "usdc" ? qLabel : "RWA"}</button>
       </div>
 
       <div class="fold2" id="tk-econ">
@@ -803,6 +808,15 @@
       var b = e.target.closest("button[data-q]");
       if (!b || b.disabled) return;
       collect();
+      if (b.dataset.q === "rwa") {
+        // pick WHICH asset prices the pair — only mints with a signed config
+        var r = window.Token.rwaQuotes();
+        if (r.length === 1) {
+          flow.quote = r[0].mint; flow.quoteSym = r[0].symbol;
+          return tokenDetails(flow);
+        }
+        return rwaQuotePicker(flow, r);
+      }
       flow.quote = b.dataset.q;
       tokenDetails(flow);                          // re-render with the new currency
     });
@@ -890,17 +904,46 @@
     });
   }
 
+  /* Which real-world asset prices the pair. Short list on purpose: every row
+   * here required the platform wallet to sign a curve config for that mint —
+   * this is not the 500+ reward list. */
+  function rwaQuotePicker(flow, list) {
+    var box = shell(H`
+      <h2>Priced in a real-world asset</h2>
+      <p class="sub">The token trades against this asset — buys are paid in it,
+      the curve graduates in it.</p>
+      <div class="plist">
+        ${raw(list.map(function (t) {
+          return '<button class="prow" data-mint="' + esc(t.mint) + '">' +
+            "<b>" + esc(t.symbol) + "</b>" +
+            "<i>" + esc(shortAddr(t.mint)) + "</i></button>";
+        }).join(""))}
+      </div>
+      <div class="acts"><button id="lp-x">Back</button></div>
+    `);
+    box.querySelector("#lp-x").onclick = function () { tokenDetails(flow); };
+    box.querySelectorAll(".prow").forEach(function (b) {
+      b.onclick = function () {
+        var t = list.find(function (x) { return x.mint === b.dataset.mint; });
+        flow.quote = t.mint; flow.quoteSym = t.symbol;
+        tokenDetails(flow);
+      };
+    });
+  }
+
   async function tokenConfirm(flow) {
     var w = window.Wallet.current();
     var nft = flow.nft;
+    var qLabel = flow.quote === "usdc" ? "USDC"
+      : flow.quote === "sol" ? "SOL" : (flow.quoteSym || "RWA");
     var box = shell(H`
       <h2>Confirm token</h2>
       <p class="sub">One small metadata upload, then the pool. The curve is the liquidity.</p>
       <div class="row"><span class="k">Token</span><b>${flow.tname} · $${flow.tsym}</b></div>
       ${nft ? H`<div class="row"><span class="k">Paired with</span><b>${nft.cfg.name}</b></div>` : ""}
-      <div class="row"><span class="k">Priced in</span><b>${flow.quote === "usdc" ? "USDC" : "SOL"}</b></div>
+      <div class="row"><span class="k">Priced in</span><b>${qLabel}</b></div>
       <div class="row"><span class="k">Rewards in</span><b>${flow.reward.symbol}</b></div>
-      <div class="row"><span class="k">First buy</span><b>${flow.tbuy > 0 ? flow.tbuy + " " + (flow.quote === "usdc" ? "USDC" : "SOL") : "none"}</b></div>
+      <div class="row"><span class="k">First buy</span><b>${flow.tbuy > 0 ? flow.tbuy + " " + qLabel : "none"}</b></div>
       ${flow.feeWallet ? H`<div class="row"><span class="k">Fees claim to</span><b>${shortAddr(flow.feeWallet)}</b></div>` : ""}
       <div class="row"><span class="k">Metadata storage</span><b id="lp-fee">quoting…</b></div>
       <div class="row"><span class="k">Wallet</span><b>${w ? w.name + " · " + shortAddr(w.publicKey) : "not connected"}</b></div>

@@ -85,33 +85,61 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
   var CLUSTER = qs.get("cluster") === "devnet" ? "devnet" : "mainnet-beta";
   window.Launch.cluster(CLUSTER);
   var QUOTE = (qs.get("quote") || "sol").toLowerCase();
-  var Q = DBC_TERMS.QUOTES[QUOTE];
   var T = DBC_TERMS.TERMS;
   var $ = function (id) { return document.getElementById(id); };
-
-  var cl = $("cl");
-  cl.textContent = CLUSTER + " · " + Q.label + " quote";
-  cl.className = "cluster " + (CLUSTER === "mainnet-beta" ? "main" : "dev");
+  var Q = null;                                   // resolved by init()
 
   function say(k, h) { var m = $("msg"); m.className = "msg " + k; m.innerHTML = h; }
 
-  /* The review the wallet owner reads before signing. Same derivation as the
-   * CLI summary — platform share is (100 - creator%) of the 80% LP share. */
-  var plat = 80 * (100 - T.creatorTradingFeePercentage) / 100;
-  var crea = 80 * T.creatorTradingFeePercentage / 100;
-  $("terms").innerHTML =
-    '<div class="row"><span class="k">Quote</span><b>' + esc(Q.label) + "</b></div>" +
-    '<div class="row"><span class="k">Supply per launch</span><b>' +
-      T.totalTokenSupply.toLocaleString() + " · fixed</b></div>" +
-    '<div class="row"><span class="k">Trading fee</span><b>' + (T.baseFeeBps / 100) + "%</b></div>" +
-    '<div class="row"><span class="k">Split</span><b>' +
-      plat + "% platform / " + crea + "% creator / 20% Meteora</b></div>" +
-    '<div class="row"><span class="k">Curve</span><b>' +
-      Q.initialMarketCap.toLocaleString() + " → " + Q.migrationMarketCap.toLocaleString() +
-      " " + esc(Q.label) + " mcap</b></div>" +
-    '<div class="row"><span class="k">Launch cost to creators</span><b>free</b></div>' +
-    '<div class="row"><span class="k">Graduation</span><b>Meteora DAMM v2, LP locked</b></div>' +
-    '<div class="row"><span class="k">Token metadata</span><b>immutable</b></div>';
+  /* ?quote=rwa&mint=<address> prices a config in a tokenised asset. The mint
+   * must be on the verified rwa.json list — never a typed address — and the
+   * curve is the USDC curve's dollar targets converted at today's price. */
+  async function resolveQuote() {
+    if (QUOTE !== "rwa") return DBC_TERMS.QUOTES[QUOTE];
+    var mint = qs.get("mint") || "";
+    var list = await fetch("/rwa.json").then(function (r) { return r.json(); });
+    var t = (list.tokens || []).find(function (x) { return x.mint === mint; });
+    if (!t) throw new Error("That mint is not on the verified RWA list.");
+    var px = null;
+    try {
+      var j = await fetch("https://lite-api.jup.ag/price/v3?ids=" + mint)
+        .then(function (r) { return r.json(); });
+      px = (j[mint] && (j[mint].usdPrice || j[mint].price)) ||
+           (j.data && j.data[mint] && Number(j.data[mint].price)) || null;
+    } catch (e) {}
+    if (!(px > 0)) throw new Error("Could not price " + t.symbol + " — try again.");
+    return DBC_TERMS.rwaQuote(t.mint, t.decimals, t.symbol, px);
+  }
+
+  function paintTerms() {
+    var cl = $("cl");
+    cl.textContent = CLUSTER + " · " + Q.label + " quote";
+    cl.className = "cluster " + (CLUSTER === "mainnet-beta" ? "main" : "dev");
+
+    /* The review the wallet owner reads before signing. Same derivation as
+     * the CLI summary — platform share is (100 - creator%) of the 80% share. */
+    var plat = 80 * (100 - T.creatorTradingFeePercentage) / 100;
+    var crea = 80 * T.creatorTradingFeePercentage / 100;
+    var fmtQ = function (n) {
+      return n >= 100 ? Math.round(n).toLocaleString() : n.toPrecision(4);
+    };
+    $("terms").innerHTML =
+      '<div class="row"><span class="k">Quote</span><b>' + esc(Q.label) + "</b></div>" +
+      (Q.priceUsdAtCreation ? '<div class="row"><span class="k">' + esc(Q.label) +
+        ' price now</span><b>$' + Q.priceUsdAtCreation.toLocaleString() + "</b></div>" : "") +
+      '<div class="row"><span class="k">Supply per launch</span><b>' +
+        T.totalTokenSupply.toLocaleString() + " · fixed</b></div>" +
+      '<div class="row"><span class="k">Trading fee</span><b>' + (T.baseFeeBps / 100) + "%</b></div>" +
+      '<div class="row"><span class="k">Split</span><b>' +
+        plat + "% platform / " + crea + "% creator / 20% Meteora</b></div>" +
+      '<div class="row"><span class="k">Curve</span><b>' +
+        fmtQ(Q.initialMarketCap) + " → " + fmtQ(Q.migrationMarketCap) +
+        " " + esc(Q.label) + " mcap" +
+        (Q.priceUsdAtCreation ? " ($5k → $69k today)" : "") + "</b></div>" +
+      '<div class="row"><span class="k">Launch cost to creators</span><b>free</b></div>' +
+      '<div class="row"><span class="k">Graduation</span><b>Meteora DAMM v2, LP locked</b></div>' +
+      '<div class="row"><span class="k">Token metadata</span><b>immutable</b></div>';
+  }
 
   var busy = false;
   function paint() {
@@ -139,7 +167,7 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
       var conn = new X.Connection(rpc, "confirmed");
       var cli = new sdk.DynamicBondingCurveClient(conn, "confirmed");
 
-      var curve = sdk.buildCurveWithMarketCap(DBC_TERMS.buildParams(sdk, QUOTE));
+      var curve = sdk.buildCurveWithMarketCap(DBC_TERMS.buildParams(sdk, Q));
       var owner = new X.PublicKey(w.publicKey);
       var cfgKp = X.Keypair.generate();
 
@@ -164,14 +192,18 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
       await conn.confirmTransaction(sig, "confirmed");
 
       var addr = cfgKp.publicKey.toBase58();
+      var entry = QUOTE === "rwa"
+        ? 'dbcConfigs["' + esc(CLUSTER) + '"].rwa["' + esc(Q.mint) + '"] = ' +
+          '{ config: "' + esc(addr) + '", symbol: "' + esc(Q.label) +
+          '", decimals: ' + Q.decimals + ' }'
+        : 'dbcConfigs["' + esc(CLUSTER) + '"].' + esc(QUOTE) + ' = "' + esc(addr) + '"';
       say("ok",
         "<b>Config created.</b><br>Address: <code>" + esc(addr) + "</code><br>" +
         "Owner: <code>" + esc(w.publicKey) + "</code><br>" +
         '<a href="https://explorer.solana.com/tx/' + esc(sig) +
           (CLUSTER === "devnet" ? "?cluster=devnet" : "") +
           '" target="_blank" rel="noopener">View transaction ↗</a><br><br>' +
-        "brand.js entry: <code>dbcConfigs[\"" + esc(CLUSTER) + "\"]." + esc(QUOTE) +
-        ' = "' + esc(addr) + '"</code>');
+        "brand.js entry: <code>" + entry + "</code>");
       go.textContent = "Done";
       return;
     } catch (e) {
@@ -183,10 +215,19 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
     paint();
   }
 
-  paint();
-  var n = 0, t = setInterval(function () {
-    paint(); if (window.Wallet.current() || ++n > 10) clearInterval(t);
-  }, 500);
+  (async function init() {
+    try { Q = await resolveQuote(); } catch (e) {
+      $("terms").textContent = "";
+      say("err", esc(String(e.message)));
+      $("go").textContent = "Unavailable";
+      return;
+    }
+    paintTerms();
+    paint();
+    var n = 0, t = setInterval(function () {
+      paint(); if (window.Wallet.current() || ++n > 10) clearInterval(t);
+    }, 500);
+  })();
 })();
 </script>
 </body>
