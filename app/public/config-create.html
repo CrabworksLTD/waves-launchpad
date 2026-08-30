@@ -135,7 +135,7 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
     try {
       var sdk = await import("/vendor/dbc.esm.js");
       var X = await import("/vendor/metaplex.esm.js");
-      var rpc = window.Launch.clusters()[CLUSTER].rpc;
+      var rpc = window.Launch.clusters[CLUSTER].rpc;
       var conn = new X.Connection(rpc, "confirmed");
       var cli = new sdk.DynamicBondingCurveClient(conn, "confirmed");
 
