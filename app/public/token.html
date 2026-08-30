@@ -242,8 +242,18 @@ input:focus{outline:none;border-color:var(--accent)}
     $("t-buy").onclick = function () { setSide("buy"); };
     $("t-sell").onclick = function () { setSide("sell"); };
     $("chips").addEventListener("click", function (e) {
-      var b = e.target.closest("button[data-v]");
-      if (b) { $("amt").value = b.dataset.v; requote(); }
+      var b = e.target.closest("button[data-v],button[data-p]");
+      if (!b) return;
+      if (b.dataset.v) { $("amt").value = b.dataset.v; requote(); return; }
+      // sell chips are a percentage of what the wallet actually holds
+      if (!window.Wallet.current()) { say("err", "Connect a wallet to size a sell."); return; }
+      window.Token.balanceOf(MINT).then(function (bal) {
+        if (!bal) { say("err", "This wallet holds none of this token."); return; }
+        var amt = Math.floor(bal * (+b.dataset.p / 100) * 1e6) / 1e6;
+        $("amt").value = amt; say("", ""); requote();
+      }).catch(function (err) {
+        say("err", esc(String(err.message).slice(0, 120)));
+      });
     });
     $("amt").addEventListener("input", requote);
     paintGo();
@@ -256,7 +266,7 @@ input:focus{outline:none;border-color:var(--accent)}
     $("amt-label").textContent = s === "buy" ? "Amount (SOL)" : "Amount (tokens)";
     $("chips").innerHTML = s === "buy"
       ? '<button data-v="0.1">0.1</button><button data-v="0.5">0.5</button><button data-v="1">1</button><button data-v="5">5</button>'
-      : '<button data-v="1000">1k</button><button data-v="10000">10k</button><button data-v="100000">100k</button><button data-v="1000000">1M</button>';
+      : '<button data-p="10">10%</button><button data-p="25">25%</button><button data-p="50">50%</button><button data-p="100">100%</button>';
     $("est").textContent = "—"; lastQuote = null; requote(); paintGo();
   }
 

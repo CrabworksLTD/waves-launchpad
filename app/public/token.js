@@ -354,10 +354,28 @@
     return await send(c, tx);
   }
 
+  /* The connected wallet's balance of a launch token, in whole tokens.
+   * The sell box's percentage chips size against this. */
+  async function balanceOf(baseMint) {
+    var X = await mx();
+    var w = window.Wallet.current();
+    if (!w) return null;
+    var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
+    var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
+    var res = await conn.getParsedTokenAccountsByOwner(
+      new X.PublicKey(w.publicKey), { mint: new X.PublicKey(baseMint) });
+    var total = 0;
+    (res.value || []).forEach(function (a) {
+      total += a.account.data.parsed.info.tokenAmount.uiAmount || 0;
+    });
+    return total;
+  }
+
   window.Token = {
     readMarket: readMarket,
     getQuote: getQuote,
     swap: swap,
+    balanceOf: balanceOf,
     launchToken: launchToken,
     readPool: readPool,
     claimCreatorFeesTo: claimCreatorFeesTo,
