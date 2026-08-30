@@ -48,6 +48,16 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
   background-size:calc(100% + 2px) 100%;background-position:-1px 0}
 .btn:disabled{opacity:.4;cursor:default}
 .btn.quiet{background:transparent;border-color:rgba(255,255,255,.14);color:var(--ink)}
+/* mint phases: one row per wave, the buyer's own row highlighted */
+.phases{margin-top:16px}
+.ph{display:flex;align-items:center;gap:10px;padding:9px 12px;margin-top:6px;
+  border:1px solid rgba(255,255,255,.08);border-radius:10px;font-size:12.5px;
+  color:var(--dim)}
+.ph b{font:600 12px "IBM Plex Mono",monospace;letter-spacing:.06em;flex:none}
+.ph .st{margin-left:auto;flex:none;font:500 11px "IBM Plex Mono",monospace;color:var(--faint)}
+.ph.open .st{color:var(--accent)}
+.ph.mine{border-color:rgba(20,241,149,.45)}
+.ph.mine b{color:var(--accent)}
 .msg{margin-top:14px;font-size:12.5px;padding:11px 12px;border-radius:8px;display:none}
 .msg.err{display:block;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ffb3b3}
 .msg.ok{display:block;background:rgba(20,241,149,.08);border:1px solid rgba(20,241,149,.3);color:#8ff5cd}
@@ -70,6 +80,8 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
 
     <div class="bar"><i id="bar"></i></div>
     <p class="foot mono" id="pct">—</p>
+
+    <div class="phases" id="phases" hidden></div>
 
     <button class="btn" id="go" disabled>Loading…</button>
     <div class="msg" id="msg"></div>
@@ -97,12 +109,77 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
   }
 
   var CM = machineAddress();
+  var qcl = new URLSearchParams(location.search).get("cluster");
+  if (qcl) window.Launch.cluster(qcl);
   var state = null;
+  var lists = null;                                // _allowlist.json phases, by label
+  var myPhase = null;                              // {group, wallets} for mintOne
 
   function say(kind, html) {
     var m = $("msg");
     m.className = "msg " + kind;
     m.innerHTML = html;
+  }
+
+  /* The pinned wallet lists behind the merkle roots. Public by design —
+   * an allowlist you cannot audit is not an allowlist. */
+  function loadLists() {
+    if (!state.firstItemUri) return Promise.resolve(null);
+    var uri = state.firstItemUri.replace(/[^/]+$/, "_allowlist.json");
+    return fetch(uri).then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
+  }
+
+  /* Which phase can THIS wallet mint through right now?
+   * The earliest-opened wave that lists the wallet wins (waves stay open once
+   * started); the public group works for anyone once it opens. */
+  function resolvePhase() {
+    myPhase = null;
+    var w = window.Wallet.current();
+    var now = Date.now();
+    for (var i = 0; i < state.groups.length; i++) {
+      var g = state.groups[i];
+      if (g.opensAt && g.opensAt > now) continue;
+      if (!g.allowlisted) { myPhase = { group: g.label }; break; }
+      if (!w || !lists) continue;
+      var ph = (lists.phases || []).find(function (p) { return p.label === g.label; });
+      if (ph && ph.wallets && ph.wallets.indexOf(w.publicKey) >= 0) {
+        myPhase = { group: g.label, wallets: ph.wallets };
+        break;
+      }
+    }
+  }
+
+  function phaseName(label) {
+    if (label === "pub") return "Public";
+    var m = label.match(/^w(\d+)$/);
+    return m ? "Wave " + m[1] : label;
+  }
+
+  function renderPhases() {
+    var box = $("phases");
+    if (!state.groups.length) { box.hidden = true; return; }
+    var w = window.Wallet.current();
+    var now = Date.now();
+    box.hidden = false;
+    box.innerHTML = state.groups.map(function (g) {
+      var open = !g.opensAt || g.opensAt <= now;
+      var mine = myPhase && myPhase.group === g.label;
+      var onList = null;
+      if (g.allowlisted && w && lists) {
+        var ph = (lists.phases || []).find(function (p) { return p.label === g.label; });
+        onList = !!(ph && ph.wallets && ph.wallets.indexOf(w.publicKey) >= 0);
+      }
+      var status = open ? "open" : "opens " + new Date(g.opensAt).toLocaleTimeString(
+        [], { hour: "numeric", minute: "2-digit" });
+      var who = g.allowlisted
+        ? (onList === null ? "allowlist" : onList ? "you're on this list" : "not on this list")
+        : "everyone";
+      return '<div class="ph' + (open ? " open" : "") + (mine ? " mine" : "") + '">' +
+        "<b>" + phaseName(g.label) + "</b><span>" + who +
+        (g.priceSol != null ? " · " + (g.priceSol === 0 ? "free" : g.priceSol + " SOL") : "") +
+        '</span><span class="st">' + status + "</span></div>";
+    }).join("");
   }
 
   async function load() {
@@ -129,12 +206,38 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
 
     $("name").textContent = "Mint";
     $("price").textContent = state.priceSol == null ? "free" : state.priceSol + " SOL";
-    render();
 
+    if (state.groups.length) lists = await loadLists();
+    resolvePhase();
+    renderPhases();
+    render();
+    arm();
+    // countdowns and phase openings resolve themselves without a reload
+    if (state.groups.length) setInterval(function () {
+      resolvePhase(); renderPhases();
+      if (!$("go").dataset.busy) arm();
+    }, 30000);
+  }
+
+  function arm() {
     var w = window.Wallet.current();
-    $("go").disabled = false;
-    $("go").textContent = w ? "Mint" : "Connect wallet";
-    $("go").onclick = w ? mint : connect;
+    var go = $("go");
+    if (state.redeemed >= state.available) return;   // render() said sold out
+    if (!w) { go.disabled = false; go.textContent = "Connect wallet"; go.onclick = connect; return; }
+    if (!state.groups.length) {
+      go.disabled = false; go.textContent = "Mint"; go.onclick = mint; return;
+    }
+    if (myPhase) {
+      go.disabled = false;
+      go.textContent = "Mint — " + phaseName(myPhase.group);
+      go.onclick = mint;
+      return;
+    }
+    // nothing mintable for this wallet yet: say why, honestly
+    var now = Date.now();
+    var anyOpen = state.groups.some(function (g) { return !g.opensAt || g.opensAt <= now; });
+    go.disabled = true;
+    go.textContent = anyOpen ? "Not on an open allowlist yet" : "Opens soon";
   }
 
   function render() {
@@ -150,20 +253,22 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
 
   async function connect() {
     var w = await (window.Shell ? Shell.connect() : Promise.resolve(null));
-    if (w) load();
+    if (w) { resolvePhase(); renderPhases(); arm(); }
   }
 
   async function mint() {
     $("go").disabled = true;
+    $("go").dataset.busy = "1";
     $("go").textContent = "Minting…";
     say("", "");
     try {
-      var r = await window.Launch.mintOne(CM);
+      var r = await window.Launch.mintOne(CM, myPhase || {});
       var url = "https://explorer.solana.com/address/" + r.asset +
                 (window.Launch.cluster() === "devnet" ? "?cluster=devnet" : "");
       say("ok", 'Minted. <a href="' + url + '" target="_blank" rel="noopener">View it ↗</a>');
       state = await window.Launch.readMachine(CM);
       render();
+      delete $("go").dataset.busy;
       $("go").disabled = false;
       $("go").textContent = "Mint another";
     } catch (e) {
@@ -175,6 +280,7 @@ h1{font-family:"Space Grotesk";font-size:26px;font-weight:600;letter-spacing:-.0
       else if (/CandyMachineEmpty|0x1785/i.test(m)) m = "Sold out.";
       else if (/User rejected|rejected the request/i.test(m)) m = "You cancelled the transaction.";
       say("err", m);
+      delete $("go").dataset.busy;
       $("go").disabled = false;
       $("go").textContent = "Try again";
     }

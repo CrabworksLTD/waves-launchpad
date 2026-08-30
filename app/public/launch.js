@@ -378,16 +378,36 @@
     var mx = c.mx, umi = c.umi;
     var cm = await mx.fetchCandyMachine(umi, mx.publicKey(candyMachineAddress));
     var guard = await mx.fetchCandyGuard(umi, cm.mintAuthority);
-    var price = null;
-    if (guard.guards.solPayment && guard.guards.solPayment.__option === "Some") {
-      price = Number(guard.guards.solPayment.value.lamports.basisPoints) / 1e9;
+    function optVal(set, name) {
+      return set && set[name] && set[name].__option === "Some" ? set[name].value : null;
     }
+    var pay = optVal(guard.guards, "solPayment");
+    var price = pay ? Number(pay.lamports.basisPoints) / 1e9 : null;
+    var open = optVal(guard.guards, "startDate");
+
+    // Phases, for grouped machines: each wave is a group with an allowlist
+    // and an opening time; "pub" is the ungated tail. The wallet lists behind
+    // the merkle roots are pinned as _allowlist.json next to the metadata.
+    var groups = (guard.groups || []).map(function (g) {
+      var gp = optVal(g.guards, "solPayment");
+      var sd = optVal(g.guards, "startDate");
+      return {
+        label: g.label,
+        opensAt: sd ? Number(sd.date) * 1000 : null,
+        priceSol: gp ? Number(gp.lamports.basisPoints) / 1e9 : price,
+        allowlisted: !!optVal(g.guards, "allowList")
+      };
+    });
+
     return {
       collection: String(cm.collectionMint),
       available: Number(cm.data.itemsAvailable),
       redeemed: Number(cm.itemsRedeemed),
       loaded: Number(cm.itemsLoaded),
       priceSol: price,
+      opensAt: open ? Number(open.date) * 1000 : null,
+      groups: groups,
+      firstItemUri: (cm.items && cm.items[0] && cm.items[0].uri) || null,
       authority: String(cm.authority)
     };
   }

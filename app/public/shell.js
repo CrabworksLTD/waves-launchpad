@@ -99,7 +99,9 @@
     /* connect popup */
     ".shl-back{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);",
     "  backdrop-filter:blur(5px);display:grid;place-items:center;padding:24px}",
-    ".shl-card{width:min(400px,100%);background:var(--panel);border:1px solid var(--line2);",
+    ".shl-card{width:min(400px,100%);border:1px solid transparent;",
+    "  background:linear-gradient(var(--panel),var(--panel)) padding-box,",
+    "    var(--grad) border-box;",
     "  border-radius:14px;padding:20px}",
     ".shl-card .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}",
     ".shl-card .hd b{font:700 15px Archivo,sans-serif}",
