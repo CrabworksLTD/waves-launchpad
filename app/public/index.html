@@ -4,38 +4,38 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUNPAD — NFT design and deployment on Solana</title>
-<meta name="description" content="Draw the traits, generate the collection, launch it on Solana. We take no cut of your mint.">
+<meta name="description" content="Draw the traits, generate the collection, launch it on Solana.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SUNPAD">
 <meta property="og:title" content="SUNPAD">
-<meta property="og:description" content="Draw the traits, generate the collection, launch it on Solana. We take no cut of your mint.">
+<meta property="og:description" content="Draw the traits, generate the collection, launch it on Solana.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="SUNPAD">
 <meta name="twitter:description" content="Draw the traits, generate the collection, launch it on Solana.">
-<meta name="theme-color" content="#0a0810">
+<meta name="theme-color" content="#07060b">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/theme.css">
 <style>
-/* Landing page. Flat and calm — the aurora is one wash behind the hero rather
-   than three drifting fields, because a simplified layout with a busy
-   background is two ideas fighting. Content carries the page. */
+/* Homepage: a title, a button, and the collections. That is the whole page.
+ *
+ * Everything else — how it works, pricing, the four steps — was true but did
+ * not belong here. A launchpad homepage is a shop window, and the shop window
+ * is the work, not an explanation of the shop.
+ *
+ * Flat black, no background treatment, no gradient type. The only gradient
+ * left is the rail's mark and its + button, which is what makes those read as
+ * the actions rather than as more decoration. */
 
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%}
-body{background:var(--bg);color:var(--ink);
+body{background:var(--void);color:var(--ink);
   font:400 15px/1.65 Inter,ui-sans-serif,system-ui,sans-serif;
   -webkit-font-smoothing:antialiased;overflow-x:hidden}
 .disp{font-family:"Space Grotesk",ui-sans-serif,system-ui,sans-serif}
 .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
 a{color:inherit}
-
-.aur{position:absolute;top:-34vh;right:-14vw;width:78vw;height:92vh;z-index:0;
-  pointer-events:none;filter:blur(110px);opacity:.45;
-  background:
-    radial-gradient(closest-side,rgba(var(--accent-2-rgb),.55),transparent 70%) 32% 42%/58% 68% no-repeat,
-    radial-gradient(closest-side,rgba(var(--accent-rgb),.3),transparent 70%) 70% 62%/54% 62% no-repeat}
 
 /* ---- rail ---- */
 .rail{position:fixed;left:0;top:0;bottom:0;width:60px;z-index:5;
@@ -62,93 +62,43 @@ a{color:inherit}
 .rail a.ico:hover::after{opacity:1;transform:translateX(0)}
 .rail .spacer{flex:1}
 
-.wrap{position:relative;z-index:2;max-width:1120px;margin:0 auto;padding:0 32px 0 92px}
-section{position:relative}
-.eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;
-  color:var(--faint);margin:0 0 18px;display:flex;align-items:center;gap:9px}
-.eyebrow b{width:6px;height:6px;border-radius:50%;background:var(--accent)}
-h2{font-family:"Space Grotesk";font-size:clamp(24px,3vw,34px);font-weight:600;
-  letter-spacing:-.025em;margin:0 0 8px}
-.lede{color:var(--dim);max-width:52ch;margin:0}
+.wrap{max-width:1120px;margin:0 auto;padding:0 32px 0 92px}
 
-/* ---- hero ---- */
-.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,440px);
-  gap:52px;align-items:center;padding:80px 0 96px}
-h1{font-family:"Space Grotesk";font-size:clamp(34px,4.2vw,54px);line-height:1.06;
+/* ---- hero: title and one button ---- */
+.hero{text-align:center;padding:120px 0 84px}
+h1{font-family:"Space Grotesk";font-size:clamp(34px,5vw,58px);line-height:1.05;
   font-weight:600;letter-spacing:-.035em;margin:0;text-wrap:balance}
-h1 em{font-style:normal;white-space:nowrap;background:var(--grad);
-  -webkit-background-clip:text;background-clip:text;color:transparent}
-.hero .lede{margin-top:20px;font-size:16px}
-.cta{display:flex;gap:12px;margin-top:30px;flex-wrap:wrap}
-.btn{display:inline-flex;align-items:center;gap:9px;padding:14px 25px;border-radius:999px;
+.btn{display:inline-flex;align-items:center;gap:9px;margin-top:30px;
+  padding:14px 28px;border-radius:999px;
   font:600 14.5px "Space Grotesk",sans-serif;text-decoration:none;cursor:pointer;
-  border:1px solid transparent;transition:transform .2s,background .2s}
-.btn-fill{background:var(--grad);color:var(--accent-ink)}
-.btn-fill:hover{transform:translateY(-2px)}
-.btn-quiet{color:var(--ink);border-color:var(--line2)}
-.btn-quiet:hover{background:var(--panel2)}
-
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
-.panel-head{display:flex;justify-content:space-between;padding:2px 4px 13px;
-  font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
-.live{display:inline-flex;align-items:center;gap:7px;color:var(--accent)}
-.live i{width:6px;height:6px;border-radius:50%;background:var(--accent);
-  animation:blink 1.6s ease-in-out infinite}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
-#grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
-#grid canvas{width:100%;aspect-ratio:1;display:block;border-radius:9px;
-  image-rendering:pixelated;background:var(--void);
-  transition:opacity .32s ease,transform .32s ease}
-#grid canvas.swap{opacity:.12;transform:scale(.94)}
-.panel-foot{padding:13px 4px 2px;font-size:11.5px;color:var(--faint);text-align:center}
-
-/* ---- steps ---- */
-.steps{display:grid;grid-template-columns:repeat(4,1fr);
-  border-top:1px solid var(--line);margin:0 0 110px}
-.step{padding:26px 24px 30px;border-right:1px solid var(--line)}
-.step:last-child{border-right:0}
-.step .n{font-size:11.5px;letter-spacing:.12em;color:var(--faint)}
-.step h3{font-family:"Space Grotesk";font-size:16px;font-weight:600;margin:11px 0 7px}
-.step p{margin:0;color:var(--dim);font-size:13.5px}
+  background:var(--raise);color:var(--ink);border:1px solid var(--line2);
+  transition:background .2s,border-color .2s}
+.btn:hover{background:var(--panel2);border-color:var(--faint)}
 
 /* ---- collections ---- */
-.colhead{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:24px}
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+.colhead{display:flex;align-items:baseline;justify-content:space-between;
+  gap:20px;margin-bottom:22px}
+h2{font-family:"Space Grotesk";font-size:19px;font-weight:600;letter-spacing:-.015em;margin:0}
+.pill{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+  border:1px solid var(--line);border-radius:99px;padding:5px 11px;white-space:nowrap}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
-  overflow:hidden;text-decoration:none;display:block;transition:border-color .2s,transform .2s}
+  overflow:hidden;text-decoration:none;display:block;
+  transition:border-color .2s,transform .2s}
 .card:hover{border-color:var(--line2);transform:translateY(-2px)}
-.card .thumb{aspect-ratio:1;background:var(--void);display:block}
-.card .thumb canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
-.card .meta{padding:13px 14px 15px}
+.card .thumb{aspect-ratio:1;background:var(--bg);display:block}
+.card .thumb canvas{width:100%;height:100%;display:block;image-rendering:pixelated;
+  transition:opacity .3s ease}
+.card .thumb canvas.swap{opacity:.15}
+.card .meta{padding:12px 14px 14px}
 .card .meta b{display:block;font-family:"Space Grotesk";font-size:14.5px;font-weight:600;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card .meta span{display:block;margin-top:3px;font-size:12px;color:var(--faint)}
-.pill{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
-  border:1px solid var(--line2);border-radius:99px;padding:5px 11px;white-space:nowrap}
-
-/* ---- pricing ---- */
-.price{border-top:1px solid var(--line);margin-top:110px;padding:56px 0 0;
-  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,380px);gap:52px;align-items:start}
-.big{font-family:"Space Grotesk";font-size:clamp(30px,4vw,44px);line-height:1.08;
-  font-weight:600;letter-spacing:-.03em;margin:0}
-.big em{font-style:normal;background:var(--grad);
-  -webkit-background-clip:text;background-clip:text;color:transparent}
-.facts{margin:0;padding:0;list-style:none}
-.facts li{display:flex;justify-content:space-between;gap:16px;padding:13px 0;
-  border-bottom:1px solid var(--line);font-size:14px}
-.facts li span{color:var(--dim)}
-.facts li b{font-weight:600;text-align:right}
 
 footer{border-top:1px solid var(--line);margin-top:110px;padding:26px 0 60px;
   display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;
   font-size:12.5px;color:var(--faint)}
 
-@media (max-width:900px){
-  .hero{grid-template-columns:1fr;gap:38px;padding:48px 0 64px}
-  .steps{grid-template-columns:1fr 1fr}
-  .step{border-bottom:1px solid var(--line)}
-  .price{grid-template-columns:1fr;gap:36px}
-}
 @media (max-width:720px){
   .rail{top:auto;right:0;bottom:0;width:auto;height:58px;flex-direction:row;
     justify-content:center;gap:6px;padding:0 10px;border-right:0;border-top:1px solid var(--line)}
@@ -158,7 +108,7 @@ footer{border-top:1px solid var(--line);margin-top:110px;padding:26px 0 60px;
   .rail a.ico::after{left:50%;bottom:calc(100% + 10px);transform:translate(-50%,4px)}
   .rail a.ico:hover::after{transform:translate(-50%,0)}
   .wrap{padding:0 20px 78px}
-  .steps{grid-template-columns:1fr}
+  .hero{padding:72px 0 56px}
 }
 </style>
 </head>
@@ -172,9 +122,6 @@ footer{border-top:1px solid var(--line);margin-top:110px;padding:26px 0 60px;
   <a class="ico" href="#collections" data-label="Collections" aria-label="Collections">
     <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
   </a>
-  <a class="ico" href="#how" data-label="How it works" aria-label="How it works">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 0 1 4.7 1.1c0 1.7-2.3 2.2-2.3 3.7"/><path d="M12 17.2h.01"/></svg>
-  </a>
   <a class="ico cta" href="/app" data-label="New collection" aria-label="New collection">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
   </a>
@@ -183,96 +130,31 @@ footer{border-top:1px solid var(--line);margin-top:110px;padding:26px 0 60px;
 
 <div class="wrap">
 
-  <section class="hero">
-    <div class="aur" aria-hidden="true"></div>
-    <div>
-      <p class="eyebrow mono"><b></b> Solana &middot; NFT Editor</p>
-      <h1 class="disp">Draw thirty traits.<br><em>Ship ten thousand.</em></h1>
-      <p class="lede">Every other generator assumes you turn up with a folder of
-         finished art. This one starts at the blank canvas — draw each piece,
-         weight the odds, and watch the collection assemble itself.</p>
-      <div class="cta">
-        <a class="btn btn-fill" href="/app">Start drawing →</a>
-        <a class="btn btn-quiet" href="#how">How it works</a>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-head mono">
-        <span>Chain Punks &middot; 34 traits</span>
-        <span class="live"><i></i>Generating</span>
-      </div>
-      <div id="grid" aria-hidden="true"></div>
-      <p class="panel-foot mono">56,000 possible combinations</p>
-    </div>
-  </section>
-
-  <section id="how">
-    <div class="steps">
-      <div class="step">
-        <span class="n mono">01 — DRAW</span>
-        <h3 class="disp">Nothing to upload</h3>
-        <p>Pixel grid or pressure-sensitive brush. Every trait gets its own layer stack.</p>
-      </div>
-      <div class="step">
-        <span class="n mono">02 — WEIGHT</span>
-        <h3 class="disp">Decide what's scarce</h3>
-        <p>Give each trait a weight. Rules catch combinations that shouldn't exist.</p>
-      </div>
-      <div class="step">
-        <span class="n mono">03 — GENERATE</span>
-        <h3 class="disp">In your own tab</h3>
-        <p>The whole set assembles locally. No queue, no server doing it for you.</p>
-      </div>
-      <div class="step">
-        <span class="n mono">04 — LAUNCH</span>
-        <h3 class="disp">Straight to Solana</h3>
-        <p>Art to Arweave, collection on chain, and a mint page people can buy from.</p>
-      </div>
-    </div>
-  </section>
+  <header class="hero">
+    <h1 class="disp">Draw thirty traits.<br>Ship ten thousand.</h1>
+    <a class="btn" href="/app">Start drawing →</a>
+  </header>
 
   <section id="collections">
     <div class="colhead">
-      <div>
-        <p class="eyebrow mono"><b></b> Live on Solana</p>
-        <h2 class="disp">Collections</h2>
-      </div>
+      <h2 class="disp">Collections</h2>
       <span class="pill mono" id="colcount">—</span>
     </div>
     <div class="cards" id="cards"></div>
   </section>
 
-  <section class="price">
-    <div>
-      <p class="eyebrow mono"><b></b> Pricing</p>
-      <h2 class="big disp">We take <em>none</em> of your mint.</h2>
-      <p class="lede" style="margin-top:18px">Every other launchpad takes a cut of
-        every sale. We charge once, before your collection is even live, for the
-        permanent storage your art actually needs. After that, what people pay
-        goes to you.</p>
-      <div class="cta"><a class="btn btn-fill" href="/app">Start drawing →</a></div>
-    </div>
-    <ul class="facts">
-      <li><span>Using the editor</span><b>Free</b></li>
-      <li><span>Cut of your mint</span><b>0%</b></li>
-      <li><span>Storage, 5,000 pieces</span><b>~0.02 SOL</b></li>
-      <li><span>Solana rent &amp; fees</span><b>At cost</b></li>
-      <li><span>Royalties</span><b>Yours, on chain</b></li>
-    </ul>
-  </section>
-
   <footer>
-    <span>Built on Metaplex Core. No custom contracts in the middle.</span>
-    <span><a href="/app">Editor</a> &middot; <a href="#how">How it works</a></span>
+    <span>Built on Metaplex Core. We take no cut of your mint.</span>
+    <span><a href="/app">Editor</a></span>
   </footer>
 </div>
 
 <script src="/brand.js"></script>
 <script>
-/* Shared: composite one random token from a loaded template. Used by the hero
-   grid and by the collection card thumbnails, so both show real generated art
-   rather than a placeholder rectangle. */
+/* Composite one random token from a template — real generated art on every
+   card, not a placeholder rectangle. The cards reroll on a slow stagger, which
+   is where the live-generation idea ended up: folded into the collections grid
+   instead of sitting in a second panel doing the same job. */
 function loadTemplate(file) {
   return fetch("/templates/" + file).then(function (r) { return r.json(); })
     .then(function (doc) {
@@ -311,29 +193,9 @@ function esc(s) {
   });
 }
 
-/* Hero grid — the real generator, picking by each trait's actual weight and
-   compositing in category order, the same stacking the editor uses. One tile
-   rerolls at a time; the whole grid at once strobes and reads as a loading
-   state rather than as generation. */
-(function () {
-  var TILES = 16, grid = document.getElementById("grid"), tiles = [], tpl = null;
-  loadTemplate("chain-punks.moonpad.json").then(function (t) {
-    tpl = t;
-    for (var i = 0; i < TILES; i++) {
-      var cv = document.createElement("canvas");
-      grid.appendChild(cv); tiles.push(cv); paint(cv, tpl);
-    }
-    setInterval(function () {
-      var cv = tiles[(Math.random() * tiles.length) | 0];
-      cv.classList.add("swap");
-      setTimeout(function () { paint(cv, tpl); cv.classList.remove("swap"); }, 320);
-    }, 620);
-  }).catch(function () {});
-})();
-
-/* Collections. One component, two sources: real launches when there are any,
-   bundled templates when there are not. An empty grid is the most damaging
-   thing a launchpad homepage can show, and on day one there will be none. */
+/* One component, two sources: real launches when there are any, the bundled
+   templates when there are not. An empty grid is the most damaging thing a
+   launchpad homepage can show, and on day one there will be none. */
 (function () {
   var cards = document.getElementById("cards"), count = document.getElementById("colcount");
 
@@ -344,7 +206,7 @@ function esc(s) {
 
   function live(list) {
     count.textContent = list.length + (list.length === 1 ? " collection" : " collections");
-    cards.innerHTML = list.slice(0, 8).map(function (c) {
+    cards.innerHTML = list.slice(0, 12).map(function (c) {
       return '<a class="card" href="/mint/' + esc(c.candyMachine) + '">' +
         '<div class="thumb"></div><div class="meta"><b>' + esc(c.name) + "</b>" +
         '<span class="mono">' + esc(c.candyMachine.slice(0, 4)) + "…" +
@@ -362,14 +224,28 @@ function esc(s) {
             '<div class="meta"><b>' + esc(x.name) + "</b><span>" +
             esc(x.traits) + " traits · " + esc(x.categories) + " categories</span></div></a>";
         }).join("");
-        // Real generated art on each card, not a grey box. Only the small
-        // templates — the large ones carry hundreds of KB of trait images and
-        // the homepage does not need them.
+
+        var loaded = [];
         t.forEach(function (x, i) {
           var cv = cards.children[i] && cards.children[i].querySelector("canvas");
           if (!cv) return;
-          loadTemplate(x.file).then(function (tp) { paint(cv, tp); }).catch(function () {});
+          loadTemplate(x.file).then(function (tp) {
+            paint(cv, tp);
+            loaded.push({ cv: cv, tp: tp });
+          }).catch(function () {});
         });
+
+        // Slow, one at a time. Rerolling the grid together strobes, and fast
+        // enough to notice reads as a broken carousel rather than as work.
+        setInterval(function () {
+          if (!loaded.length) return;
+          var pick = loaded[(Math.random() * loaded.length) | 0];
+          pick.cv.classList.add("swap");
+          setTimeout(function () {
+            paint(pick.cv, pick.tp);
+            pick.cv.classList.remove("swap");
+          }, 300);
+        }, 1400);
       }).catch(function () { cards.innerHTML = ""; });
   }
 })();
