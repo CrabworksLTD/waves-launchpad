@@ -321,34 +321,19 @@
         </div>
       </div>
 
-      <label class="tick"><input type="checkbox" id="f-pairOn" ${d.pairOn && !isEvm() ? raw("checked") : ""}
-        ${!isEvm() && window.Token && window.Token.configKey() ? "" : raw("disabled")}>
-        <span><b>Pair a token</b>
-        <span>${isEvm()
-          ? "Solana only for now — a paired token needs the bonding-curve launchpad, which we are still building for Robinhood Chain."
-          : (window.Token && window.Token.configKey()
-            ? "Launch a bonding-curve token alongside the collection — its trading fees can reward your holders."
-            : "Not configured on this deployment yet.")}</span></span></label>
-      <div class="fold2" id="f-pairbox" ${d.pairOn && !isEvm() ? "" : raw("hidden")}>
-        <div class="two">
-          <div><label>Token name</label>
-          <input id="f-tname" placeholder="${d.name || "Same as the collection"}" value="${d.tname}"></div>
-          <div><label>Ticker</label>
-          <input id="f-tsym" placeholder="WAVE" maxlength="10" value="${d.tsym}"></div>
-        </div>
-        <p class="note">Start it here if you like. <b>Continue opens the full
-        token setup</b> — what it is priced in (SOL, USDC or a tokenised stock),
-        your first buy, the swap fee and how much of it goes to holders, the
-        reward asset, your fee wallet and links — and you confirm the whole
-        launch, both halves, before anything is signed.</p>
-      </div>
-
-      <label class="tick"><input type="checkbox" disabled>
-        <span><b>Enable staking</b>
-        <span>Burn-to-stake is not live yet: the staking program is written and
-        tested but stays off mainnet until it has been audited, and we will not
-        take a deposit against code nobody has reviewed. Pick the reward asset
-        in the token step meanwhile.</span></span></label>
+      <!-- Pairing and staking are one decision, not two. A paired token exists
+           so its trading fees can reward the collection's holders, and staking
+           is the mechanism that delivers them — offering the pairing on its own
+           would promise something the site cannot do yet. -->
+      <label class="tick"><input type="checkbox" id="f-pairOn" disabled>
+        <span><b>Pair a token that rewards holders</b>
+        <span>Launch a bonding-curve token alongside the collection and route a
+        share of its trading fees to holders who stake their pieces.
+        <b>Not available yet</b> — the burn-to-stake program is written and its
+        tests pass, but it stays off mainnet until it has been audited, and we
+        will not take a deposit against code nobody outside this project has
+        reviewed. Launching a token on its own is open today under
+        <b>Launch → Token</b>.</span></span></label>
 
       <div id="lp-err"></div>
       <div class="acts"><button id="lp-x">Cancel</button>
@@ -416,10 +401,6 @@
         b.onclick = function () { d.phases.splice(+b.dataset.pdel, 1); drawPhases(); };
       });
     }
-    box.querySelector("#f-pairOn").addEventListener("change", function (e) {
-      d.pairOn = e.target.checked;
-      box.querySelector("#f-pairbox").hidden = !d.pairOn;
-    });
     box.querySelector("#f-allowOn").addEventListener("change", function (e) {
       d.allowOn = e.target.checked;
       box.querySelector("#f-allowbox").hidden = !d.allowOn;
@@ -448,9 +429,8 @@
       d.openAt = box.querySelector("#f-open").value;
       d.wave = parseInt(box.querySelector("#f-wave").value, 10) || 30;
       d.allowOn = box.querySelector("#f-allowOn").checked;
-      d.pairOn = box.querySelector("#f-pairOn").checked && !isEvm();
-      d.tname = (box.querySelector("#f-tname") || {}).value || "";
-      d.tsym = (box.querySelector("#f-tsym") || {}).value || "";
+      // pairing is coupled to staking and neither is live — see the note above
+      d.pairOn = false;
       if (!box.querySelector("#f-splitOn").checked) d.splits = [];
 
       // validate

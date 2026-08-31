@@ -107,7 +107,8 @@
     { id: "launch", label: "Launch", menu: [
       { label: "Token",      mode: "token" },
       { label: "Collection", mode: "collection" },
-      { label: "Pair",       mode: "pair" }
+      // pairing arrives with staking — see the launch window
+      { label: "Pair", mode: "pair", soon: true }
     ]},
     { id: "explore", label: "Explore", menu: [
       { label: "Tokens",      href: "/tokens" },
@@ -160,6 +161,13 @@
     ".shl-dd .menu a{display:block;padding:10px 14px;border-radius:7px;font-size:14.5px;",
     "  color:var(--ink);text-decoration:none}",
     ".shl-dd .menu a:hover{background:var(--panel2)}",
+    /* an item that is not open yet: readable, explained, inert */
+    ".shl-dd .menu a.soon{color:var(--faint);cursor:default;display:flex;",
+    "  align-items:center;gap:8px}",
+    ".shl-dd .menu a.soon:hover{background:transparent}",
+    ".shl-dd .menu a.soon i{font-style:normal;margin-left:auto;font:600 9px 'IBM Plex Mono',monospace;",
+    "  letter-spacing:.14em;text-transform:uppercase;color:#ffb84d;",
+    "  border:1px solid rgba(255,180,80,.45);border-radius:99px;padding:2px 7px}",
     ".shl-dd.r .menu{left:auto;right:0;transform:none}",
     /* Hollow pill: the gradient runs through a transparent 1px border via the
      * padding-box/border-box double background, and through the lettering via
@@ -356,8 +364,11 @@
               n.menu.map(function (m) {
                 return m.href
                   ? '<a href="' + m.href + '">' + window.UI.esc(m.label) + "</a>"
-                  : '<a href="/app?launch=' + m.mode + '" data-mode="' + m.mode + '">' +
-                    window.UI.esc(m.label) + "</a>";
+                  : m.soon
+                    ? '<a class="soon" aria-disabled="true">' + window.UI.esc(m.label) +
+                      "<i>soon</i></a>"
+                    : '<a href="/app?launch=' + m.mode + '" data-mode="' + m.mode + '">' +
+                      window.UI.esc(m.label) + "</a>";
               }).join("") + "</div></div>";
           }
           return '<a href="' + n.href + '"' +
@@ -413,6 +424,7 @@
       });
       dd.querySelectorAll(".menu a").forEach(function (a) {
         a.addEventListener("click", function (e) {
+          if (a.classList.contains("soon")) { e.preventDefault(); return; }
           var mode = a.dataset.mode;
           setOpen(false);
           if (!mode) return;                      // plain link (Explore items)

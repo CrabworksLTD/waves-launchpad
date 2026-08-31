@@ -66,6 +66,13 @@ h1{font-family:Archivo;font-size:clamp(34px,4.6vw,58px);font-weight:800;
 svg .ln{stroke:var(--line2);fill:none;stroke-width:1.5}
 svg .ac{stroke:var(--accent);fill:none;stroke-width:1.5}
 svg .df{stroke:var(--accent);stroke-dasharray:3 4}
+/* an option that is not open yet: shown, explained, not clickable */
+.opt.soon{opacity:.62;cursor:default}
+.opt.soon:hover{transform:none;border-color:var(--line)}
+.opt.soon .cta{color:var(--faint)}
+.badge{font:600 10px "IBM Plex Mono",monospace;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--warn);border:1px solid rgba(255,204,85,.4);
+  border-radius:99px;padding:3px 9px;margin-left:8px;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -97,16 +104,18 @@ svg .df{stroke:var(--accent);stroke-dasharray:3 4}
         waves, team splits, a mint page the moment it's live.</p>
         <span class="cta">Launch a collection →</span>
       </a>
-      <a class="opt" href="/launch?mode=pair">
+      <div class="opt soon">
         <span class="ic"><svg width="30" height="30" viewBox="0 0 24 24">
           <rect class="ac" x="3" y="8" width="8" height="8"/>
           <path class="ac" d="M13 16 Q 17 14 19 9 T 21 4"/>
           <circle fill="var(--accent)" cx="21" cy="4" r="2"/></svg></span>
-        <h2>Pair</h2>
-        <p>Collection and token together — optionally route the token's trading
-        fees to your holders in 400+ tokenized stocks and commodities.</p>
-        <span class="cta">Launch a pair →</span>
-      </a>
+        <h2>Pair <span class="badge">soon</span></h2>
+        <p>Collection and token together, with a share of the token's trading
+        fees going to holders who stake their pieces. It arrives with staking —
+        the program is written and tested, and stays off mainnet until it has
+        been audited.</p>
+        <span class="cta">Not open yet</span>
+      </div>
     </div>
     <p class="trust">Everything deploys from your own wallet. We never hold your
     art, your money or your collection.</p>
