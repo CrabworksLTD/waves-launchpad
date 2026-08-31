@@ -104,8 +104,15 @@
       "  border:1px solid rgba(20,241,149,.35);border-radius:99px;padding:4px 11px;",
       "  white-space:nowrap}",
       ".lp .pick:hover{border-color:var(--accent)}",
-      ".lp .sharebox{padding:6px 2px 2px}",
-      ".lp .sharebox input[type=range]{width:100%;accent-color:var(--accent)}",
+      ".lp .sharebox{padding:6px 0 2px}",
+      ".lp .sharebox input[type=range]{-webkit-appearance:none;appearance:none;",
+      "  width:100%;height:6px;border-radius:99px;background:var(--raise);",
+      "  outline:none;margin:8px 0 4px;display:block}",
+      ".lp .sharebox input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;",
+      "  width:18px;height:18px;border-radius:50%;background:#fff;cursor:pointer;",
+      "  border:2px solid var(--accent);box-shadow:0 1px 6px rgba(0,0,0,.5)}",
+      ".lp .sharebox input[type=range]::-moz-range-thumb{width:18px;height:18px;",
+      "  border-radius:50%;background:#fff;cursor:pointer;border:2px solid var(--accent)}",
       ".lp .shareticks{display:flex;justify-content:space-between;margin-top:2px;",
       "  font:500 10.5px 'IBM Plex Mono',monospace;color:var(--faint)}",
       ".lp .shareticks span{width:28px;text-align:center}",
@@ -278,7 +285,7 @@
       20% you / 60% platform / 20% Meteora on the standard tier.</p>
 
       <label>Royalty wallet</label>
-      <input id="f-royto" value="${d.royTo}" placeholder="optional — defaults to your wallet">
+      <input id="f-royto" value="${d.royTo}" placeholder="optional — defaults to deployer wallet">
 
       <label class="tick"><input type="checkbox" id="f-splitOn" ${d.splits.length ? raw("checked") : ""}>
         <span><b>Split the creator supply</b>
@@ -775,6 +782,31 @@
       <p class="note">Lands in the same transaction as the pool, so nobody can snipe
       the opening price ahead of you.</p>
 
+      <label>Swap fee</label>
+      <div class="tiers" id="tk-tiers">
+        <button data-t="standard" class="tier ${!flow.customFee ? "on" : ""}">
+          <b>Standard — 1%</b><span>You keep 20% of the fee (0.2% of volume).</span></button>
+        <button data-t="custom" class="tier ${flow.customFee ? "on" : ""}"
+          ${flow.quote !== "sol" && flow.quote !== "usdc"
+            ? raw('disabled title="Custom fees are SOL/USDC quotes only for now"') : ""}>
+          <b>Tax token — your %</b><span>You keep 40% of the fee — the
+          burn/dividend budget.</span></button>
+      </div>
+      <div id="tk-customrow" ${flow.customFee ? "" : raw("hidden")}>
+        <label>Fee percent</label>
+        <input id="tk-custompct" type="number" min="0.25" max="20" step="0.25"
+          value="${flow.customFee || 5}">
+        <div class="ptabs" id="tk-feechips">
+          <button data-v="1">1%</button><button data-v="2">2%</button>
+          <button data-v="3">3%</button><button data-v="5">5%</button>
+          <button data-v="10">10%</button>
+        </div>
+        <p class="note" id="tk-customsplit"></p>
+      </div>
+      <p class="note">A tax token is a bigger swap fee with a bigger creator share —
+      that stream funds burns or dividends via the rewards program. Per-transfer
+      taxes arrive with holder staking.</p>
+
       <label>Fee sharing — how much of your share goes to holders</label>
       <div class="sharebox">
         <input id="tk-sharepct" type="range" min="0" max="6" step="1"
@@ -801,36 +833,11 @@
       <div id="tk-fwwrap" ${(flow.feeSharePct || 0) >= 100 ? raw("hidden") : ""}>
         <label>Creator fee wallet</label>
         <input id="tk-feewallet" value="${flow.feeWallet || ""}"
-          placeholder="optional — defaults to your wallet">
+          placeholder="optional — defaults to deployer wallet">
         <p class="note">Where your kept portion goes. Claim anytime from
         Explore → Claim fees${(flow.feeSharePct || 0) > 0
           ? " — the keeper routes it here automatically on shared launches" : ""}.</p>
       </div>
-
-      <label>Swap fee</label>
-      <div class="tiers" id="tk-tiers">
-        <button data-t="standard" class="tier ${!flow.customFee ? "on" : ""}">
-          <b>Standard — 1%</b><span>You keep 20% of the fee (0.2% of volume).</span></button>
-        <button data-t="custom" class="tier ${flow.customFee ? "on" : ""}"
-          ${flow.quote !== "sol" && flow.quote !== "usdc"
-            ? raw('disabled title="Custom fees are SOL/USDC quotes only for now"') : ""}>
-          <b>Tax token — your %</b><span>You keep 40% of the fee — the
-          burn/dividend budget.</span></button>
-      </div>
-      <div id="tk-customrow" ${flow.customFee ? "" : raw("hidden")}>
-        <label>Fee percent</label>
-        <input id="tk-custompct" type="number" min="0.25" max="20" step="0.25"
-          value="${flow.customFee || 5}">
-        <div class="ptabs" id="tk-feechips">
-          <button data-v="1">1%</button><button data-v="2">2%</button>
-          <button data-v="3">3%</button><button data-v="5">5%</button>
-          <button data-v="10">10%</button>
-        </div>
-        <p class="note" id="tk-customsplit"></p>
-      </div>
-      <p class="note">A tax token is a bigger swap fee with a bigger creator share —
-      that stream funds burns or dividends via the rewards program. Per-transfer
-      taxes arrive with holder staking.</p>
 
       <div class="two">
         <div><label>Website</label><input id="tk-web" value="${flow.web || ""}" placeholder="site.xyz"></div>
@@ -901,7 +908,13 @@
     });
     var SHARE_STOPS = [0, 10, 25, 50, 75, 90, 100];
     function paintShare() {
-      var pct = SHARE_STOPS[+box.querySelector("#tk-sharepct").value] || 0;
+      var sl = box.querySelector("#tk-sharepct");
+      var pct = SHARE_STOPS[+sl.value] || 0;
+      // the track tells the truth: green exactly as far as the thumb travels,
+      // and the thumb runs the full rail — 0 is hard left, 100 hard right
+      var t = (+sl.value / 6) * 100;
+      sl.style.background = "linear-gradient(90deg, var(--accent) 0%, var(--accent) " +
+        t + "%, var(--raise) " + t + "%, var(--raise) 100%)";
       flow.feeSharePct = pct;
       flow.feeShare = pct > 0 ? "holders" : "keep";
       box.querySelector("#tk-sharetxt").textContent = pct === 0
