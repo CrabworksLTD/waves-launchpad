@@ -31,6 +31,8 @@ import {
   fromWeb3JsKeypair, toWeb3JsPublicKey,
 } from "@metaplex-foundation/umi-web3js-adapters";
 import { expect } from "chai";
+// anchor's BN re-export is not constructible under ts-mocha ESM interop
+import BN from "bn.js";
 
 describe("waves-staking", () => {
   const provider = anchor.AnchorProvider.env();
@@ -86,13 +88,19 @@ describe("waves-staking", () => {
       await mintTo(conn, payer, tokenMint, ata, payer, 1_000_000_000n); // 1000 tokens
     }
 
-    // Core collection + assets against the CLONED mpl-core program
-    umi = createUmi(conn.rpcEndpoint).use(mplCore());
+    // Core collection + assets against the CLONED mpl-core program.
+    // commitment must be pinned: umi's finalized default races a
+    // seconds-old validator whose finalized bank is still genesis
+    umi = createUmi(conn.rpcEndpoint, { commitment: "confirmed" }).use(mplCore());
     umi.use(keypairIdentity(fromWeb3JsKeypair(payer)));
     const col = generateSigner(umi);
     await createCollection(umi, {
       collection: col, name: "Stake Test", uri: "https://example.com/c.json",
-    }).sendAndConfirm(umi);
+    }).sendAndConfirm(umi).catch((e: any) => {
+      console.error("createCollection failed:", e.message,
+        e.logs || (e.getLogs ? "call getLogs" : ""));
+      throw e;
+    });
     collection = toWeb3JsPublicKey(col.publicKey);
 
     const a1 = generateSigner(umi), a2 = generateSigner(umi);
@@ -137,7 +145,7 @@ describe("waves-staking", () => {
   it("stake burns the token and records weight", async () => {
     const ata = getAssociatedTokenAddressSync(tokenMint, staker.publicKey);
     const beforeBal = (await getAccount(conn, ata)).amount;
-    await program.methods.stake(new anchor.BN(100_000_000)).accounts({
+    await program.methods.stake(new BN(100_000_000)).accounts({
       pool, position: posPda(asset1), asset: asset1,
       tokenMint, stakerTokens: ata, owner: staker.publicKey,
       tokenProgram: TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,
@@ -161,7 +169,7 @@ describe("waves-staking", () => {
 
   it("splits the next pot pro-rata (2x weight -> 2/3)", async () => {
     const ata2 = getAssociatedTokenAddressSync(tokenMint, staker2.publicKey);
-    await program.methods.stake(new anchor.BN(200_000_000)).accounts({
+    await program.methods.stake(new BN(200_000_000)).accounts({
       pool, position: posPda(asset2), asset: asset2,
       tokenMint, stakerTokens: ata2, owner: staker2.publicKey,
       tokenProgram: TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,
@@ -224,7 +232,7 @@ describe("waves-staking", () => {
   it("refuses zero stakes", async () => {
     const ata2 = getAssociatedTokenAddressSync(tokenMint, staker2.publicKey);
     let refused = false;
-    await program.methods.stake(new anchor.BN(0)).accounts({
+    await program.methods.stake(new BN(0)).accounts({
       pool, position: posPda(asset2), asset: asset2,
       tokenMint, stakerTokens: ata2, owner: staker2.publicKey,
       tokenProgram: TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,

@@ -140,6 +140,13 @@ h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:te
 .rrow .who span{display:flex;align-items:center;gap:6px;margin-top:3px;
   font:400 12px "IBM Plex Mono",monospace;color:var(--faint)}
 .rrow .who span svg{width:11px;height:11px;flex:none}
+/* minted / bonding-curve progress under the name */
+.rrow .bar{display:block;height:4px;margin-top:6px;border-radius:99px;
+  overflow:hidden;background:var(--panel2);border:1px solid var(--line)}
+.rrow .bar i{display:block;height:100%;border-radius:99px;
+  background-image:var(--grad);background-repeat:no-repeat;
+  background-size:calc(100% + 2px) 100%;background-position:-1px 0;
+  transition:width .4s ease}
 
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:16px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:4px;
@@ -432,10 +439,13 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
     '</linearGradient></defs>' +
     '<path fill="url(#rg)" d="M7.2 4h13.6l-4 4.9H3.2Zm0 13.5h13.6l-4 4.9H3.2Zm9.6-6.8H3.2l4-4.9h13.6z"/></svg>';
 
-  function rankRow(href, name, thumb, stat) {
+  function rankRow(href, name, thumb, stat, frac) {
+    var bar = frac == null ? ""
+      : '<span class="bar"><i style="width:' +
+        Math.min(100, Math.max(0, frac * 100)).toFixed(1) + '%"></i></span>';
     return '<li><a class="rrow" data-name="' + esc(name) + '" href="' + esc(href) + '">' +
       '<span class="rk"></span>' + thumb +
-      '<span class="who"><b>' + esc(name) + "</b>" +
+      '<span class="who"><b>' + esc(name) + "</b>" + bar +
       (stat ? "<span>" + MINI + '<i class="st" style="font-style:normal">' +
         esc(stat) + "</i></span>" : "") + "</span></a></li>";
   }
@@ -471,7 +481,8 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
           '<span class="th">' + (x.r.avatar
             ? '<img alt="" loading="lazy" src="' + esc(x.r.avatar) + '">' : "") + "</span>",
           x.m ? x.m.redeemed.toLocaleString() + "/" + x.m.available.toLocaleString() + " minted"
-              : "reading chain…");
+              : "reading chain…",
+          x.m && x.m.available ? x.m.redeemed / x.m.available : 0);
       }).join("");
       number(ol);
     }
@@ -503,7 +514,9 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
           x.m ? (x.m.migrated ? "graduated"
                 : UI.fmt(x.m.raised, 2) + "/" + UI.fmt(x.m.threshold, 0) + " " +
                   x.m.quote + " raised")
-              : "reading the curve…");
+              : "reading the curve…",
+          x.m ? (x.m.migrated ? 1
+                : x.m.threshold ? x.m.raised / x.m.threshold : 0) : 0);
       }).join("");
       number(ol);
     }
