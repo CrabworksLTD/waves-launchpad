@@ -19,11 +19,14 @@
 </head>
 <body class="pixelmode">
 
-<header class="brand">
-  <a class="wordmark" href="/"><span>WAV</span><em>ES</em></a>
-  <p class="tag">Editor</p>
-  <button id="howto" class="howto" title="How it works" aria-label="How it works"><span aria-hidden="true">?</span></button>
-</header>
+<!-- No header: the canvas gets that height. Home and help float in the
+     corners of the viewport, never over the drawing surface. -->
+<a class="mini-home" href="/" aria-label="Home"><svg viewBox="0 0 24 24" aria-hidden="true">
+  <defs><linearGradient id="mh-g" x1="0" y1="1" x2="1" y2="0">
+  <stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>
+  </linearGradient></defs>
+  <path fill="url(#mh-g)" d="M0 16h8v8H0ZM8 8h8v8H8Zm8-8h8v8h-8Z"/></svg></a>
+<button id="howto" class="howto corner" title="How it works" aria-label="How it works"><span aria-hidden="true">?</span></button>
 
 <div class="app">
 
