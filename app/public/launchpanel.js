@@ -246,7 +246,7 @@
       price: 0, maxPer: 0, dev: 0, roy: 5, royTo: "",
       site: "", x: "", tg: "", dc: "",
       openAt: "", splits: [], allowOn: false, phases: [""], wave: 30,
-      pairOn: false, avatar: null, avatarName: "", banner: null, bannerName: ""
+      pairOn: false, tname: "", tsym: "", avatar: null, avatarName: "", banner: null, bannerName: ""
     };
 
     var box = shell(H`
@@ -327,12 +327,28 @@
         <span>${isEvm()
           ? "Solana only for now — a paired token needs the bonding-curve launchpad, which we are still building for Robinhood Chain."
           : (window.Token && window.Token.configKey()
-            ? "Launch a bonding-curve token after the collection — you set its name, ticker, what it is priced in, your first buy and the fee split on the next step, before anything is signed."
+            ? "Launch a bonding-curve token alongside the collection — its trading fees can reward your holders."
             : "Not configured on this deployment yet.")}</span></span></label>
+      <div class="fold2" id="f-pairbox" ${d.pairOn && !isEvm() ? "" : raw("hidden")}>
+        <div class="two">
+          <div><label>Token name</label>
+          <input id="f-tname" placeholder="${d.name || "Same as the collection"}" value="${d.tname}"></div>
+          <div><label>Ticker</label>
+          <input id="f-tsym" placeholder="WAVE" maxlength="10" value="${d.tsym}"></div>
+        </div>
+        <p class="note">Start it here if you like — the token step opens once the
+        collection is on chain, carrying whatever you put above. There you set
+        what it is priced in (SOL, USDC or a tokenised stock), your first buy,
+        how much of the trading fee goes to holders, and the reward asset.
+        <b>Nothing about the token is signed until you confirm that step.</b></p>
+      </div>
 
       <label class="tick"><input type="checkbox" disabled>
         <span><b>Enable staking</b>
-        <span>Burn-to-stake rewards are coming — pick the reward asset in the token step meanwhile.</span></span></label>
+        <span>Burn-to-stake is not live yet: the staking program is written and
+        tested but stays off mainnet until it has been audited, and we will not
+        take a deposit against code nobody has reviewed. Pick the reward asset
+        in the token step meanwhile.</span></span></label>
 
       <div id="lp-err"></div>
       <div class="acts"><button id="lp-x">Cancel</button>
@@ -400,6 +416,10 @@
         b.onclick = function () { d.phases.splice(+b.dataset.pdel, 1); drawPhases(); };
       });
     }
+    box.querySelector("#f-pairOn").addEventListener("change", function (e) {
+      d.pairOn = e.target.checked;
+      box.querySelector("#f-pairbox").hidden = !d.pairOn;
+    });
     box.querySelector("#f-allowOn").addEventListener("change", function (e) {
       d.allowOn = e.target.checked;
       box.querySelector("#f-allowbox").hidden = !d.allowOn;
@@ -429,6 +449,8 @@
       d.wave = parseInt(box.querySelector("#f-wave").value, 10) || 30;
       d.allowOn = box.querySelector("#f-allowOn").checked;
       d.pairOn = box.querySelector("#f-pairOn").checked && !isEvm();
+      d.tname = (box.querySelector("#f-tname") || {}).value || "";
+      d.tsym = (box.querySelector("#f-tsym") || {}).value || "";
       if (!box.querySelector("#f-splitOn").checked) d.splits = [];
 
       // validate
@@ -460,6 +482,8 @@
       }
 
       flow.pair = d.pairOn;
+      flow.preTname = d.tname;
+      flow.preTsym = d.tsym;
       nftConfirm({
         name: d.name, symbol: d.symbol, description: d.desc,
         priceSol: d.price, maxPerWallet: d.maxPer, royaltyPercent: d.roy,
@@ -927,8 +951,11 @@
   function tokenDetails(flow) {
     flow = flow || {};
     var nft = flow.nft;
-    var defName = nft ? nft.cfg.name : "";
-    var defSym = defName ? defName.replace(/[^A-Za-z]/g, "").slice(0, 5).toUpperCase() : "";
+    // what they typed beside the pair tick comes through as the default here,
+    // so the token step opens already carrying their answer
+    var defName = flow.preTname || (nft ? nft.cfg.name : "");
+    var defSym = flow.preTsym ||
+      (defName ? defName.replace(/[^A-Za-z]/g, "").slice(0, 5).toUpperCase() : "");
     flow.reward = flow.reward || BUILTIN_REWARDS[0];
     flow.quote = flow.quote || "sol";
     var quotes = window.Token.quotes();
