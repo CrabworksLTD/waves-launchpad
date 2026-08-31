@@ -1,6 +1,7 @@
 {
   "cleanUrls": true,
   "buildCommand": null,
+  "installCommand": "npm install",
   "rewrites": [
     { "source": "/mint/:address", "destination": "/mint" },
     { "source": "/token/:address", "destination": "/token" }
