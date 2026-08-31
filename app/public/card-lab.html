@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Share card lab</title>
+<style>
+/* A faithful HTML twin of api/og.js buildCard() — same dimensions, fonts,
+ * colours — so the card design can be reviewed and iterated without a
+ * deploy. When this and og.js disagree, og.js is the product. */
+@font-face { font-family: Display; src: url(/fonts/space-mono-bold.ttf); font-weight: 700; }
+@font-face { font-family: Mono; src: url(/fonts/ibm-plex-mono.ttf); font-weight: 400; }
+@font-face { font-family: Mono; src: url(/fonts/ibm-plex-mono-semibold.ttf); font-weight: 600; }
+body{background:#222;margin:0;display:grid;gap:26px;place-items:center;padding:30px 0}
+.card{width:1200px;height:630px;transform:scale(.72);transform-origin:top center;
+  margin-bottom:-176px;display:flex;flex-direction:column;justify-content:flex-end;
+  position:relative;background:#0a0a0a;color:#fff;font-family:Mono;overflow:hidden}
+.wash{position:absolute;inset:0;background:linear-gradient(180deg,#16181d 0%,#0a0a0a 100%)}
+.wm{position:absolute;top:44px;right:56px;font-family:Display;font-size:30px;letter-spacing:2px}
+.body{display:flex;flex-direction:column;padding:0 56px 52px;z-index:1}
+.who{display:flex;align-items:flex-end;margin-bottom:34px}
+.ava{width:176px;height:176px;border-radius:22px;margin-right:30px;background:#191c21;
+  display:flex;align-items:center;justify-content:center;font-family:Display;font-size:84px;
+  color:rgba(255,255,255,.85)}
+.ava img{width:100%;height:100%;object-fit:cover;border-radius:19px}
+.nm{font-family:Display;font-size:72px;line-height:1;margin-bottom:16px}
+.chips{font-size:22px;letter-spacing:1px;color:rgba(255,255,255,.62)}
+.stats{display:flex}
+.stat{display:flex;flex-direction:column;margin-right:64px}
+.stat b{font-size:20px;letter-spacing:1px;color:rgba(255,255,255,.45);margin-bottom:6px;font-weight:400}
+.stat i{font-style:normal;font-weight:600;font-size:34px}
+</style>
+</head>
+<body>
+<script>
+function card(o) {
+  var d = document.createElement("div");
+  d.className = "card";
+  d.innerHTML =
+    '<div class="wash"></div>' +
+    '<div class="wm" style="color:' + o.accent + '">WAVES</div>' +
+    '<div class="body"><div class="who">' +
+    '<div class="ava" style="border:3px solid ' + o.accent + '">' +
+      (o.img ? '<img src="' + o.img + '">' : o.name.replace(/^\$/, "").slice(0, 1).toUpperCase()) + '</div>' +
+    '<div><div class="nm">' + o.name + '</div><div class="chips">' + o.chips + '</div></div>' +
+    '</div><div class="stats">' +
+    o.stats.map(function (s) {
+      return '<div class="stat"><b>' + s[0] + '</b><i>' + s[1] + '</i></div>';
+    }).join("") + '</div></div>';
+  document.body.appendChild(d);
+}
+card({ accent: "#14F195", name: "$WAVE · First Wave",
+  chips: "SOLANA  ·  BONDING CURVE",
+  stats: [["RAISED", "12.4 / 85 SOL"], ["CURVE", "14.6%"], ["CHAIN", "Solana"]] });
+card({ accent: "#14F195", name: "Tide Runners",
+  chips: "SOLANA  ·  3,333 ITEMS  ·  METAPLEX CORE",
+  stats: [["ITEMS", "3,333"], ["MINTED", "1,204 / 3,333"], ["PRICE", "0.1 SOL"], ["CHAIN", "Solana"]] });
+card({ accent: "#CCFF00", name: "Hood Cats",
+  chips: "BY 0x37fd…5bea  ·  ROBINHOOD  ·  500 ITEMS",
+  stats: [["ITEMS", "500"], ["MINTED", "212 / 500"], ["PRICE", "0.002 ETH"], ["CHAIN", "Robinhood"]] });
+</script>
+</body>
+</html>

@@ -294,12 +294,26 @@ async function solMintCard(origin, cm) {
     minted = st.minted; supply = st.supply;
   } catch (e) { failed = true; }
 
-  const avatarUri = await toDataUri(arw(rec.avatar));
+  // the launch pins _collection.json next to the avatar — the banner uploaded
+  // in the launch window lives there and fills the card background
+  let banner = null, avatar = rec.avatar || null;
+  if (rec.avatar) {
+    try {
+      const dir = rec.avatar.replace(/[^/]*$/, "");
+      const col = await fetch(dir + "_collection.json",
+        { signal: AbortSignal.timeout(5000) }).then((r) => (r.ok ? r.json() : null));
+      if (col && col.banner) banner = col.banner;
+      if (col && col.image && !avatar) avatar = col.image;
+    } catch (e) {}
+  }
+  const [avatarUri, bannerUri] = await Promise.all([
+    toDataUri(arw(avatar)), toDataUri(arw(banner))
+  ]);
   const fonts = await loadFonts(origin);
   return respond(buildCard({
     accent: SOL.accent, name: rec.name || "Collection",
     chips: (SOL.label + "  ·  " + fmtOr(supply) + " ITEMS  ·  METAPLEX CORE").toUpperCase(),
-    avatarUri, bannerUri: null,
+    avatarUri, bannerUri,
     stats: [
       ["ITEMS", fmtOr(supply)],
       ["MINTED", fmtOr(minted) + " / " + fmtOr(supply)],
