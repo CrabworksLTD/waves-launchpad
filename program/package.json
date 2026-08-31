@@ -1,0 +1,21 @@
+{
+  "name": "waves-staking-tests",
+  "private": true,
+  "scripts": {
+    "test": "anchor test"
+  },
+  "devDependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
+    "@metaplex-foundation/mpl-core": "^1.1.1",
+    "@metaplex-foundation/umi": "^0.9.2",
+    "@metaplex-foundation/umi-bundle-defaults": "^0.9.2",
+    "@metaplex-foundation/umi-web3js-adapters": "^0.9.2",
+    "@solana/spl-token": "^0.4.8",
+    "@solana/web3.js": "^1.95.0",
+    "@types/mocha": "^10.0.7",
+    "chai": "^4.4.1",
+    "mocha": "^10.7.0",
+    "ts-mocha": "^10.0.0",
+    "typescript": "^5.5.0"
+  }
+}

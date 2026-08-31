@@ -27,7 +27,7 @@ use anchor_spl::token_interface::{
     self, Burn, Mint, TokenAccount, TokenInterface, TransferChecked,
 };
 
-declare_id!("WAVESstake1111111111111111111111111111111111");
+declare_id!("DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY");
 
 /// Fixed-point precision for the accumulator. u128 math throughout;
 /// PRECISION chosen so (u64::MAX weight) * acc cannot overflow u128 within
