@@ -1,6 +1,7 @@
 {
   "name": "waves-site",
   "private": true,
+  "type": "module",
   "description": "Deploy root. Exists so Vercel installs what the api/ functions import — the site itself is static and has no build step.",
   "scripts": {
     "postinstall": "node -e \"try{const f=require('fs');const s='node_modules/harfbuzzjs/hb.wasm',d='node_modules/@vercel/og/dist/hb.wasm';if(f.existsSync(s)&&!f.existsSync(d)){f.copyFileSync(s,d);console.log('og: copied hb.wasm into @vercel/og/dist')}}catch(e){console.log('og postinstall skipped:',e.message)}\""
