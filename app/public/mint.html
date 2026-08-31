@@ -144,10 +144,36 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
 <script src="/wallet.js"></script>
 <script src="/shell.js"></script>
 <script>Shell.mount({ search: false });</script>
+<script>
+/* One mint page, two chains. A 0x address is a Robinhood Chain drop and gets
+ * the EVM driver; a base58 address is a candy machine and runs the Solana
+ * path below untouched. */
+(function () {
+  var m = location.pathname.match(/\/mint\/(0x[0-9a-fA-F]{40})/);
+  var q = new URLSearchParams(location.search).get("cm");
+  window.__EVM_MINT = (m && m[1]) ||
+    (q && /^0x[0-9a-fA-F]{40}$/.test(q) ? q : null);
+  if (!window.__EVM_MINT) return;
+  ["/evm-chains.js", "/evm-contract.js", "/evm-registry.js",
+   "/evm-collections.js", "/evm-mint.js"].reduce(function (p, src) {
+    return p.then(function () {
+      return new Promise(function (res, rej) {
+        var el = document.createElement("script");
+        el.src = src; el.onload = res;
+        el.onerror = function () { rej(new Error("failed to load " + src)); };
+        document.head.appendChild(el);
+      });
+    });
+  }, Promise.resolve()).then(function () {
+    window.EvmMintPage.init(window.__EVM_MINT);
+  });
+})();
+</script>
 <script src="/launch.js"></script>
 <script>
 (function () {
   "use strict";
+  if (window.__EVM_MINT) return;   // the EVM driver owns the page
   var esc = UI.esc, shortAddr = UI.shortAddr;
   var $ = function (id) { return document.getElementById(id); };
 

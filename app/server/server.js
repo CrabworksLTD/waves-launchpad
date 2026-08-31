@@ -185,7 +185,7 @@ const server = http.createServer(async function (req, res) {
   else if (rel === "/app" || rel === "/app/") rel = "/app.html";
   // pretty asset paths: /mint/<address> and /token/<address> carry the address
   // in the path and the page reads it back out of location.pathname
-  else if (/^\/mint\/[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(rel)) rel = "/mint.html";
+  else if (/^\/mint\/([1-9A-HJ-NP-Za-km-z]{32,44}|0x[0-9a-fA-F]{40})$/.test(rel)) rel = "/mint.html";
   else if (/^\/token\/[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(rel)) rel = "/token.html";
   // generic cleanUrls, matching how Vercel serves /launch -> launch.html —
   // one rule here instead of a mapping to keep in sync per page
