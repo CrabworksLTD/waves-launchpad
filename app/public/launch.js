@@ -60,9 +60,17 @@
     umi.rpc.confirmTransaction = async function (signature, options) {
       var sig = typeof signature === "string"
         ? signature : mx.base58.deserialize(signature)[0];
-      var deadline = Date.now() + 120000;
+      var started = Date.now();
+      var deadline = started + 120000;
       var missing = 0;
       while (Date.now() < deadline) {
+        // Say what is happening. Polling in silence for two minutes is
+        // indistinguishable from a hang, and the last thing a creator needs
+        // after signing a payment is a dialog that looks dead.
+        if (typeof window.Launch.onWait === "function") {
+          window.Launch.onWait("Confirming on chain — " +
+            Math.round((Date.now() - started) / 1000) + "s");
+        }
         var st = null;
         try { st = await conn.getSignatureStatus(sig, { searchTransactionHistory: true }); }
         catch (e) { st = null; }
@@ -461,6 +469,7 @@
     // — a launch died there after the storage payment was already signed.
     asAdapter: asAdapter,
     usePolledConfirm: usePolledConfirm,
+    onWait: null,   // set by the launch panel to surface waiting states
     deploy: deploy,
     mintOne: mintOne,
     readMachine: readMachine,

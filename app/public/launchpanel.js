@@ -657,6 +657,8 @@
       <div id="lp-err"></div>
     `);
     var mark = stepList(box);
+    var waitingOn = "storage";
+    window.Launch.onWait = function (msg) { mark(waitingOn, "on", msg); };
 
     try {
       var card = await makeCard(cfg, "collection", [
@@ -678,11 +680,20 @@
           : null,
         onProgress: function (p) {
           if (p.phase === "images" && p.state === "quoting") mark("storage", "on");
-          if (p.phase === "images") mark("images", p.state === "done" ? "done" : "on");
-          if (p.phase === "metadata") mark("metadata", p.state === "done" ? "done" : "on");
+          if (p.phase === "images") {
+            waitingOn = "images";
+            mark("images", p.state === "done" ? "done" : "on",
+              p.state === "done" ? null : "Uploading to Arweave…");
+          }
+          if (p.phase === "metadata") {
+            waitingOn = "metadata";
+            mark("metadata", p.state === "done" ? "done" : "on",
+              p.state === "done" ? null : "Uploading to Arweave…");
+          }
         },
         payer: async function (q) {
-          mark("storage", "on");
+          waitingOn = "storage";
+          mark("storage", "on", "Approve the payment in your wallet…");
           var sig = await payStorage(q);
           mark("storage", "done");
           return sig;
@@ -721,10 +732,12 @@
         return;
       }
 
+      window.Launch.onWait = null;
       recordCollection(cfg, res, null, up);
       nftDone(cfg, res, up);
     } catch (e) {
       busy = false;
+      window.Launch.onWait = null;
       fail(box, describe(e));
       box.insertAdjacentHTML("beforeend",
         '<div class="acts"><button id="lp-close2">Close</button></div>');
@@ -1545,6 +1558,7 @@
       tokenDone(flow, res);
     } catch (e) {
       busy = false;
+      window.Launch.onWait = null;
       fail(box, describe(e));
       box.insertAdjacentHTML("beforeend",
         '<div class="acts"><button id="lp-close2">Close</button></div>');
