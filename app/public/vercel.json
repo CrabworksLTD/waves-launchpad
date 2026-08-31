@@ -72,6 +72,10 @@
     {
       "path": "/api/keeper",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/indexer",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

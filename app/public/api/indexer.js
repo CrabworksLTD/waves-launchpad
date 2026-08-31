@@ -1,0 +1,247 @@
+// GET /api/indexer — walk each launch's pool and record its trades.
+//
+// The token page needs price history, volume, market cap and holders. None of
+// that exists on chain as a queryable thing: a bonding-curve pool knows its
+// current state, not what it was an hour ago. So we build the history the only
+// way there is — read every transaction that touched the pool, once, and keep
+// the result.
+//
+// ── How a swap is read ───────────────────────────────────────────────────────
+// Not from the trader's SOL balance: that includes gas and any account rent
+// they paid, which would quietly corrupt the price. It comes from the POOL's
+// own vault movements, which are exactly the swap and nothing else.
+//
+// In every swap the pool authority owns both vaults, so it is the one address
+// appearing in both a base-mint move and a quote-mint move. Its quote delta
+// tells you the direction:
+//
+//   pool quote +, pool base −   → somebody bought
+//   pool quote −, pool base +   → somebody sold
+//
+// price = |pool quote delta| / |pool base delta|, in UI units. Verified against
+// the $SOLWAVES dev buy: 0.01 SOL in, 353,455.499312 out.
+//
+// Transactions that touch the pool without moving the base mint — fee claims,
+// migration plumbing — move no tokens and are skipped.
+//
+// ── Cost ─────────────────────────────────────────────────────────────────────
+// Each run only reads signatures newer than the cursor, so a quiet token costs
+// one request. Backfilling a new token costs one request per historical trade,
+// once. Needs an RPC that allows getProgramAccounts and getTokenSupply for the
+// holder and supply figures — see api/keeper.js for why the public node is not
+// enough.
+
+export const config = { runtime: "nodejs", maxDuration: 300 };
+
+const RPC = process.env.SOLANA_RPC || "https://solana-rpc.publicnode.com";
+const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const MAX_TRADES = 600;          // ~70KB of JSON, plenty for a chart and a feed
+const MAX_BACKFILL = 2000;       // signatures per run, so one busy pool cannot
+                                 // eat the whole 300s budget
+const PAGE = 1000;               // getSignaturesForAddress maximum
+
+function kv() {
+  return import("@upstash/redis").then(({ Redis }) => new Redis({
+    url: process.env.KV_REST_API_URL,
+    token: process.env.KV_REST_API_TOKEN
+  }));
+}
+
+async function rpc(method, params) {
+  const r = await fetch(RPC, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params })
+  });
+  const j = await r.json();
+  if (j.error) throw new Error(method + ": " + (j.error.message || "rpc error"));
+  return j.result;
+}
+
+/* Every token account movement in one transaction, keyed by account index so a
+ * balance that only appears on one side still counts (a freshly created ATA has
+ * no pre-balance). */
+function moves(meta) {
+  const by = new Map();
+  for (const b of meta.preTokenBalances || []) {
+    by.set(b.accountIndex, {
+      owner: b.owner, mint: b.mint, dec: b.uiTokenAmount.decimals,
+      pre: BigInt(b.uiTokenAmount.amount), post: 0n
+    });
+  }
+  for (const b of meta.postTokenBalances || []) {
+    const e = by.get(b.accountIndex) || {
+      owner: b.owner, mint: b.mint, dec: b.uiTokenAmount.decimals, pre: 0n, post: 0n
+    };
+    e.post = BigInt(b.uiTokenAmount.amount);
+    by.set(b.accountIndex, e);
+  }
+  const out = [];
+  for (const e of by.values()) {
+    const d = e.post - e.pre;
+    if (d !== 0n) out.push({ owner: e.owner, mint: e.mint, dec: e.dec, delta: d });
+  }
+  return out;
+}
+
+function readSwap(tx, baseMint, sig, blockTime) {
+  if (!tx || !tx.meta || tx.meta.err) return null;
+  const ms = moves(tx.meta);
+  const base = ms.filter((m) => m.mint === baseMint);
+  if (base.length < 2) return null;                 // not a swap of this token
+
+  // the pool authority is the address on both sides of the trade
+  const quoteByOwner = new Map();
+  for (const m of ms) {
+    if (m.mint === baseMint) continue;
+    if (!quoteByOwner.has(m.owner)) quoteByOwner.set(m.owner, m);
+  }
+  const poolSide = base.find((b) => quoteByOwner.has(b.owner));
+  if (!poolSide) return null;
+  const poolQuote = quoteByOwner.get(poolSide.owner);
+  const trader = base.find((b) => b.owner !== poolSide.owner);
+  if (!trader || poolQuote.delta === 0n || poolSide.delta === 0n) return null;
+
+  const abs = (x) => (x < 0n ? -x : x);
+  const baseAmt = Number(abs(poolSide.delta)) / Math.pow(10, poolSide.dec);
+  const quoteAmt = Number(abs(poolQuote.delta)) / Math.pow(10, poolQuote.dec);
+  if (!(baseAmt > 0) || !(quoteAmt > 0)) return null;
+
+  return {
+    sig,
+    at: (blockTime || 0) * 1000,
+    who: String(trader.owner || ""),
+    side: poolQuote.delta > 0n ? "buy" : "sell",    // pool gained quote = a buy
+    tokens: baseAmt,
+    quote: quoteAmt,
+    price: quoteAmt / baseAmt
+  };
+}
+
+export default async function handler(req, res) {
+  const secret = process.env.CRON_SECRET;
+  if (secret) {
+    const auth = req.headers.authorization || "";
+    if (auth !== "Bearer " + secret) return res.status(401).json({ error: "no" });
+  }
+
+  const log = [];
+  try {
+    const db = await kv();
+    const proto = req.headers["x-forwarded-proto"] || "https";
+    const origin = proto + "://" + (req.headers["x-forwarded-host"] || req.headers.host);
+    const j = await fetch(origin + "/api/tokens").then((r) => r.json()).catch(() => ({}));
+    const toks = (j.tokens || []).filter((t) => t.pool && t.mint);
+    const only = (req.query && req.query.mint) || null;
+
+    for (const t of only ? toks.filter((x) => x.mint === only) : toks) {
+      try {
+        const cursorKey = "ix:" + t.mint + ":cursor";
+        const tradesKey = "ix:" + t.mint + ":trades";
+        const statsKey = "ix:" + t.mint + ":stats";
+
+        let cursor = await db.get(cursorKey).catch(() => null);
+
+        /* Collect signatures newer than the cursor, newest first. `until` stops
+         * the walk at what we already have, so steady state is one request. */
+        const fresh = [];
+        let before = null;
+        for (let page = 0; page < Math.ceil(MAX_BACKFILL / PAGE); page++) {
+          const opts = { limit: PAGE };
+          if (before) opts.before = before;
+          if (cursor) opts.until = cursor;
+          const sigs = await rpc("getSignaturesForAddress", [t.pool, opts]);
+          if (!sigs.length) break;
+          fresh.push(...sigs);
+          if (sigs.length < PAGE) break;
+          before = sigs[sigs.length - 1].signature;
+        }
+        if (!fresh.length) { log.push(t.symbol + ": up to date"); continue; }
+
+        // oldest first, so the stored list stays in order and ATH is found
+        // in the sequence it actually happened
+        fresh.reverse();
+        const found = [];
+        for (const s of fresh) {
+          if (s.err) continue;
+          const tx = await rpc("getTransaction", [s.signature, {
+            encoding: "jsonParsed", maxSupportedTransactionVersion: 0,
+            commitment: "confirmed"
+          }]).catch(() => null);
+          const trade = readSwap(tx, t.mint, s.signature, s.blockTime);
+          if (trade) found.push(trade);
+        }
+
+        let stored = await db.get(tradesKey).catch(() => null);
+        if (typeof stored === "string") { try { stored = JSON.parse(stored); } catch { stored = null; } }
+        const all = (Array.isArray(stored) ? stored : []).concat(found);
+        // newest last; trim the oldest away
+        const trades = all.slice(-MAX_TRADES);
+
+        // supply and holders — both need an RPC that answers indexed requests
+        let supply = null, decimals = 6, holders = null;
+        try {
+          const s = await rpc("getTokenSupply", [t.mint]);
+          supply = Number(s.value.amount) / Math.pow(10, s.value.decimals);
+          decimals = s.value.decimals;
+        } catch (e) { log.push(t.symbol + ": supply unavailable (" + e.message.slice(0, 60) + ")"); }
+        try {
+          const accts = await rpc("getProgramAccounts", [TOKEN_PROGRAM, {
+            encoding: "base64",
+            filters: [{ dataSize: 165 }, { memcmp: { offset: 0, bytes: t.mint } }]
+          }]);
+          let n = 0;
+          for (const a of accts) {
+            const d = Buffer.from(a.account.data[0], "base64");
+            if (d.readBigUInt64LE(64) > 0n) n++;
+          }
+          holders = n;
+        } catch (e) { /* leave null; the page says "—" rather than a wrong number */ }
+
+        /* ATH is cumulative: trades get trimmed, so the previous high has to
+         * survive independently of the list it came from. */
+        let prev = await db.get(statsKey).catch(() => null);
+        if (typeof prev === "string") { try { prev = JSON.parse(prev); } catch { prev = null; } }
+        let ath = (prev && prev.ath) || 0, athAt = (prev && prev.athAt) || 0;
+        for (const tr of found) {
+          if (tr.price > ath) { ath = tr.price; athAt = tr.at; }
+        }
+
+        const now = Date.now();
+        const since = (ms) => trades.filter((x) => now - x.at <= ms);
+        const sum = (rows, f) => rows.reduce((a, b) => a + f(b), 0);
+        const d1 = since(86400000);
+        const last = trades.length ? trades[trades.length - 1] : null;
+        const price = last ? last.price : (prev && prev.price) || null;
+
+        const stats = {
+          mint: t.mint,
+          price,
+          // the standard quote: price times everything that exists
+          mcap: price != null && supply != null ? price * supply : null,
+          supply, decimals, holders,
+          ath, athAt,
+          vol24h: sum(d1, (x) => x.quote),
+          vol7d: sum(since(604800000), (x) => x.quote),
+          trades24h: d1.length,
+          buyers24h: new Set(d1.filter((x) => x.side === "buy").map((x) => x.who)).size,
+          firstAt: trades.length ? trades[0].at : null,
+          lastAt: last ? last.at : null,
+          count: trades.length,
+          at: now
+        };
+
+        await db.set(tradesKey, JSON.stringify(trades));
+        await db.set(statsKey, JSON.stringify(stats));
+        await db.set(cursorKey, fresh[fresh.length - 1].signature);
+        log.push(t.symbol + ": +" + found.length + " trades (" + trades.length +
+                 " kept), " + (holders == null ? "holders n/a" : holders + " holders"));
+      } catch (e) {
+        log.push((t.symbol || t.mint) + ": FAILED " + String((e && e.message) || e).slice(0, 140));
+      }
+    }
+    return res.status(200).json({ ok: true, indexed: log.length, log });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: String((e && e.message) || e).slice(0, 300), log });
+  }
+}
