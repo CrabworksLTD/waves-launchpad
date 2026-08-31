@@ -47,15 +47,31 @@ function kv() {
   }));
 }
 
-async function rpc(method, params) {
-  const r = await fetch(RPC, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params })
-  });
-  const j = await r.json();
-  if (j.error) throw new Error(method + ": " + (j.error.message || "rpc error"));
-  return j.result;
+/* Free-tier RPCs rate-limit, and they do it in plain text — a 429 body is
+ * "Too Many Requests", not JSON, so parsing it as JSON throws something that
+ * reads like a bug in us. Back off and retry instead; a backfill is a burst by
+ * nature and one refusal should not cost the whole run. */
+async function rpc(method, params, tries) {
+  const max = tries == null ? 5 : tries;
+  let wait = 400;
+  for (let i = 0; i < max; i++) {
+    const r = await fetch(RPC, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params })
+    });
+    const text = await r.text();
+    let j = null;
+    try { j = JSON.parse(text); } catch (e) { /* rate limit or gateway page */ }
+    if (j && j.error) throw new Error(method + ": " + (j.error.message || "rpc error"));
+    if (j) return j.result;
+    if (r.status !== 429 && r.status < 500) {
+      throw new Error(method + ": " + r.status + " " + text.slice(0, 60));
+    }
+    await new Promise((s) => setTimeout(s, wait));
+    wait = Math.min(wait * 2, 4000);
+  }
+  throw new Error(method + ": rate limited after " + max + " attempts");
 }
 
 /* Every token account movement in one transaction, keyed by account index so a
@@ -170,6 +186,9 @@ export default async function handler(req, res) {
           }]).catch(() => null);
           const trade = readSwap(tx, t.mint, s.signature, s.blockTime);
           if (trade) found.push(trade);
+          // pace the backfill so the reads that come after it are not the ones
+          // that get refused
+          await new Promise((r) => setTimeout(r, 60));
         }
 
         let stored = await db.get(tradesKey).catch(() => null);
