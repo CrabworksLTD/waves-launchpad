@@ -577,14 +577,16 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
     say("", "");
     var got = [];
     try {
-      /* One transaction per piece: the candy machine mints singly, so a run
-       * of five is five signatures. Anything already minted is kept if a
-       * later one fails — the count comes back off the machine either way. */
-      for (var i = 0; i < qty; i++) {
-        if (qty > 1) go.textContent = "Minting " + (i + 1) + " of " + qty + "…";
-        var r = await window.Launch.mintOne(CM, myPhase || {});
-        got.push(r.asset);
-      }
+      /* One transaction per piece — the candy machine mints singly — but one
+       * approval for the whole run: mintMany builds the batch, has the wallet
+       * sign it once, then broadcasts. Anything already minted is kept if a
+       * later one fails; the count comes back off the machine either way. */
+      got = await window.Launch.mintMany(CM, myPhase || {}, qty, function (p) {
+        if (qty === 1) { go.textContent = "Minting…"; return; }
+        if (p.phase === "build") go.textContent = "Preparing " + qty + "…";
+        else if (p.phase === "sign") go.textContent = "Approve once for all " + qty + "…";
+        else if (p.phase === "send") go.textContent = "Minting " + (p.done + 1) + " of " + qty + "…";
+      });
       var url = "https://explorer.solana.com/address/" + got[got.length - 1] +
                 (window.Launch.cluster() === "devnet" ? "?cluster=devnet" : "");
       say("ok", (got.length > 1 ? "Minted " + got.length + ". " : "Minted. ") +

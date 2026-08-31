@@ -442,6 +442,149 @@
     return { asset: String(asset.publicKey) };
   }
 
+  /* Mint several in ONE wallet prompt.
+   *
+   * The candy machine mints a single asset per instruction and a Core mint is
+   * heavy enough that packing several into one transaction is not reliable —
+   * so a run of ten really is ten transactions. What it does not have to be is
+   * ten approvals: wallets implement signAllTransactions, so we build the whole
+   * batch, sign it once, and broadcast. Minting ten used to mean clicking
+   * approve ten times.
+   *
+   * Everything that can fail is done before the prompt: the machine and guard
+   * are fetched once instead of per mint, and the allowlist proof rides along
+   * as the first transaction in the same batch rather than as its own popup.
+   *
+   * Wallets that do not implement signAllTransactions fall back to the old
+   * one-at-a-time path, which still works — it just asks more often. */
+  async function mintMany(candyMachineAddress, opts, count, onProgress) {
+    opts = opts || {};
+    var qty = Math.max(1, count || 1);
+    var progress = onProgress || function () {};
+    if (qty === 1) {
+      progress({ phase: "sign", done: 0, total: 1 });
+      var one = await mintOne(candyMachineAddress, opts);
+      progress({ phase: "done", done: 1, total: 1 });
+      return [one.asset];
+    }
+
+    var c = await connectUmi();
+    var mx = c.mx, umi = c.umi;
+
+    if (typeof umi.identity.signAllTransactions !== "function") {
+      var out = [];
+      for (var k = 0; k < qty; k++) {
+        progress({ phase: "sign", done: k, total: qty });
+        out.push((await mintOne(candyMachineAddress, opts)).asset);
+      }
+      progress({ phase: "done", done: qty, total: qty });
+      return out;
+    }
+
+    var cm = await mx.fetchCandyMachine(umi, mx.publicKey(candyMachineAddress));
+    var guard = await mx.fetchCandyGuard(umi, cm.mintAuthority);
+    var hasGroups = guard.groups && guard.groups.length > 0;
+    if (hasGroups && !opts.group) {
+      throw new Error("This mint runs in phases — the page has to pick your phase first.");
+    }
+    var set = guard.guards, groupSet = null;
+    if (hasGroups) {
+      var g = guard.groups.find(function (x) { return x.label === opts.group; });
+      if (!g) throw new Error("No phase named " + opts.group);
+      groupSet = g.guards;
+    }
+    function guardVal(name) {
+      if (groupSet && groupSet[name] && groupSet[name].__option === "Some") return groupSet[name].value;
+      if (set[name] && set[name].__option === "Some") return set[name].value;
+      return null;
+    }
+
+    var mintArgs = {};
+    var pay = guardVal("solPayment");
+    if (pay) mintArgs.solPayment = mx.some({ destination: pay.destination });
+    var lim = guardVal("mintLimit");
+    if (lim) mintArgs.mintLimit = mx.some({ id: lim.id });
+
+    var allow = groupSet && groupSet.allowList && groupSet.allowList.__option === "Some"
+      ? groupSet.allowList.value : null;
+
+    progress({ phase: "build", done: 0, total: qty });
+    var blockhash = await umi.rpc.getLatestBlockhash();
+    var builders = [];
+
+    if (allow) {
+      if (!opts.wallets || !opts.wallets.length) {
+        throw new Error("This phase is allowlisted and the list could not be loaded.");
+      }
+      builders.push({
+        asset: null,
+        b: mx.route(umi, {
+          candyMachine: cm.publicKey, candyGuard: cm.mintAuthority,
+          guard: "allowList", group: mx.some(opts.group),
+          routeArgs: {
+            path: "proof", merkleRoot: allow.merkleRoot,
+            merkleProof: mx.getMerkleProof(opts.wallets, String(umi.identity.publicKey))
+          }
+        })
+      });
+      mintArgs.allowList = mx.some({ merkleRoot: allow.merkleRoot });
+    }
+
+    for (var i = 0; i < qty; i++) {
+      var asset = mx.generateSigner(umi);
+      var b = await mx.mintV1(umi, {
+        candyMachine: cm.publicKey, asset: asset, collection: cm.collectionMint,
+        group: hasGroups ? mx.some(opts.group) : undefined, mintArgs: mintArgs
+      });
+      builders.push({ asset: asset, b: b.prepend(mx.setComputeUnitLimit(umi, { units: 800000 })) });
+    }
+
+    /* Sign the batch: each transaction's own asset keypair signs silently
+     * first, then the wallet signs all of them in one approval. */
+    var unsigned = [];
+    for (var j = 0; j < builders.length; j++) {
+      var built = builders[j].b.setBlockhash(blockhash).build(umi);
+      if (builders[j].asset) built = await builders[j].asset.signTransaction(built);
+      unsigned.push(built);
+    }
+    progress({ phase: "sign", done: 0, total: qty });
+    var signed = await umi.identity.signAllTransactions(unsigned);
+
+    /* Broadcast one at a time. The allowlist proof must land before the mints
+     * that read it, and a candy machine mints in sequence anyway. */
+    progress({ phase: "send", done: 0, total: qty });
+    var minted = [];
+    for (var n = 0; n < signed.length; n++) {
+      var sig = await umi.rpc.sendTransaction(signed[n], { maxRetries: 5 });
+      await umi.rpc.confirmTransaction(sig, {
+        strategy: { type: "blockhash", blockhash: blockhash.blockhash,
+                    lastValidBlockHeight: blockhash.lastValidBlockHeight },
+        commitment: "confirmed"
+      });
+      if (builders[n].asset) {
+        minted.push(String(builders[n].asset.publicKey));
+        progress({ phase: "send", done: minted.length, total: qty });
+      }
+    }
+
+    /* Same rule as a single mint: a confirmed transaction is not a successful
+     * mint. With botTax armed a rejection lands as a paid, empty transaction,
+     * so only the asset existing counts. */
+    var confirmedAssets = [];
+    for (var q = 0; q < minted.length; q++) {
+      var ok = await mx.fetchAsset(umi, mx.publicKey(minted[q]))
+        .then(function () { return true; }).catch(function () { return false; });
+      if (ok) confirmedAssets.push(minted[q]);
+    }
+    if (!confirmedAssets.length) {
+      throw new Error("The mint was refused by the sale rules (wrong phase, " +
+        "not on the allowlist, over the wallet limit, or not open yet). " +
+        "A small bot-protection fee was charged.");
+    }
+    progress({ phase: "done", done: confirmedAssets.length, total: qty });
+    return confirmedAssets;
+  }
+
   async function readMachine(candyMachineAddress) {
     var c = await connectUmi().catch(async function () {
       // The mint page has to show supply and price before anyone connects.
@@ -497,6 +640,7 @@
     onWait: null,   // set by the launch panel to surface waiting states
     deploy: deploy,
     mintOne: mintOne,
+    mintMany: mintMany,
     readMachine: readMachine,
     cluster: function (name) { if (name) cluster = name; return cluster; },
     clusters: CLUSTERS
