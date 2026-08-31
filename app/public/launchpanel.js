@@ -694,13 +694,13 @@
 
       <label>Logo</label>
       <div class="filebtn"><button id="tk-logobtn" type="button">Choose…</button>
-      <span id="tk-logoname">${flow.iconName || "square png — shown in wallets and on Jupiter"}</span></div>
-      <input type="file" id="tk-logo" accept="image/png" hidden>
+      <span id="tk-logoname">${flow.iconName || "1:1 — shown in wallets and on Jupiter"}</span></div>
+      <input type="file" id="tk-logo" accept="image/png,image/jpeg" hidden>
 
       <label>Banner</label>
       <div class="filebtn"><button id="tk-bannerbtn" type="button">Choose…</button>
-      <span id="tk-bannername">${flow.bannerName || "wide png — tops your token's trading page"}</span></div>
-      <input type="file" id="tk-banner" accept="image/png" hidden>
+      <span id="tk-bannername">${flow.bannerName || "3:1 — tops your token's trading page"}</span></div>
+      <input type="file" id="tk-banner" accept="image/png,image/jpeg" hidden>
 
       <div class="two">
         <div><label>Name</label>
@@ -807,6 +807,7 @@
       f.arrayBuffer().then(function (buf) {
         flow.icon = new Uint8Array(buf);
         flow.iconName = f.name;
+        flow.iconExt = /\.jpe?g$/i.test(f.name) ? "jpg" : "png";
         box.querySelector("#tk-logoname").textContent = f.name;
       });
     });
@@ -819,6 +820,7 @@
       f.arrayBuffer().then(function (buf) {
         flow.banner = new Uint8Array(buf);
         flow.bannerName = f.name;
+        flow.bannerExt = /\.jpe?g$/i.test(f.name) ? "jpg" : "png";
         box.querySelector("#tk-bannername").textContent = f.name;
       });
     });
@@ -1018,7 +1020,9 @@
         symbol: flow.tsym,
         description: flow.tdesc || (flow.nft ? "Paired with " + flow.nft.cfg.name : ""),
         icon: flow.icon || null,
+        iconExt: flow.iconExt || "png",
         banner: flow.banner || null,
+        bannerExt: flow.bannerExt || "png",
         links: { website: flow.web, x: flow.x, telegram: flow.tg },
         payer: function (q) { return payStorage(q); }
       });

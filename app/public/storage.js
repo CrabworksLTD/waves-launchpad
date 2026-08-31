@@ -341,8 +341,10 @@
    * one manifest covers both. */
   async function uploadTokenMeta(opts) {
     var files = [];
-    if (opts.icon) files.push({ id: "_icon", name: "icon.png", bytes: opts.icon });
-    if (opts.banner) files.push({ id: "_banner", name: "banner.png", bytes: opts.banner });
+    var iconName = "icon." + (opts.iconExt || "png");
+    var bannerName = "banner." + (opts.bannerExt || "png");
+    if (opts.icon) files.push({ id: "_icon", name: iconName, bytes: opts.icon });
+    if (opts.banner) files.push({ id: "_banner", name: bannerName, bytes: opts.banner });
 
     function buildJson(cid) {
       var j = {
@@ -350,8 +352,8 @@
         symbol: opts.symbol,
         description: opts.description || ""
       };
-      if (opts.icon) j.image = "https://arweave.net/" + cid + "/icon.png";
-      if (opts.banner) j.banner = "https://arweave.net/" + cid + "/banner.png";
+      if (opts.icon) j.image = "https://arweave.net/" + cid + "/" + iconName;
+      if (opts.banner) j.banner = "https://arweave.net/" + cid + "/" + bannerName;
       // the extensions shape Jupiter and the explorers read socials from
       if (opts.links) {
         var ext = {};
@@ -383,8 +385,8 @@
     var cid = await uploadWith(up, set, "token metadata", opts.onProgress);
     return {
       uri: "https://arweave.net/" + cid + "/token.json", cid: cid,
-      iconUri: opts.icon ? "https://arweave.net/" + cid + "/icon.png" : null,
-      bannerUri: opts.banner ? "https://arweave.net/" + cid + "/banner.png" : null
+      iconUri: opts.icon ? "https://arweave.net/" + cid + "/" + iconName : null,
+      bannerUri: opts.banner ? "https://arweave.net/" + cid + "/" + bannerName : null
     };
   }
 
