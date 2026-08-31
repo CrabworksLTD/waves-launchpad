@@ -1,0 +1,14 @@
+/Users/kyletokar/nft-builder-sol/program/target/release/deps/serde-f836a288a941569f.d: /Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /Users/kyletokar/nft-builder-sol/program/target/release/build/serde-bd6e8d49d0b8d98b/out/private.rs
+
+/Users/kyletokar/nft-builder-sol/program/target/release/deps/libserde-f836a288a941569f.rlib: /Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /Users/kyletokar/nft-builder-sol/program/target/release/build/serde-bd6e8d49d0b8d98b/out/private.rs
+
+/Users/kyletokar/nft-builder-sol/program/target/release/deps/libserde-f836a288a941569f.rmeta: /Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /Users/kyletokar/nft-builder-sol/program/target/release/build/serde-bd6e8d49d0b8d98b/out/private.rs
+
+/Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs:
+/Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs:
+/Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs:
+/Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs:
+/Users/kyletokar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs:
+/Users/kyletokar/nft-builder-sol/program/target/release/build/serde-bd6e8d49d0b8d98b/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/kyletokar/nft-builder-sol/program/target/release/build/serde-bd6e8d49d0b8d98b/out

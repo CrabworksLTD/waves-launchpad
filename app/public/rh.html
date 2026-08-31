@@ -550,14 +550,14 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
         return spotCard({
           name: r.name || "Token", sym: "$" + String(r.symbol || "").toUpperCase(),
           href: "/token/" + r.mint, img: r.icon || null,
-          badge: "TOKEN", addr: r.mint, at: r.at
+          badge: "TOKEN", badgeKind: "live", addr: r.mint, at: r.at
         });
       }
       if (it.kind === "col") {
         return spotCard({
           name: r.name || "Collection", sym: "Collection",
           href: "/mint/" + r.candyMachine, img: r.avatar || null,
-          badge: "COLLECTION", addr: r.candyMachine, at: r.at
+          badge: "COLLECTION", badgeKind: "live", addr: r.candyMachine, at: r.at
         });
       }
       return spotCard({
@@ -582,18 +582,14 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
         setStat(statEl, (it.rec.combinations || 0).toLocaleString(), "possible");
         return;
       }
+      /* The badge says what a card IS, not how it is doing — the spotlight
+       * mixes both kinds, so "TOKEN" / "COLLECTION" is the thing you need at a
+       * glance. Status lives in the stat line and the bar underneath. */
       if (it.kind === "token") {
         window.Token.readMarket(it.rec.mint).then(function (m) {
           it.size = m.raised || 0;
-          if (m.migrated) {
-            card.querySelector(".badge").textContent = "GRADUATED";
-            card.querySelector(".badge").className = "badge done";
-            setStat(statEl, "Graduated", "");
-          } else {
-            card.querySelector(".badge").className = "badge live";
-            card.querySelector(".badge").textContent = "ON THE CURVE";
-            setStat(statEl, UI.fmt(m.raised, 2) + " " + m.quote, "raised");
-          }
+          if (m.migrated) setStat(statEl, "Graduated", "");
+          else setStat(statEl, UI.fmt(m.raised, 2) + " " + m.quote, "raised");
         }).catch(function () {});
         return;
       }
@@ -606,10 +602,6 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
         it.size = (m.redeemed || 0) * (m.priceSol || m.price || 0);
         var symEl = card.querySelector(".sym");
         if (symEl) symEl.textContent = m.available.toLocaleString() + " supply";
-        var out = m.redeemed >= m.available;
-        var b = card.querySelector(".badge");
-        b.textContent = out ? "SOLD OUT" : "MINTING";
-        b.className = "badge " + (out ? "done" : "live");
         setStat(statEl, m.redeemed.toLocaleString() + " / " + m.available.toLocaleString(), "minted");
       }).catch(function () {});
     });

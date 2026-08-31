@@ -1,0 +1,236 @@
+Streaming transaction logs mentioning DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY. Confirmed commitment
+Transaction executed in slot 37:
+  Signature: QUTvgvHHhTVykUU6AcLCZVz5xYcFmipsEgcu132HHKMRFW44BhWurFmVoUXMrChtyjYyvibmxmpxZYurSpwjZRC
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: InitPool
+    Program 11111111111111111111111111111111 invoke [2]
+    Program 11111111111111111111111111111111 success
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 9832 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 38:
+  Signature: QUTvgvHHhTVykUU6AcLCZVz5xYcFmipsEgcu132HHKMRFW44BhWurFmVoUXMrChtyjYyvibmxmpxZYurSpwjZRC
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: InitPool
+    Program 11111111111111111111111111111111 invoke [2]
+    Program 11111111111111111111111111111111 success
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 9832 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 38:
+  Signature: b9JeQAsdEcnvP4EYpR4NppRQoBKx5ZxCepK5R8WqkU8X1BbJuYAPrXoW3GtTNTqQQyDW37Se3UhekLVnkNAetEo
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Stake
+    Program 11111111111111111111111111111111 invoke [2]
+    Program 11111111111111111111111111111111 success
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 131 of 186944 compute units
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+    Program data: C5ItzeY61fCD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZ+vETT2Pxn1R2UWTSDchXR/yO4YTd0jo9cDLJfqeL+gyAOH1BQAAAAAA4fUFAAAAAA==
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 14974 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 39:
+  Signature: b9JeQAsdEcnvP4EYpR4NppRQoBKx5ZxCepK5R8WqkU8X1BbJuYAPrXoW3GtTNTqQQyDW37Se3UhekLVnkNAetEo
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Stake
+    Program 11111111111111111111111111111111 invoke [2]
+    Program 11111111111111111111111111111111 success
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 131 of 186944 compute units
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+    Program data: C5ItzeY61fCD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZ+vETT2Pxn1R2UWTSDchXR/yO4YTd0jo9cDLJfqeL+gyAOH1BQAAAAAA4fUFAAAAAA==
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 14974 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 40:
+  Signature: HSELuE3s2jRiXFHW3bxsc1iFWyTDtXgAozjHAGEcihNdiPjpKgunkbM2MJDy5dbaZtT4ZXUkJAatdzPxhy3UYDT
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Sync
+    Program data: cvSjYWNQpEaD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZyChBwAAAAAA
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 2623 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 41:
+  Signature: HSELuE3s2jRiXFHW3bxsc1iFWyTDtXgAozjHAGEcihNdiPjpKgunkbM2MJDy5dbaZtT4ZXUkJAatdzPxhy3UYDT
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Sync
+    Program data: cvSjYWNQpEaD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZyChBwAAAAAA
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 2623 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 42:
+  Signature: 4UezFMULyDXjNXPtTi9SYBZAujPDUHaFaYwD6StcXB6o1UbPNZsrsaWnf8GqUWiVd2jFxH5yKxBcgrph6xPna6wc
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Claim
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 105 of 191716 compute units
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+    Program data: 2cB7SGyW+CGD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZ+vETT2Pxn1R2UWTSDchXR/yO4YTd0jo9cDLJfqeL+gyIKEHAAAAAAA=
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 9926 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 43:
+  Signature: 4UezFMULyDXjNXPtTi9SYBZAujPDUHaFaYwD6StcXB6o1UbPNZsrsaWnf8GqUWiVd2jFxH5yKxBcgrph6xPna6wc
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Claim
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 105 of 191716 compute units
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+    Program data: 2cB7SGyW+CGD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZ+vETT2Pxn1R2UWTSDchXR/yO4YTd0jo9cDLJfqeL+gyIKEHAAAAAAA=
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 9926 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 43:
+  Signature: 4UspvGFKrwddAxUhHubpjx6ggXiB41ebUDbvnjjPkSuCymMNdvAYm6zydZMHWRFAeUPRJ1pYc7x8RX8qjitUbXxu
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Stake
+    Program 11111111111111111111111111111111 invoke [2]
+    Program 11111111111111111111111111111111 success
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 131 of 188444 compute units
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+    Program data: C5ItzeY61fCD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZyxjjUEgkh8MRDV8eXeJ+7qmEe+Hri0epy40JiLlORAHAMLrCwAAAAAAwusLAAAAAA==
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 13473 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 44:
+  Signature: 4UspvGFKrwddAxUhHubpjx6ggXiB41ebUDbvnjjPkSuCymMNdvAYm6zydZMHWRFAeUPRJ1pYc7x8RX8qjitUbXxu
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Stake
+    Program 11111111111111111111111111111111 invoke [2]
+    Program 11111111111111111111111111111111 success
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 131 of 188444 compute units
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+    Program data: C5ItzeY61fCD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZyxjjUEgkh8MRDV8eXeJ+7qmEe+Hri0epy40JiLlORAHAMLrCwAAAAAAwusLAAAAAA==
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 13473 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 45:
+  Signature: 28bsFKEpWxrP8RpbvtqtXEPi23ZRfAQa63Pm2THwXdK2pFYfgyHVhRZJ2mxATF8Qnx2H31HMHQd7cqPWuEFnugW3
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Sync
+    Program data: cvSjYWNQpEaD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZ6C7DQAAAAAA
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 2623 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 46:
+  Signature: 28bsFKEpWxrP8RpbvtqtXEPi23ZRfAQa63Pm2THwXdK2pFYfgyHVhRZJ2mxATF8Qnx2H31HMHQd7cqPWuEFnugW3
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Sync
+    Program data: cvSjYWNQpEaD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZ6C7DQAAAAAA
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 2623 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 48:
+  Signature: 5iL5qsYrV2LYChkE8mc7V1wGemdwYH7htW9jgJD2EoQb89Jo2bikmAwi2hBZ63dxXypbNN6kZFzXNUzgWVc4UEnu
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Claim
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 105 of 191716 compute units
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+    Program data: 2cB7SGyW+CGD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZ+vETT2Pxn1R2UWTSDchXR/yO4YTd0jo9cDLJfqeL+gy4JMEAAAAAAA=
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 9926 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 49:
+  Signature: 5iL5qsYrV2LYChkE8mc7V1wGemdwYH7htW9jgJD2EoQb89Jo2bikmAwi2hBZ63dxXypbNN6kZFzXNUzgWVc4UEnu
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Claim
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 105 of 191716 compute units
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+    Program data: 2cB7SGyW+CGD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZ+vETT2Pxn1R2UWTSDchXR/yO4YTd0jo9cDLJfqeL+gy4JMEAAAAAAA=
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 9926 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 49:
+  Signature: vn8NC7B8BTAJrNNAD1WioXMHAqwf4xPiWNFFwoL6EHKLN8tgRbrnBNQfj9Hn2xt6X7mw17JyS2MXg2vNywsQpR1
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Claim
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 105 of 191716 compute units
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+    Program data: 2cB7SGyW+CGD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZyxjjUEgkh8MRDV8eXeJ+7qmEe+Hri0epy40JiLlORAHwCcJAAAAAAA=
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 9926 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 50:
+  Signature: vn8NC7B8BTAJrNNAD1WioXMHAqwf4xPiWNFFwoL6EHKLN8tgRbrnBNQfj9Hn2xt6X7mw17JyS2MXg2vNywsQpR1
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Claim
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 105 of 191716 compute units
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+    Program data: 2cB7SGyW+CGD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZyxjjUEgkh8MRDV8eXeJ+7qmEe+Hri0epy40JiLlORAHwCcJAAAAAAA=
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 9926 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 52:
+  Signature: 2LKnibq2fLfA3bUw55nXwHWb4KJB4P2p2XRGoM7Ay3MV7nZJYACcanJyqtWwK3UK89aSXGJ15hhgnT3F5UZ8MwKG
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Sync
+    Program data: cvSjYWNQpEaD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZ+CTBAAAAAAA
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 2623 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 53:
+  Signature: 2LKnibq2fLfA3bUw55nXwHWb4KJB4P2p2XRGoM7Ay3MV7nZJYACcanJyqtWwK3UK89aSXGJ15hhgnT3F5UZ8MwKG
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Sync
+    Program data: cvSjYWNQpEaD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZ+CTBAAAAAAA
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 2623 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 54:
+  Signature: 4iHGi2VmM7R2AXuS7CRmj3VgrXCnwh76SPzdxuoQSSHcFmTuHSGGa5JkePXQygvZPA3NxCr9pdKoyJJiYqQuFYw
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Claim
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 105 of 191716 compute units
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+    Program data: 2cB7SGyW+CGD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZ+vETT2Pxn1R2UWTSDchXR/yO4YTd0jo9cDLJfqeL+gyoIYBAAAAAAA=
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 9926 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 55:
+  Signature: 4iHGi2VmM7R2AXuS7CRmj3VgrXCnwh76SPzdxuoQSSHcFmTuHSGGa5JkePXQygvZPA3NxCr9pdKoyJJiYqQuFYw
+  Status: Ok
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Claim
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 105 of 191716 compute units
+    Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+    Program data: 2cB7SGyW+CGD8SxRqaZcB2d0mNxIYDGTYqIvRW2fc5MQPHcR/sGYZ+vETT2Pxn1R2UWTSDchXR/yO4YTd0jo9cDLJfqeL+gyoIYBAAAAAAA=
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 9926 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY success
+Transaction executed in slot 55:
+  Signature: 3vEqiMFLHgw1S3qymDbmkTziaBKHkxLgggmMSRpkYo84PRfbWyK2Fhat6q1cQrquw6SYrtxz5mfnq2kZKpodd5K4
+  Status: Error processing Instruction 0: custom program error: 0x1770
+  Log Messages:
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY invoke [1]
+    Program log: Instruction: Stake
+    Program log: AnchorError thrown in programs/waves-staking/src/lib.rs:85. Error Code: ZeroAmount. Error Number: 6000. Error Message: amount must be greater than zero.
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY consumed 8359 of 200000 compute units
+    Program DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY failed: custom program error: 0x1770

@@ -50,6 +50,22 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
 .seg button:hover{color:var(--ink)}
 .seg button.on{background:var(--panel2);color:var(--ink)}
 .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+/* search — same pill rail as .seg so the heights can't drift apart. Stays an
+   icon until you need it, so it costs no room on a page about browsing. */
+.srch{display:flex;align-items:center;gap:2px;padding:4px;border-radius:999px;
+  background:var(--panel);border:1px solid var(--line);transition:border-color .18s}
+.srch:focus-within{border-color:var(--faint)}
+.srch button{width:34px;height:34px;flex:none;display:grid;place-items:center;
+  padding:0;border:0;border-radius:999px;background:transparent;color:var(--dim);
+  cursor:pointer;transition:color .18s}
+.srch button:hover,.srch.open button{color:var(--ink)}
+.srch svg{width:16px;height:16px;display:block}
+.srch input{width:0;min-width:0;padding:0;border:0;background:transparent;
+  color:var(--ink);font:500 13px Inter,sans-serif;outline:0;
+  transition:width .22s ease,padding .22s ease}
+.srch.open input{width:172px;padding:0 10px 0 2px}
+.srch input::placeholder{color:var(--faint)}
+@media (prefers-reduced-motion:reduce){.srch input{transition:none}}
 .filters{display:flex;gap:8px;flex-wrap:wrap}
 .chip{padding:8px 16px;border:1px solid var(--line2);background:transparent;
   color:var(--dim);font:600 12.5px Inter;cursor:pointer;border-radius:999px;
@@ -120,6 +136,14 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
       graduation.</p>
     </div>
     <div class="controls">
+      <div class="srch" id="srch">
+        <button type="button" id="srch-btn" aria-label="Search tokens" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+        </button>
+        <input id="srch-in" type="text" placeholder="Name, ticker or address"
+          autocomplete="off" spellcheck="false" aria-label="Search tokens">
+      </div>
       <div class="seg" id="sort">
         <button data-s="progress" class="on">Closest to graduating</button>
         <button data-s="raised">Raised</button>
@@ -170,6 +194,7 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   var state = [];                                  // {rec, mkt|null}
   var filter = "all";
   var sort = "progress";
+  var query = "";
 
   fetch("/api/tokens").then(function (r) { return r.json(); })
     .then(function (j) { return (j.tokens || []); })
@@ -203,6 +228,11 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   }
 
   function visible(row) {
+    if (query) {
+      var hay = ((row.rec.name || "") + " " + (row.rec.symbol || "") + " " +
+                 (row.rec.mint || "")).toLowerCase();
+      if (hay.indexOf(query) < 0) return false;
+    }
     if (filter === "all") return true;
     if (!row.mkt) return filter === "curve";       // unknown counts as on-curve
     return filter === "grad" ? row.mkt.migrated : !row.mkt.migrated;
@@ -268,9 +298,38 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
         "</span></a>";
     }).join("");
     if (!$("grid").innerHTML) {
-      $("grid").innerHTML = '<p class="note" style="grid-column:1/-1">Nothing matches that filter.</p>';
+      $("grid").innerHTML = '<p class="note" style="grid-column:1/-1">' +
+        (query ? "No token matches “" + esc(query) + "”."
+               : "Nothing matches that filter.") + "</p>";
     }
   }
+
+  /* Search. The shell has a global search box too, so both write through the
+   * same setter — otherwise the two could disagree about what is filtered. */
+  var srch = $("srch"), srchIn = $("srch-in"), srchBtn = $("srch-btn");
+  function open(on) {
+    srch.classList.toggle("open", on);
+    srchBtn.setAttribute("aria-expanded", on ? "true" : "false");
+  }
+  function setQuery(q, echo) {
+    query = (q || "").trim().toLowerCase();
+    if (echo) { srchIn.value = q || ""; if (query) open(true); }
+    draw();
+  }
+  srchBtn.addEventListener("click", function () {
+    if (srch.classList.contains("open")) {
+      open(false);
+      if (query) setQuery("", true);
+    } else { open(true); srchIn.focus(); }
+  });
+  srchIn.addEventListener("input", function () { setQuery(srchIn.value); });
+  srchIn.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    setQuery("", true); open(false); srchIn.blur();
+  });
+  // collapse on the way out, but only if it is empty — otherwise the filter
+  // would still be applied with nothing on screen explaining why
+  srchIn.addEventListener("blur", function () { if (!query) open(false); });
 
   function segClick(id, apply) {
     $(id).addEventListener("click", function (e) {
@@ -290,10 +349,7 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   });
 
   document.addEventListener("shell:search", function (e) {
-    var q = (e.detail.query || "").trim().toLowerCase();
-    document.querySelectorAll("[data-name]").forEach(function (c) {
-      c.style.display = !q || (c.dataset.name || "").toLowerCase().indexOf(q) >= 0 ? "" : "none";
-    });
+    setQuery(e.detail.query || "", true);
   });
 })();
 </script>
