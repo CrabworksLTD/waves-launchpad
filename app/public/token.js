@@ -113,6 +113,40 @@
     return r ? r.decimals : 6;
   }
 
+  var WSOL = "So11111111111111111111111111111111111111112";
+  var USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+  /* Find a token's pool WITHOUT getProgramAccounts. Public RPCs refuse
+   * indexed scans ("Indexed requests require a personal token"), but a DBC
+   * pool address is a PDA of (quoteMint, baseMint, config) and we know every
+   * config this deployment has — so derive the candidates and read them with
+   * a plain getMultipleAccountsInfo. Falls back to the indexed scan only when
+   * the cluster has no configs in brand.js (localnet smoke pools). Returns
+   * the same {publicKey, account} shape getPoolByBaseMint gives. */
+  async function poolByMint(cli, X, M, conn, baseMint) {
+    var m = clusterConfigs();
+    var cands = [];
+    if (m.sol) cands.push({ q: WSOL, c: m.sol });
+    if (m.usdc) cands.push({ q: USDC, c: m.usdc });
+    Object.keys(m.rwa || {}).forEach(function (mint) {
+      cands.push({ q: mint, c: m.rwa[mint].config });
+    });
+    if (cands.length) {
+      var addrs = cands.map(function (x) {
+        return M.deriveDbcPoolAddress(
+          new X.PublicKey(x.q), new X.PublicKey(baseMint), new X.PublicKey(x.c));
+      });
+      var infos = await conn.getMultipleAccountsInfo(addrs);
+      for (var i = 0; i < infos.length; i++) {
+        if (!infos[i]) continue;
+        var acct = await cli.state.getPool(addrs[i]);
+        return { publicKey: addrs[i], account: acct };
+      }
+      return null;
+    }
+    return cli.state.getPoolByBaseMint(new X.PublicKey(baseMint));
+  }
+
   // RWA quote currencies this deployment can launch in: only mints whose
   // config the platform wallet has actually signed
   function rwaQuotes() {
@@ -255,7 +289,7 @@
     var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
     var cli = new M.DynamicBondingCurveClient(conn, "confirmed");
 
-    var pool = await cli.state.getPoolByBaseMint(new X.PublicKey(baseMint));
+    var pool = await poolByMint(cli, X, M, conn, baseMint);
     if (!pool) return null;
     var progress = await cli.state.getPoolQuoteTokenCurveProgress(pool.publicKey)
       .catch(function () { return null; });
@@ -278,7 +312,7 @@
    * us ever holding creator funds. */
   async function claimCreatorFeesTo(baseMint, receiver) {
     var c = await client();
-    var pool = await c.cli.state.getPoolByBaseMint(new c.X.PublicKey(baseMint));
+    var pool = await poolByMint(c.cli, c.X, c.M, c.conn, baseMint);
     if (!pool) throw new Error("No pool for that mint");
 
     // u64 max as BN: "claim everything". The SDK types these as BN, not
@@ -302,7 +336,7 @@
     var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
     var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
     var cli = new M.DynamicBondingCurveClient(conn, "confirmed");
-    var pool = await cli.state.getPoolByBaseMint(new X.PublicKey(baseMint));
+    var pool = await poolByMint(cli, X, M, conn, baseMint);
     if (!pool) throw new Error("No pool for that mint on " + cluster);
     // the decoded state nests one level down as .poolState — but swapQuote
     // wants the WRAPPED object (it reads virtualPool.poolState.* itself)
@@ -387,7 +421,7 @@
    * the user was shown the number their slippage floor protects. */
   async function swap(baseMint, direction, amountInRaw, minOutRaw) {
     var c = await client();                        // wallet-connected web3 ctx
-    var pool = await c.cli.state.getPoolByBaseMint(new c.X.PublicKey(baseMint));
+    var pool = await poolByMint(c.cli, c.X, c.M, c.conn, baseMint);
     if (!pool) throw new Error("No pool for that mint");
     var tx = await c.cli.pool.swap({
       owner: c.owner,
