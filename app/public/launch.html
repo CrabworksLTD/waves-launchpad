@@ -72,10 +72,19 @@ svg .df{stroke:var(--accent);stroke-dasharray:3 4}
   <div id="choose" hidden>
     <p class="eyebrow">Launch</p>
     <h1 class="disp">What goes on chain today?</h1>
-    <p class="lede">Three ways in — a collection drawn or uploaded, a bonding-curve
-    token, or both launched together, with the trading fees <em>optionally</em>
+    <p class="lede">Three ways in — a bonding-curve token, a collection drawn or
+    uploaded, or both launched together, with the trading fees <em>optionally</em>
     wired to your holders who stake.</p>
     <div class="threeup">
+      <a class="opt" href="#" id="opt-token">
+        <span class="ic"><svg width="30" height="30" viewBox="0 0 24 24">
+          <path class="ac" d="M3 20 Q 12 19 16 12 T 21 4"/>
+          <circle fill="var(--accent)" cx="21" cy="4" r="2.2"/></svg></span>
+        <h2>Token</h2>
+        <p>A bonding-curve token priced in SOL, USDC or gold. No liquidity to
+        manage — the curve is the market, graduation locks the LP.</p>
+        <span class="cta">Launch a token →</span>
+      </a>
       <a class="opt" href="/launch?mode=collection">
         <span class="ic"><svg width="30" height="30" viewBox="0 0 24 24">
           <rect class="ac" x="3" y="3" width="8" height="8"/>
@@ -86,15 +95,6 @@ svg .df{stroke:var(--accent);stroke-dasharray:3 4}
         <p>Draw the traits here or bring finished art. Metaplex Core, allowlist
         waves, team splits, a mint page the moment it's live.</p>
         <span class="cta">Launch a collection →</span>
-      </a>
-      <a class="opt" href="#" id="opt-token">
-        <span class="ic"><svg width="30" height="30" viewBox="0 0 24 24">
-          <path class="ac" d="M3 20 Q 12 19 16 12 T 21 4"/>
-          <circle fill="var(--accent)" cx="21" cy="4" r="2.2"/></svg></span>
-        <h2>Token</h2>
-        <p>A bonding-curve token priced in SOL, USDC or gold. No liquidity to
-        manage — the curve is the market, graduation locks the LP.</p>
-        <span class="cta">Launch a token →</span>
       </a>
       <a class="opt" href="/launch?mode=pair">
         <span class="ic"><svg width="30" height="30" viewBox="0 0 24 24">

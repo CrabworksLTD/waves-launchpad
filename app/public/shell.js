@@ -29,8 +29,8 @@
     // page. On /app the items open the panel directly; elsewhere they carry
     // the mode in the query and the panel opens itself on arrival.
     { id: "launch", label: "Launch", menu: [
-      { label: "Collection", mode: "collection" },
       { label: "Token",      mode: "token" },
+      { label: "Collection", mode: "collection" },
       { label: "Pair",       mode: "pair" }
     ]},
     { id: "explore", label: "Explore", menu: [
