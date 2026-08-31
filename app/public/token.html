@@ -155,7 +155,7 @@ input:focus{outline:none;border-color:var(--accent)}
   var MINT = (location.pathname.match(/\/token\/([1-9A-HJ-NP-Za-km-z]{32,44})/) || [])[1]
           || qs.get("mint") || "";
   var $ = function (id) { return document.getElementById(id); };
-  var side = "buy", market = null, lastQuote = null, quoteSeq = 0;
+  var side = "buy", market = null, lastQuote = null, quoteSeq = 0, poolHint = null;
 
   function say(k, h) { var m = $("msg"); m.className = "msg " + k; m.innerHTML = h; }
 
@@ -177,6 +177,7 @@ input:focus{outline:none;border-color:var(--accent)}
     fetch("/api/tokens").then(function (r) { return r.json(); }).then(function (j) {
       var rec = (j.tokens || []).find(function (t) { return t.mint === MINT; });
       if (rec) {
+        poolHint = rec.pool || null;
         $("name").firstChild.textContent = rec.name;
         $("sym").textContent = "$" + rec.symbol;
         if (rec.icon) $("logo").innerHTML = '<img alt="" src="' + esc(rec.icon) + '">';
@@ -188,7 +189,7 @@ input:focus{outline:none;border-color:var(--accent)}
     }).catch(function () {});
 
     try {
-      market = await window.Token.readMarket(MINT);
+      market = await window.Token.readMarket(MINT, poolHint);
     } catch (e) {
       $("name").firstChild.textContent = "Not found";
       say("err", esc(String(e.message)));
@@ -294,7 +295,7 @@ input:focus{outline:none;border-color:var(--accent)}
       if (!(amt > 0)) { $("est").textContent = "—"; lastQuote = null; paintGo(); return; }
       var seq = ++quoteSeq;
       try {
-        var q = await window.Token.getQuote(MINT, amt, side);
+        var q = await window.Token.getQuote(MINT, amt, side, poolHint);
         if (seq !== quoteSeq) return;              // a newer quote superseded this one
         lastQuote = q;
         $("est").textContent = UI.fmt(q.out, side === "buy" ? 0 : 4) +
@@ -328,7 +329,7 @@ input:focus{outline:none;border-color:var(--accent)}
     go.disabled = true; go.textContent = "Confirm in your wallet…";
     say("", "");
     try {
-      var sig = await window.Token.swap(MINT, side, lastQuote.amountIn, lastQuote.minOut);
+      var sig = await window.Token.swap(MINT, side, lastQuote.amountIn, lastQuote.minOut, poolHint);
       say("ok", (side === "buy" ? "Bought." : "Sold.") +
         ' <a href="https://explorer.solana.com/tx/' + esc(sig) + '" target="_blank" rel="noopener">View tx ↗</a>');
       load();                                      // refresh price, curve, bar

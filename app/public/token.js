@@ -125,7 +125,14 @@
    * a plain getMultipleAccountsInfo. Falls back to the indexed scan only when
    * the cluster has no configs in brand.js (localnet smoke pools). Returns
    * the same {publicKey, account} shape getPoolByBaseMint gives. */
-  async function poolByMint(cli, X, M, conn, baseMint) {
+  async function poolByMint(cli, X, M, conn, baseMint, hint) {
+    if (hint) {
+      try {
+        var hp = new X.PublicKey(hint);
+        var ha = await cli.state.getPool(hp);
+        if (ha) return { publicKey: hp, account: ha };
+      } catch (e) { /* fall through to derivation */ }
+    }
     var m = clusterConfigs();
     var cands = [];
     [m, m.tax || {}].forEach(function (fam) {
@@ -227,37 +234,92 @@
     var progress = opts.onProgress || function () {};
 
     var baseMint = c.X.Keypair.generate();
-    progress({ step: "pool", state: "signing" });
+    var configPk, sig;
 
-    var args = {
-      config: new c.X.PublicKey(configKey(opts.quote, opts.tier)),
-      baseMint: baseMint.publicKey,
-      name: opts.name,
-      symbol: opts.symbol,
-      uri: opts.uri,
-      payer: c.owner,
-      poolCreator: c.owner
-    };
+    if (opts.customFeeBps && opts.customFeeBps !== 100) {
+      /* Creator-chosen fee: a per-launch config. The program stores the
+       * platform wallet as feeClaimer WITHOUT its signature — only the
+       * launcher and the ephemeral config key sign. Split policy for custom
+       * fees: creator% 50 (40% of the total fee each way, 20% Meteora). */
+      if (opts.quote !== "sol" && opts.quote !== "usdc") {
+        // an RWA custom-fee curve needs a live price to set its market caps;
+        // until that's built, RWA quotes launch on the standard tier
+        throw new Error("Custom fees are SOL/USDC only for now — " +
+          "RWA-quoted launches use the standard 1% tier.");
+      }
+      var terms = window.DBC_TERMS;
+      if (!terms) throw new Error("dbc-terms.js is not loaded");
+      var feeOwner = new c.X.PublicKey(window.BRAND.feeOwner);
+      var cfgKp = c.X.Keypair.generate();
+      var quoteMint = opts.quote === "sol" ? "So11111111111111111111111111111111111111112" : USDC;
+      var curve = c.M.buildCurveWithMarketCap(terms.buildParams(c.M, opts.quote,
+        { baseFeeBps: opts.customFeeBps, creatorTradingFeePercentage: 50 }));
 
-    var built;
-    if (opts.firstBuySol > 0) {
-      built = await c.cli.creator.createPoolWithFirstBuy({
-        createPoolParam: args,
+      progress({ step: "pool", state: "signing" });
+      var pair = await c.cli.partner.createConfigAndPoolWithFirstBuy(Object.assign({
+        config: cfgKp.publicKey,
+        feeClaimer: feeOwner,
+        leftoverReceiver: feeOwner,
+        payer: c.owner,
+        quoteMint: new c.X.PublicKey(quoteMint),
+        preCreatePoolParam: {
+          baseMint: baseMint.publicKey,
+          name: opts.name,
+          symbol: opts.symbol,
+          uri: opts.uri,
+          poolCreator: c.owner
+        }
+      }, curve, opts.firstBuySol > 0 ? {
         firstBuyParam: {
           buyer: c.owner,
-          // decimals follow the QUOTE currency — 9 here once spent 1000x on
-          // a USDC first buy (10^9 raw units = 1,000 USDC, not 1)
           buyAmount: c.M.convertToLamports(opts.firstBuySol, quoteDecimals(opts.quote)),
-          minimumAmountOut: 1,        // creator buying their own launch, slippage is theirs
+          minimumAmountOut: new c.M.BN(1),
           referralTokenAccount: null
         }
-      });
+      } : {}));
+      await send(c, { transaction: pair.createConfigTx, signers: [cfgKp] });
+      sig = await send(c, { transaction: pair.createPoolWithFirstBuyTx, signers: [baseMint] });
+      configPk = cfgKp.publicKey;
     } else {
-      built = await c.cli.creator.createPool(args);
+      configPk = new c.X.PublicKey(configKey(opts.quote, opts.tier));
+      progress({ step: "pool", state: "signing" });
+
+      var args = {
+        config: configPk,
+        baseMint: baseMint.publicKey,
+        name: opts.name,
+        symbol: opts.symbol,
+        uri: opts.uri,
+        payer: c.owner,
+        poolCreator: c.owner
+      };
+
+      var built;
+      if (opts.firstBuySol > 0) {
+        built = await c.cli.creator.createPoolWithFirstBuy({
+          createPoolParam: args,
+          firstBuyParam: {
+            buyer: c.owner,
+            // decimals follow the QUOTE currency — 9 here once spent 1000x on
+            // a USDC first buy (10^9 raw units = 1,000 USDC, not 1)
+            buyAmount: c.M.convertToLamports(opts.firstBuySol, quoteDecimals(opts.quote)),
+            minimumAmountOut: 1,      // creator buying their own launch, slippage is theirs
+            referralTokenAccount: null
+          }
+        });
+      } else {
+        built = await c.cli.creator.createPool(args);
+      }
+      var tx = built.createPoolTx || built.transaction || built;
+      sig = await send(c, { transaction: tx, signers: [baseMint] });
     }
 
-    var tx = built.createPoolTx || built.transaction || built;
-    var sig = await send(c, { transaction: tx, signers: [baseMint] });
+    // the pool address is deterministic — record it so lookups never need an
+    // indexed scan even for per-launch configs
+    var qm2 = opts.quote === "sol" ? "So11111111111111111111111111111111111111112"
+      : opts.quote === "usdc" ? USDC : opts.quote;
+    var poolPk = c.M.deriveDbcPoolAddress(
+      new c.X.PublicKey(qm2), baseMint.publicKey, configPk);
     progress({ step: "pool", state: "done", mint: String(baseMint.publicKey) });
 
     // Record for the homepage token listing — fire-and-forget, same contract
@@ -272,6 +334,8 @@
         banner: opts.banner || null,
         collection: opts.collection || null,
         creator: String(c.owner),
+        pool: String(poolPk),
+        config: String(configPk),
         quote: opts.quote || "sol",
         feeWallet: opts.feeWallet || null,
         cluster: window.Launch ? window.Launch.cluster() : "mainnet-beta"
@@ -335,12 +399,12 @@
 
   /* ---- trading, for the /token page ---- */
 
-  async function readCtx(baseMint) {
+  async function readCtx(baseMint, poolHint) {
     var M = await dbc(), X = await mx();
     var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
     var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
     var cli = new M.DynamicBondingCurveClient(conn, "confirmed");
-    var pool = await poolByMint(cli, X, M, conn, baseMint);
+    var pool = await poolByMint(cli, X, M, conn, baseMint, poolHint);
     if (!pool) throw new Error("No pool for that mint on " + cluster);
     // the decoded state nests one level down as .poolState — but swapQuote
     // wants the WRAPPED object (it reads virtualPool.poolState.* itself)
@@ -361,8 +425,8 @@
   /* Everything the trading page shows, in one read. Price is quoted from the
    * live curve by pricing a tiny buy — the same maths a real swap uses, so the
    * number cannot drift from what a buyer would actually pay. */
-  async function readMarket(baseMint) {
-    var c = await readCtx(baseMint);
+  async function readMarket(baseMint, poolHint) {
+    var c = await readCtx(baseMint, poolHint);
     var acct = c.acct;
     var quoteDec = c.quoteDec;
     var threshold = Number(c.cfg.migrationQuoteThreshold) / Math.pow(10, quoteDec);
@@ -396,8 +460,8 @@
   }
 
   /* A live quote for the trade box. direction "buy" = quote in, base out. */
-  async function getQuote(baseMint, amount, direction) {
-    var c = await readCtx(baseMint);
+  async function getQuote(baseMint, amount, direction, poolHint) {
+    var c = await readCtx(baseMint, poolHint);
     var quoteDec = c.quoteDec;
     var dec = direction === "buy" ? quoteDec : 6;
     var amountIn = new c.M.BN(Math.round(amount * Math.pow(10, dec)));
@@ -423,9 +487,9 @@
 
   /* Execute the trade with the connected wallet. minOut comes from getQuote so
    * the user was shown the number their slippage floor protects. */
-  async function swap(baseMint, direction, amountInRaw, minOutRaw) {
+  async function swap(baseMint, direction, amountInRaw, minOutRaw, poolHint) {
     var c = await client();                        // wallet-connected web3 ctx
-    var pool = await poolByMint(c.cli, c.X, c.M, c.conn, baseMint);
+    var pool = await poolByMint(c.cli, c.X, c.M, c.conn, baseMint, poolHint);
     if (!pool) throw new Error("No pool for that mint");
     var tx = await c.cli.pool.swap({
       owner: c.owner,

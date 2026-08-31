@@ -70,7 +70,8 @@
    * `quote` is "sol"/"usdc" or a QUOTES-shaped object from rwaQuote(). */
   function buildParams(sdk, quote, tier) {
     var Q = typeof quote === "string" ? QUOTES[quote] : quote;
-    var T2 = TIERS[tier || "standard"] || TIERS.standard;
+    var T2 = (tier && typeof tier === "object") ? tier
+      : TIERS[tier || "standard"] || TIERS.standard;
     return {
       initialMarketCap: Q.initialMarketCap,
       migrationMarketCap: Q.migrationMarketCap,

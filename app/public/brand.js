@@ -26,6 +26,11 @@
     // before pretending otherwise. Password is with Kyle.
     gate: "53d3ecce08c0327fbcce4ee44ffcb3e8f0f02e2c486f840dc561427377c6bc5e",
 
+    // The wallet that owns the platform's fee share. Creator-chosen-fee
+    // launches create their own config naming this as feeClaimer — the
+    // program does not require its signature, only its address.
+    feeOwner: "BU9dYi7fGw5G3Wd54CUTmt1Y58jEJaPq8LKiL72ydeKJ",
+
     // DBC partner configs, one per cluster per quote currency. Created once
     // each by tools/create-dbc-config.js; a missing entry disables that
     // currency in the token launch window rather than hiding the field.

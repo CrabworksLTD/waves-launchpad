@@ -279,16 +279,11 @@
       <div class="zone r">
         <div class="shl-dd r" id="shl-nmenu">
           <button class="shl-net" aria-haspopup="true" aria-expanded="false">
-            ${raw('<svg viewBox="0 0 24 24" aria-hidden="true">' +
-              '<defs><linearGradient id="shl-ng" x1="0" y1="1" x2="1" y2="0">' +
-              '<stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>' +
-              '</linearGradient></defs>' +
-              '<path fill="url(#shl-ng)" d="M7.2 4h13.6l-4 4.9H3.2Zm0 13.5h13.6l-4 4.9H3.2Zm9.6-6.8H3.2l4-4.9h13.6z"/></svg>')}
+            <img src="/art/solana.svg" width="15" height="15" alt="">
             <span>Solana</span> <i>▾</i>
           </button>
           <div class="menu">
-            <a href="#" data-net="solana">${raw('<svg width="13" height="13" viewBox="0 0 24 24">' +
-              '<path fill="url(#shl-ng)" d="M7.2 4h13.6l-4 4.9H3.2Zm0 13.5h13.6l-4 4.9H3.2Zm9.6-6.8H3.2l4-4.9h13.6z"/></svg>')}
+            <a href="#" data-net="solana"><img src="/art/solana.svg" width="13" height="13" alt="">
               Solana</a>
             <a href="#" data-net="robinhood">${raw('<svg width="13" height="13" viewBox="0 0 24 24">' +
               '<path fill="#00C805" d="M12 2 3 7v10l9 5 9-5V7Z" opacity=".85"/></svg>')}
@@ -550,7 +545,7 @@
   function ensureLaunchStack() {
     if (window.LaunchPanel) return Promise.resolve();
     if (stackP) return stackP;
-    stackP = ["/storage.js", "/launch.js", "/token.js", "/launchpanel.js"]
+    stackP = ["/dbc-terms.js", "/storage.js", "/launch.js", "/token.js", "/launchpanel.js"]
       .reduce(function (p, src) {
         return p.then(function () {
           return new Promise(function (res, rej) {
