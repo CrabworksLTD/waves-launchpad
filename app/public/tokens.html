@@ -220,11 +220,33 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
     $("count").hidden = false;
     $("grid").hidden = false;
     draw();
+
+    /* Headline figures for the whole grid in one request. Market cap in
+     * dollars is what a browser is actually comparing across cards — "0.00 SOL
+     * of 82" is the curve's internal bookkeeping, and it was the only number
+     * here. The graduation bar still comes off the live pool below. */
+    fetch("/api/stats?mints=" + records.map(function (r) { return r.mint; }).join(","))
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var byMint = j.stats || {};
+        state.forEach(function (row) { row.ix = byMint[row.rec.mint] || null; });
+        draw();
+      }).catch(function () {});
+
     state.forEach(function (row) {
       window.Token.readMarket(row.rec.mint).then(function (m) {
         row.mkt = m; draw();
       }).catch(function () {});
     });
+  }
+
+  // same convention as the token page: dollars, K/M/B, never scientific
+  function money(n) {
+    if (n == null || !isFinite(n)) return null;
+    if (n >= 1e9) return "$" + (n / 1e9).toFixed(2) + "B";
+    if (n >= 1e6) return "$" + (n / 1e6).toFixed(2) + "M";
+    if (n >= 1e3) return "$" + (n / 1e3).toFixed(1) + "K";
+    return "$" + n.toFixed(2);
   }
 
   function ago(ts) {
@@ -297,11 +319,17 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
         '<span class="body">' +
           "<b>" + esc(r.name || "Token") + "</b>" +
           '<span class="sym">$' + esc(sym) + "</span>" +
-          '<span class="big">' + (m
-            ? (m.migrated ? "Graduated"
-               : UI.fmt(m.raised, 2) + " " + esc(m.quote) +
-                 '<i>of ' + UI.fmt(m.threshold, 0) + "</i>")
-            : "—") + "</span>" +
+          /* Market cap when the indexer knows it, because that is the number
+           * people compare tokens by. Falls back to the curve's own raised /
+           * threshold until a launch has been indexed. */
+          '<span class="big">' + (function () {
+            var mc = row.ix && money(row.ix.mcapUsd);
+            if (m && m.migrated) return "Graduated";
+            if (mc) return mc + "<i>mcap</i>";
+            if (m) return UI.fmt(m.raised, 2) + " " + esc(m.quote) +
+                          '<i>of ' + UI.fmt(m.threshold, 0) + "</i>";
+            return "—";
+          })() + "</span>" +
           '<span class="bar"><i style="width:' + pct.toFixed(1) + '%"></i></span>' +
           '<span class="foot"><span>' + esc(shortAddr(r.mint)) + "</span>" +
           "<span>" + esc(ago(r.at)) + "</span></span>" +

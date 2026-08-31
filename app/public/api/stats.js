@@ -59,6 +59,36 @@ function bucket(trades, from, to, want) {
 }
 
 export default async function handler(req, res) {
+  /* Bulk mode: ?mints=a,b,c returns just the headline figures for each, so the
+   * explore page can price a whole grid in dollars with one request instead of
+   * one per card. No trades, no series — those are only wanted on a detail
+   * page, and shipping them for twenty tokens would be most of a megabyte. */
+  const many = (req.query && req.query.mints) || "";
+  if (many) {
+    const mints = many.split(",").map((s) => s.trim()).filter((s) => B58.test(s)).slice(0, 60);
+    if (!mints.length) return res.status(200).json({ stats: {} });
+    try {
+      const db = await kv();
+      if (!db) return res.status(200).json({ stats: {}, degraded: true });
+      const raws = await Promise.all(mints.map((m) => db.get("ix:" + m + ":stats")));
+      const out = {};
+      raws.forEach((v, i) => {
+        let s = v;
+        if (typeof s === "string") { try { s = JSON.parse(s); } catch { s = null; } }
+        if (!s) return;
+        out[mints[i]] = {
+          price: s.price, priceUsd: s.priceUsd, mcap: s.mcap, mcapUsd: s.mcapUsd,
+          quoteUsd: s.quoteUsd, vol24h: s.vol24h, holders: s.holders,
+          trades24h: s.trades24h, supply: s.supply
+        };
+      });
+      res.setHeader("Cache-Control", "public, s-maxage=30, stale-while-revalidate=300");
+      return res.status(200).json({ stats: out });
+    } catch (e) {
+      return res.status(200).json({ stats: {}, degraded: true });
+    }
+  }
+
   const mint = (req.query && req.query.mint) || "";
   if (!B58.test(mint)) return res.status(400).json({ error: "bad mint" });
   const tf = (req.query && req.query.tf) || "all";
