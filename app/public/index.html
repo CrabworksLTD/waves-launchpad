@@ -537,8 +537,9 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
     if (!items.length) {
       box.innerHTML = '<div class="spotnone">Nothing launched yet — ' +
         '<a href="/launch">be the first</a>.</div>';
-      drawRankedCollections(live ? collections.slice(0, 10) : null,
-                            live ? null : templates.slice(0, 10));
+      // no templates here either — this is the "nothing launched" path, and a
+      // leaderboard of bundled samples is exactly the padding we removed above
+      drawRankedCollections(live ? collections.slice(0, 10) : [], null);
       drawRankedTokens(tokens.slice(0, 10));
       return;
     }
