@@ -41,15 +41,15 @@ main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
 .socials a{padding:7px 14px;border:1px solid rgba(255,255,255,.22);border-radius:99px;
   font-size:12px;color:var(--dim);background:rgba(0,0,0,.4)}
 .socials a:hover{color:var(--ink);border-color:var(--faint)}
-.ca{display:flex;align-items:center;gap:10px;padding:9px 12px;
-  border:1px solid rgba(255,255,255,.22);border-radius:8px;background:rgba(0,0,0,.45);
-  max-width:620px}
-.ca .lb{flex:none;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
-.ca code{flex:1;font:500 12px ui-monospace,monospace;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
-.ca button{flex:none;font:600 11.5px Inter;padding:6px 12px;border-radius:6px;cursor:pointer;
-  background:var(--panel2);color:var(--ink);border:1px solid var(--line2)}
-.ca button.did{color:var(--accent);border-color:var(--accent)}
+/* the contract address: a line of text you can click, not a form field */
+.ca{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+  font:400 12.5px "IBM Plex Mono",monospace;color:var(--faint);
+  background:none;border:0;padding:0;transition:color .18s}
+.ca:hover{color:var(--dim)}
+.ca svg{width:13px;height:13px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.ca.did{color:var(--accent)}
+#ca-said{font-size:11px;letter-spacing:.08em;text-transform:uppercase}
 
 .grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}
 @media (max-width:900px){.grid{grid-template-columns:1fr}}
@@ -108,8 +108,12 @@ input:focus{outline:none;border-color:var(--accent)}
     <div class="who">
       <div class="logo" id="logo">?</div>
       <h1 id="name">Loading…<span class="sym" id="sym"></span></h1>
-      <div class="ca"><span class="lb">Token CA</span><code id="ca">—</code>
-        <button id="ca-copy">Copy</button></div>
+      <button class="ca" id="ca-copy" title="Copy the contract address">
+        <code id="ca">—</code>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/>
+        <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+        <span id="ca-said"></span>
+      </button>
       <div class="socials" id="socials"></div>
     </div>
   </div>
@@ -177,8 +181,13 @@ input:focus{outline:none;border-color:var(--accent)}
     $("ca").textContent = MINT;
     $("ca-copy").onclick = function () {
       navigator.clipboard.writeText(MINT).then(function () {
-        var b = $("ca-copy"); b.classList.add("did"); b.textContent = "Copied";
-        setTimeout(function () { b.classList.remove("did"); b.textContent = "Copy"; }, 1600);
+        var b = $("ca-copy");
+        b.classList.add("did");
+        $("ca-said").textContent = "copied";
+        setTimeout(function () {
+          b.classList.remove("did");
+          $("ca-said").textContent = "";
+        }, 1400);
       });
     };
     load();
