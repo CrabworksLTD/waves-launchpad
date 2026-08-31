@@ -304,7 +304,11 @@
             // decimals follow the QUOTE currency — 9 here once spent 1000x on
             // a USDC first buy (10^9 raw units = 1,000 USDC, not 1)
             buyAmount: c.M.convertToLamports(opts.firstBuySol, quoteDecimals(opts.quote)),
-            minimumAmountOut: 1,      // creator buying their own launch, slippage is theirs
+            // MUST be a BN — the SDK calls .toArrayLike on it, and a plain 1
+            // fails with "e.toArrayLike is not a function" only at pool
+            // creation, after the metadata upload has been paid for. The
+            // custom-fee path above already learned this.
+            minimumAmountOut: new c.M.BN(1),   // creator buying their own launch, slippage is theirs
             referralTokenAccount: null
           }
         });

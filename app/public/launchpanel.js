@@ -726,6 +726,12 @@
 
       if (flow && flow.pair) {
         flow.nft = { cfg: cfg, res: res, up: up };
+        /* Record it NOW, not after the token. The collection is on chain and
+         * paid for the moment this line runs; leaving it unrecorded until the
+         * second half succeeds meant a failed token launch made a real,
+         * deployed collection invisible to the site. The token records itself
+         * and links back when it lands. */
+        recordCollection(cfg, res, null, up);
         // configured and confirmed before any of this was signed
         if (flow.preconfig) { doTokenLaunch(flow); return; }
         tokenDetails(flow);
