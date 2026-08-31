@@ -1183,7 +1183,7 @@
         <div class="sharelbl"><span id="tk-sharetxt"></span></div>
       </div>
 
-      <div id="tk-rewardwrap" ${(flow.feeSharePct || 0) > 0 ? "" : raw("hidden")}>
+      <div id="tk-rewardwrap">
         <label>Holders are paid in</label>
         <button class="pick" id="lp-reward">
           <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
