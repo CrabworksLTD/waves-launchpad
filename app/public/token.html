@@ -17,24 +17,33 @@ body{background:var(--void);color:var(--ink);font:400 15px/1.6 Inter,sans-serif;
   -webkit-font-smoothing:antialiased}
 .mono{font-family:"IBM Plex Mono",monospace}
 a{color:inherit;text-decoration:none}
-main{max-width:1420px;margin:0 auto;padding:28px 24px 90px}
+main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
 
-/* header */
-.tbanner{display:none;margin:-28px -24px 22px;max-height:240px;overflow:hidden;
-  border-bottom:1px solid var(--line)}
-.tbanner img{width:100%;display:block;object-fit:cover}
-.head{display:flex;gap:16px;align-items:center;margin-bottom:10px}
-.logo{width:56px;height:56px;border-radius:12px;background:var(--raise);flex:none;
-  display:grid;place-items:center;font:800 22px Archivo;color:var(--dim);overflow:hidden}
-.logo img{width:100%;height:100%;object-fit:cover}
-.head h1{font-family:Archivo;font-size:24px;font-weight:800;margin:0;letter-spacing:-.015em}
-.head .sym{color:var(--faint);font-size:14px;margin-left:8px}
-.socials{margin-left:auto;display:flex;gap:8px}
-.socials a{padding:7px 13px;border:1px solid var(--line2);border-radius:99px;
-  font-size:12px;color:var(--dim)}
+/* ---- hero: the mint page's shape — banner behind, identity on it ---- */
+.hero{position:relative;border-bottom:1px solid var(--line);overflow:hidden}
+.hero .bg{position:absolute;inset:0;background:var(--panel);overflow:hidden}
+.hero .bg img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated;
+  display:block;filter:brightness(.55)}
+.hero .bg::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,rgba(0,0,0,.82) 0%,rgba(0,0,0,.45) 45%,rgba(0,0,0,.6) 100%)}
+.hero-in{position:relative;max-width:1420px;margin:0 auto;padding:44px 24px 40px}
+.who{display:flex;flex-direction:column;gap:16px;min-width:0;max-width:720px;align-items:flex-start}
+.logo{width:84px;height:84px;border-radius:12px;background:var(--raise);flex:none;
+  border:1px solid rgba(255,255,255,.22);display:grid;place-items:center;
+  font:800 26px Archivo;color:var(--faint);overflow:hidden}
+.logo img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated;display:block}
+.who h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
+  letter-spacing:-.02em;margin:0;background:var(--grad);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.who .sym{-webkit-text-fill-color:var(--faint);color:var(--faint);
+  font-size:16px;margin-left:10px;letter-spacing:0}
+.socials{display:flex;gap:8px;flex-wrap:wrap}
+.socials a{padding:7px 14px;border:1px solid rgba(255,255,255,.22);border-radius:99px;
+  font-size:12px;color:var(--dim);background:rgba(0,0,0,.4)}
 .socials a:hover{color:var(--ink);border-color:var(--faint)}
-.ca{display:flex;align-items:center;gap:10px;padding:8px 12px;margin:8px 0 24px;
-  border:1px solid var(--line);border-radius:8px;background:var(--bg);max-width:620px}
+.ca{display:flex;align-items:center;gap:10px;padding:9px 12px;
+  border:1px solid rgba(255,255,255,.22);border-radius:8px;background:rgba(0,0,0,.45);
+  max-width:620px}
 .ca .lb{flex:none;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
 .ca code{flex:1;font:500 12px ui-monospace,monospace;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
@@ -93,16 +102,20 @@ input:focus{outline:none;border-color:var(--accent)}
 </style>
 </head>
 <body>
-<main>
-  <div class="tbanner" id="tbanner"><img alt="" id="tbanner-img"></div>
-  <div class="head">
-    <div class="logo" id="logo">?</div>
-    <div><h1 id="name">Loading…<span class="sym" id="sym"></span></h1></div>
-    <div class="socials" id="socials"></div>
+<header class="hero">
+  <div class="bg"><img alt="" id="tbanner-img" hidden></div>
+  <div class="hero-in">
+    <div class="who">
+      <div class="logo" id="logo">?</div>
+      <h1 id="name">Loading…<span class="sym" id="sym"></span></h1>
+      <div class="ca"><span class="lb">Token CA</span><code id="ca">—</code>
+        <button id="ca-copy">Copy</button></div>
+      <div class="socials" id="socials"></div>
+    </div>
   </div>
-  <div class="ca"><span class="lb">Token CA</span><code id="ca">—</code>
-    <button id="ca-copy">Copy</button></div>
+</header>
 
+<main>
   <div class="grid">
     <div class="panel">
       <div class="stats">
@@ -191,7 +204,7 @@ input:focus{outline:none;border-color:var(--accent)}
         if (rec.icon) $("logo").innerHTML = '<img alt="" src="' + esc(rec.icon) + '">';
         if (rec.banner) {
           $("tbanner-img").src = rec.banner;
-          $("tbanner").style.display = "block";
+          $("tbanner-img").hidden = false;
         }
       }
     }).catch(function () {});
