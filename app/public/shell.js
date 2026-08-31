@@ -34,8 +34,8 @@
       { label: "Pair",       mode: "pair" }
     ]},
     { id: "explore", label: "Explore", menu: [
-      { label: "Collections", href: "/collections" },
-      { label: "Tokens",      href: "/tokens" }
+      { label: "Tokens",      href: "/tokens" },
+      { label: "Collections", href: "/collections" }
     ]},
     { id: "docs",        label: "Docs",        href: "/docs" },
     { id: "faq",         label: "FAQ",         href: "/faq" }
