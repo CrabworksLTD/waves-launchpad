@@ -321,19 +321,13 @@
         </div>
       </div>
 
-      <!-- Pairing and staking are one decision, not two. A paired token exists
-           so its trading fees can reward the collection's holders, and staking
-           is the mechanism that delivers them — offering the pairing on its own
-           would promise something the site cannot do yet. -->
+      <!-- Pairing and staking are one decision: a paired token exists so its
+           trading fees can reward holders, and staking is what delivers them.
+           The reasoning lives in the docs; the launch window just says it is
+           not open yet. -->
       <label class="tick"><input type="checkbox" id="f-pairOn" disabled>
         <span><b>Pair a token that rewards holders</b>
-        <span>Launch a bonding-curve token alongside the collection and route a
-        share of its trading fees to holders who stake their pieces.
-        <b>Not available yet</b> — the burn-to-stake program is written and its
-        tests pass, but it stays off mainnet until it has been audited, and we
-        will not take a deposit against code nobody outside this project has
-        reviewed. Launching a token on its own is open today under
-        <b>Launch → Token</b>.</span></span></label>
+        <span>Still in closed testing.</span></span></label>
 
       <div id="lp-err"></div>
       <div class="acts"><button id="lp-x">Cancel</button>
