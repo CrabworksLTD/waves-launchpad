@@ -18,8 +18,10 @@ import { ImageResponse } from "@vercel/og";
 export const config = { runtime: "edge" };
 
 const BG = "#0a0a0a";
-const RH = { rpc: "https://rpc.mainnet.chain.robinhood.com", label: "ROBINHOOD", accent: "#CCFF00" };
-const SOL = { rpc: "https://solana-rpc.publicnode.com", label: "SOLANA", accent: "#14F195" };
+const RH = { rpc: "https://rpc.mainnet.chain.robinhood.com", label: "ROBINHOOD",
+  accent: "#CCFF00", gradA: "#CCFF00", gradM: "#D2EC6C", gradB: "#D9D9D9" };
+const SOL = { rpc: "https://solana-rpc.publicnode.com", label: "SOLANA",
+  accent: "#14F195", gradA: "#9945FF", gradM: "#569BCA", gradB: "#14F195" };
 
 // DBC configs a WAVES token can be priced against (mirrors brand.js — the
 // server can't load browser globals). quote decimals resolve raised amounts.
@@ -138,12 +140,16 @@ async function render(req) {
     const fonts = await loadFonts(origin);
     const rh = url.searchParams.get("rh");
     return respond(buildCard(demo === "token" ? {
-      accent: rh ? RH.accent : SOL.accent, name: "$WAVE · First Wave",
+      accent: rh ? RH.accent : SOL.accent,
+      gradA: (rh ? RH : SOL).gradA, gradM: (rh ? RH : SOL).gradM, gradB: (rh ? RH : SOL).gradB,
+      name: "$WAVE · First Wave",
       chips: (rh ? RH.label : SOL.label) + "  ·  BONDING CURVE",
       avatarUri: null, bannerUri: null,
       stats: [["RAISED", "12.4 / 85 SOL"], ["CURVE", "14.6%"], ["CHAIN", rh ? "Robinhood" : "Solana"]]
     } : {
-      accent: rh ? RH.accent : SOL.accent, name: "Tide Runners",
+      accent: rh ? RH.accent : SOL.accent,
+      gradA: (rh ? RH : SOL).gradA, gradM: (rh ? RH : SOL).gradM, gradB: (rh ? RH : SOL).gradB,
+      name: "Tide Runners",
       chips: (rh ? RH.label : SOL.label) + "  ·  3,333 ITEMS  ·  METAPLEX CORE",
       avatarUri: null, bannerUri: null,
       stats: [["ITEMS", "3,333"], ["MINTED", "1,204 / 3,333"], ["PRICE", "0.1 SOL"],
@@ -171,6 +177,14 @@ function buildCard(o) {
       h("div", { fontFamily: "Mono", fontWeight: 600, fontSize: 34, color: "#fff" }, value)
     ]);
 
+  // no banner: the WAVES staircase fills the corner exactly as it does on the
+  // brand share card — bottom-left flush, climbing off the top edge — in the
+  // chain's colours, dimmed under the same scrim a banner would get
+  const S = 210;
+  const mark = [[0, 630 - S, o.gradA], [S, 630 - 2 * S, o.gradM], [2 * S, 0, o.gradB]]
+    .map((p) => h("div", { position: "absolute", left: p[0], top: p[1],
+      width: S, height: S, backgroundColor: p[2], display: "flex" }, null));
+
   return h("div", {
     width: "1200px", height: "630px", display: "flex", flexDirection: "column",
     justifyContent: "flex-end", position: "relative", backgroundColor: BG,
@@ -178,10 +192,11 @@ function buildCard(o) {
   }, [
     o.bannerUri ? img(o.bannerUri, 1200, 630,
       { position: "absolute", top: 0, left: 0, objectFit: "cover", objectPosition: "center" }) : null,
+    ...(o.bannerUri ? [] : mark),
     h("div", { position: "absolute", top: 0, left: 0, width: "1200px", height: "630px", display: "flex",
       backgroundImage: o.bannerUri
         ? "linear-gradient(180deg, rgba(10,10,10,.25) 0%, rgba(10,10,10,.55) 52%, rgba(10,10,10,.96) 100%)"
-        : "linear-gradient(180deg, #16181d 0%, #0a0a0a 100%)" }, null),
+        : "linear-gradient(180deg, rgba(10,10,10,.35) 0%, rgba(10,10,10,.66) 52%, rgba(10,10,10,.94) 100%)" }, null),
     h("div", { position: "absolute", top: 44, right: 56, display: "flex", fontFamily: "Display",
       fontSize: 30, letterSpacing: 2, color: o.accent }, "WAVES"),
     h("div", { display: "flex", flexDirection: "column", padding: "0 56px 52px 56px", zIndex: 1 }, [
@@ -265,7 +280,7 @@ async function evmCard(origin, c) {
 
   const fonts = await loadFonts(origin);
   return respond(buildCard({
-    accent: RH.accent, name,
+    accent: RH.accent, gradA: RH.gradA, gradM: RH.gradM, gradB: RH.gradB, name,
     chips: ("BY " + short(owner) + "  ·  " + RH.label + "  ·  " +
       fmtOr(supply) + " ITEMS").toUpperCase(),
     avatarUri, bannerUri,
@@ -311,7 +326,8 @@ async function solMintCard(origin, cm) {
   ]);
   const fonts = await loadFonts(origin);
   return respond(buildCard({
-    accent: SOL.accent, name: rec.name || "Collection",
+    accent: SOL.accent, gradA: SOL.gradA, gradM: SOL.gradM, gradB: SOL.gradB,
+    name: rec.name || "Collection",
     chips: (SOL.label + "  ·  " + fmtOr(supply) + " ITEMS  ·  METAPLEX CORE").toUpperCase(),
     avatarUri, bannerUri,
     stats: [
@@ -345,7 +361,7 @@ async function solTokenCard(origin, mint) {
   const avatarUri = await toDataUri(arw(rec.icon));
   const fonts = await loadFonts(origin);
   return respond(buildCard({
-    accent: SOL.accent,
+    accent: SOL.accent, gradA: SOL.gradA, gradM: SOL.gradM, gradB: SOL.gradB,
     name: (sym ? "$" + sym : "") + (rec.name ? (sym ? " · " : "") + rec.name : "") || "Token",
     chips: (SOL.label + "  ·  BONDING CURVE" +
       (migrated ? "  ·  GRADUATED" : "")).toUpperCase(),
