@@ -1,0 +1,17 @@
+{
+  "name": "waves-site",
+  "private": true,
+  "description": "Deploy root. Exists so Vercel installs what the api/ functions import — the site itself is static and has no build step.",
+  "scripts": {
+    "postinstall": "node -e \"try{const f=require('fs');const s='node_modules/harfbuzzjs/hb.wasm',d='node_modules/@vercel/og/dist/hb.wasm';if(f.existsSync(s)&&!f.existsSync(d)){f.copyFileSync(s,d);console.log('og: copied hb.wasm into @vercel/og/dist')}}catch(e){console.log('og postinstall skipped:',e.message)}\""
+  },
+  "dependencies": {
+    "@metaplex-foundation/mpl-core-candy-machine": "^0.3.0",
+    "@metaplex-foundation/umi": "^1.5.1",
+    "@metaplex-foundation/umi-bundle-defaults": "^1.5.1",
+    "@meteora-ag/dynamic-bonding-curve-sdk": "^1.5.11",
+    "@solana/web3.js": "^1.98.4",
+    "@upstash/redis": "^1.38.3",
+    "@vercel/og": "^1.0.1"
+  }
+}

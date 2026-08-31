@@ -1,5 +1,6 @@
 {
   "cleanUrls": true,
+  "buildCommand": null,
   "rewrites": [
     { "source": "/mint/:address", "destination": "/mint" },
     { "source": "/token/:address", "destination": "/token" }
@@ -16,12 +17,23 @@
       "permanent": false
     },
     {
-      "source": "/mint/:address(0x[0-9a-fA-F]{40})",
+      "source": "/mint/:address",
       "has": [
         { "type": "header", "key": "user-agent",
           "value": ".*(facebookexternalhit|Twitterbot|Slackbot|Discordbot|TelegramBot|WhatsApp|LinkedInBot|redditbot).*" }
       ],
-      "destination": "/share-rh",
+      "missing": [{ "type": "query", "key": "hp" }],
+      "destination": "/api/share?id=:address&to=mint",
+      "permanent": false
+    },
+    {
+      "source": "/token/:address",
+      "has": [
+        { "type": "header", "key": "user-agent",
+          "value": ".*(facebookexternalhit|Twitterbot|Slackbot|Discordbot|TelegramBot|WhatsApp|LinkedInBot|redditbot).*" }
+      ],
+      "missing": [{ "type": "query", "key": "hp" }],
+      "destination": "/api/share?id=:address&to=token",
       "permanent": false
     }
   ]
