@@ -72,12 +72,40 @@ export default async function handler(req, res) {
 
     try {
       const db = await kv();
-      // Idempotent: relaunching the same machine must not double-list it.
-      const dupeKey = isEvm ? "evm:" + address.toLowerCase() : "cm:" + candyMachine;
-      const first = await db.set(dupeKey, 1, { nx: true });
-      if (first !== "OK") return res.status(200).json({ ok: true, duplicate: true });
+      const key = isEvm ? address.toLowerCase() : candyMachine;
+      const matches = (cur) => cur &&
+        (isEvm ? String(cur.address || "").toLowerCase() === key : cur.candyMachine === key);
 
-      await db.lpush(KEY, JSON.stringify({
+      /* Correcting a value that is already set needs the cron secret, so a
+       * stranger cannot rewrite someone's listing; filling a blank is open,
+       * because it cannot destroy anything. Both matter: a paired launch
+       * writes its collection before the token exists, then comes back with
+       * the token mint. */
+      const admin = process.env.CRON_SECRET &&
+        req.headers.authorization === "Bearer " + process.env.CRON_SECRET;
+
+      // Idempotent: relaunching the same machine must not double-list it.
+      const dupeKey = isEvm ? "evm:" + key : "cm:" + key;
+      const first = await db.set(dupeKey, 1, { nx: true });
+      if (first !== "OK") {
+        const raw = await db.lrange(KEY, 0, MAX - 1);
+        for (let i = 0; i < (raw || []).length; i++) {
+          const cur = typeof raw[i] === "string" ? JSON.parse(raw[i]) : raw[i];
+          if (!matches(cur)) continue;
+          let changed = false;
+          for (const k of Object.keys(rec)) {
+            if (k === "at" || rec[k] == null) continue;
+            if (admin || cur[k] === null || cur[k] === undefined) {
+              if (cur[k] !== rec[k]) { cur[k] = rec[k]; changed = true; }
+            }
+          }
+          if (changed) await db.lset(KEY, i, JSON.stringify(cur));
+          return res.status(200).json({ ok: true, updated: changed, duplicate: !changed });
+        }
+        return res.status(200).json({ ok: true, duplicate: true });
+      }
+
+      const rec = {
         candyMachine: isEvm ? null : candyMachine,
         collection: isEvm ? null : collection,
         chain: isEvm ? "robinhood" : null,
@@ -90,7 +118,8 @@ export default async function handler(req, res) {
         tokenMint: (tokenMint && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(tokenMint)) ? tokenMint : null,
         creator: (creator && (B58.test(creator) || EVM.test(creator))) ? creator : null,
         at: Date.now()
-      }));
+      };
+      await db.lpush(KEY, JSON.stringify(rec));
       await db.ltrim(KEY, 0, MAX - 1);
       return res.status(200).json({ ok: true });
     } catch (e) {
