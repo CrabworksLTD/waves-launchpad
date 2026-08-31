@@ -76,6 +76,12 @@ export default async function handler(req, res) {
     const from = win ? now - win : (trades.length ? trades[0].at : now);
     const inWindow = win ? trades.filter((t) => t.at >= from) : trades;
 
+    /* Bucket out to the last trade, not to now. On "all", a token that traded
+     * hard for two minutes and then went quiet was being spread across a
+     * window stretching to the present, so every trade landed in the first
+     * bucket or two and the chart drew a two-point line. */
+    const to = win ? now : (inWindow.length ? inWindow[inWindow.length - 1].at : now);
+
     /* Change over the selected window, measured from the first trade inside it
      * — or from the last trade before it, so a quiet token still shows the move
      * that got it to where it is rather than a flat zero. */
@@ -95,7 +101,7 @@ export default async function handler(req, res) {
       change,
       windowVol: inWindow.reduce((a, b) => a + b.quote, 0),
       windowTrades: inWindow.length,
-      points: bucket(inWindow, from, now, 120),
+      points: bucket(inWindow, from, to, 120),
       // newest first is what a feed wants; the store keeps oldest first
       trades: inWindow.slice(-60).reverse()
     });

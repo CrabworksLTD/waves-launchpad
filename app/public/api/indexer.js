@@ -118,8 +118,15 @@ function readSwap(tx, baseMint, sig, blockTime) {
   const trader = base.find((b) => b.owner !== poolSide.owner);
   if (!trader || poolQuote.delta === 0n || poolSide.delta === 0n) return null;
 
+  /* Size comes from the TRADER's side, not the pool's. They are the same
+   * number in an ordinary swap, but not in the launch transaction: createPool
+   * WithFirstBuy mints the whole supply into the vault and does the dev buy at
+   * once, so the pool's delta there is ~the entire supply. Reading the pool
+   * side made the launch look like a 999,646,544-token buy for 0.01 SOL — a
+   * price of 1e-11 that dragged "change since launch" to +456,570%. The
+   * trader's delta is what they actually received: 353,455.499312. */
   const abs = (x) => (x < 0n ? -x : x);
-  const baseAmt = Number(abs(poolSide.delta)) / Math.pow(10, poolSide.dec);
+  const baseAmt = Number(abs(trader.delta)) / Math.pow(10, trader.dec);
   const quoteAmt = Number(abs(poolQuote.delta)) / Math.pow(10, poolQuote.dec);
   if (!(baseAmt > 0) || !(quoteAmt > 0)) return null;
 
@@ -157,6 +164,14 @@ export default async function handler(req, res) {
         const statsKey = "ix:" + t.mint + ":stats";
 
         let cursor = await db.get(cursorKey).catch(() => null);
+        if (req.query && req.query.reset === "1") {
+          // re-read a pool from scratch, for when a parsing bug has already
+          // written wrong numbers (gated by CRON_SECRET like the rest)
+          cursor = null;
+          await db.del(tradesKey).catch(() => {});
+          await db.del(statsKey).catch(() => {});
+          await db.del(cursorKey).catch(() => {});
+        }
 
         /* Collect signatures newer than the cursor, newest first. `until` stops
          * the walk at what we already have, so steady state is one request. */
@@ -172,20 +187,39 @@ export default async function handler(req, res) {
           if (sigs.length < PAGE) break;
           before = sigs[sigs.length - 1].signature;
         }
-        if (!fresh.length) { log.push(t.symbol + ": up to date"); continue; }
+        /* No new trades is not a reason to stop: supply, holders and therefore
+         * market cap all move without anyone trading, and skipping the rest of
+         * this loop meant they were only ever written during a backfill. */
+        const quiet = !fresh.length;
 
         // oldest first, so the stored list stays in order and ATH is found
         // in the sequence it actually happened
         fresh.reverse();
         const found = [];
+
+        /* The cursor may only advance over signatures we actually READ. It used
+         * to advance to the newest signature regardless, so when the rate
+         * limiter ate the last few reads of a backfill, those trades were
+         * skipped and then permanently excluded from every future run — the
+         * first index of $SOLWAVES lost its five newest trades that way.
+         * Stop at the first unreadable transaction and let the next run retry. */
+        let safeCursor = cursor;
+        let stalled = false;
         for (const s of fresh) {
-          if (s.err) continue;
+          if (s.err) { if (!stalled) safeCursor = s.signature; continue; }
           const tx = await rpc("getTransaction", [s.signature, {
             encoding: "jsonParsed", maxSupportedTransactionVersion: 0,
             commitment: "confirmed"
           }]).catch(() => null);
+          if (!tx) {
+            stalled = true;
+            log.push(t.symbol + ": could not read " + s.signature.slice(0, 12) +
+                     ", holding the cursor for the next run");
+            break;
+          }
           const trade = readSwap(tx, t.mint, s.signature, s.blockTime);
           if (trade) found.push(trade);
+          safeCursor = s.signature;
           // pace the backfill so the reads that come after it are not the ones
           // that get refused
           await new Promise((r) => setTimeout(r, 60));
@@ -193,7 +227,12 @@ export default async function handler(req, res) {
 
         let stored = await db.get(tradesKey).catch(() => null);
         if (typeof stored === "string") { try { stored = JSON.parse(stored); } catch { stored = null; } }
-        const all = (Array.isArray(stored) ? stored : []).concat(found);
+        /* Dedupe by signature: holding the cursor back means a later run can
+         * legitimately re-read transactions it already stored. */
+        const seen = new Set((Array.isArray(stored) ? stored : []).map((x) => x.sig));
+        const all = (Array.isArray(stored) ? stored : [])
+          .concat(found.filter((f) => !seen.has(f.sig)));
+        all.sort((a, b) => a.at - b.at);
         // newest last; trim the oldest away
         const trades = all.slice(-MAX_TRADES);
 
@@ -252,9 +291,11 @@ export default async function handler(req, res) {
 
         await db.set(tradesKey, JSON.stringify(trades));
         await db.set(statsKey, JSON.stringify(stats));
-        await db.set(cursorKey, fresh[fresh.length - 1].signature);
-        log.push(t.symbol + ": +" + found.length + " trades (" + trades.length +
-                 " kept), " + (holders == null ? "holders n/a" : holders + " holders"));
+        if (safeCursor && safeCursor !== cursor) await db.set(cursorKey, safeCursor);
+        log.push(t.symbol + ": " + (quiet ? "no new trades" : "+" + found.length + " trades") +
+                 " (" + trades.length + " kept), " +
+                 (holders == null ? "holders n/a" : holders + " holders") +
+                 (stats.mcap == null ? ", mcap n/a" : ", mcap " + stats.mcap.toFixed(2)));
       } catch (e) {
         log.push((t.symbol || t.mint) + ": FAILED " + String((e && e.message) || e).slice(0, 140));
       }
