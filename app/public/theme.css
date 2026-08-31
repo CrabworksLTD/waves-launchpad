@@ -69,6 +69,14 @@
        background-image:var(--grad);background-repeat:no-repeat;
        background-size:calc(100% + 2px) 100%;background-position:-1px 0
      Text clips (background-clip:text) and tiles sized >100% are immune. */
+  /* The gradient's two endpoints, exposed for inline SVG stops and canvas
+     code that can't paint with --grad directly. a = left/start, b = end. */
+  --grad-a:     #9945FF;
+  --grad-b:     #14F195;
+  --grad-a-rgb: 153,69,255;
+  --grad-b-rgb: 20,241,149;
+  --accent-2-hi: #c9b2ff;  /* light tint of the secondary, for small tags */
+
   --grad:      linear-gradient(90deg, #9945FF 0%, #14F195 100%);
   --grad-rev:  linear-gradient(90deg, #14F195 0%, #9945FF 100%);
   --grad-hi:   linear-gradient(90deg, #b06bff 0%, #5cffb9 100%);
@@ -87,4 +95,36 @@
   --lime-dim:  var(--accent-dim);
   --lime-glow: var(--accent-glow);
   --phos:      var(--accent);
+}
+
+/* Robinhood Chain skin — applied as <html data-chain="robinhood"> by the
+ * network selector (shell.js persists the choice). Same variables, different
+ * voice: Robinhood's signature green carrying into light grey wherever the
+ * Solana purple→green gradient runs. Everything painted from the tokens above
+ * recolours automatically; anything that doesn't is a hardcoded hex and a bug. */
+:root[data-chain="robinhood"]{
+  --accent:      #00C805;
+  --accent-dim:  #00a304;
+  --accent-hi:   #3fe944;
+  --accent-glow: rgba(0,200,5,.16);
+  --accent-ink:  #041204;
+
+  --accent-2:      #d6d6d6;
+  --accent-2-dim:  #ababab;
+  --accent-2-glow: rgba(214,214,214,.18);
+
+  --accent-rgb:   0,200,5;
+  --accent-2-rgb: 214,214,214;
+
+  --grad-a:     #00C805;
+  --grad-b:     #d9d9d9;
+  --grad-a-rgb: 0,200,5;
+  --grad-b-rgb: 217,217,217;
+  --accent-2-hi: #ececec;
+
+  --grad:      linear-gradient(90deg, #00C805 0%, #d9d9d9 100%);
+  --grad-rev:  linear-gradient(90deg, #d9d9d9 0%, #00C805 100%);
+  --grad-hi:   linear-gradient(90deg, #35e13a 0%, #f0f0f0 100%);
+  --grad-soft: linear-gradient(90deg, rgba(0,200,5,.16) 0%, rgba(217,217,217,.16) 100%);
+  --grad-line: linear-gradient(90deg, transparent, #00C805 28%, #d9d9d9 72%, transparent);
 }

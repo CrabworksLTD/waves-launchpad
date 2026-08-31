@@ -32,7 +32,7 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
   text-transform:uppercase;padding:5px 12px;border-radius:99px;display:inline-block;
   margin-bottom:18px}
 .cluster.main{background:rgba(255,107,107,.12);color:#ff9f9f;border:1px solid rgba(255,107,107,.4)}
-.cluster.dev{background:rgba(20,241,149,.1);color:var(--accent);border:1px solid rgba(20,241,149,.35)}
+.cluster.dev{background:rgba(var(--accent-rgb),.1);color:var(--accent);border:1px solid rgba(var(--accent-rgb),.35)}
 .go{width:100%;padding:15px;border-radius:8px;border:0;cursor:pointer;
   font:800 14.5px Archivo;color:var(--accent-ink);
   background-image:var(--grad);background-repeat:no-repeat;
@@ -41,7 +41,7 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
 .msg{margin-top:14px;font-size:13px;padding:12px 14px;border-radius:8px;display:none;
   word-break:break-all}
 .msg.err{display:block;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ffb3b3}
-.msg.ok{display:block;background:rgba(20,241,149,.08);border:1px solid rgba(20,241,149,.3);color:#8ff5cd}
+.msg.ok{display:block;background:rgba(var(--accent-rgb),.08);border:1px solid rgba(var(--accent-rgb),.3);color:#8ff5cd}
 .msg code{font:500 12.5px ui-monospace,monospace}
 .msg a{color:inherit}
 .note{color:var(--faint);font-size:12px;margin-top:12px;line-height:1.6}

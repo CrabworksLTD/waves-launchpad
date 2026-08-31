@@ -51,14 +51,14 @@ h1{font-family:Archivo;font-size:clamp(34px,4.6vw,58px);font-weight:800;
   transition:border-color .25s,transform .25s}
 .opt::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;
   transition:opacity .3s;
-  background:radial-gradient(130% 120% at 50% 115%,rgba(153,69,255,.18),transparent 55%),
-             radial-gradient(120% 110% at 85% -10%,rgba(20,241,149,.14),transparent 50%)}
+  background:radial-gradient(130% 120% at 50% 115%,rgba(var(--accent-2-rgb),.18),transparent 55%),
+             radial-gradient(120% 110% at 85% -10%,rgba(var(--accent-rgb),.14),transparent 50%)}
 .opt:hover{border-color:var(--faint);transform:translateY(-4px)}
 .opt:hover::before{opacity:1}
 .opt .ic{width:64px;height:64px;border-radius:14px;flex:none;
   border:1px solid transparent;display:grid;place-items:center;margin-bottom:22px;
   background:linear-gradient(var(--bg),var(--bg)) padding-box,
-             linear-gradient(135deg,rgba(153,69,255,.55),rgba(20,241,149,.55)) border-box}
+             linear-gradient(135deg,rgba(var(--accent-2-rgb),.55),rgba(var(--accent-rgb),.55)) border-box}
 .opt h2{font-family:Archivo;font-size:23px;font-weight:800;letter-spacing:-.015em;
   margin:0 0 10px;color:var(--ink);text-decoration:none}
 .opt p{margin:0 0 26px;color:var(--dim);font-size:14px;line-height:1.6;flex:1}

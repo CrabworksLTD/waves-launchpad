@@ -30,7 +30,7 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   color:var(--dim);font:600 12.5px Inter;cursor:pointer;border-radius:999px;
   transition:color .2s,border-color .2s}
 .chip:hover{color:var(--ink)}
-.chip.on{color:var(--accent);border-color:rgba(20,241,149,.45)}
+.chip.on{color:var(--accent);border-color:rgba(var(--accent-rgb),.45)}
 
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px}
 .tk{position:relative;display:block;border:1px solid rgba(255,255,255,.16);
@@ -38,8 +38,8 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   transition:border-color .25s,transform .25s}
 .tk:hover{border-color:var(--faint);transform:translateY(-3px)}
 .tk::before{content:"";position:absolute;inset:0;pointer-events:none;
-  background:radial-gradient(130% 170% at 0% 100%,rgba(153,69,255,.13),transparent 55%),
-             radial-gradient(130% 170% at 100% 0%,rgba(20,241,149,.10),transparent 55%)}
+  background:radial-gradient(130% 170% at 0% 100%,rgba(var(--accent-2-rgb),.13),transparent 55%),
+             radial-gradient(130% 170% at 100% 0%,rgba(var(--accent-rgb),.10),transparent 55%)}
 .tk .top{display:flex;align-items:center;gap:14px;position:relative}
 .tk .coin{width:46px;height:46px;flex:none;border-radius:9px;
   border:2px solid transparent;display:grid;place-items:center;
@@ -53,8 +53,8 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tk .tag{flex:none;font:600 9.5px "IBM Plex Mono",monospace;letter-spacing:.16em;
   border-radius:99px;padding:4px 10px;text-transform:uppercase}
-.tk .tag.curve{color:var(--accent);border:1px solid rgba(20,241,149,.4)}
-.tk .tag.grad{color:#c9b2ff;border:1px solid rgba(153,69,255,.5)}
+.tk .tag.curve{color:var(--accent);border:1px solid rgba(var(--accent-rgb),.4)}
+.tk .tag.grad{color:var(--accent-2-hi);border:1px solid rgba(var(--accent-2-rgb),.5)}
 .tk .bar{display:block;height:5px;border-radius:99px;background:var(--raise);
   overflow:hidden;margin-top:16px;position:relative}
 .tk .top{display:flex}

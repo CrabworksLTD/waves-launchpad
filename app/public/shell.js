@@ -22,6 +22,34 @@
   var H = window.UI.html, raw = window.UI.raw, render = window.UI.render,
       on = window.UI.on, shortAddr = window.UI.shortAddr;
 
+  /* Chain skin. The selector's choice persists, and the data-chain attribute
+   * flips theme.css's variable block — set it here, before any shell markup
+   * renders, so a Robinhood visitor doesn't get a purple flash. Launches are
+   * still Solana-only; this recolours, it does not rewire. */
+  var CHAINS = {
+    solana:    { label: "Solana",          icon: "/art/solana.svg" },
+    robinhood: { label: "Robinhood Chain", icon: "/art/robinhood.svg" }
+  };
+  function currentChain() {
+    try { var c = localStorage.getItem("shl-chain"); } catch (e) {}
+    return CHAINS[c] ? c : "solana";
+  }
+  function applyChain(net) {
+    if (!CHAINS[net]) net = "solana";
+    try { localStorage.setItem("shl-chain", net); } catch (e) {}
+    if (net === "solana") delete document.documentElement.dataset.chain;
+    else document.documentElement.dataset.chain = net;
+    var trig = document.querySelector("#shl-nmenu .shl-net");
+    if (trig) {
+      trig.querySelector("img").src = CHAINS[net].icon;
+      trig.querySelector("span").textContent =
+        net === "robinhood" ? "Robinhood" : CHAINS[net].label;
+    }
+  }
+  if (currentChain() !== "solana") {
+    document.documentElement.dataset.chain = currentChain();
+  }
+
   // No "Collections" home link — the logo mark is the way home, and the
   // Explore menu is the way to the marketplaces.
   var NAV = [
@@ -193,7 +221,7 @@
     // favicons and anything external.
     var markSvg = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
       '<defs><linearGradient id="shl-g" x1="0" y1="1" x2="1" y2="0">' +
-      '<stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>' +
+      '<stop offset="0" style="stop-color:var(--grad-a)"/><stop offset="1" style="stop-color:var(--grad-b)"/>' +
       "</linearGradient></defs>" +
       '<path fill="url(#shl-g)" d="M0 16h8v8H0ZM8 8h8v8H8Zm8-8h8v8h-8Z"/></svg>';
     // the name rides in every browser tab; pages keep their own first word
@@ -223,7 +251,7 @@
       ov.innerHTML =
         '<div class="gcard"><svg viewBox="0 0 24 24">' +
         '<defs><linearGradient id="shl-gg" x1="0" y1="1" x2="1" y2="0">' +
-        '<stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>' +
+        '<stop offset="0" style="stop-color:var(--grad-a)"/><stop offset="1" style="stop-color:var(--grad-b)"/>' +
         '</linearGradient></defs>' +
         '<path fill="url(#shl-gg)" d="M0 16h8v8H0ZM8 8h8v8H8Zm8-8h8v8h-8Z"/></svg>' +
         "<b>" + NM + " is almost here</b>" +
@@ -289,8 +317,8 @@
       <div class="zone r">
         <div class="shl-dd r" id="shl-nmenu">
           <button class="shl-net" aria-haspopup="true" aria-expanded="false">
-            <img src="/art/solana.svg" width="15" height="15" alt="">
-            <span>Solana</span> <i>▾</i>
+            <img src="${CHAINS[currentChain()].icon}" width="15" height="15" alt="">
+            <span>${currentChain() === "robinhood" ? "Robinhood" : "Solana"}</span> <i>▾</i>
           </button>
           <div class="menu">
             <a href="#" data-net="solana"><img src="/art/solana.svg" width="13" height="13" alt="">
@@ -382,9 +410,10 @@
         a.addEventListener("click", function (e) {
           e.preventDefault();
           nd.classList.remove("open");
+          applyChain(a.dataset.net);
           if (a.dataset.net === "robinhood") {
             alertBar("Robinhood Chain is being wired in — the EVM side is coming to WAVES. " +
-              "Solana is live today.");
+              "Launches still run on Solana for now.");
           }
         });
       });

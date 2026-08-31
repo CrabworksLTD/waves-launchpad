@@ -32,7 +32,7 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   color:var(--dim);font:600 12.5px Inter;cursor:pointer;border-radius:999px;
   transition:color .2s,border-color .2s}
 .chip:hover{color:var(--ink)}
-.chip.on{color:var(--accent);border-color:rgba(20,241,149,.45)}
+.chip.on{color:var(--accent);border-color:rgba(var(--accent-rgb),.45)}
 
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px}
 .tile{display:block;position:relative;border:1px solid rgba(255,255,255,.16);
@@ -47,7 +47,7 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
 .tag{position:absolute;top:10px;left:10px;padding:4px 10px;border-radius:99px;
   font:700 9.5px/1 "IBM Plex Mono",monospace;letter-spacing:.14em;text-transform:uppercase;
   background:rgba(0,0,0,.72);backdrop-filter:blur(6px);border:1px solid var(--line2)}
-.tag.live{color:var(--accent);border-color:rgba(20,241,149,.45)}
+.tag.live{color:var(--accent);border-color:rgba(var(--accent-rgb),.45)}
 .tag.out{color:var(--faint)}
 .body{padding:14px 15px 15px}
 .body h2{margin:0;font-family:Archivo;font-size:15.5px;font-weight:700;line-height:1.25;
