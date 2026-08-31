@@ -43,40 +43,8 @@
     return CHAINS[c] ? c : "solana";
   }
   var shellPaintWallet = null;   // set by mount(); repainted on chain switch
-  function applyChain(net) {
-    if (!CHAINS[net]) net = "solana";
-    try { localStorage.setItem("shl-chain", net); } catch (e) {}
-    if (net === "solana") delete document.documentElement.dataset.chain;
-    else document.documentElement.dataset.chain = net;
-    var trig = document.querySelector("#shl-nmenu .shl-net");
-    if (trig) {
-      trig.querySelector("img").src = CHAINS[net].icon;
-      trig.querySelector("span").textContent =
-        net === "robinhood" ? "Robinhood" : CHAINS[net].label;
-    }
-    // the wallet pill answers to a different chain now
-    if (net === "robinhood") window.Shell.ensureEvmStack().catch(function () {});
-    if (shellPaintWallet) shellPaintWallet();
-    // and so does the tab's favicon
-    var fv = document.querySelector('link[rel="icon"]');
-    if (fv) fv.href = net === "robinhood" ? "/mark-rh.svg" : "/mark.svg";
-    // the address bar carries the chain, so a copied link shares the same
-    // side of the site (and gets the matching share card). The homepage gets
-    // a real path — /rh — because crawlers refuse to unfurl through a
-    // query-triggered redirect; inner pages carry the query param.
-    try {
-      var u = new URL(location.href);
-      var home = u.pathname === "/" || u.pathname === "/index.html" ||
-        u.pathname === "/rh" || u.pathname === "/rh.html";
-      if (home) {
-        history.replaceState(null, "", (net === "robinhood" ? "/rh" : "/") + u.hash);
-      } else {
-        if (net === "robinhood") u.searchParams.set("chain", "rh");
-        else u.searchParams.delete("chain");
-        history.replaceState(null, "", u.pathname + (u.search || "") + u.hash);
-      }
-    } catch (e) {}
-  }
+  /* Chains are applied by loading the page, not by re-skinning it in place —
+     see the network selector below for why. Boot reads the persisted choice. */
   if (currentChain() !== "solana") {
     document.documentElement.dataset.chain = currentChain();
     // keep the address bar honest on every page of the Robinhood side —
@@ -473,11 +441,25 @@
         a.addEventListener("click", function (e) {
           e.preventDefault();
           nd.classList.remove("open");
-          applyChain(a.dataset.net);
-          if (a.dataset.net === "robinhood") {
-            alertBar("Robinhood Chain is being wired in — the EVM side is coming to WAVES. " +
-              "Launches still run on Solana for now.");
-          }
+          var net = a.dataset.net;
+          if (net === currentChain()) return;          // already there
+
+          /* Switching chains goes home, rather than re-skinning the page you
+           * are standing on.
+           *
+           * Switching in place meant every page had to correctly rebuild
+           * itself around a different chain — a different wallet, a different
+           * set of records, a lazily-loaded EVM stack, live reads already in
+           * flight against the old chain. Most pages did some of that and none
+           * did all of it, which is what made switching feel buggy. A page you
+           * cannot even reach on the other side (a Solana token's trading
+           * page) has no sensible answer at all.
+           *
+           * A full navigation to the homepage rebuilds everything from the
+           * persisted choice, which is the one path that is already exercised
+           * on every page load. */
+          try { localStorage.setItem("shl-chain", net); } catch (err) {}
+          location.href = net === "robinhood" ? "/rh" : "/";
         });
       });
       function alertBar(text) {
@@ -489,6 +471,21 @@
         el.textContent = text;
         document.body.appendChild(el);
         setTimeout(function () { el.remove(); }, 4200);
+      }
+
+      /* The "Robinhood is still being wired in" notice used to fire on the
+       * switch itself. Now that switching navigates, say it on arrival — once
+       * per session, so it informs rather than nags. */
+      if (currentChain() === "robinhood") {
+        var told = false;
+        try { told = sessionStorage.getItem("shl-rh-note") === "1"; } catch (e) {}
+        if (!told) {
+          try { sessionStorage.setItem("shl-rh-note", "1"); } catch (e) {}
+          setTimeout(function () {
+            alertBar("Robinhood Chain is being wired in — you can browse and mint here, " +
+              "but launching still runs on Solana for now.");
+          }, 900);
+        }
       }
     })();
 
