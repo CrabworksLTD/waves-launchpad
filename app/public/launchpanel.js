@@ -627,12 +627,18 @@
   }
 
   function stepList(box) {
+    /* Status is written beside the step's name, never over it. Replacing the
+     * label meant a finished run read "Confirming on chain — 1s" where it
+     * should say "Paying for storage", so the list stopped describing what
+     * had actually happened. */
     return function mark(k, state, extra) {
       var li = box.querySelector('[data-k="' + k + '"]');
       if (!li) return;
       li.className = state;
       li.querySelector("i").textContent = state === "done" ? "✓" : "›";
-      if (extra) li.querySelector("span").textContent = extra;
+      var span = li.querySelector("span");
+      if (!span.dataset.label) span.dataset.label = span.textContent;
+      span.textContent = span.dataset.label + (extra && state !== "done" ? " — " + extra : "");
     };
   }
 

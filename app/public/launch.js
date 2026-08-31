@@ -57,6 +57,20 @@
    * the launch panel gets it without a call-site change. */
   function usePolledConfirm(mx, umi, rpcUrl) {
     var conn = new mx.Connection(rpcUrl, "confirmed");
+
+    /* Solana drops transactions. A validator under load will accept a send and
+     * never gossip it, and nothing retries on its own — which is how a launch
+     * gets "Creating collection ✓, candy machine ✓, items ✓" and then loses
+     * the last step to silence. Keep the signed bytes from the send and
+     * re-broadcast them while we wait: the network dedupes by signature, so
+     * repeating is free and only the first landing counts. */
+    var lastRaw = null;
+    var send = umi.rpc.sendTransaction.bind(umi.rpc);
+    umi.rpc.sendTransaction = function (tx, options) {
+      try { lastRaw = umi.transactions.serialize(tx); } catch (e) { lastRaw = null; }
+      return send(tx, Object.assign({ maxRetries: 5 }, options || {}));
+    };
+
     umi.rpc.confirmTransaction = async function (signature, options) {
       var sig = typeof signature === "string"
         ? signature : mx.base58.deserialize(signature)[0];
@@ -81,7 +95,14 @@
         if (v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized")) {
           return { context: { slot: v.slot || 0 }, value: { err: null } };
         }
-        if (!v) missing++;
+        if (!v) {
+          missing++;
+          // every ~6s of not seeing it, put it back on the wire
+          if (lastRaw && missing % 5 === 0) {
+            try { await conn.sendRawTransaction(lastRaw, { skipPreflight: true, maxRetries: 5 }); }
+            catch (e) {}
+          }
+        }
         await new Promise(function (r) { setTimeout(r, 1200); });
       }
       throw new Error("Timed out waiting for " + sig.slice(0, 8) +
