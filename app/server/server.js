@@ -129,6 +129,38 @@ const server = http.createServer(async function (req, res) {
     } catch (e) { return json(400, { error: e.message }); }
   }
 
+  /* Everything under /api that this server does not implement is a Vercel
+   * function in production — storage quotes, upload approvals, share cards.
+   * Locally they 404, which made a launch die at "Could not price storage"
+   * with no hint that the endpoint simply is not here. Forward them to the
+   * deployment instead, so the launch flow can be walked end to end on
+   * localhost. Set DEV_API=off to get the old 404s back.
+   *
+   * ⚠️ This talks to PRODUCTION: an upload approval granted here spends real
+   * Turbo credits, and a payment verified here is a real payment. Reads are
+   * free; the paid paths still require a real signed payment, so nothing can
+   * be spent by accident. */
+  const DEV_API = process.env.DEV_API !== "off";
+  const LOCAL_API = new Set(["/api/collections", "/api/tokens", "/api/limits",
+    "/api/project", "/api/download", "/api/generate", "/api/dev-save"]);
+  if (DEV_API && url.pathname.startsWith("/api/") && !LOCAL_API.has(url.pathname)) {
+    const target = (process.env.DEV_API_ORIGIN || "https://www.waveslaunchpad.xyz") +
+      url.pathname + url.search;
+    try {
+      const init = { method: req.method, headers: { "content-type": "application/json" } };
+      if (req.method === "POST") init.body = JSON.stringify(await body(req));
+      const r = await fetch(target, init);
+      const buf = Buffer.from(await r.arrayBuffer());
+      res.writeHead(r.status, {
+        "Content-Type": r.headers.get("content-type") || "application/json",
+        "Cache-Control": "no-cache"
+      });
+      return res.end(buf);
+    } catch (e) {
+      return json(502, { error: "dev proxy could not reach " + target, detail: e.message });
+    }
+  }
+
   // In production these are Vercel KV functions. Locally, an optional
   // .dev-records.json at the repo root feeds the marketplace/homepage so the
   // listing UI can be developed without deploying: { collections: [], tokens: [] }
