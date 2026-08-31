@@ -45,7 +45,7 @@
                         rwa: {
                           "AymATz4TCL9sWNEEV9Kvyz45CHVhDZ6kUgjTJPzLpU9P":
                             { config: "AWar1Y1GALnT3TjL3d4K1qjH2ZLB5KiqrSw3gmaR9EGA",
-                              symbol: "XAUt0", decimals: 6 }
+                              symbol: "XAUt0", decimals: 6, label: "Gold" }
                         } },
       devnet: { sol: "97FsuYAZrY1HxSokdSz1GnPVsLWNdpVgdczt3bLqXv8J", usdc: "", rwa: {} }
     },

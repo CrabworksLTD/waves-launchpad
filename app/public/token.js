@@ -153,7 +153,7 @@
     var m = clusterConfigs().rwa || {};
     return Object.keys(m).map(function (mint) {
       return { mint: mint, symbol: m[mint].symbol, decimals: m[mint].decimals,
-               config: m[mint].config };
+               label: m[mint].label || m[mint].symbol, config: m[mint].config };
     });
   }
 

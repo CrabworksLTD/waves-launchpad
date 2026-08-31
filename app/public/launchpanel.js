@@ -99,6 +99,11 @@
       ".lp .pick{display:flex;justify-content:space-between;align-items:center;gap:10px;",
       "  width:100%;text-align:left;padding:11px 12px}",
       ".lp .pick .k2{color:var(--faint);font-size:11px}",
+      ".lp .pick .pk-r{display:flex;align-items:center;gap:12px}",
+      ".lp .pick .pk-dd{font:600 11px Inter,sans-serif;color:var(--accent);",
+      "  border:1px solid rgba(20,241,149,.35);border-radius:99px;padding:4px 11px;",
+      "  white-space:nowrap}",
+      ".lp .pick:hover{border-color:var(--accent)}",
       /* long form */
       ".lp .four{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}",
       ".lp .tick{display:flex;gap:10px;align-items:flex-start;margin:16px 0 4px;cursor:pointer}",
@@ -720,7 +725,8 @@
           ${quotes.indexOf("usdc") < 0 ? raw("disabled") : ""}>USDC</button>
         <button data-q="rwa" ${flow.quote !== "sol" && flow.quote !== "usdc" ? raw('class="on"') : ""}
           ${rwas.length ? "" : raw('disabled title="A stock or commodity as the trading pair — no RWA curve config signed yet"')}
-          >${flow.quote !== "sol" && flow.quote !== "usdc" ? qLabel : "RWA"}</button>
+          >${flow.quote !== "sol" && flow.quote !== "usdc" ? qLabel
+             : (rwas.length === 1 ? rwas[0].label : "RWA")}</button>
       </div>
 
       <div class="fold2" id="tk-econ">
@@ -744,7 +750,8 @@
       <label>Holder rewards paid in</label>
       <button class="pick" id="lp-reward">
         <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
-        <span class="k2 mono">${shortAddr(flow.reward.mint)}</span>
+        <span class="pk-r"><span class="k2 mono">${shortAddr(flow.reward.mint)}</span>
+        <span class="pk-dd">Change ▾</span></span>
       </button>
       <p class="note">What the fee keeper converts trading fees into before paying
       ${nft ? "this collection's stakers" : "holders"}.</p>
@@ -832,7 +839,7 @@
         // pick WHICH asset prices the pair — only mints with a signed config
         var r = window.Token.rwaQuotes();
         if (r.length === 1) {
-          flow.quote = r[0].mint; flow.quoteSym = r[0].symbol;
+          flow.quote = r[0].mint; flow.quoteSym = r[0].label;
           return tokenDetails(flow);
         }
         return rwaQuotePicker(flow, r);
@@ -945,7 +952,7 @@
     box.querySelectorAll(".prow").forEach(function (b) {
       b.onclick = function () {
         var t = list.find(function (x) { return x.mint === b.dataset.mint; });
-        flow.quote = t.mint; flow.quoteSym = t.symbol;
+        flow.quote = t.mint; flow.quoteSym = t.label || t.symbol;
         tokenDetails(flow);
       };
     });
