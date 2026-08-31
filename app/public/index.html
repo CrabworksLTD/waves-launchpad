@@ -68,6 +68,36 @@ h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:te
   background:radial-gradient(closest-side,rgba(var(--accent-rgb),.6),transparent)}
 .panel>*{position:relative;z-index:1}
 .panel .sechead{margin-top:0}
+/* spotlight cards: square art, a status badge on it, then name, ticker,
+   the one number that matters, and where/when it came from */
+.spot{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:20px}
+@media (max-width:1180px){.spot{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:720px){.spot{grid-template-columns:repeat(2,1fr)}}
+.scard{display:block;border-radius:14px;overflow:hidden;background:var(--panel);
+  border:1px solid var(--line);transition:border-color .2s,transform .2s}
+.scard:hover{border-color:var(--faint);transform:translateY(-3px)}
+.scard .art{position:relative;aspect-ratio:1;background:var(--bg);overflow:hidden}
+.scard .art canvas,.scard .art img{width:100%;height:100%;display:block;
+  object-fit:cover;image-rendering:pixelated}
+.scard .art .none{position:absolute;inset:0;display:grid;place-items:center;
+  font:800 40px Archivo;color:var(--line2)}
+.scard .badge{position:absolute;top:10px;left:10px;padding:5px 11px;border-radius:99px;
+  font:600 10px "IBM Plex Mono",monospace;letter-spacing:.08em;
+  background:rgba(0,0,0,.7);backdrop-filter:blur(6px);border:1px solid var(--line2);
+  color:var(--dim)}
+.scard .badge.live{color:var(--accent);border-color:rgba(var(--accent-rgb),.45)}
+.scard .badge.done{color:var(--accent-2-hi);border-color:rgba(var(--accent-2-rgb),.5)}
+.scard .sinfo{padding:12px 14px 14px}
+.scard .sinfo b{display:block;font:700 15px Archivo;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scard .sym{display:block;margin-top:1px;font:400 12px "IBM Plex Mono",monospace;
+  color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scard .stat{margin-top:9px;font:600 15px "IBM Plex Mono",monospace;
+  font-variant-numeric:tabular-nums}
+.scard .stat i{font-style:normal;font-weight:400;font-size:11px;color:var(--faint);
+  margin-left:5px;letter-spacing:.06em}
+.scard .foot{display:flex;justify-content:space-between;gap:8px;margin-top:9px;
+  font:400 10.5px "IBM Plex Mono",monospace;color:var(--faint)}
 .feature{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px}
 .feature .wide3{grid-template-columns:1fr 1fr 1fr}
 .ban{position:relative;display:block;border:1px solid transparent;
@@ -224,8 +254,7 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
   <!-- spotlight: 2 wide collection banners, then a row of 3 that tokens share -->
   <section aria-label="Spotlight" class="panel">
     <div class="sechead"><h2 class="disp">Spotlight</h2></div>
-    <div class="feature" id="feat2"></div>
-    <div class="row3" id="feat3"></div>
+    <div class="spot" id="spot"></div>
   </section>
 
   <!-- ranked top-10s, side by side, after the reference: rank, thumb, name,
@@ -448,29 +477,117 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
     }, 300);
   }, 1400);
 
+  function ago(ts) {
+    if (!ts) return "";
+    var d = Math.floor((Date.now() - ts) / 86400000);
+    if (d >= 1) return d + "d ago";
+    var h = Math.floor((Date.now() - ts) / 3600000);
+    if (h >= 1) return h + "h ago";
+    return "just now";
+  }
+
+  /* One spotlight card: the art square with a status badge on it, then the
+   * name, the ticker or supply, the single number that matters, and where it
+   * came from. Tokens and collections share the shape deliberately — the
+   * badge and the stat label say which is which. */
+  function spotCard(o) {
+    return '<a class="scard" data-name="' + esc(o.name) + '" href="' + esc(o.href) + '">' +
+      '<div class="art">' +
+        (o.img ? '<img alt="" loading="lazy" src="' + esc(o.img) + '">'
+               : o.canvas ? "<canvas></canvas>"
+               : '<span class="none">' + esc((o.name || "?").slice(0, 1).toUpperCase()) + "</span>") +
+        '<span class="badge' + (o.badgeKind ? " " + o.badgeKind : "") + '">' +
+          esc(o.badge || "") + "</span>" +
+      "</div>" +
+      '<div class="sinfo"><b>' + esc(o.name) + "</b>" +
+      '<span class="sym">' + esc(o.sym || "") + "</span>" +
+      '<div class="stat" data-stat><b>—</b></div>' +
+      '<div class="foot"><span>' + esc(o.addr ? shortAddr(o.addr) : "") + "</span>" +
+      "<span>" + esc(ago(o.at)) + "</span></div></div></a>";
+  }
+  function setStat(el, value, label) {
+    if (!el) return;
+    el.innerHTML = "<b>" + esc(value) + "</b>" + (label ? "<i>" + esc(label) + "</i>" : "");
+  }
+
   function draw(collections, tokens, templates) {
     var live = collections && collections.length;
-    // spotlight tokens claim up to 3 slots of the bottom row; collections
-    // (or templates while nothing is live) fill whatever tokens leave open
-    var spotTok = tokens.slice(0, 3);
-    var needCol = 2 + (3 - spotTok.length);
-    var feat = (live ? collections : templates).slice(0, needCol);
-    var rest = (live ? collections : templates).slice(needCol);
+    var box = document.getElementById("spot");
 
-    var f2 = document.getElementById("feat2"), f3 = document.getElementById("feat3");
-    f2.innerHTML = feat.slice(0, 2).map(function (x) {
-      return bannerTile(x.name, live ? "/mint/" + x.candyMachine : "/app");
+    // tokens lead the row — most people are here for those — then collections,
+    // then templates while nothing has launched yet
+    var items = [];
+    tokens.slice(0, 5).forEach(function (t) { items.push({ kind: "token", rec: t }); });
+    (live ? collections : []).slice(0, 10 - items.length).forEach(function (c) {
+      items.push({ kind: "col", rec: c });
+    });
+    if (items.length < 10) {
+      templates.slice(0, 10 - items.length).forEach(function (t) {
+        items.push({ kind: "tpl", rec: t });
+      });
+    }
+
+    box.innerHTML = items.map(function (it) {
+      var r = it.rec;
+      if (it.kind === "token") {
+        return spotCard({
+          name: r.name || "Token", sym: "$" + String(r.symbol || "").toUpperCase(),
+          href: "/token/" + r.mint, img: r.icon || null,
+          badge: "TOKEN", addr: r.mint, at: r.at
+        });
+      }
+      if (it.kind === "col") {
+        return spotCard({
+          name: r.name || "Collection", sym: "Collection",
+          href: "/mint/" + r.candyMachine, img: r.avatar || null,
+          badge: "COLLECTION", addr: r.candyMachine, at: r.at
+        });
+      }
+      return spotCard({
+        name: r.name, sym: "Ready to launch",
+        href: "/app", canvas: true, badge: "TEMPLATE"
+      });
     }).join("");
-    f3.innerHTML = spotTok.map(tokenTile).join("") +
-      feat.slice(2).map(function (x) {
-        return bannerTile(x.name, live ? "/mint/" + x.candyMachine : "/app");
-      }).join("");
-    feat.forEach(function (x, i) {
-      var host = i < 2 ? f2.children[i] : f3.children[spotTok.length + i - 2];
-      var cv = host && host.querySelector("canvas");
-      if (!cv || live) return;                      // live banners need real art; later
-      loadTemplate(x.file).then(function (tp) {
-        paintBanner(cv, tp, i < 2 ? 5 : 3);
+
+    // art and numbers stream in after the first paint
+    items.forEach(function (it, i) {
+      var card = box.children[i];
+      if (!card) return;
+      var statEl = card.querySelector("[data-stat]");
+      if (it.kind === "tpl") {
+        var cv = card.querySelector("canvas");
+        loadTemplate(it.rec.file).then(function (tp) {
+          paint(cv, tp);
+          rerolls.push({ cv: cv, tp: tp });
+        }).catch(function () {});
+        setStat(statEl, String(it.rec.traits || ""), "traits");
+        return;
+      }
+      if (it.kind === "token") {
+        window.Token.readMarket(it.rec.mint).then(function (m) {
+          if (m.migrated) {
+            card.querySelector(".badge").textContent = "GRADUATED";
+            card.querySelector(".badge").className = "badge done";
+            setStat(statEl, "Graduated", "");
+          } else {
+            card.querySelector(".badge").className = "badge live";
+            card.querySelector(".badge").textContent = "ON THE CURVE";
+            setStat(statEl, UI.fmt(m.raised, 2) + " " + m.quote, "raised");
+          }
+        }).catch(function () {});
+        return;
+      }
+      var read = EVM
+        ? window.EvmCollections.readOne(it.rec.candyMachine).then(function (c) {
+            return { redeemed: c.minted, available: c.maxSupply };
+          })
+        : window.Launch.readMachine(it.rec.candyMachine);
+      read.then(function (m) {
+        var out = m.redeemed >= m.available;
+        var b = card.querySelector(".badge");
+        b.textContent = out ? "SOLD OUT" : "MINTING";
+        b.className = "badge " + (out ? "done" : "live");
+        setStat(statEl, m.redeemed.toLocaleString() + " / " + m.available.toLocaleString(), "minted");
       }).catch(function () {});
     });
 
