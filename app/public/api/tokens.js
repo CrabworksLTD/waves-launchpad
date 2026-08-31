@@ -23,6 +23,7 @@ function kv() {
 }
 
 const B58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const EVM = /^0x[0-9a-fA-F]{40}$/;
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
@@ -40,14 +41,22 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-    const { mint, name, symbol, cluster, rewardMint, collection, creator, icon, banner, pool, config, feeShare, feeSharePct, feeWallet } = body;
+    const { mint, name, symbol, cluster, rewardMint, collection, creator, icon, banner, pool, config, feeShare, feeSharePct, feeWallet, chain } = body;
+    const isEvm = chain === "robinhood";
 
-    if (!B58.test(mint || "")) return res.status(400).json({ error: "bad mint" });
-    // both optional; validated when present so a bad value is dropped loudly
-    if (rewardMint && !B58.test(rewardMint)) return res.status(400).json({ error: "bad rewardMint" });
-    if (collection && !B58.test(collection)) return res.status(400).json({ error: "bad collection" });
-    // Mainnet only — a devnet token on the homepage is a bug dressed as a scam.
-    if (cluster && cluster !== "mainnet-beta") return res.status(200).json({ ok: true, skipped: "not mainnet" });
+    /* A Robinhood Chain token is a 0x contract, not a base58 mint — the same
+     * split api/collections.js makes. Validating everything as base58 would
+     * reject every EVM launch with "bad mint". */
+    if (isEvm) {
+      if (!EVM.test(mint || "")) return res.status(400).json({ error: "bad address" });
+    } else {
+      if (!B58.test(mint || "")) return res.status(400).json({ error: "bad mint" });
+      // both optional; validated when present so a bad value is dropped loudly
+      if (rewardMint && !B58.test(rewardMint)) return res.status(400).json({ error: "bad rewardMint" });
+      if (collection && !B58.test(collection)) return res.status(400).json({ error: "bad collection" });
+      // Mainnet only — a devnet token on the homepage is a bug dressed as a scam.
+      if (cluster && cluster !== "mainnet-beta") return res.status(200).json({ ok: true, skipped: "not mainnet" });
+    }
 
     try {
       const db = await kv();
@@ -57,6 +66,11 @@ export default async function handler(req, res) {
         mint,
         name: String(name || "Untitled").slice(0, 40),
         symbol: String(symbol || "").slice(0, 12),
+        /* Which side launched it. Mirrors api/collections.js — null means
+         * Solana, so records written before this field existed stay Solana,
+         * which is what they are. Without it the tokens page showed every
+         * launch on both chains. */
+        chain: isEvm ? "robinhood" : null,
         // the reward asset the creator picked, and the collection this token
         // is paired with — consumed by the staking keeper later, displayed now
         rewardMint: rewardMint || null,

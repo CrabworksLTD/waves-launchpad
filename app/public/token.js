@@ -388,6 +388,9 @@
         feeSharePct: opts.feeSharePct || 0,
         quote: opts.quote || "sol",
         feeWallet: opts.feeWallet || null,
+        // which side this launched on — the tokens page filters on it, and
+        // without it every launch appeared on both chains
+        chain: (window.Shell && window.Shell.chain) ? window.Shell.chain() : "solana",
         cluster: window.Launch ? window.Launch.cluster() : "mainnet-beta"
       })
     }).catch(function () {});

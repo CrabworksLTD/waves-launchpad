@@ -196,8 +196,18 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   var sort = "progress";
   var query = "";
 
+  /* One side at a time. WAVES lists only what launched on the chain you are
+   * looking at — this page had no chain filter at all, so every Solana token
+   * also appeared on the Robinhood side. A null chain means Solana, which is
+   * what every record written before the field existed actually is. */
+  var EVM = !!(window.Shell && window.Shell.chain && window.Shell.chain() === "robinhood");
+
   fetch("/api/tokens").then(function (r) { return r.json(); })
-    .then(function (j) { return (j.tokens || []); })
+    .then(function (j) {
+      return (j.tokens || []).filter(function (t) {
+        return EVM ? t.chain === "robinhood" : t.chain !== "robinhood";
+      });
+    })
     .catch(function () { return []; })
     .then(load);
 
