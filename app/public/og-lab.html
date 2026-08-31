@@ -17,7 +17,17 @@ canvas{width:900px;height:472px;border:1px solid #444}</style>
 /* The share card, per Kyle: black, the mark huge running bottom-left to the
  * top edge, WAVES in the middle, gradient leaking in at bottom-right.
  * Drawn at exact OG size; the lab page exists so the PNG can be pulled out
- * pixel-perfect instead of screenshotting a scaled window. */
+ * pixel-perfect instead of screenshotting a scaled window.
+ *
+ * ?rh=1 draws the Robinhood Chain variant — the SAME card, only the mark's
+ * gradient recoloured lime→grey (Kyle: keep everything else identical) —
+ * and ?save=<name>.png POSTs the card to /api/dev-save (dev server only). */
+var Q = new URLSearchParams(location.search);
+var RH = Q.has("rh");
+var PAL = RH
+  ? { a: "#CCFF00", b: "#d9d9d9" }
+  : { a: "#9945FF", b: "#14F195" };
+
 async function draw() {
   await document.fonts.load("900 160px Archivo");
   await document.fonts.ready;
@@ -45,8 +55,8 @@ async function draw() {
     [2 * S, 0]
   ];
   var mg = g.createLinearGradient(steps[0][0], steps[0][1] + S, steps[2][0] + S, steps[2][1]);
-  mg.addColorStop(0, "#9945FF");
-  mg.addColorStop(1, "#14F195");
+  mg.addColorStop(0, PAL.a);
+  mg.addColorStop(1, PAL.b);
   g.fillStyle = mg;
   steps.forEach(function (p) { g.fillRect(p[0], p[1], S, S); });
 
@@ -62,6 +72,16 @@ async function draw() {
   g.letterSpacing = "2px";
   g.fillStyle = "rgba(255,255,255,.62)";
   g.fillText("DEPLOY… EVERYTHING.", 600, 427);
+
+  var name = Q.get("save");
+  if (name) {
+    fetch("/api/dev-save", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name,
+        dataUrl: document.getElementById("c").toDataURL("image/png") })
+    }).then(function (r) { return r.json(); })
+      .then(function (j) { console.log("dev-save", JSON.stringify(j)); });
+  }
 }
 draw();
 

@@ -30,6 +30,14 @@
     solana:    { label: "Solana",          icon: "/art/solana.svg" },
     robinhood: { label: "Robinhood Chain", icon: "/art/robinhood.svg" }
   };
+  // a shared ?chain=rh link lands on the Robinhood side (and it's what lets
+  // the share crawlers serve the Robinhood card — they never run this code,
+  // vercel.json routes them by the same query param)
+  try {
+    if (new URLSearchParams(location.search).get("chain") === "rh") {
+      localStorage.setItem("shl-chain", "robinhood");
+    }
+  } catch (e) {}
   function currentChain() {
     try { var c = localStorage.getItem("shl-chain"); } catch (e) {}
     return CHAINS[c] ? c : "solana";
@@ -49,9 +57,25 @@
     // the wallet pill answers to a different chain now
     if (net === "robinhood") window.Shell.ensureEvmStack().catch(function () {});
     if (shellPaintWallet) shellPaintWallet();
+    // the address bar carries the chain, so a copied link shares the same
+    // side of the site (and gets the matching share card)
+    try {
+      var u = new URL(location.href);
+      if (net === "robinhood") u.searchParams.set("chain", "rh");
+      else u.searchParams.delete("chain");
+      history.replaceState(null, "", u.pathname + (u.search || "") + u.hash);
+    } catch (e) {}
   }
   if (currentChain() !== "solana") {
     document.documentElement.dataset.chain = currentChain();
+    // keep the address bar honest on every page of the Robinhood side
+    try {
+      var bu = new URL(location.href);
+      if (bu.searchParams.get("chain") !== "rh") {
+        bu.searchParams.set("chain", "rh");
+        history.replaceState(null, "", bu.pathname + bu.search + bu.hash);
+      }
+    } catch (e) {}
     // load the EVM stack up front so connect and reads have no lag
     document.addEventListener("DOMContentLoaded", function () {
       window.Shell.ensureEvmStack().catch(function () {});
