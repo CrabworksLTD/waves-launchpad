@@ -61,20 +61,33 @@
     var fv = document.querySelector('link[rel="icon"]');
     if (fv) fv.href = net === "robinhood" ? "/mark-rh.svg" : "/mark.svg";
     // the address bar carries the chain, so a copied link shares the same
-    // side of the site (and gets the matching share card)
+    // side of the site (and gets the matching share card). The homepage gets
+    // a real path — /rh — because crawlers refuse to unfurl through a
+    // query-triggered redirect; inner pages carry the query param.
     try {
       var u = new URL(location.href);
-      if (net === "robinhood") u.searchParams.set("chain", "rh");
-      else u.searchParams.delete("chain");
-      history.replaceState(null, "", u.pathname + (u.search || "") + u.hash);
+      var home = u.pathname === "/" || u.pathname === "/index.html" ||
+        u.pathname === "/rh" || u.pathname === "/rh.html";
+      if (home) {
+        history.replaceState(null, "", (net === "robinhood" ? "/rh" : "/") + u.hash);
+      } else {
+        if (net === "robinhood") u.searchParams.set("chain", "rh");
+        else u.searchParams.delete("chain");
+        history.replaceState(null, "", u.pathname + (u.search || "") + u.hash);
+      }
     } catch (e) {}
   }
   if (currentChain() !== "solana") {
     document.documentElement.dataset.chain = currentChain();
-    // keep the address bar honest on every page of the Robinhood side
+    // keep the address bar honest on every page of the Robinhood side —
+    // the homepage becomes /rh (a real page, crawler-safe), inner pages
+    // carry ?chain=rh
     try {
       var bu = new URL(location.href);
-      if (bu.searchParams.get("chain") !== "rh") {
+      if (bu.pathname === "/" || bu.pathname === "/index.html") {
+        history.replaceState(null, "", "/rh" + bu.hash);
+      } else if (bu.pathname !== "/rh" && bu.pathname !== "/rh.html" &&
+                 bu.searchParams.get("chain") !== "rh") {
         bu.searchParams.set("chain", "rh");
         history.replaceState(null, "", bu.pathname + bu.search + bu.hash);
       }
@@ -278,8 +291,9 @@
     (function () {
       var gh = window.BRAND && window.BRAND.gate;
       if (!gh || /^(localhost|127\.)/.test(location.hostname)) return;
-      // the lock is on the front door only — inner pages stay open
-      if (location.pathname !== "/" && location.pathname !== "/index.html") return;
+      // the lock is on the front doors only — inner pages stay open
+      if (location.pathname !== "/" && location.pathname !== "/index.html" &&
+          location.pathname !== "/rh" && location.pathname !== "/rh.html") return;
       try { if (sessionStorage.getItem("shl.gate") === gh) return; } catch (e) {}
       var ov = document.createElement("div");
       ov.id = "shl-gate";
