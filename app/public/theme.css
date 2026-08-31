@@ -103,28 +103,28 @@
  * Solana purple→green gradient runs. Everything painted from the tokens above
  * recolours automatically; anything that doesn't is a hardcoded hex and a bug. */
 :root[data-chain="robinhood"]{
-  --accent:      #00CF98;
-  --accent-dim:  #00a87b;
-  --accent-hi:   #43ecb8;
-  --accent-glow: rgba(0,207,152,.16);
-  --accent-ink:  #04120d;
+  --accent:      #CCFF00;
+  --accent-dim:  #a3cc00;
+  --accent-hi:   #e0ff4d;
+  --accent-glow: rgba(204,255,0,.16);
+  --accent-ink:  #141400;
 
   --accent-2:      #d6d6d6;
   --accent-2-dim:  #ababab;
   --accent-2-glow: rgba(214,214,214,.18);
 
-  --accent-rgb:   0,207,152;
+  --accent-rgb:   204,255,0;
   --accent-2-rgb: 214,214,214;
 
-  --grad-a:     #00CF98;
+  --grad-a:     #CCFF00;
   --grad-b:     #d9d9d9;
-  --grad-a-rgb: 0,207,152;
+  --grad-a-rgb: 204,255,0;
   --grad-b-rgb: 217,217,217;
   --accent-2-hi: #ececec;
 
-  --grad:      linear-gradient(90deg, #00CF98 0%, #d9d9d9 100%);
-  --grad-rev:  linear-gradient(90deg, #d9d9d9 0%, #00CF98 100%);
-  --grad-hi:   linear-gradient(90deg, #35e0ac 0%, #f0f0f0 100%);
-  --grad-soft: linear-gradient(90deg, rgba(0,207,152,.16) 0%, rgba(217,217,217,.16) 100%);
-  --grad-line: linear-gradient(90deg, transparent, #00CF98 28%, #d9d9d9 72%, transparent);
+  --grad:      linear-gradient(90deg, #CCFF00 0%, #d9d9d9 100%);
+  --grad-rev:  linear-gradient(90deg, #d9d9d9 0%, #CCFF00 100%);
+  --grad-hi:   linear-gradient(90deg, #d6ff33 0%, #f0f0f0 100%);
+  --grad-soft: linear-gradient(90deg, rgba(204,255,0,.16) 0%, rgba(217,217,217,.16) 100%);
+  --grad-line: linear-gradient(90deg, transparent, #CCFF00 28%, #d9d9d9 72%, transparent);
 }
