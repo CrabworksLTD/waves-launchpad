@@ -100,8 +100,17 @@ export default async function handler(req, res) {
         for (let i = 0; i < (raw || []).length; i++) {
           const cur = typeof raw[i] === "string" ? JSON.parse(raw[i]) : raw[i];
           if (!cur || cur.mint !== mint) continue;
+          /* Only fields the caller actually SENT.
+           *
+           * This used to copy every non-null field of `rec`, but `rec` is a
+           * fully-formed record with defaults — name falls back to "Untitled"
+           * and symbol to "", neither of which is null. So correcting one field
+           * silently renamed the token to "Untitled" and blanked its ticker.
+           * Doing it to $SOLWAVES while attaching its share card is how this
+           * was found. */
           for (const k of Object.keys(rec)) {
-            if (k !== "at" && rec[k] != null) cur[k] = rec[k];
+            if (k === "at" || !(k in body)) continue;
+            if (rec[k] != null) cur[k] = rec[k];
           }
           await db.lset(KEY, i, JSON.stringify(cur));
           return res.status(200).json({ ok: true, corrected: true });

@@ -109,6 +109,12 @@ export default async function handler(req, res) {
           let changed = false;
           for (const k of Object.keys(rec)) {
             if (k === "at" || rec[k] == null) continue;
+            /* An admin correction may only touch fields the caller actually
+             * SENT. `rec` is a fully-formed record with defaults — name falls
+             * back to "Untitled collection" — so without this, fixing one
+             * field silently renames the collection. The same bug in
+             * api/tokens.js blanked $SOLWAVES's name and ticker. */
+            if (admin && !(k in body)) continue;
             if (admin || cur[k] === null || cur[k] === undefined) {
               if (cur[k] !== rec[k]) { cur[k] = rec[k]; changed = true; }
             }
