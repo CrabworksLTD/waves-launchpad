@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WAVES Launchpad</title>
+<meta name="description" content="Claim your accrued trading fees.">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+/* The claim console. Creators see the tokens they launched with live
+ * accrued-fee numbers straight from the pools, one claim per row. The
+ * platform wallet sees a second section for its own share. Tokens whose
+ * fees are pledged to holders say so and hold the button — that promise
+ * is enforced socially until the staking vault enforces it on chain,
+ * and the row says exactly that. */
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{margin:0;min-height:100%}
+body{background:var(--void);color:var(--ink);font:400 15px/1.6 Inter,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono",monospace}
+a{color:inherit;text-decoration:none}
+main{max-width:900px;margin:0 auto;padding:44px 24px 100px}
+h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
+  letter-spacing:-.02em;margin:0 0 6px}
+.lede{color:var(--dim);margin:0 0 30px;max-width:60ch;font-size:14.5px}
+h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
+.frow{display:flex;align-items:center;gap:14px;padding:14px 16px;margin-top:8px;
+  border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.frow .coin{width:42px;height:42px;flex:none;border-radius:9px;overflow:hidden;
+  border:2px solid transparent;display:grid;place-items:center;
+  background:linear-gradient(var(--panel2),var(--panel2)) padding-box,var(--grad) border-box;
+  font:800 16px Archivo}
+.frow .coin img{width:100%;height:100%;object-fit:cover}
+.frow .who{min-width:0;flex:1}
+.frow .who b{display:block;font:700 14.5px Archivo}
+.frow .who span{display:block;font:400 12px "IBM Plex Mono",monospace;color:var(--faint)}
+.frow .owed{flex:none;text-align:right;margin-right:4px}
+.frow .owed b{display:block;font:700 15px "IBM Plex Mono",monospace}
+.frow .owed span{display:block;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--faint)}
+.frow button{flex:none;padding:10px 22px;border-radius:999px;border:0;cursor:pointer;
+  font:700 13px Archivo;color:var(--accent-ink);
+  background-image:var(--grad);background-repeat:no-repeat;
+  background-size:calc(100% + 2px) 100%;background-position:-1px 0}
+.frow button:disabled{opacity:.4;cursor:default}
+.frow .shared{flex:none;font:600 10px "IBM Plex Mono",monospace;letter-spacing:.12em;
+  color:#ffb84d;border:1px solid rgba(255,180,80,.45);border-radius:99px;padding:5px 11px}
+.gate,.none{border:1px dashed var(--line2);border-radius:10px;padding:38px 24px;
+  text-align:center;color:var(--faint);font-size:13.5px}
+.gate button{margin-top:14px;padding:11px 26px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--line2);background:var(--void);font:700 13.5px Archivo}
+.gate button span{background:var(--grad);-webkit-background-clip:text;
+  background-clip:text;color:transparent}
+.msg{margin-top:14px;font-size:12.5px;padding:11px 13px;border-radius:8px;display:none}
+.msg.err{display:block;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ffb3b3}
+.msg.ok{display:block;background:rgba(20,241,149,.08);border:1px solid rgba(20,241,149,.3);color:#8ff5cd}
+.msg a{color:inherit;text-decoration:underline}
+</style>
+</head>
+<body>
+<main>
+  <h1 class="disp">Claim fees</h1>
+  <p class="lede">Every trade of your token pays your share into its pool, where it
+  accrues until you claim it. Numbers below are read from the pools, live.</p>
+
+  <div class="gate" id="gate">
+    <p>Connect the wallet that launched your tokens.</p>
+    <button id="gate-connect"><span>Connect wallet</span></button>
+  </div>
+
+  <section id="mine-wrap" hidden>
+    <h2 class="disp">Your launches</h2>
+    <div id="mine"></div>
+  </section>
+
+  <section id="plat-wrap" hidden>
+    <h2 class="disp">Platform share</h2>
+    <div id="plat"></div>
+  </section>
+
+  <div class="msg" id="msg"></div>
+</main>
+
+<script src="/brand.js"></script>
+<script src="/ui.js"></script>
+<script src="/wallet.js"></script>
+<script src="/shell.js"></script>
+<script src="/launch.js"></script>
+<script src="/token.js"></script>
+<script>
+(function () {
+  "use strict";
+  var esc = UI.esc, shortAddr = UI.shortAddr;
+  Shell.mount({ active: "explore", search: false });
+  var qs = new URLSearchParams(location.search);
+  if (qs.get("cluster")) window.Launch.cluster(qs.get("cluster"));
+  var $ = function (id) { return document.getElementById(id); };
+
+  function say(k, h) { var m = $("msg"); m.className = "msg " + k; m.innerHTML = h; }
+
+  function row(t, kind, amt) {
+    var sym = (t.symbol || "?").toUpperCase();
+    var shared = kind === "creator" && t.feeShare === "holders";
+    return '<div class="frow" data-mint="' + esc(t.mint) + '" data-kind="' + kind + '">' +
+      '<span class="coin">' + (t.icon ? '<img alt="" src="' + esc(t.icon) + '">'
+        : esc(sym.slice(0, 1))) + "</span>" +
+      '<span class="who"><b>$' + esc(sym) + " · " + esc(t.name) + "</b>" +
+      "<span>" + esc(shortAddr(t.mint)) + "</span></span>" +
+      '<span class="owed"><b class="amt">' + (amt == null ? "…" : amt) + "</b>" +
+      "<span>accrued</span></span>" +
+      (shared
+        ? '<span class="shared" title="This launch pledged its fee share to holders — ' +
+          'it claims to the staking vault when staking ships.">PLEDGED TO HOLDERS</span>'
+        : '<button class="cl" disabled>Claim</button>') +
+      "</div>";
+  }
+
+  async function load() {
+    var w = window.Wallet.current();
+    if (!w) return;
+    $("gate").hidden = true;
+
+    var tokens = await fetch("/api/tokens").then(function (r) { return r.json(); })
+      .then(function (j) { return j.tokens || []; }).catch(function () { return []; });
+
+    var mine = tokens.filter(function (t) { return t.creator === w.publicKey; });
+    var isPlatform = w.publicKey === (window.BRAND.feeOwner || "");
+
+    $("mine-wrap").hidden = false;
+    $("mine").innerHTML = mine.length
+      ? mine.map(function (t) { return row(t, "creator", null); }).join("")
+      : '<div class="none">No launches from this wallet yet.</div>';
+
+    if (isPlatform) {
+      $("plat-wrap").hidden = false;
+      $("plat").innerHTML = tokens.length
+        ? tokens.map(function (t) { return row(t, "partner", null); }).join("")
+        : '<div class="none">No pools yet.</div>';
+    }
+
+    // stream the live numbers in; arm buttons as they land
+    var rows = [].slice.call(document.querySelectorAll(".frow"));
+    rows.forEach(function (el) {
+      var t = tokens.find(function (x) { return x.mint === el.dataset.mint; });
+      window.Token.feeMetrics(t.mint, t.pool || null).then(function (m) {
+        var amt = el.dataset.kind === "creator" ? m.creator : m.partner;
+        el.querySelector(".amt").textContent = UI.fmt(amt, 4) + " " + m.quote;
+        var btn = el.querySelector(".cl");
+        if (btn && amt > 0) {
+          btn.disabled = false;
+          btn.onclick = function () { doClaim(el, t, btn); };
+        }
+      }).catch(function () {
+        el.querySelector(".amt").textContent = "—";
+      });
+    });
+  }
+
+  async function doClaim(el, t, btn) {
+    btn.disabled = true; btn.textContent = "Confirm…";
+    say("", "");
+    try {
+      var w = window.Wallet.current();
+      var fn = el.dataset.kind === "creator"
+        ? window.Token.claimCreatorFeesTo : window.Token.claimPartnerFeesTo;
+      var sig = await fn(t.mint, w.publicKey, t.pool || null);
+      say("ok", 'Claimed. <a href="https://explorer.solana.com/tx/' + esc(sig) +
+        '" target="_blank" rel="noopener">View tx ↗</a>');
+      el.querySelector(".amt").textContent = "0 " + el.querySelector(".amt").textContent.split(" ").pop();
+      btn.textContent = "Claimed";
+    } catch (e) {
+      var m = String(e.message || e);
+      if (/reject/i.test(m)) m = "You cancelled the transaction.";
+      say("err", esc(m.slice(0, 200)));
+      btn.disabled = false; btn.textContent = "Claim";
+    }
+  }
+
+  $("gate-connect").addEventListener("click", async function () {
+    var w = await Shell.connect();
+    if (w) load();
+  });
+  if (window.Wallet.current()) load();
+  var n = 0, iv = setInterval(function () {
+    if (window.Wallet.current()) { load(); clearInterval(iv); }
+    if (++n > 10) clearInterval(iv);
+  }, 500);
+})();
+</script>
+</body>
+</html>

@@ -36,7 +36,8 @@
     { id: "explore", label: "Explore", menu: [
       { label: "Tokens",      href: "/tokens" },
       { label: "Collections", href: "/collections" },
-      { label: "Staking",     href: "/stake" }
+      { label: "Staking",     href: "/stake" },
+      { label: "Claim fees",   href: "/fees" }
     ]},
     { id: "docs",        label: "Docs",        href: "/docs" },
     { id: "faq",         label: "FAQ",         href: "/faq" }
@@ -200,7 +201,7 @@
     var PAGE_NAMES = {
       "/": "Launchpad", "/app": "Editor", "/launch": "Launch",
       "/collections": "Collections", "/tokens": "Tokens", "/stake": "Staking",
-      "/docs": "Docs", "/faq": "FAQ", "/profile": "Profile"
+      "/docs": "Docs", "/faq": "FAQ", "/profile": "Profile", "/fees": "Fees"
     };
     var pg = PAGE_NAMES[location.pathname]
       || (location.pathname.indexOf("/mint/") === 0 ? "Mint" : null)

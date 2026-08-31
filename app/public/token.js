@@ -336,6 +336,7 @@
         creator: String(c.owner),
         pool: String(poolPk),
         config: String(configPk),
+        feeShare: opts.feeShare || "keep",
         quote: opts.quote || "sol",
         feeWallet: opts.feeWallet || null,
         cluster: window.Launch ? window.Launch.cluster() : "mainnet-beta"
@@ -375,12 +376,41 @@
     };
   }
 
+  /* Accrued, unclaimed fees on a pool — read-only, for the claim page. */
+  async function feeMetrics(baseMint, poolHint) {
+    var c = await readCtx(baseMint, poolHint);
+    var m = await c.cli.state.getPoolFeeMetrics(c.pool.publicKey);
+    var dec = Math.pow(10, c.quoteDec);
+    return {
+      creator: Number(m.current.creatorQuoteFee) / dec,
+      partner: Number(m.current.partnerQuoteFee) / dec,
+      quote: c.quoteSym
+    };
+  }
+
+  /* The platform's own claim — only the feeOwner wallet can sign it. */
+  async function claimPartnerFeesTo(baseMint, receiver, poolHint) {
+    var c = await client();
+    var pool = await poolByMint(c.cli, c.X, c.M, c.conn, baseMint, poolHint);
+    if (!pool) throw new Error("No pool for that mint");
+    var U64MAX = "18446744073709551615";
+    var tx = await c.cli.partner.claimPartnerTradingFeeToReceiver({
+      feeClaimer: c.owner,
+      payer: c.owner,
+      pool: pool.publicKey,
+      receiver: new c.X.PublicKey(receiver),
+      maxBaseAmount: new c.M.BN(U64MAX),
+      maxQuoteAmount: new c.M.BN(U64MAX)
+    });
+    return await send(c, tx);
+  }
+
   /* Claim a creator's accrued trading fees straight into a receiver — the
    * collection's reward vault. This is what makes the rewards loop work without
    * us ever holding creator funds. */
-  async function claimCreatorFeesTo(baseMint, receiver) {
+  async function claimCreatorFeesTo(baseMint, receiver, poolHint) {
     var c = await client();
-    var pool = await poolByMint(c.cli, c.X, c.M, c.conn, baseMint);
+    var pool = await poolByMint(c.cli, c.X, c.M, c.conn, baseMint, poolHint);
     if (!pool) throw new Error("No pool for that mint");
 
     // u64 max as BN: "claim everything". The SDK types these as BN, not
@@ -527,6 +557,8 @@
     launchToken: launchToken,
     readPool: readPool,
     claimCreatorFeesTo: claimCreatorFeesTo,
+    claimPartnerFeesTo: claimPartnerFeesTo,
+    feeMetrics: feeMetrics,
     rewards: REWARDS,
     rwa: loadRwa,
     commodities: loadCommodities,
