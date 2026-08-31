@@ -669,12 +669,84 @@
     } catch (e) { return null; }
   }
 
+  /* Recent trades, read straight off the pool.
+   *
+   * No indexer yet, and none needed for a first page of history: the pool's
+   * signature list is a chronological record of everything that touched it,
+   * and each transaction's token balance deltas say who traded, which way and
+   * how much. Later this moves to a cron so the page does not pay for it, but
+   * a launchpad with an empty trades panel looks dead, and this is real.
+   *
+   * getSignaturesForAddress is allowed on public nodes (unlike the by-owner
+   * token queries), so this works without a paid RPC. */
+  async function recentTrades(baseMint, poolAddr, limit) {
+    var X = await mx();
+    var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
+    var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
+    var pool = new X.PublicKey(poolAddr);
+    var sigs = await conn.getSignaturesForAddress(pool, { limit: limit || 20 });
+    var dec = await baseDecimals(baseMint, conn, X);
+    var out = [];
+    for (var i = 0; i < sigs.length; i++) {
+      var s = sigs[i];
+      if (s.err) continue;
+      /* Parsed, not raw: these transactions use address lookup tables, and the
+       * raw form refuses to resolve account keys without them
+       * ("address table lookups were not resolved"). The parsed form hands
+       * back plain pubkeys with their signer flags already worked out. */
+      var tx = await conn.getParsedTransaction(s.signature, {
+        maxSupportedTransactionVersion: 0, commitment: "confirmed"
+      }).catch(function () { return null; });
+      if (!tx || !tx.meta) continue;
+
+      // whoever signed is the trader; the pool's own accounts are not traders
+      var keys = (tx.transaction.message.accountKeys || []).map(function (k) {
+        return typeof k === "string" ? { pubkey: k } : k;
+      });
+      var signer = keys.find(function (k) { return k.signer; }) || keys[0];
+      var who = signer ? String(signer.pubkey) : "";
+
+      // the trader's change in the launch token decides direction and size
+      var before = 0, after = 0, seen = false;
+      (tx.meta.preTokenBalances || []).forEach(function (b) {
+        if (b.mint === baseMint && String(b.owner) === who) {
+          before = Number(b.uiTokenAmount.uiAmount || 0); seen = true;
+        }
+      });
+      (tx.meta.postTokenBalances || []).forEach(function (b) {
+        if (b.mint === baseMint && String(b.owner) === who) {
+          after = Number(b.uiTokenAmount.uiAmount || 0); seen = true;
+        }
+      });
+      if (!seen) continue;
+      var delta = after - before;
+      if (!delta) continue;
+
+      // the quote side is the signer's lamport change, minus fees
+      var wi = keys.findIndex(function (k) { return String(k.pubkey) === who; });
+      var sol = wi >= 0
+        ? (Number(tx.meta.postBalances[wi]) - Number(tx.meta.preBalances[wi])) / 1e9
+        : 0;
+      out.push({
+        sig: s.signature,
+        who: who,
+        side: delta > 0 ? "buy" : "sell",
+        tokens: Math.abs(delta),
+        sol: Math.abs(sol),
+        at: (s.blockTime || 0) * 1000,
+        decimals: dec
+      });
+    }
+    return out;
+  }
+
   window.Token = {
     readMarket: readMarket,
     getQuote: getQuote,
     swap: swap,
     balanceOf: balanceOf,
     onchainIdentity: onchainIdentity,
+    recentTrades: recentTrades,
     launchToken: launchToken,
     readPool: readPool,
     claimCreatorFeesTo: claimCreatorFeesTo,

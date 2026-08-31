@@ -57,9 +57,34 @@ main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
 .ca.did{color:var(--accent)}
 #ca-said{font-size:11px;letter-spacing:.08em;text-transform:uppercase}
 
-.grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}
+/* trade box and chart share a row and a height; history sits under both */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:stretch}
 @media (max-width:900px){.grid{grid-template-columns:1fr}}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;
+  display:flex;flex-direction:column}
+.panel.chartp{min-height:440px;order:1}
+.panel.tradep{order:2}
+#curve{width:100%;flex:1;min-height:260px;display:block}
+
+/* recent trades */
+.hist{margin-top:20px;background:var(--panel);border:1px solid var(--line);
+  border-radius:14px;padding:18px}
+.hist .hh{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.hist .hh b{font:800 15px Archivo}
+.hist .hh span{margin-left:auto;font:400 11.5px "IBM Plex Mono",monospace;color:var(--faint)}
+.trow{display:flex;align-items:center;gap:12px;padding:11px 6px;
+  border-top:1px solid var(--line);font-size:13px}
+.trow:first-of-type{border-top:0}
+.trow .dir{width:22px;flex:none;font:700 14px Archivo;text-align:center}
+.trow .dir.buy{color:var(--accent)}
+.trow .dir.sell{color:#ff8f8f}
+.trow .amt{min-width:0;flex:1}
+.trow .amt b{display:block;font:600 13.5px "IBM Plex Mono",monospace}
+.trow .amt span{display:block;font:400 11px "IBM Plex Mono",monospace;color:var(--faint)}
+.trow .val{text-align:right;flex:none}
+.trow .val b{display:block;font:600 13px "IBM Plex Mono",monospace}
+.trow .val span{display:block;font:400 11px "IBM Plex Mono",monospace;color:var(--faint)}
+.hist .empty{padding:26px 6px;text-align:center;color:var(--faint);font-size:13px}
 
 /* stats + curve */
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-bottom:14px}
@@ -127,20 +152,7 @@ input:focus{outline:none;border-color:var(--accent)}
 
 <main>
   <div class="grid">
-    <div class="panel">
-      <div class="stats">
-        <div class="stat"><span class="k">Price</span><b id="s-price">—</b></div>
-        <div class="stat"><span class="k">Raised</span><b id="s-raised">—</b></div>
-        <div class="stat"><span class="k">Graduates at</span><b id="s-grad">—</b></div>
-        <div class="stat"><span class="k">Status</span><b id="s-status">—</b></div>
-      </div>
-      <canvas id="curve"></canvas>
-      <div class="bar"><i id="bar"></i></div>
-      <div class="barlb"><span id="pct">—</span><span>graduation → Meteora DAMM v2, LP locked</span></div>
-      <p class="desc" id="desc"></p>
-    </div>
-
-    <div class="panel">
+    <div class="panel tradep">
       <div class="tabs">
         <button class="on buy" id="t-buy">Buy</button>
         <button class="sell" id="t-sell">Sell</button>
@@ -158,6 +170,25 @@ input:focus{outline:none;border-color:var(--accent)}
       <p class="note">Trades run against the bonding curve — no order book, no LP.
       1% trading fee: 20% creator / 60% platform / 20% Meteora.</p>
     </div>
+
+    <div class="panel chartp">
+      <div class="stats">
+        <div class="stat"><span class="k">Price</span><b id="s-price">—</b></div>
+        <div class="stat"><span class="k">Raised</span><b id="s-raised">—</b></div>
+        <div class="stat"><span class="k">Graduates at</span><b id="s-grad">—</b></div>
+        <div class="stat"><span class="k">Status</span><b id="s-status">—</b></div>
+      </div>
+      <canvas id="curve"></canvas>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="barlb"><span id="pct">—</span><span>graduation → Meteora DAMM v2, LP locked</span></div>
+      <p class="desc" id="desc"></p>
+    </div>
+
+  </div>
+
+  <div class="hist">
+    <div class="hh"><b>Recent trades</b><span id="hist-note">reading the chain…</span></div>
+    <div id="hist"></div>
   </div>
 </main>
 
@@ -234,6 +265,43 @@ input:focus{outline:none;border-color:var(--accent)}
     $("socials").innerHTML = out.join("");
   }
 
+  /* Recent trades, straight off the pool. Rendered after the page is usable
+   * because it is a dozen RPC round trips — the trade box must never wait on
+   * history to become interactive. */
+  function shortWho(a) { return a ? a.slice(0, 4) + "…" + a.slice(-4) : ""; }
+  function agoShort(ts) {
+    if (!ts) return "";
+    var s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return s + "s";
+    if (s < 3600) return Math.floor(s / 60) + "m";
+    if (s < 86400) return Math.floor(s / 3600) + "h";
+    return Math.floor(s / 86400) + "d";
+  }
+  function loadTrades() {
+    if (!poolHint) { $("hist-note").textContent = "no pool recorded"; return; }
+    window.Token.recentTrades(MINT, poolHint, 15).then(function (list) {
+      if (!list.length) {
+        $("hist-note").textContent = "";
+        $("hist").innerHTML = '<div class="empty">No trades yet — the first one shows up here.</div>';
+        return;
+      }
+      $("hist-note").textContent = list.length + " shown";
+      $("hist").innerHTML = list.map(function (t) {
+        return '<a class="trow" href="https://explorer.solana.com/tx/' + esc(t.sig) +
+          '" target="_blank" rel="noopener">' +
+          '<span class="dir ' + t.side + '">' + (t.side === "buy" ? "↗" : "↙") + "</span>" +
+          '<span class="amt"><b>' + UI.fmt(t.tokens, 2) + " " +
+            esc(($("sym").textContent || "").replace(/^\$/, "")) + "</b>" +
+            "<span>" + esc(shortWho(t.who)) + "</span></span>" +
+          '<span class="val"><b>' + UI.fmt(t.sol, 4) + " SOL</b>" +
+            "<span>" + agoShort(t.at) + " ago</span></span></a>";
+      }).join("");
+    }).catch(function () {
+      $("hist-note").textContent = "";
+      $("hist").innerHTML = '<div class="empty">Could not read trade history right now.</div>';
+    });
+  }
+
   async function load() {
     // identity from the pinned record if we have one; chain has name via
     // metadata uri but the record round-trip is cheaper
@@ -280,6 +348,7 @@ input:focus{outline:none;border-color:var(--accent)}
     $("bar").style.width = (market.progress * 100).toFixed(1) + "%";
     $("pct").textContent = (market.progress * 100).toFixed(1) + "% to graduation";
     drawCurve(market.progress);
+    loadTrades();
 
     if (market.migrated) {
       $("go").textContent = "Trade on Jupiter ↗";
