@@ -72,6 +72,20 @@ export default async function handler(req, res) {
 
     try {
       const db = await kv();
+      const rec = {
+        candyMachine: isEvm ? null : candyMachine,
+        collection: isEvm ? null : collection,
+        chain: isEvm ? "robinhood" : null,
+        address: isEvm ? address : null,
+        name: String(name || "Untitled").slice(0, 40),
+        // only arweave art, never an arbitrary URL someone POSTs at us
+        avatar: (typeof avatar === "string" && /^https:\/\/arweave\.net\/[\w\-\/\.]+$/.test(avatar)) ? avatar : null,
+        // the launch's own share card, pinned beside its art
+        card: (typeof body.card === "string" && /^https:\/\/arweave\.net\/[\w\-\/\.]+$/.test(body.card)) ? body.card : null,
+        tokenMint: (tokenMint && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(tokenMint)) ? tokenMint : null,
+        creator: (creator && (B58.test(creator) || EVM.test(creator))) ? creator : null,
+        at: Date.now()
+      };
       const key = isEvm ? address.toLowerCase() : candyMachine;
       const matches = (cur) => cur &&
         (isEvm ? String(cur.address || "").toLowerCase() === key : cur.candyMachine === key);
@@ -105,20 +119,6 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, duplicate: true });
       }
 
-      const rec = {
-        candyMachine: isEvm ? null : candyMachine,
-        collection: isEvm ? null : collection,
-        chain: isEvm ? "robinhood" : null,
-        address: isEvm ? address : null,
-        name: String(name || "Untitled").slice(0, 40),
-        // only arweave art, never an arbitrary URL someone POSTs at us
-        avatar: (typeof avatar === "string" && /^https:\/\/arweave\.net\/[\w\-\/\.]+$/.test(avatar)) ? avatar : null,
-        // the launch's own share card, pinned beside its art
-        card: (typeof body.card === "string" && /^https:\/\/arweave\.net\/[\w\-\/\.]+$/.test(body.card)) ? body.card : null,
-        tokenMint: (tokenMint && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(tokenMint)) ? tokenMint : null,
-        creator: (creator && (B58.test(creator) || EVM.test(creator))) ? creator : null,
-        at: Date.now()
-      };
       await db.lpush(KEY, JSON.stringify(rec));
       await db.ltrim(KEY, 0, MAX - 1);
       return res.status(200).json({ ok: true });
