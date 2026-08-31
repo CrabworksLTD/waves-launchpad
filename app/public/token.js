@@ -348,6 +348,7 @@
         rewardMint: opts.rewardMint || null,
         icon: opts.icon || null,
         banner: opts.banner || null,
+        card: opts.card || null,
         collection: opts.collection || null,
         creator: String(c.owner),
         pool: String(poolPk),

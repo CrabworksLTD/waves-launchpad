@@ -359,6 +359,8 @@
     var bannerName = "banner." + (opts.bannerExt || "png");
     if (opts.icon) files.push({ id: "_icon", name: iconName, bytes: opts.icon });
     if (opts.banner) files.push({ id: "_banner", name: bannerName, bytes: opts.banner });
+    // the launch's share card, composed in the browser (see cardmaker.js)
+    if (opts.card) files.push({ id: "_card", name: "card.png", bytes: opts.card });
 
     function buildJson(cid) {
       var j = {
@@ -400,7 +402,8 @@
     return {
       uri: "https://arweave.net/" + cid + "/token.json", cid: cid,
       iconUri: opts.icon ? "https://arweave.net/" + cid + "/" + iconName : null,
-      bannerUri: opts.banner ? "https://arweave.net/" + cid + "/" + bannerName : null
+      bannerUri: opts.banner ? "https://arweave.net/" + cid + "/" + bannerName : null,
+      cardUri: opts.card ? "https://arweave.net/" + cid + "/card.png" : null
     };
   }
 

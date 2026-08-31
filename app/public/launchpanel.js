@@ -1372,8 +1372,17 @@
 
     try {
       mark("meta", "on");
+      var tcard = await makeCard({
+        name: flow.tname, symbol: flow.tsym,
+        avatar: flow.icon || null, banner: flow.banner || null
+      }, "token", [
+        ["priced in", (flow.quote || "SOL").toUpperCase()],
+        ["swap fee", (flow.customFeeBps ? (flow.customFeeBps / 100) : 1) + "%"],
+        ["chain", "Solana"]
+      ]);
       var meta = await window.Storage.uploadTokenMeta({
         name: flow.tname,
+        card: tcard,
         symbol: flow.tsym,
         description: flow.tdesc || (flow.nft ? "Paired with " + flow.nft.cfg.name : ""),
         icon: flow.icon || null,
@@ -1399,6 +1408,7 @@
         feeWallet: flow.feeWallet || null,
         icon: meta.iconUri || null,
         banner: meta.bannerUri || null,
+        card: meta.cardUri || null,
         collection: flow.nft ? flow.nft.res.collection : null
       });
       mark("pool", "done");
