@@ -179,6 +179,11 @@
      panel. Every call site in app.js is still guarded on window.LaunchPanel,
      so deleting these four lines leaves a working standalone editor — that
      guard is worth keeping even now that the panel exists. -->
+<!-- shell.js is loaded but never mounted here: the editor has no top bar,
+     but it still needs the chain the visitor selected — the skin, and which
+     chain the launch window deploys to. Without it Shell.chain() is undefined
+     and a Robinhood launch would quietly run the Solana path. -->
+<script src="shell.js"></script>
 <script src="wallet.js"></script>
 <script src="storage.js"></script>
 <script src="launch.js"></script>
