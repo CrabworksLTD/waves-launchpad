@@ -322,6 +322,21 @@
       new c.X.PublicKey(qm2), baseMint.publicKey, configPk);
     progress({ step: "pool", state: "done", mint: String(baseMint.publicKey) });
 
+    /* "Share with holders": hand the pool's creator authority to the keeper.
+     * Only the current creator signs, so the launcher does this alone — and
+     * afterwards cannot claim the stream they pledged. The keeper
+     * (tools/fee-share-keeper.js) claims and distributes it. */
+    if (opts.feeShare === "holders") {
+      progress({ step: "pledge", state: "signing" });
+      var ttx = await c.cli.creator.transferPoolCreator({
+        pool: poolPk,
+        creator: c.owner,
+        newCreator: new c.X.PublicKey(window.BRAND.feeKeeper)
+      });
+      await send(c, ttx);
+      progress({ step: "pledge", state: "done" });
+    }
+
     // Record for the homepage token listing — fire-and-forget, same contract
     // as the collections listing: the pool exists regardless.
     fetch("/api/tokens", {
@@ -337,6 +352,7 @@
         pool: String(poolPk),
         config: String(configPk),
         feeShare: opts.feeShare || "keep",
+        feeSharePct: opts.feeSharePct || 0,
         quote: opts.quote || "sol",
         feeWallet: opts.feeWallet || null,
         cluster: window.Launch ? window.Launch.cluster() : "mainnet-beta"

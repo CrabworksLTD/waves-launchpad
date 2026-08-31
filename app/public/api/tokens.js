@@ -40,7 +40,7 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-    const { mint, name, symbol, cluster, rewardMint, collection, creator, icon, banner, pool, config, feeShare } = body;
+    const { mint, name, symbol, cluster, rewardMint, collection, creator, icon, banner, pool, config, feeShare, feeSharePct } = body;
 
     if (!B58.test(mint || "")) return res.status(400).json({ error: "bad mint" });
     // both optional; validated when present so a bad value is dropped loudly
@@ -67,6 +67,7 @@ export default async function handler(req, res) {
         icon: okArt(icon), banner: okArt(banner),
         pool: (pool && B58.test(pool)) ? pool : null,
         feeShare: feeShare === "holders" ? "holders" : "keep",
+        feeSharePct: Math.max(0, Math.min(100, parseInt(feeSharePct, 10) || 0)),
         config: (config && B58.test(config)) ? config : null,
         collection: collection || null,
         creator: (creator && B58.test(creator)) ? creator : null,

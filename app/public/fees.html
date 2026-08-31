@@ -102,7 +102,8 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
 
   function row(t, kind, amt) {
     var sym = (t.symbol || "?").toUpperCase();
-    var shared = kind === "creator" && t.feeShare === "holders";
+    var pct = t.feeSharePct || (t.feeShare === "holders" ? 100 : 0);
+    var shared = kind === "creator" && pct > 0;
     return '<div class="frow" data-mint="' + esc(t.mint) + '" data-kind="' + kind + '">' +
       '<span class="coin">' + (t.icon ? '<img alt="" src="' + esc(t.icon) + '">'
         : esc(sym.slice(0, 1))) + "</span>" +
@@ -111,8 +112,9 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
       '<span class="owed"><b class="amt">' + (amt == null ? "…" : amt) + "</b>" +
       "<span>accrued</span></span>" +
       (shared
-        ? '<span class="shared" title="This launch pledged its fee share to holders — ' +
-          'it claims to the staking vault when staking ships.">PLEDGED TO HOLDERS</span>'
+        ? '<span class="shared" title="The keeper claims this pool and pays ' + pct +
+          '% to holders automatically; your ' + (100 - pct) +
+          '% arrives at your fee wallet in the same run.">' + pct + '% AUTO-SHARED</span>'
         : '<button class="cl" disabled>Claim</button>') +
       "</div>";
   }

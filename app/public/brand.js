@@ -31,6 +31,13 @@
     // program does not require its signature, only its address.
     feeOwner: "BU9dYi7fGw5G3Wd54CUTmt1Y58jEJaPq8LKiL72ydeKJ",
 
+    // Auto-shared launches set the POOL CREATOR to this keeper instead of the
+    // launcher — that is what makes "share with holders" enforced on chain:
+    // the launcher cannot claim a stream they pledged away, and the keeper
+    // (tools/fee-share-keeper.js) claims + distributes it to holders.
+    // Same wallet as feeOwner until a dedicated hot keeper key exists.
+    feeKeeper: "BU9dYi7fGw5G3Wd54CUTmt1Y58jEJaPq8LKiL72ydeKJ",
+
     // DBC partner configs, one per cluster per quote currency. Created once
     // each by tools/create-dbc-config.js; a missing entry disables that
     // currency in the token launch window rather than hiding the field.

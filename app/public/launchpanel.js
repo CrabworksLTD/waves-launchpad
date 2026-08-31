@@ -104,6 +104,9 @@
       "  border:1px solid rgba(20,241,149,.35);border-radius:99px;padding:4px 11px;",
       "  white-space:nowrap}",
       ".lp .pick:hover{border-color:var(--accent)}",
+      ".lp .sharebox{padding:6px 2px 2px}",
+      ".lp .sharebox input[type=range]{width:100%;accent-color:var(--accent)}",
+      ".lp .sharelbl{font-size:12px;color:var(--dim);margin-top:6px}",
       ".lp .artbtn{width:100%;padding:12px;border:1px dashed var(--line2);",
       "  border-radius:8px;background:var(--void);color:var(--dim);cursor:pointer;",
       "  font:600 12.5px Inter,sans-serif;overflow:hidden;text-overflow:ellipsis;",
@@ -767,33 +770,31 @@
       <p class="note">Lands in the same transaction as the pool, so nobody can snipe
       the opening price ahead of you.</p>
 
-      <label>Your fee share</label>
-      <div class="tiers" id="tk-share">
-        <button data-s="keep" class="tier ${flow.feeShare !== "holders" ? "on" : ""}">
-          <b>Keep it</b><span>Your share claims to your wallet, whenever you want.</span></button>
-        <button data-s="holders" class="tier ${flow.feeShare === "holders" ? "on" : ""}">
-          <b>Share with holders</b><span>Your share funds staking rewards
-          ${nft ? "for this collection's holders" : "once staking ships"}.</span></button>
+      <label>Fee sharing — how much of your share goes to holders</label>
+      <div class="sharebox">
+        <input id="tk-sharepct" type="range" min="0" max="100" step="5"
+          value="${flow.feeSharePct || 0}">
+        <div class="sharelbl"><span id="tk-sharetxt"></span></div>
       </div>
 
-      <div ${flow.feeShare === "holders" ? "" : raw("hidden")}>
+      <div id="tk-rewardwrap" ${(flow.feeSharePct || 0) > 0 ? "" : raw("hidden")}>
         <label>Holder rewards paid in</label>
         <button class="pick" id="lp-reward">
           <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
           <span class="pk-r"><span class="k2 mono">${shortAddr(flow.reward.mint)}</span>
           <span class="pk-dd">Change ▾</span></span>
         </button>
-        <p class="note">What the fee keeper converts your share into before paying
-        ${nft ? "this collection's stakers" : "holders"}. Fees accrue on the pool
-        untouched until the staking vault claims them.</p>
+        <p class="note">What the keeper pays holders in. Distributions run on a
+        schedule, pro-rata by holdings.</p>
       </div>
 
-      <div ${flow.feeShare === "holders" ? raw("hidden") : ""}>
+      <div id="tk-fwwrap" ${(flow.feeSharePct || 0) >= 100 ? raw("hidden") : ""}>
         <label>Creator fee wallet</label>
         <input id="tk-feewallet" value="${flow.feeWallet || ""}"
           placeholder="optional — defaults to your wallet">
-        <p class="note">Where your share of trading fees claims to. A treasury or a
-        multisig works. Claim anytime from Explore → Claim fees.</p>
+        <p class="note">Where your kept portion goes. Claim anytime from
+        Explore → Claim fees${(flow.feeSharePct || 0) > 0
+          ? " — the keeper routes it here automatically on shared launches" : ""}.</p>
       </div>
 
       <label>Swap fee</label>
@@ -811,8 +812,9 @@
         <input id="tk-custompct" type="number" min="0.25" max="20" step="0.25"
           value="${flow.customFee || 5}">
         <div class="ptabs" id="tk-feechips">
-          <button data-v="2">2%</button><button data-v="3">3%</button>
-          <button data-v="5">5%</button><button data-v="10">10%</button>
+          <button data-v="1">1%</button><button data-v="2">2%</button>
+          <button data-v="3">3%</button><button data-v="5">5%</button>
+          <button data-v="10">10%</button>
         </div>
         <p class="note" id="tk-customsplit"></p>
       </div>
@@ -887,13 +889,19 @@
         bb.textContent = "✓ " + f.name; bb.classList.add("has");
       });
     });
-    box.querySelector("#tk-share").addEventListener("click", function (e) {
-      var b = e.target.closest("button[data-s]");
-      if (!b) return;
-      collect();
-      flow.feeShare = b.dataset.s;
-      tokenDetails(flow);
-    });
+    function paintShare() {
+      var pct = +box.querySelector("#tk-sharepct").value;
+      flow.feeSharePct = pct;
+      flow.feeShare = pct > 0 ? "holders" : "keep";
+      box.querySelector("#tk-sharetxt").textContent = pct === 0
+        ? "You keep everything — claim whenever you like."
+        : pct + "% to your holders, " + (100 - pct) + "% to you — paid out " +
+          "automatically by the keeper.";
+      box.querySelector("#tk-rewardwrap").hidden = pct === 0;
+      box.querySelector("#tk-fwwrap").hidden = pct >= 100;
+    }
+    paintShare();
+    box.querySelector("#tk-sharepct").addEventListener("input", paintShare);
     box.querySelector("#tk-tiers").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-t]");
       if (!b || b.disabled) return;
@@ -1060,9 +1068,10 @@
       <div class="row"><span class="k">Token</span><b>${flow.tname} · $${flow.tsym}</b></div>
       ${nft ? H`<div class="row"><span class="k">Paired with</span><b>${nft.cfg.name}</b></div>` : ""}
       <div class="row"><span class="k">Priced in</span><b>${qLabel}</b></div>
-      <div class="row"><span class="k">Your fee share</span><b>${flow.feeShare === "holders"
-        ? "Shared with holders" : "Kept — claims to " + (flow.feeWallet ? shortAddr(flow.feeWallet) : "your wallet")}</b></div>
-      ${flow.feeShare === "holders" ? H`<div class="row"><span class="k">Rewards in</span><b>${flow.reward.symbol}</b></div>` : ""}
+      <div class="row"><span class="k">Fee sharing</span><b>${(flow.feeSharePct || 0) > 0
+        ? flow.feeSharePct + "% to holders / " + (100 - flow.feeSharePct) + "% to you"
+        : "You keep everything"}</b></div>
+      ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Rewards in</span><b>${flow.reward.symbol}</b></div>` : ""}
       <div class="row"><span class="k">First buy</span><b>${flow.tbuy > 0 ? flow.tbuy + " " + qLabel : "none"}</b></div>
       ${flow.feeWallet ? H`<div class="row"><span class="k">Fees claim to</span><b>${shortAddr(flow.feeWallet)}</b></div>` : ""}
       <div class="row"><span class="k">Metadata storage</span><b id="lp-fee">quoting…</b></div>
@@ -1107,6 +1116,9 @@
       ["meta", "Storing token metadata"],
       ["pool", "Creating the pool" + (flow.tbuy > 0 ? " + your first buy" : "")]
     ];
+    if (flow.feeShare === "holders") {
+      stages.push(["pledge", "Pledging your fee share to holders"]);
+    }
     var box = shell(H`
       <h2>Launching token</h2>
       <p class="sub">Leave this tab open.</p>
@@ -1140,6 +1152,7 @@
         quote: flow.quote,
         customFeeBps: flow.customFee ? Math.round(flow.customFee * 100) : 0,
         feeShare: flow.feeShare || "keep",
+        feeSharePct: flow.feeSharePct || 0,
         firstBuySol: flow.tbuy,
         rewardMint: flow.reward.mint,
         feeWallet: flow.feeWallet || null,
@@ -1169,9 +1182,10 @@
     var box = shell(H`
       <h2>Live</h2>
       <p class="sub">$${flow.tsym} is trading on ${res.cluster}.</p>
-      <div class="row"><span class="k">Your fee share</span><b>${flow.feeShare === "holders"
-        ? "Shared with holders" : "Kept — claims to " + (flow.feeWallet ? shortAddr(flow.feeWallet) : "your wallet")}</b></div>
-      ${flow.feeShare === "holders" ? H`<div class="row"><span class="k">Rewards in</span><b>${flow.reward.symbol}</b></div>` : ""}
+      <div class="row"><span class="k">Fee sharing</span><b>${(flow.feeSharePct || 0) > 0
+        ? flow.feeSharePct + "% to holders / " + (100 - flow.feeSharePct) + "% to you"
+        : "You keep everything"}</b></div>
+      ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Rewards in</span><b>${flow.reward.symbol}</b></div>` : ""}
       ${raw(caRow("Token CA", res.mint))}
       ${nft ? raw(caRow("Collection", nft.res.collection) + caRow("Candy machine", nft.res.candyMachine)) : ""}
       ${nft ? H`<label>Mint page</label>
