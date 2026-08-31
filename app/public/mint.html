@@ -263,6 +263,7 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
       out.push('<a href="' + explorer(state.collection) +
         '" target="_blank" rel="noopener">Collection <i>↗</i></a>');
     }
+    out.push('<a href="#" id="share">Share <i>↗</i></a>');
     [["website", "Website"], ["x", "X"], ["telegram", "Telegram"], ["discord", "Discord"]]
       .forEach(function (kv) {
         var v = links && links[kv[0]];
@@ -274,6 +275,36 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
           '" href="' + esc(href) + '" target="_blank" rel="noopener">' + MARK[kv[0]] + "</a>");
       });
     $("links").innerHTML = out.join("");
+    wireShare($("share"), function () {
+      return {
+        url: location.origin + "/mint/" + CM,
+        title: ($("name").textContent || "This collection") + " on WAVES"
+      };
+    });
+  }
+
+  /* Share. The OS share sheet on a phone, a copied link everywhere else — no
+   * pre-written post, because the launch's own share card does the talking.
+   * Built from the machine address rather than location.href so it never
+   * carries a stray ?chain= or ?cluster= to the wrong side of the site. */
+  function wireShare(el, get) {
+    if (!el) return;
+    el.addEventListener("click", async function (e) {
+      e.preventDefault();
+      var d = get();
+      if (navigator.share) {
+        try { await navigator.share({ title: d.title, url: d.url }); return; }
+        catch (err) { if (err && err.name === "AbortError") return; }
+      }
+      var label = el.innerHTML;
+      try {
+        await navigator.clipboard.writeText(d.url);
+        el.textContent = "Link copied";
+      } catch (err) {
+        el.textContent = d.url;
+      }
+      setTimeout(function () { el.innerHTML = label; }, 1600);
+    });
   }
 
   /* ---- identity, from the files pinned at launch ---- */
@@ -567,6 +598,18 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
   async function connect() {
     var w = await (window.Shell ? Shell.connect() : Promise.resolve(null));
     if (w) { resolvePhase(); renderPhases(); arm(); }
+  }
+
+  /* The wallet can arrive without anyone clicking Connect: the shell restores
+   * an existing session on load, and that resolves a moment AFTER this page has
+   * already drawn itself. Reading Wallet.current() once at startup meant the
+   * page said "Connect wallet" to someone who was connected the whole time.
+   * Redraw whenever the wallet changes — connect, disconnect, or the user
+   * switching accounts in their extension. */
+  if (window.Wallet) {
+    window.Wallet.on("change", function () {
+      resolvePhase(); renderPhases(); arm();
+    });
   }
 
   async function mint() {

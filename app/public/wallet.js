@@ -225,11 +225,11 @@
       var all = list();
       for (var i = 0; i < all.length; i++) {
         if (all[i].id === id) {
-          return connect(id, true).catch(function () {
-            // not authorised any more — forget it rather than nagging forever
-            try { localStorage.removeItem(REMEMBER); } catch (e) {}
-            return null;
-          });
+          /* Keep the memory even when the silent connect fails. A refusal is
+             not proof the user is gone — the wallet may be locked, or mid
+             update — and a silent retry on the next page costs nothing and
+             shows no popup. Only an explicit disconnect forgets. */
+          return connect(id, true).catch(function () { return null; });
         }
       }
       if (Date.now() > deadline) return Promise.resolve(null);

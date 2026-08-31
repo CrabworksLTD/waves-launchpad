@@ -303,6 +303,9 @@ input:focus{outline:none;border-color:var(--accent)}
     if (poolHint) {
       out.push('<a href="' + explorer(poolHint) + '" target="_blank" rel="noopener">Pool <i>↗</i></a>');
     }
+    // sits with the explorer links because it is the same kind of thing: a way
+    // out of the page. Every launch has a share card waiting on the other end.
+    out.push('<a href="#" id="share">Share <i>↗</i></a>');
     // brand marks, so the row stays short whatever a creator fills in
     var MARK = {
       website: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 9h-3a15.6 15.6 0 0 0-1.1-5.2A8 8 0 0 1 18.9 11ZM12 4.1c.7 1 1.6 3 1.8 6.9h-3.6c.2-3.9 1.1-5.9 1.8-6.9ZM5.1 11a8 8 0 0 1 4.1-5.2A15.6 15.6 0 0 0 8.1 11Zm0 2h3a15.6 15.6 0 0 0 1.1 5.2A8 8 0 0 1 5.1 13Zm6.9 6.9c-.7-1-1.6-3-1.8-6.9h3.6c-.2 3.9-1.1 5.9-1.8 6.9Zm2.8-1.7a15.6 15.6 0 0 0 1.1-5.2h3a8 8 0 0 1-4.1 5.2Z"/></svg>',
@@ -323,6 +326,43 @@ input:focus{outline:none;border-color:var(--accent)}
         '" href="' + esc(href) + '" target="_blank" rel="noopener">' + MARK[kv[0]] + "</a>");
     });
     $("socials").innerHTML = out.join("");
+    wireShare($("share"), function () {
+      return {
+        url: location.origin + "/token/" + MINT,
+        title: ($("name") ? $("name").firstChild.textContent.trim() : "") +
+               " on WAVES"
+      };
+    });
+  }
+
+  /* Share.
+   *
+   * On a phone this hands off to the OS share sheet, which is where people
+   * actually want it. Everywhere else it copies the link and says so — no
+   * pre-written tweet, because the launch's own share card does the talking
+   * and putting words in someone's mouth is not our job.
+   *
+   * The link is built from the canonical address rather than location.href so
+   * it never carries a stray ?chain= or ?cluster= that would send a stranger
+   * to the wrong side of the site. */
+  function wireShare(el, get) {
+    if (!el) return;
+    el.addEventListener("click", async function (e) {
+      e.preventDefault();
+      var d = get();
+      if (navigator.share) {
+        try { await navigator.share({ title: d.title, url: d.url }); return; }
+        catch (err) { if (err && err.name === "AbortError") return; }
+      }
+      var label = el.innerHTML;
+      try {
+        await navigator.clipboard.writeText(d.url);
+        el.textContent = "Link copied";
+      } catch (err) {
+        el.textContent = d.url;                 // at least make it selectable
+      }
+      setTimeout(function () { el.innerHTML = label; }, 1600);
+    });
   }
 
   /* Recent trades, straight off the pool. Rendered after the page is usable
@@ -798,6 +838,13 @@ input:focus{outline:none;border-color:var(--accent)}
   async function connect() {
     var w = await Shell.connect();
     if (w) { paintGo(); }
+  }
+
+  /* Same as the mint page: the shell restores an existing session on load and
+   * that lands after this page has drawn, so the trade box has to redraw when
+   * the wallet turns up rather than only when someone clicks Connect. */
+  if (window.Wallet) {
+    window.Wallet.on("change", function () { armTradeBox(); });
   }
 
   async function trade() {
