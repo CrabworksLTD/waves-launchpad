@@ -103,16 +103,33 @@ main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
 .pairlink b,.pairlink span.s,.pairlink span:nth-child(2)>span{
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* stats + curve */
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-bottom:14px}
+/* stats + curve — two rows of four, so nothing is cramped and the numbers
+   line up in columns you can read down */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 0;margin-bottom:14px}
 .stat{padding:4px 10px;border-right:1px solid var(--line)}
-.stat:last-child{border-right:0}
+.stat:nth-child(4n),.stat:last-child{border-right:0}
+@media (max-width:560px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .stat:nth-child(2n){border-right:0}
+  .stat:nth-child(4n){border-right:1px solid var(--line)}
+}
 .stat .k{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
 .stat b{display:block;font:600 15px "IBM Plex Mono",monospace;margin-top:2px}
 .stat em{display:block;font:600 11px "IBM Plex Mono",monospace;font-style:normal;
   margin-top:2px;color:var(--faint)}
 .stat em.up{color:var(--accent)}
 .stat em.down{color:#ff8f8f}
+/* timeframe rail — sits on the chart's top edge, right-aligned so it reads as
+   a control on the chart rather than another row of page furniture */
+.tfrow{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.tfrow .lbl{font:400 11.5px "IBM Plex Mono",monospace;color:var(--faint)}
+.tf{margin-left:auto;display:flex;gap:2px;padding:3px;border-radius:999px;
+  background:var(--panel2);border:1px solid var(--line)}
+.tf button{padding:5px 11px;border:0;border-radius:999px;background:transparent;
+  color:var(--faint);font:600 11px "IBM Plex Mono",monospace;letter-spacing:.04em;
+  cursor:pointer;transition:color .18s,background .18s}
+.tf button:hover{color:var(--ink)}
+.tf button.on{background:var(--panel);color:var(--ink)}
 #curve{width:100%;height:400px;display:block}
 .bar{height:7px;border-radius:99px;background:var(--raise);overflow:hidden;margin-top:12px}
 .bar i{display:block;height:100%;width:0;transition:width .5s;
@@ -198,9 +215,26 @@ input:focus{outline:none;border-color:var(--accent)}
       <div class="stats">
         <div class="stat"><span class="k">Price</span><b id="s-price">—</b>
           <em id="s-chg"></em></div>
+        <div class="stat"><span class="k">Market cap</span><b id="s-mcap">—</b>
+          <em id="s-supply"></em></div>
+        <div class="stat"><span class="k">Volume 24h</span><b id="s-vol">—</b>
+          <em id="s-trades"></em></div>
+        <div class="stat"><span class="k">Holders</span><b id="s-holders">—</b></div>
+        <div class="stat"><span class="k">All-time high</span><b id="s-ath">—</b>
+          <em id="s-athat"></em></div>
         <div class="stat"><span class="k">Raised</span><b id="s-raised">—</b></div>
         <div class="stat"><span class="k">Graduates at</span><b id="s-grad">—</b></div>
         <div class="stat"><span class="k">Status</span><b id="s-status">—</b></div>
+      </div>
+      <div class="tfrow">
+        <span class="lbl" id="tf-note"></span>
+        <div class="tf" id="tf">
+          <button data-tf="1h">1H</button>
+          <button data-tf="6h">6H</button>
+          <button data-tf="1d">1D</button>
+          <button data-tf="7d">7D</button>
+          <button data-tf="all" class="on">ALL</button>
+        </div>
       </div>
       <canvas id="curve"></canvas>
       <div class="bar"><i id="bar"></i></div>
@@ -301,6 +335,85 @@ input:focus{outline:none;border-color:var(--accent)}
     if (s < 86400) return Math.floor(s / 3600) + "h";
     return Math.floor(s / 86400) + "d";
   }
+  /* The indexer (api/indexer.js, every 10 minutes) is the source for history:
+   * price series, volume, market cap, holders, ATH. It reads each swap from the
+   * pool's own vault movements, which the page cannot do cheaply — walking the
+   * signature list on every load cost a second or two and still could not say
+   * what the price was yesterday.
+   *
+   * If it has not indexed this token yet, fall back to reading the chain
+   * directly, which is what the page always did. A launch minutes old should
+   * not look dead while it waits for the first cron. */
+  var tf = "all";
+  var QUOTE = "SOL";                    // replaced by the pool's real quote symbol
+  function loadStats() {
+    return fetch("/api/stats?mint=" + encodeURIComponent(MINT) + "&tf=" + tf)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.indexed || !d.stats) return false;
+        var s = d.stats;
+        var sym = ($("sym").textContent || "").replace(/^\$/, "");
+
+        if (s.price != null) $("s-price").textContent = s.price.toPrecision(3);
+        setChange(d.change);
+        if (s.mcap != null) {
+          $("s-mcap").textContent = UI.fmt(s.mcap, 2) + " " + QUOTE;
+          $("s-supply").textContent = s.supply
+            ? UI.fmt(s.supply, 0) + " supply" : "";
+        }
+        $("s-vol").textContent = UI.fmt(d.windowVol || s.vol24h || 0, 2) + " " + QUOTE;
+        $("s-trades").textContent = (d.windowTrades || 0) + " trades";
+        $("s-holders").textContent = s.holders == null ? "—" : s.holders.toLocaleString();
+        if (s.ath) {
+          $("s-ath").textContent = s.ath.toPrecision(3);
+          $("s-athat").textContent = s.athAt ? agoShort(s.athAt) + " ago" : "";
+        }
+
+        if (d.points && d.points.length >= 2) {
+          drawPrice(d.points.map(function (p) { return { at: p.at, price: p.price }; }));
+          $("tf-note").textContent = d.points.length + " points";
+        } else {
+          $("tf-note").textContent = d.points && d.points.length
+            ? "one trade in this window" : "no trades in this window";
+        }
+
+        if (d.trades && d.trades.length) {
+          $("hist-note").textContent = d.trades.length + " shown";
+          $("hist").innerHTML = d.trades.map(function (t) {
+            return '<a class="trow" href="https://explorer.solana.com/tx/' + esc(t.sig) +
+              '" target="_blank" rel="noopener">' +
+              '<span class="dir ' + t.side + '">' + (t.side === "buy" ? "↗" : "↙") + "</span>" +
+              '<span class="amt"><b>' + UI.fmt(t.tokens, 2) + " " + esc(sym) + "</b>" +
+                "<span>" + esc(shortWho(t.who)) + "</span></span>" +
+              '<span class="val"><b>' + UI.fmt(t.quote, 4) + " " + QUOTE + "</b>" +
+                "<span>" + agoShort(t.at) + " ago</span></span></a>";
+          }).join("");
+        } else {
+          $("hist-note").textContent = "";
+          $("hist").innerHTML = '<div class="empty">No trades in this window.</div>';
+        }
+        return true;
+      })
+      .catch(function () { return false; });
+  }
+
+  function setChange(chg) {
+    var cel = $("s-chg");
+    if (!cel) return;
+    if (chg == null) { cel.textContent = ""; cel.className = ""; return; }
+    var pc = chg * 100;
+    cel.textContent = (pc >= 0 ? "+" : "") + pc.toFixed(1) + "%";
+    cel.className = pc >= 0 ? "up" : "down";
+  }
+
+  document.getElementById("tf").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    tf = b.dataset.tf;
+    [].forEach.call(this.children, function (x) { x.classList.toggle("on", x === b); });
+    $("tf-note").textContent = "…";
+    loadStats();
+  });
+
   function loadTrades() {
     if (!poolHint) { $("hist-note").textContent = "no pool recorded"; return; }
     window.Token.recentTrades(MINT, poolHint, 15).then(function (list) {
@@ -419,7 +532,10 @@ input:focus{outline:none;border-color:var(--accent)}
     $("bar").style.width = (market.progress * 100).toFixed(1) + "%";
     $("pct").textContent = (market.progress * 100).toFixed(1) + "% to graduation";
     drawCurve(market.progress);
-    loadTrades();
+    QUOTE = market.quote || "SOL";
+    /* Indexed history if we have it, the chain if we do not — a token launched
+     * between cron runs still shows its trades. */
+    loadStats().then(function (ok) { if (!ok) loadTrades(); });
     loadPairedCollection();
 
     if (market.migrated) {
