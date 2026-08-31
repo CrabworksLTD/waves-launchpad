@@ -413,6 +413,11 @@
   }
 
   window.Launch = {
+    // Exported so every wallet-to-Metaplex bridge on the site is THIS one.
+    // The launch panel had its own copy that passed the wallet's {serialize}
+    // shim straight back to the adapter, which reads .message.version off it
+    // — a launch died there after the storage payment was already signed.
+    asAdapter: asAdapter,
     deploy: deploy,
     mintOne: mintOne,
     readMachine: readMachine,

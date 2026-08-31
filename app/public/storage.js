@@ -38,6 +38,17 @@
   // 1.3MB respectively, and no other page needs either.
   var turboMod = null, mxMod = null;
   function turbo() {
+    /* One of the bundles loaded before this defines globalThis.process with a
+     * `version`, and a crypto shim inside the Turbo bundle reads that as
+     * "I am Node" — then dereferences a process module that does not exist in
+     * a browser and dies with "Cannot read properties of undefined (reading
+     * 'version')" mid-upload, after the creator has already paid for storage.
+     * The same shim checks process.browser first, so saying so up front takes
+     * the branch that was written for us. */
+    try {
+      if (!globalThis.process) globalThis.process = {};
+      if (!globalThis.process.browser) globalThis.process.browser = true;
+    } catch (e) {}
     if (!turboMod) turboMod = import("/vendor/turbo.esm.js");
     return turboMod;
   }

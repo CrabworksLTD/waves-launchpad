@@ -963,13 +963,14 @@
     var w = window.Wallet.current();
     if (!q.feeTo) throw new Error("Storage fees are not configured on this deployment");
 
+    /* One bridge, shared with launch.js: the adapter hands us a transaction
+     * and expects a real one back — it reads .message.version off the result.
+     * Our wallet speaks Wallet Standard, which signs BYTES and returns bytes,
+     * so the round trip has to serialize in and rehydrate out. This panel had
+     * its own copy that skipped the rehydrate, and a launch died on it after
+     * the storage payment had been signed. */
     var umi = mx.createUmi(window.Launch.clusters[window.Launch.cluster()].rpc, "confirmed")
-      .use(mx.walletAdapterIdentity({
-        publicKey: new mx.PublicKey(w.publicKey),
-        signMessage: function (b) { return w.signMessage(b); },
-        signTransaction: function (t) { return w.signTransaction(t); },
-        signAllTransactions: function (t) { return w.signAllTransactions(t); }
-      }));
+      .use(mx.walletAdapterIdentity(window.Launch.asAdapter(mx, w)));
 
     var res = await mx.transferSol(umi, {
       destination: mx.publicKey(q.feeTo),
