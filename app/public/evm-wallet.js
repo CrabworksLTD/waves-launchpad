@@ -363,7 +363,7 @@
 
     var css = document.createElement("style");
     css.textContent =
-      "#mwPick{position:fixed;inset:0;z-index:2000}" +
+      "#mwPick{position:fixed;inset:0;z-index:10000}" +
       "#mwPick .mw-back{position:absolute;inset:0;background:rgba(4,5,8,.74);backdrop-filter:blur(4px);" +
         "animation:mwFade .18s ease-out}" +
       "#mwPick .mw-card{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);" +

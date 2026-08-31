@@ -321,12 +321,14 @@
         </div>
       </div>
 
-      <label class="tick"><input type="checkbox" id="f-pairOn" ${d.pairOn ? raw("checked") : ""}
-        ${window.Token && window.Token.configKey() ? "" : raw("disabled")}>
+      <label class="tick"><input type="checkbox" id="f-pairOn" ${d.pairOn && !isEvm() ? raw("checked") : ""}
+        ${!isEvm() && window.Token && window.Token.configKey() ? "" : raw("disabled")}>
         <span><b>Pair a token</b>
-        <span>${window.Token && window.Token.configKey()
-          ? "Launch a bonding-curve token after the collection — its trading fees can reward your holders."
-          : "Not configured on this deployment yet."}</span></span></label>
+        <span>${isEvm()
+          ? "Solana only for now — a paired token needs the bonding-curve launchpad, which we are still building for Robinhood Chain."
+          : (window.Token && window.Token.configKey()
+            ? "Launch a bonding-curve token after the collection — you set its name, ticker, what it is priced in, your first buy and the fee split on the next step, before anything is signed."
+            : "Not configured on this deployment yet.")}</span></span></label>
 
       <label class="tick"><input type="checkbox" disabled>
         <span><b>Enable staking</b>
@@ -426,7 +428,7 @@
       d.openAt = box.querySelector("#f-open").value;
       d.wave = parseInt(box.querySelector("#f-wave").value, 10) || 30;
       d.allowOn = box.querySelector("#f-allowOn").checked;
-      d.pairOn = box.querySelector("#f-pairOn").checked;
+      d.pairOn = box.querySelector("#f-pairOn").checked && !isEvm();
       if (!box.querySelector("#f-splitOn").checked) d.splits = [];
 
       // validate
@@ -494,7 +496,11 @@
       <div class="row"><span class="k">Royalty</span><b>${cfg.royaltyPercent}%${cfg.royaltyTo ? " → " + shortAddr(cfg.royaltyTo) : ""}</b></div>
       <div class="row"><span class="k">Allowlist</span><b>${waveTxt}</b></div>
       <div class="row"><span class="k">Opens</span><b>${cfg.openAt ? new Date(cfg.openAt).toLocaleString() : "immediately"}</b></div>
-      ${flow && flow.pair ? H`<div class="row"><span class="k">Then</span><b>a paired token</b></div>` : ""}
+      ${flow && flow.pair ? H`<div class="row"><span class="k">Then</span><b>a paired token</b></div>
+      <p class="note">After the collection is on chain you set the token up —
+      name, ticker, what it is priced in, your first buy, and how much of the
+      trading fee goes to holders. Nothing about the token is signed until you
+      confirm that step.</p>` : ""}
       <div class="row"><span class="k">Storage fee</span><b id="lp-fee">quoting…</b></div>
       <div class="row"><span class="k">Wallet</span><b>${w ? w.name + " · " + shortAddr(w.publicKey) : "not connected"}</b></div>
       <p class="note">Storage is a one-off payment to Arweave for permanent hosting,

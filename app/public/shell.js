@@ -196,7 +196,7 @@
     "  font:400 13.5px Inter,sans-serif}",
     ".shl-search input:focus{outline:none;border-color:var(--faint)}",
     /* connect popup */
-    ".shl-back{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);",
+    ".shl-back{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.72);",
     "  backdrop-filter:blur(5px);display:grid;place-items:center;padding:24px}",
     ".shl-card{width:min(400px,100%);background:var(--panel);",
     "  border:1px solid var(--line2);border-radius:14px;padding:20px}",
