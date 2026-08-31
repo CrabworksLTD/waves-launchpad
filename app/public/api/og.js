@@ -15,7 +15,7 @@
 
 import { ImageResponse } from "@vercel/og";
 
-export const config = { runtime: "edge" };
+export const config = { runtime: "nodejs" };
 
 const BG = "#0a0a0a";
 const RH = { rpc: "https://rpc.mainnet.chain.robinhood.com", label: "ROBINHOOD",
