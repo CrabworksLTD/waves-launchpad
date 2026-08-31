@@ -49,6 +49,7 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   background:rgba(0,0,0,.72);backdrop-filter:blur(6px);border:1px solid var(--line2)}
 .tag.live{color:var(--accent);border-color:rgba(var(--accent-rgb),.45)}
 .tag.out{color:var(--faint)}
+.tag.soon{color:var(--dim)}
 .body{padding:14px 15px 15px}
 .body h2{margin:0;font-family:Archivo;font-size:15.5px;font-weight:700;line-height:1.25;
   letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -130,15 +131,66 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   var state = [];                                  // {rec, machine|null}
   var filter = "all";
 
-  fetch("/api/collections").then(function (r) { return r.json(); })
-    .then(function (j) { return (j.collections || []); })
-    .catch(function () { return []; })
-    .then(load);
+  var EVM = window.Shell.chain && window.Shell.chain() === "robinhood";
+
+  function loadScripts(list) {
+    return list.reduce(function (p, src) {
+      return p.then(function () {
+        return new Promise(function (res, rej) {
+          var el = document.createElement("script");
+          el.src = src; el.onload = res;
+          el.onerror = function () { rej(new Error("failed to load " + src)); };
+          document.head.appendChild(el);
+        });
+      });
+    }, Promise.resolve());
+  }
+
+  if (EVM) {
+    /* Robinhood Chain: the list comes off the on-chain registry, every number
+     * off the collection contract — no database on this side either. */
+    loadScripts(["/evm-chains.js", "/evm-contract.js", "/evm-registry.js", "/evm-collections.js"])
+      .then(function () { return window.EvmCollections.listEntries(24); })
+      .then(loadEvm)
+      .catch(function () { $("skel").hidden = true; $("empty").hidden = false; });
+  } else {
+    fetch("/api/collections").then(function (r) { return r.json(); })
+      .then(function (j) { return (j.collections || []); })
+      .catch(function () { return []; })
+      .then(load);
+  }
+
+  function loadEvm(entries) {
+    $("skel").hidden = true;
+    if (!entries.length) { $("empty").hidden = false; return; }
+    state = entries.map(function (e) {
+      return { rec: { name: "…", id: e.collection }, m: null };
+    });
+    $("grid").hidden = false;
+    draw();
+    state.forEach(function (row) {
+      window.EvmCollections.readOne(row.rec.id).then(function (c) {
+        row.rec.name = c.name;
+        row.m = {
+          redeemed: c.minted, available: c.maxSupply, open: c.saleOpen,
+          priceText: c.price === 0n ? "free"
+            : "<b>" + window.EvmCollections.fmtEth(c.price) + "</b> ETH"
+        };
+        draw();
+        return window.EvmCollections.artFor(c);
+      }).then(function (art) {
+        if (art) { row.rec.avatar = art; draw(); }
+      }).catch(function () {});
+    });
+  }
 
   function load(records) {
     $("skel").hidden = true;
     if (!records.length) { $("empty").hidden = false; return; }
-    state = records.map(function (rec) { return { rec: rec, m: null }; });
+    state = records.map(function (rec) {
+      rec.id = rec.candyMachine;
+      return { rec: rec, m: null };
+    });
     $("grid").hidden = false;
     draw();
     // machines are read after first paint — names render instantly, numbers
@@ -153,8 +205,9 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   function tag(row) {
     if (!row.m) return "";
     var out = row.m.redeemed >= row.m.available;
-    return '<span class="tag ' + (out ? "out" : "live") + '">' +
-      (out ? "Sold out" : "Minting") + "</span>";
+    var closed = !out && row.m.open === false;
+    return '<span class="tag ' + (out ? "out" : closed ? "soon" : "live") + '">' +
+      (out ? "Sold out" : closed ? "Not open" : "Minting") + "</span>";
   }
 
   function visible(row) {
@@ -168,19 +221,23 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
     $("grid").innerHTML = state.filter(visible).map(function (row) {
       var r = row.rec, m = row.m;
       var pct = m && m.available ? Math.min(100, 100 * m.redeemed / m.available) : 0;
-      return '<a class="tile" data-name="' + esc(r.name) + '" href="/mint/' + esc(r.candyMachine) + '">' +
+      var price = "";
+      if (m) {
+        if (EVM) price = m.priceText || "";
+        else if (m.priceSol != null)
+          price = m.priceSol === 0 ? "free" : "<b>" + m.priceSol + "</b> SOL";
+      }
+      return '<a class="tile" data-name="' + esc(r.name) + '" href="/mint/' + esc(r.id) + '">' +
         '<div class="shot">' +
           (r.avatar ? '<img alt="" loading="lazy" src="' + esc(r.avatar) + '">'
                     : '<span class="none">no art</span>') +
           tag(row) + "</div>" +
         '<div class="body"><h2>' + esc(r.name) + "</h2>" +
-        '<p class="sym mono">' + esc(shortAddr(r.candyMachine)) + "</p>" +
+        '<p class="sym mono">' + esc(shortAddr(r.id)) + "</p>" +
         '<div class="bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
         '<div class="nums"><span>' +
           (m ? "<b>" + m.redeemed.toLocaleString() + "</b> / " + m.available.toLocaleString()
-             : "reading chain…") + "</span><span>" +
-          (m && m.priceSol != null
-            ? (m.priceSol === 0 ? "free" : "<b>" + m.priceSol + "</b> SOL") : "") +
+             : "reading chain…") + "</span><span>" + price +
         "</span></div></div></a>";
     }).join("") || "";
     if (!$("grid").innerHTML) {

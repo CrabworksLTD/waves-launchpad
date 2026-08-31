@@ -34,6 +34,7 @@
     try { var c = localStorage.getItem("shl-chain"); } catch (e) {}
     return CHAINS[c] ? c : "solana";
   }
+  var shellPaintWallet = null;   // set by mount(); repainted on chain switch
   function applyChain(net) {
     if (!CHAINS[net]) net = "solana";
     try { localStorage.setItem("shl-chain", net); } catch (e) {}
@@ -45,9 +46,16 @@
       trig.querySelector("span").textContent =
         net === "robinhood" ? "Robinhood" : CHAINS[net].label;
     }
+    // the wallet pill answers to a different chain now
+    if (net === "robinhood") window.Shell.ensureEvmStack().catch(function () {});
+    if (shellPaintWallet) shellPaintWallet();
   }
   if (currentChain() !== "solana") {
     document.documentElement.dataset.chain = currentChain();
+    // load the EVM stack up front so connect and reads have no lag
+    document.addEventListener("DOMContentLoaded", function () {
+      window.Shell.ensureEvmStack().catch(function () {});
+    });
   }
 
   // No "Collections" home link — the logo mark is the way home, and the
@@ -454,11 +462,20 @@
     var btn = document.getElementById("shl-wallet");
     var wmenu = document.getElementById("shl-wmenu");
     function setWOpen(v) { wmenu.classList.toggle("open", v); }
-    function paint() {
+    var evm = function () { return currentChain() === "robinhood"; };
+    function connectedAddr() {
+      if (evm()) {
+        var mw = window.MoonpadWallet;
+        return mw && mw.account ? { addr: mw.account, name: "EVM wallet" } : null;
+      }
       var w = window.Wallet && window.Wallet.current();
+      return w ? { addr: w.publicKey, name: w.name } : null;
+    }
+    function paint() {
+      var w = connectedAddr();
       if (w) {
         btn.className = "shl-wallet linked";
-        btn.innerHTML = "<span>" + window.UI.esc(shortAddr(w.publicKey)) + " ▾</span>";
+        btn.innerHTML = "<span>" + window.UI.esc(shortAddr(w.addr)) + " ▾</span>";
         btn.title = w.name;
       } else {
         btn.className = "shl-wallet";
@@ -467,21 +484,36 @@
         setWOpen(false);
       }
     }
+    shellPaintWallet = paint;
     btn.addEventListener("click", function (e) {
-      if (!window.Wallet) return;
       e.stopPropagation();
-      if (window.Wallet.current()) {
+      if (connectedAddr()) {
+        // the profile page only knows Solana launches — hide it on the EVM side
+        document.getElementById("shl-profile").style.display = evm() ? "none" : "";
         setWOpen(!wmenu.classList.contains("open"));
         return;
       }
+      if (evm()) {
+        ensureEvmStack().then(function () {
+          return window.MoonpadWallet.connect();
+        }).then(paint).catch(function () {});
+        return;
+      }
+      if (!window.Wallet) return;
       connectModal().then(paint);
     });
     document.addEventListener("click", function () { setWOpen(false); });
     document.getElementById("shl-disconnect").addEventListener("click", function (e) {
       e.preventDefault();
+      if (evm()) {
+        var mw = window.MoonpadWallet;
+        (mw && mw.disconnect ? mw.disconnect() : Promise.resolve()).then(paint);
+        return;
+      }
       window.Wallet.disconnect().then(paint);
     });
     if (window.Wallet) window.Wallet.on("change", paint);
+    window.addEventListener("moonpad-wallet", paint);
     paint();
     // wallets may register after page load; recheck briefly rather than never
     var n = 0, t = setInterval(function () { paint(); if (++n > 5) clearInterval(t); }, 450);
@@ -601,5 +633,29 @@
     return stackP;
   }
 
-  window.Shell = { mount: mount, connect: connectModal, ensureLaunchStack: ensureLaunchStack };
+  /* The EVM stack, for Robinhood Chain. Same lazy pattern: chains first
+   * (RPC layer + chain table), then the wallet (EIP-6963 picker). Loaded the
+   * moment the chain is Robinhood so connect works without a beat of lag. */
+  var evmP = null;
+  function ensureEvmStack() {
+    if (window.MoonpadWallet && window.MOONPAD_CHAINS) return Promise.resolve();
+    if (evmP) return evmP;
+    evmP = ["/evm-chains.js", "/evm-wallet.js"]
+      .reduce(function (p, src) {
+        return p.then(function () {
+          return new Promise(function (res, rej) {
+            var el = document.createElement("script");
+            el.src = src;
+            el.onload = res;
+            el.onerror = function () { rej(new Error("failed to load " + src)); };
+            document.head.appendChild(el);
+          });
+        });
+      }, Promise.resolve());
+    return evmP;
+  }
+
+  window.Shell = { mount: mount, connect: connectModal,
+    ensureLaunchStack: ensureLaunchStack, ensureEvmStack: ensureEvmStack,
+    chain: currentChain };
 })();
