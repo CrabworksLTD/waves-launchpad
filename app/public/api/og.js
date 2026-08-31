@@ -89,10 +89,10 @@ async function loadFonts(origin) {
   if (FONTS) return FONTS;
   const grab = (f) => fetch(origin + "/fonts/" + f).then((r) => r.arrayBuffer());
   const [display, mono, monoSemi] = await Promise.all([
-    grab("space-mono-bold.ttf"), grab("ibm-plex-mono.ttf"), grab("ibm-plex-mono-semibold.ttf")
+    grab("archivo-extrabold.ttf"), grab("ibm-plex-mono.ttf"), grab("ibm-plex-mono-semibold.ttf")
   ]);
   FONTS = [
-    { name: "Display", data: display, weight: 700, style: "normal" },
+    { name: "Display", data: display, weight: 800, style: "normal" },
     { name: "Mono", data: mono, weight: 400, style: "normal" },
     { name: "Mono", data: monoSemi, weight: 600, style: "normal" }
   ];
@@ -125,7 +125,7 @@ async function render(req) {
   const origin = url.origin;
 
   if (url.searchParams.get("test")) {
-    const f = await fetch(origin + "/fonts/space-mono-bold.ttf").then((r) => r.arrayBuffer());
+    const f = await fetch(origin + "/fonts/archivo-extrabold.ttf").then((r) => r.arrayBuffer());
     return new ImageResponse(
       h("div", { width: "1200px", height: "630px", display: "flex", alignItems: "center",
         justifyContent: "center", backgroundColor: BG, color: SOL.accent,
