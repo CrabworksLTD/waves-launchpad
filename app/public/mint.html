@@ -75,6 +75,19 @@ a{color:inherit;text-decoration:none}
 .ph.mine{border-color:rgba(var(--accent-rgb),.5)}
 .ph.mine b{color:var(--accent)}
 
+/* quantity stepper: minus, the number, plus, and MAX */
+.qty{display:flex;align-items:center;gap:8px;margin-top:14px}
+.qty button{width:42px;height:42px;flex:none;border-radius:10px;cursor:pointer;
+  border:1px solid var(--line2);background:var(--panel2);color:var(--ink);
+  font:700 19px Archivo,sans-serif;line-height:1;transition:border-color .18s,color .18s}
+.qty button:hover:not(:disabled){border-color:var(--faint)}
+.qty button:disabled{opacity:.35;cursor:default}
+.qty .n{flex:1;text-align:center;font:700 20px "IBM Plex Mono",monospace;
+  font-variant-numeric:tabular-nums;border:1px solid var(--line);border-radius:10px;
+  background:var(--void);padding:9px 0;color:var(--ink)}
+.qty .max{width:auto;padding:0 14px;font:700 12px Archivo,sans-serif;letter-spacing:.06em}
+.qtynote{margin:7px 0 0;font:400 11px "IBM Plex Mono",monospace;color:var(--faint);
+  display:flex;justify-content:space-between;gap:10px}
 .btn{display:block;width:100%;margin-top:16px;padding:15px;border-radius:999px;border:1px solid transparent;
   font:700 15px Archivo,sans-serif;cursor:pointer;color:var(--accent-ink);
   background-image:var(--grad);background-repeat:no-repeat;
@@ -85,6 +98,18 @@ a{color:inherit;text-decoration:none}
 .msg.ok{display:block;background:rgba(var(--accent-rgb),.08);border:1px solid rgba(var(--accent-rgb),.3);color:#8ff5cd}
 .msg a{color:inherit}
 .sale .foot{text-align:center;margin-top:12px;font-size:11px;color:var(--faint)}
+/* the paired token, when this collection launched with one */
+.pairlink{display:flex;align-items:center;gap:10px;margin-top:12px;padding:11px 13px;
+  border:1px solid transparent;border-radius:10px;
+  background:linear-gradient(var(--panel),var(--panel)) padding-box,var(--grad) border-box;
+  transition:filter .2s}
+.pairlink:hover{filter:brightness(1.15)}
+.pairlink .c{width:30px;height:30px;flex:none;border-radius:7px;overflow:hidden;
+  background:var(--panel2);display:grid;place-items:center;font:800 13px Archivo}
+.pairlink .c img{width:100%;height:100%;object-fit:cover;display:block}
+.pairlink b{font:700 13px Archivo;display:block}
+.pairlink span{display:block;font-size:11px;color:var(--faint)}
+.pairlink .go{margin-left:auto;font:700 16px Archivo;color:var(--accent)}
 
 /* ---- below: the pieces ---- */
 main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
@@ -123,8 +148,16 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
       <div class="bar"><i id="bar"></i></div>
       <div class="pctline"><span id="pct">—</span><span class="mono" id="addr">—</span></div>
       <div id="phases"></div>
+      <div class="qty" id="qty" hidden>
+        <button id="q-minus" type="button" aria-label="One fewer">−</button>
+        <div class="n" id="q-n">1</div>
+        <button id="q-plus" type="button" aria-label="One more">+</button>
+        <button id="q-max" class="max" type="button">MAX</button>
+      </div>
+      <p class="qtynote" id="q-note" hidden><span id="q-limit"></span><span id="q-cost"></span></p>
       <button class="btn" id="go" disabled>Loading…</button>
       <div class="msg" id="msg"></div>
+      <a class="pairlink" id="pairlink" hidden></a>
       <p class="foot">Runs on Metaplex Core. Nothing custom in the middle.</p>
     </div>
   </div>
@@ -359,6 +392,7 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
     $("name").textContent = "Mint";
     $("creator").textContent = shortAddr(state.authority, 5);
     loadIdentity();
+    loadPairedToken();
 
     if (state.groups.length) lists = await loadLists();
     resolvePhase();
@@ -380,9 +414,60 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
     $("pct").textContent = pct.toFixed(1) + "% minted";
   }
 
+  /* How many to mint. Each piece is its own transaction — the candy machine
+   * mints one at a time — so a run of five is five signatures unless the
+   * wallet batches them. Stopping early keeps whatever already minted, which
+   * is why the cap is enforced here and re-read from the machine after. */
+  var qty = 1;
+  function mintCap() {
+    var left = Math.max(0, (state ? state.available - state.redeemed : 0));
+    var perWallet = (state && state.maxPerWallet) || 0;
+    var cap = perWallet > 0 ? Math.min(left, perWallet) : left;
+    return Math.max(1, Math.min(cap || 1, 50));   // 50 keeps a stray MAX sane
+  }
+  function priceEach() {
+    if (myPhase) {
+      var g = (state.groups || []).find(function (x) { return x.label === myPhase.group; });
+      if (g && g.priceSol != null) return g.priceSol;
+    }
+    return state && state.priceSol != null ? state.priceSol : 0;
+  }
+  function renderQty() {
+    var cap = mintCap();
+    if (qty > cap) qty = cap;
+    if (qty < 1) qty = 1;
+    $("q-n").textContent = String(qty);
+    $("q-minus").disabled = qty <= 1;
+    $("q-plus").disabled = qty >= cap;
+    $("q-max").disabled = qty >= cap;
+    var each = priceEach();
+    $("q-limit").textContent = (state && state.maxPerWallet)
+      ? "max " + state.maxPerWallet + " per wallet" : cap + " left";
+    $("q-cost").textContent = each > 0
+      ? (Math.round(each * qty * 1e6) / 1e6) + " SOL" : "free";
+  }
+  function showQty(on) {
+    $("qty").hidden = !on;
+    $("q-note").hidden = !on;
+    if (on) renderQty();
+  }
+  $("q-minus").onclick = function () { qty--; renderQty(); armLabel(); };
+  $("q-plus").onclick = function () { qty++; renderQty(); armLabel(); };
+  $("q-max").onclick = function () { qty = mintCap(); renderQty(); armLabel(); };
+  function armLabel() {
+    var go = $("go");
+    if (go.dataset.busy || go.disabled) return;
+    if (go.dataset.mode === "mint") {
+      go.textContent = qty > 1 ? "Mint " + qty : "Mint";
+      if (myPhase) go.textContent += " — " + phaseName(myPhase.group);
+    }
+  }
+
   function arm() {
     var w = window.Wallet.current();
     var go = $("go");
+    delete go.dataset.mode;
+    showQty(false);
     if (state.redeemed >= state.available) {
       go.disabled = true; go.textContent = "Sold out"; return;
     }
@@ -392,17 +477,49 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
       if (state.opensAt && state.opensAt > now) {
         go.disabled = true; go.textContent = "Opens soon"; return;
       }
-      go.disabled = false; go.textContent = "Mint"; go.onclick = mint; return;
+      go.disabled = false; go.dataset.mode = "mint"; go.onclick = mint;
+      showQty(true); armLabel(); return;
     }
     if (myPhase) {
       go.disabled = false;
-      go.textContent = "Mint — " + phaseName(myPhase.group);
+      go.dataset.mode = "mint";
       go.onclick = mint;
+      showQty(true); armLabel();
       return;
     }
     var anyOpen = state.groups.some(function (g) { return !g.opensAt || g.opensAt <= Date.now(); });
     go.disabled = true;
     go.textContent = anyOpen ? "Not on an open allowlist yet" : "Opens soon";
+  }
+
+  /* A paired launch records the token against the collection. Show it here:
+   * someone who found the mint should be one click from the token whose
+   * trading fees pay this collection's holders. */
+  function loadPairedToken() {
+    fetch("/api/collections").then(function (r) { return r.json(); })
+      .then(function (j) {
+        var rec = (j.collections || []).find(function (c) { return c.candyMachine === CM; });
+        if (!rec || !rec.tokenMint) return null;
+        return fetch("/api/tokens").then(function (r) { return r.json(); })
+          .then(function (t) {
+            var tok = (t.tokens || []).find(function (x) { return x.mint === rec.tokenMint; });
+            return tok || { mint: rec.tokenMint, symbol: "", name: "Paired token" };
+          });
+      })
+      .then(function (tok) {
+        if (!tok) return;
+        var el = $("pairlink");
+        var sym = String(tok.symbol || "").toUpperCase();
+        el.href = "/token/" + tok.mint;
+        el.innerHTML =
+          '<span class="c">' + (tok.icon
+            ? '<img alt="" src="' + esc(tok.icon) + '">' : esc(sym.slice(0, 1) || "$")) + "</span>" +
+          "<span><b>" + (sym ? "$" + esc(sym) : "Paired token") + "</b>" +
+          "<span>" + esc(tok.name || "trades on a bonding curve") + "</span></span>" +
+          '<span class="go">→</span>';
+        el.hidden = false;
+      })
+      .catch(function () {});
   }
 
   async function connect() {
@@ -416,13 +533,22 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
     go.dataset.busy = "1";
     go.textContent = "Minting…";
     say("", "");
+    var got = [];
     try {
-      var r = await window.Launch.mintOne(CM, myPhase || {});
-      var url = "https://explorer.solana.com/address/" + r.asset +
+      /* One transaction per piece: the candy machine mints singly, so a run
+       * of five is five signatures. Anything already minted is kept if a
+       * later one fails — the count comes back off the machine either way. */
+      for (var i = 0; i < qty; i++) {
+        if (qty > 1) go.textContent = "Minting " + (i + 1) + " of " + qty + "…";
+        var r = await window.Launch.mintOne(CM, myPhase || {});
+        got.push(r.asset);
+      }
+      var url = "https://explorer.solana.com/address/" + got[got.length - 1] +
                 (window.Launch.cluster() === "devnet" ? "?cluster=devnet" : "");
-      say("ok", 'Minted. <a href="' + url + '" target="_blank" rel="noopener">View it ↗</a>');
+      say("ok", (got.length > 1 ? "Minted " + got.length + ". " : "Minted. ") +
+        '<a href="' + url + '" target="_blank" rel="noopener">View it ↗</a>');
       state = await window.Launch.readMachine(CM);
-      render(); renderPieces();
+      render(); renderPieces(); renderQty();
       delete go.dataset.busy;
       go.disabled = false;
       go.textContent = "Mint another";
@@ -434,6 +560,11 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
       else if (/0x1784|MintNotLive|StartDate/i.test(m)) m = "The mint has not opened yet.";
       else if (/CandyMachineEmpty|0x1785/i.test(m)) m = "Sold out.";
       else if (/User rejected|rejected the request/i.test(m)) m = "You cancelled the transaction.";
+      if (got.length) {
+        m = got.length + " minted before this stopped — those are yours. " + m;
+        try { state = await window.Launch.readMachine(CM); render(); renderPieces(); renderQty(); }
+        catch (e2) {}
+      }
       say("err", m);
       delete go.dataset.busy;
       go.disabled = false;

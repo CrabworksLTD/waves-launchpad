@@ -141,8 +141,8 @@ const server = http.createServer(async function (req, res) {
    * free; the paid paths still require a real signed payment, so nothing can
    * be spent by accident. */
   const DEV_API = process.env.DEV_API !== "off";
-  const LOCAL_API = new Set(["/api/collections", "/api/tokens", "/api/limits",
-    "/api/project", "/api/download", "/api/generate", "/api/dev-save"]);
+  const LOCAL_API = new Set(["/api/limits", "/api/project", "/api/download",
+    "/api/generate", "/api/dev-save"]);
   if (DEV_API && url.pathname.startsWith("/api/") && !LOCAL_API.has(url.pathname)) {
     const target = (process.env.DEV_API_ORIGIN || "https://www.waveslaunchpad.xyz") +
       url.pathname + url.search;
