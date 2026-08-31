@@ -47,6 +47,36 @@ function kv() {
   }));
 }
 
+/* What the pool's quote asset is worth in dollars.
+ *
+ * Every figure on the token page is denominated in the quote currency, which
+ * is the honest unit for a curve but not a readable one: "27.73 SOL" and
+ * "2.77e-8" tell you nothing at a glance. Priced once per run and stored, so
+ * the page never makes a third-party call.
+ *
+ * Jupiter first because it prices any Solana mint including the RWA quotes;
+ * CoinGecko as a fallback for SOL, which is the case that matters most. */
+const usdCache = new Map();
+async function quoteUsd(mint) {
+  if (usdCache.has(mint)) return usdCache.get(mint);
+  let usd = null;
+  try {
+    const r = await fetch("https://lite-api.jup.ag/price/v3?ids=" + mint);
+    const j = await r.json();
+    const v = j && j[mint] && j[mint].usdPrice;
+    if (typeof v === "number" && isFinite(v) && v > 0) usd = v;
+  } catch (e) { /* fall through */ }
+  if (usd == null && mint === "So11111111111111111111111111111111111111112") {
+    try {
+      const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
+      const j = await r.json();
+      if (j && j.solana && j.solana.usd > 0) usd = j.solana.usd;
+    } catch (e) { /* leave null; the page falls back to native units */ }
+  }
+  usdCache.set(mint, usd);
+  return usd;
+}
+
 /* Free-tier RPCs rate-limit, and they do it in plain text — a 429 body is
  * "Too Many Requests", not JSON, so parsing it as JSON throws something that
  * reads like a bug in us. Back off and retry instead; a backfill is a burst by
@@ -137,6 +167,9 @@ function readSwap(tx, baseMint, sig, blockTime) {
     side: poolQuote.delta > 0n ? "buy" : "sell",    // pool gained quote = a buy
     tokens: baseAmt,
     quote: quoteAmt,
+    // which asset the pool is priced in, learned from the swap itself rather
+    // than from the launch record (which does not keep it)
+    qmint: poolQuote.mint,
     price: quoteAmt / baseAmt
   };
 }
@@ -272,11 +305,21 @@ export default async function handler(req, res) {
         const last = trades.length ? trades[trades.length - 1] : null;
         const price = last ? last.price : (prev && prev.price) || null;
 
+        // the quote asset comes from the swaps themselves; SOL if we have none
+        const qmint = (last && last.qmint) ||
+          (prev && prev.quoteMint) || "So11111111111111111111111111111111111111112";
+        const qusd = await quoteUsd(qmint);
+
         const stats = {
           mint: t.mint,
           price,
+          quoteMint: qmint,
+          quoteUsd: qusd,
+          priceUsd: price != null && qusd != null ? price * qusd : null,
           // the standard quote: price times everything that exists
           mcap: price != null && supply != null ? price * supply : null,
+          mcapUsd: price != null && supply != null && qusd != null
+            ? price * supply * qusd : null,
           supply, decimals, holders,
           ath, athAt,
           vol24h: sum(d1, (x) => x.quote),

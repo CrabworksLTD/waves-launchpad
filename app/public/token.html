@@ -222,8 +222,10 @@ input:focus{outline:none;border-color:var(--accent)}
         <div class="stat"><span class="k">Holders</span><b id="s-holders">—</b></div>
         <div class="stat"><span class="k">All-time high</span><b id="s-ath">—</b>
           <em id="s-athat"></em></div>
-        <div class="stat"><span class="k">Raised</span><b id="s-raised">—</b></div>
-        <div class="stat"><span class="k">Graduates at</span><b id="s-grad">—</b></div>
+        <div class="stat"><span class="k">Raised</span><b id="s-raised">—</b>
+          <em id="s-raised-n"></em></div>
+        <div class="stat"><span class="k">Graduates at</span><b id="s-grad">—</b>
+          <em id="s-grad-n"></em></div>
         <div class="stat"><span class="k">Status</span><b id="s-status">—</b></div>
       </div>
       <div class="tfrow">
@@ -346,6 +348,43 @@ input:focus{outline:none;border-color:var(--accent)}
    * not look dead while it waits for the first cron. */
   var tf = "all";
   var QUOTE = "SOL";                    // replaced by the pool's real quote symbol
+  var USD = null;                       // quote asset in dollars, from the indexer
+
+  /* Money, written the way people read it.
+   *
+   * A launch token's price has a lot of leading zeros, and "2.77e-8" is not a
+   * price anybody can compare at a glance. The convention every trading UI
+   * settled on is a subscript run-length: $0.0₇277 means seven zeros then 277.
+   * Large figures get K/M/B, because "27.73 SOL" of market cap is a number in
+   * the wrong unit AND the wrong shape. */
+  var SUBS = "₀₁₂₃₄₅₆₇₈₉";
+  function subs(n) {
+    return String(n).split("").map(function (d) { return SUBS[+d]; }).join("");
+  }
+  function usdSmall(n) {
+    var m = n.toFixed(20).match(/^0\.(0*)(\d+)/);
+    if (!m) return "$" + n.toPrecision(3);
+    var zeros = m[1].length;
+    var digits = m[2].slice(0, 4).replace(/0+$/, "") || "0";
+    return zeros >= 4
+      ? "$0.0" + subs(zeros) + digits
+      : "$0." + m[1] + digits;
+  }
+  function money(n) {
+    if (n == null || !isFinite(n)) return "—";
+    if (n >= 1e9) return "$" + (n / 1e9).toFixed(2) + "B";
+    if (n >= 1e6) return "$" + (n / 1e6).toFixed(2) + "M";
+    if (n >= 1e3) return "$" + (n / 1e3).toFixed(1) + "K";
+    if (n >= 1) return "$" + n.toFixed(2);
+    if (n > 0) return usdSmall(n);
+    return "$0";
+  }
+  // native units stay available as the small line under a figure, so the curve
+  // is still readable in the currency it actually trades in
+  function native(n, dp) {
+    return UI.fmt(n, dp == null ? 2 : dp) + " " + QUOTE;
+  }
+
   function loadStats() {
     return fetch("/api/stats?mint=" + encodeURIComponent(MINT) + "&tf=" + tf)
       .then(function (r) { return r.json(); })
@@ -354,27 +393,39 @@ input:focus{outline:none;border-color:var(--accent)}
         var s = d.stats;
         var sym = ($("sym").textContent || "").replace(/^\$/, "");
 
-        if (s.price != null) $("s-price").textContent = s.price.toPrecision(3);
+        USD = s.quoteUsd || null;
+
+        if (s.price != null) {
+          $("s-price").textContent = USD ? money(s.price * USD) : s.price.toPrecision(3);
+        }
         setChange(d.change);
         if (s.mcap != null) {
-          $("s-mcap").textContent = UI.fmt(s.mcap, 2) + " " + QUOTE;
-          $("s-supply").textContent = s.supply
-            ? UI.fmt(s.supply, 0) + " supply" : "";
+          $("s-mcap").textContent = USD ? money(s.mcap * USD) : native(s.mcap);
+          $("s-supply").textContent = s.supply ? UI.fmt(s.supply, 0) + " supply" : "";
         }
-        $("s-vol").textContent = UI.fmt(d.windowVol || s.vol24h || 0, 2) + " " + QUOTE;
+        var vol = d.windowVol || 0;
+        $("s-vol").textContent = USD ? money(vol * USD) : native(vol);
         $("s-trades").textContent = (d.windowTrades || 0) + " trades";
         $("s-holders").textContent = s.holders == null ? "—" : s.holders.toLocaleString();
         if (s.ath) {
-          $("s-ath").textContent = s.ath.toPrecision(3);
+          $("s-ath").textContent = USD ? money(s.ath * USD) : s.ath.toPrecision(3);
           $("s-athat").textContent = s.athAt ? agoShort(s.athAt) + " ago" : "";
+        }
+        // the curve's own numbers, restated in dollars with the native amount
+        // underneath — the pool still thinks in its quote currency
+        if (market) {
+          $("s-raised").textContent = USD ? money(market.raised * USD) : native(market.raised);
+          $("s-raised-n").textContent = native(market.raised);
+          $("s-grad").textContent = USD ? money(market.threshold * USD) : native(market.threshold, 0);
+          $("s-grad-n").textContent = native(market.threshold, 0);
         }
 
         if (d.points && d.points.length >= 2) {
           drawPrice(d.points.map(function (p) { return { at: p.at, price: p.price }; }));
-          $("tf-note").textContent = d.points.length + " points";
+          $("tf-note").textContent = "";
         } else {
           $("tf-note").textContent = d.points && d.points.length
-            ? "one trade in this window" : "no trades in this window";
+            ? "only one trade in this window" : "no trades in this window";
         }
 
         if (d.trades && d.trades.length) {
@@ -385,7 +436,8 @@ input:focus{outline:none;border-color:var(--accent)}
               '<span class="dir ' + t.side + '">' + (t.side === "buy" ? "↗" : "↙") + "</span>" +
               '<span class="amt"><b>' + UI.fmt(t.tokens, 2) + " " + esc(sym) + "</b>" +
                 "<span>" + esc(shortWho(t.who)) + "</span></span>" +
-              '<span class="val"><b>' + UI.fmt(t.quote, 4) + " " + QUOTE + "</b>" +
+              '<span class="val"><b>' +
+                (USD ? money(t.quote * USD) : UI.fmt(t.quote, 4) + " " + QUOTE) + "</b>" +
                 "<span>" + agoShort(t.at) + " ago</span></span></a>";
           }).join("");
         } else {
