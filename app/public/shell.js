@@ -295,8 +295,7 @@
           <div class="menu">
             <a href="#" data-net="solana"><img src="/art/solana.svg" width="13" height="13" alt="">
               Solana</a>
-            <a href="#" data-net="robinhood">${raw('<svg width="13" height="13" viewBox="0 0 24 24">' +
-              '<path fill="#00C805" d="M12 2 3 7v10l9 5 9-5V7Z" opacity=".85"/></svg>')}
+            <a href="#" data-net="robinhood"><img src="/art/robinhood.svg" width="13" height="13" alt="">
               Robinhood Chain <span class="soon">SOON</span></a>
           </div>
         </div>
