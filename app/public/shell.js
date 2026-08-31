@@ -98,6 +98,20 @@
     ".shl-wallet:hover{filter:brightness(1.18)}",
     ".shl-wallet.linked span{background:none;color:var(--dim);",
     "  font:400 14px 'IBM Plex Mono',monospace}",
+    /* network selector: which chain the pad is pointed at */
+    ".shl-net{display:flex;align-items:center;gap:8px;padding:10px 16px;",
+    "  border:1px solid var(--line2);border-radius:999px;background:transparent;",
+    "  cursor:pointer;font:600 13.5px Inter,sans-serif;color:var(--ink);",
+    "  white-space:nowrap;transition:border-color .2s}",
+    ".shl-net:hover{border-color:var(--faint)}",
+    ".shl-net svg{width:14px;height:14px;display:block}",
+    ".shl-net i{font-style:normal;font-size:10px;color:var(--faint)}",
+    "#shl-nmenu .menu{min-width:210px}",
+    "#shl-nmenu .menu a{display:flex;align-items:center;gap:10px}",
+    "#shl-nmenu .menu .soon{margin-left:auto;font:600 9px 'IBM Plex Mono',monospace;",
+    "  letter-spacing:.14em;color:#ffb84d;border:1px solid rgba(255,180,80,.45);",
+    "  border-radius:99px;padding:3px 8px}",
+    "@media (max-width:700px){.shl-net span{display:none}}",
     ".shl-search{display:none;flex:1;min-width:0}",
     ".shl-search.open{display:block}",
     ".shl-search input{width:100%;max-width:320px;background:var(--bg);color:var(--ink);",
@@ -263,6 +277,24 @@
         }).join(""))}
       </nav>
       <div class="zone r">
+        <div class="shl-dd r" id="shl-nmenu">
+          <button class="shl-net" aria-haspopup="true" aria-expanded="false">
+            ${raw('<svg viewBox="0 0 24 24" aria-hidden="true">' +
+              '<defs><linearGradient id="shl-ng" x1="0" y1="1" x2="1" y2="0">' +
+              '<stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>' +
+              '</linearGradient></defs>' +
+              '<path fill="url(#shl-ng)" d="M7.2 4h13.6l-4 4.9H3.2Zm0 13.5h13.6l-4 4.9H3.2Zm9.6-6.8H3.2l4-4.9h13.6z"/></svg>')}
+            <span>Solana</span> <i>▾</i>
+          </button>
+          <div class="menu">
+            <a href="#" data-net="solana">${raw('<svg width="13" height="13" viewBox="0 0 24 24">' +
+              '<path fill="url(#shl-ng)" d="M7.2 4h13.6l-4 4.9H3.2Zm0 13.5h13.6l-4 4.9H3.2Zm9.6-6.8H3.2l4-4.9h13.6z"/></svg>')}
+              Solana</a>
+            <a href="#" data-net="robinhood">${raw('<svg width="13" height="13" viewBox="0 0 24 24">' +
+              '<path fill="#00C805" d="M12 2 3 7v10l9 5 9-5V7Z" opacity=".85"/></svg>')}
+              Robinhood Chain <span class="soon">SOON</span></a>
+          </div>
+        </div>
         <div class="shl-dd r" id="shl-wmenu">
           <button class="shl-wallet" id="shl-wallet"><span>Connect wallet</span></button>
           <div class="menu">
@@ -325,6 +357,41 @@
         });
       });
     });
+
+    /* ---- network selector ---- */
+    (function () {
+      var nd = document.getElementById("shl-nmenu");
+      if (!nd) return;
+      var trig = nd.querySelector("button");
+      trig.addEventListener("click", function (e) {
+        e.stopPropagation();
+        document.querySelectorAll(".shl-dd.open").forEach(function (o) {
+          if (o !== nd) o.classList.remove("open");
+        });
+        nd.classList.toggle("open");
+      });
+      document.addEventListener("click", function () { nd.classList.remove("open"); });
+      nd.querySelectorAll(".menu a").forEach(function (a) {
+        a.addEventListener("click", function (e) {
+          e.preventDefault();
+          nd.classList.remove("open");
+          if (a.dataset.net === "robinhood") {
+            alertBar("Robinhood Chain is being wired in — the EVM side is coming to WAVES. " +
+              "Solana is live today.");
+          }
+        });
+      });
+      function alertBar(text) {
+        var el = document.createElement("div");
+        el.style.cssText = "position:fixed;left:50%;bottom:26px;transform:translateX(-50%);" +
+          "z-index:200;background:var(--panel);border:1px solid var(--line2);" +
+          "border-radius:10px;padding:12px 18px;font:500 13px Inter,sans-serif;" +
+          "color:var(--ink);max-width:min(480px,90vw);box-shadow:0 18px 50px -20px rgba(0,0,0,.9)";
+        el.textContent = text;
+        document.body.appendChild(el);
+        setTimeout(function () { el.remove(); }, 4200);
+      }
+    })();
 
     /* ---- search ---- */
     if (opts.search !== false) {
