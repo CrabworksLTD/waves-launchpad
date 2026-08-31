@@ -44,6 +44,13 @@ const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const PLAN_TTL = 60 * 60 * 24 * 7;  // an unfinished plan is still worth resuming a week later
 
 function kv() {
+  /* No credentials means no store, not a broken one. The Upstash client
+   * constructs happily without a url and then fails every command with
+   * "Failed to parse URL from /pipeline", which reads like a bug in us and
+   * aborted the whole job — so answer null and let callers degrade. */
+  if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+    return Promise.resolve(null);
+  }
   return import("@upstash/redis").then(({ Redis }) => new Redis({
     url: process.env.KV_REST_API_URL,
     token: process.env.KV_REST_API_TOKEN
@@ -84,6 +91,57 @@ async function signSend(conn, tx, keeper) {
   return sig;
 }
 
+/* A payment that can be interrupted at any instant and resumed without paying
+ * twice.
+ *
+ * Marking a step done AFTER it lands is not enough: the rehearsal killed the
+ * keeper between broadcasting the creator's transfer and recording it, and the
+ * next run paid the creator a second time out of a pot that only held one
+ * payment — the shortfall coming quietly out of the keeper's float.
+ *
+ * So the signature is written down BEFORE the transaction is broadcast. On
+ * resume, a recorded signature is checked against the chain: if it landed the
+ * step is simply marked done, and if it never landed the transaction is rebuilt
+ * and sent. The write-then-send ordering is what makes the crash window safe —
+ * the worst case is a recorded signature that was never sent, which resolves to
+ * "did not land, send it".
+ *
+ * `slot` is the field name in the plan; `build` returns a fresh Transaction. */
+async function payOnce(conn, keeper, plan, slot, build, save) {
+  if (plan[slot + "Done"]) return;
+
+  const known = plan[slot + "Sig"];
+  if (known) {
+    const st = await conn.getSignatureStatus(known, { searchTransactionHistory: true })
+      .catch(() => null);
+    const v = st && st.value;
+    if (v && !v.err) {                       // it landed after all
+      plan[slot + "Done"] = true;
+      await save();
+      return;
+    }
+  }
+
+  const tx = await build();
+  tx.feePayer = keeper.publicKey;
+  tx.recentBlockhash = (await conn.getLatestBlockhash("confirmed")).blockhash;
+  tx.sign(keeper);
+  const raw = tx.serialize();
+
+  // the signature exists as soon as it is signed — record it before it can land
+  const sig = bs58encode(tx.signature);
+  plan[slot + "Sig"] = sig;
+  await save();
+
+  await conn.sendRawTransaction(raw, { maxRetries: 5 });
+  await confirmed(conn, sig, raw);
+  plan[slot + "Done"] = true;
+  await save();
+}
+
+let _bs58 = null;
+function bs58encode(buf) { return _bs58.encode(buf); }
+
 export default async function handler(req, res) {
   // Vercel signs scheduled invocations; a stranger hitting this URL must not
   // be able to start a payout run.
@@ -102,6 +160,7 @@ export default async function handler(req, res) {
     const w3 = await import("@solana/web3.js");
     const M = await import("@meteora-ag/dynamic-bonding-curve-sdk");
     const bs58 = (await import("bs58")).default;
+    _bs58 = bs58;   // payOnce encodes signatures with it
     const BN = (await import("bn.js")).default;
 
     const keeper = w3.Keypair.fromSecretKey(bs58.decode(process.env.KEEPER_SECRET.trim()));
@@ -110,11 +169,27 @@ export default async function handler(req, res) {
     const cli = new M.DynamicBondingCurveClient(conn, "confirmed");
     const db = await kv().catch(() => null);
 
-    const proto = req.headers["x-forwarded-proto"] || "https";
-    const origin = proto + "://" + (req.headers["x-forwarded-host"] || req.headers.host);
-    const j = await fetch(origin + "/api/tokens").then((r) => r.json()).catch(() => ({}));
-    const jobs = (j.tokens || []).filter(
-      (t) => (t.feeSharePct || 0) > 0 || t.feeShare === "holders");
+    /* An explicit single job, instead of the live listing. This is how the
+     * distribution path gets rehearsed against a local validator before it is
+     * trusted with real fees — same deployed code, a pool that does not matter.
+     * Behind CRON_SECRET like everything else here. */
+    const q = req.query || {};
+    let jobs;
+    if (q.mint && q.pool) {
+      jobs = [{
+        mint: q.mint, pool: q.pool, symbol: q.symbol || "TEST",
+        feeShare: "holders",
+        feeSharePct: q.pct == null ? 100 : parseInt(q.pct, 10),
+        creator: q.creator || null, feeWallet: q.feeWallet || null
+      }];
+      log.push("explicit job: " + q.mint);
+    } else {
+      const proto = req.headers["x-forwarded-proto"] || "https";
+      const origin = proto + "://" + (req.headers["x-forwarded-host"] || req.headers.host);
+      const j = await fetch(origin + "/api/tokens").then((r) => r.json()).catch(() => ({}));
+      jobs = (j.tokens || []).filter(
+        (t) => (t.feeSharePct || 0) > 0 || t.feeShare === "holders");
+    }
 
     if (!jobs.length) {
       return res.status(200).json({ ok: true, keeper: keeperAddr, pledged: 0, log });
@@ -228,7 +303,7 @@ export default async function handler(req, res) {
             mint: job.mint, claimSig, claimed: claimed.toString(),
             creatorCut: creatorCut.toString(),
             creatorDest: job.feeWallet || job.creator || null,
-            creatorPaid: false, pays, done: 0, at: Date.now()
+            pays, done: 0, at: Date.now()
           };
           if (db) await db.set(planKey, JSON.stringify(plan), { ex: PLAN_TTL });
           else log.push(job.mint + ": ⚠️ no KV, a failure here cannot be resumed");
@@ -237,29 +312,37 @@ export default async function handler(req, res) {
                    new Date(plan.at).toISOString());
         }
 
-        // ── step 5: execute, recording progress as it goes ───────────────────
-        if (!plan.creatorPaid && BigInt(plan.creatorCut) > 0n && plan.creatorDest) {
-          const t = new w3.Transaction().add(w3.SystemProgram.transfer({
-            fromPubkey: keeper.publicKey, toPubkey: new w3.PublicKey(plan.creatorDest),
-            lamports: Number(plan.creatorCut)
-          }));
-          await signSend(conn, t, keeper);
-          plan.creatorPaid = true;
+        /* ── step 5: execute ────────────────────────────────────────────────
+         * Every transfer goes through payOnce, which records its signature
+         * before broadcasting so an interrupted run can ask the chain what
+         * actually happened instead of assuming. */
+        const save = async () => {
           if (db) await db.set(planKey, JSON.stringify(plan), { ex: PLAN_TTL });
+        };
+
+        if (BigInt(plan.creatorCut) > 0n && plan.creatorDest) {
+          await payOnce(conn, keeper, plan, "creator", () =>
+            new w3.Transaction().add(w3.SystemProgram.transfer({
+              fromPubkey: keeper.publicKey, toPubkey: new w3.PublicKey(plan.creatorDest),
+              lamports: Number(plan.creatorCut)
+            })), save);
         }
 
         while (plan.done < plan.pays.length) {
-          const slice = plan.pays.slice(plan.done, plan.done + BATCH);
-          const t = new w3.Transaction();
-          for (const p of slice) {
-            t.add(w3.SystemProgram.transfer({
-              fromPubkey: keeper.publicKey, toPubkey: new w3.PublicKey(p.owner),
-              lamports: Number(p.lamports)
-            }));
-          }
-          await signSend(conn, t, keeper);
-          plan.done += slice.length;
-          if (db) await db.set(planKey, JSON.stringify(plan), { ex: PLAN_TTL });
+          const at = plan.done;
+          const slice = plan.pays.slice(at, at + BATCH);
+          await payOnce(conn, keeper, plan, "batch" + at, () => {
+            const t = new w3.Transaction();
+            for (const p of slice) {
+              t.add(w3.SystemProgram.transfer({
+                fromPubkey: keeper.publicKey, toPubkey: new w3.PublicKey(p.owner),
+                lamports: Number(p.lamports)
+              }));
+            }
+            return t;
+          }, save);
+          plan.done = at + slice.length;
+          await save();
         }
 
         if (db) {

@@ -24,6 +24,13 @@ const WINDOWS = {
 };
 
 function kv() {
+  /* No credentials means no store, not a broken one. The Upstash client
+   * constructs happily without a url and then fails every command with
+   * "Failed to parse URL from /pipeline", which reads like a bug in us and
+   * aborted the whole job — so answer null and let callers degrade. */
+  if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+    return Promise.resolve(null);
+  }
   return import("@upstash/redis").then(({ Redis }) => new Redis({
     url: process.env.KV_REST_API_URL,
     token: process.env.KV_REST_API_TOKEN
