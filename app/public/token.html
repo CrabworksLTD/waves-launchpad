@@ -48,6 +48,7 @@ main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
 /* socials are marks, not words — a round button per platform */
 .socials a.ic{width:34px;height:34px;padding:0;justify-content:center;border-radius:99px}
 .socials a.ic svg{width:15px;height:15px;display:block;fill:currentColor}
+.socials a.ic img{width:16px;height:16px;display:block;border-radius:3px}
 /* the share mark is drawn with strokes, not fills — the rule above would
    flood its open paths */
 .socials a#share svg{fill:none;stroke:currentColor;stroke-width:2}
@@ -303,7 +304,19 @@ input:focus{outline:none;border-color:var(--accent)}
       (window.Launch.cluster() === "devnet" ? "?cluster=devnet" : "");
   }
   function renderLinks(meta) {
-    var out = ['<a href="' + explorer(MINT) + '" target="_blank" rel="noopener">Contract <i>↗</i></a>'];
+    /* No explorer pills. The contract address is already on the line above
+     * with a copy button, and an explorer link is a way OUT of a trading page
+     * — the row is for the project's own places and for sharing. */
+    var out = [];
+    /* DexScreener, by token address — their /solana/<address> form resolves to
+     * whichever pair they have indexed. Mainnet only, and it can be empty for a
+     * few minutes after a launch until they pick the pool up. */
+    if (window.Launch.cluster() === "mainnet-beta") {
+      out.push('<a class="ic" href="https://dexscreener.com/solana/' + esc(MINT) +
+        '" target="_blank" rel="noopener" title="DexScreener" aria-label="DexScreener">' +
+        '<img src="/art/dexscreener.png" alt="" width="16" height="16"></a>');
+    }
+
     // Share is a mark, like the socials — the row reads as icons, not a
     // sentence, and the glyph is understood everywhere.
     out.push('<a class="ic" id="share" href="#" title="Share" aria-label="Share">' +

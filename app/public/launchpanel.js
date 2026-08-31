@@ -773,13 +773,27 @@
       var blobUrl = function (b) {
         return b ? URL.createObjectURL(new Blob([b], { type: "image/png" })) : null;
       };
+
+      /* Fall back to the collection's own art when no PFP or banner was
+       * attached. A card with a letter tile on a generic pattern is the one
+       * thing every share of that launch will show, and a launcher who skipped
+       * the art step did not decide to have no art — they just skipped a step.
+       * Piece #1 is the same fallback the listing avatar already uses. */
+      var first = null;
+      if (kind === "collection" && (!cfg.avatar || !cfg.banner) && run && run.files) {
+        var img = (run.files || []).find(function (f) {
+          return /\.(png|jpe?g|webp|gif)$/i.test(f.name || "");
+        });
+        if (img && img.bytes) first = blobUrl(img.bytes);
+      }
+
       return await window.CardMaker.make({
         kind: kind,
         chain: isEvm() ? "robinhood" : "solana",
         name: cfg.name,
         sym: cfg.symbol,
-        avatar: blobUrl(cfg.avatar),
-        banner: blobUrl(cfg.banner),
+        avatar: blobUrl(cfg.avatar) || first,
+        banner: blobUrl(cfg.banner) || first,
         stats: stats
       });
     } catch (e) { return null; }

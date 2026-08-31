@@ -56,6 +56,7 @@ a{color:inherit;text-decoration:none}
 /* socials are marks, not words — one round button per platform */
 .links a.ic{width:34px;height:34px;padding:0;justify-content:center;border-radius:99px}
 .links a.ic svg{width:15px;height:15px;display:block;fill:currentColor}
+.links a.ic img{width:16px;height:16px;display:block;border-radius:3px}
 /* the share mark is drawn with strokes, not fills */
 .links a#share svg{fill:none;stroke:currentColor;stroke-width:2}
 
@@ -261,15 +262,18 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
       (window.Launch.cluster() === "devnet" ? "?cluster=devnet" : "");
   }
   function renderLinks(links) {
-    var out = ['<a href="' + explorer(CM) + '" target="_blank" rel="noopener">Machine <i>↗</i></a>'];
+    // No explorer pills — the machine address sits under the mint progress
+    // bar already, and the row is for the project's own places.
+    var out = [];
     /* Tensor, not OpenSea: OpenSea has no address-based route for a Solana
      * collection — it needs a slug it assigns after indexing, and both
      * opensea.io/assets/solana/<addr> and /collection/<addr> answer 404.
      * Tensor takes the collection address directly. Mainnet only, because a
      * devnet collection does not exist on any marketplace. */
     if (state && state.collection && window.Launch.cluster() === "mainnet-beta") {
-      out.push('<a href="https://www.tensor.trade/trade/' + esc(state.collection) +
-        '" target="_blank" rel="noopener">Tensor <i>↗</i></a>');
+      out.push('<a class="ic" href="https://www.tensor.trade/trade/' + esc(state.collection) +
+        '" target="_blank" rel="noopener" title="Tensor" aria-label="Tensor">' +
+        '<img src="/art/tensor.png" alt="" width="16" height="16"></a>');
     }
     // Share is a mark, like the socials
     out.push('<a class="ic" id="share" href="#" title="Share" aria-label="Share">' +

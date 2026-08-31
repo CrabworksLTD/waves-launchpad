@@ -75,6 +75,38 @@
 
   function fmtEth(wei) { return window.EvmCollections.fmtEth(wei); }
 
+  /* The links row, which the Solana mint page renders for itself. The EVM
+   * driver owns this page on the Robinhood side, so nothing was filling it —
+   * there was no marketplace link and no share button here at all. */
+  function renderLinks() {
+    var box = $("links");
+    if (!box) return;
+    var out = [];
+    var os = chain().opensea;
+    if (os) {
+      out.push('<a class="ic" href="https://opensea.io/assets/' + os + "/" + C +
+        '" target="_blank" rel="noopener" title="OpenSea" aria-label="OpenSea">' +
+        '<img src="/art/opensea.png" alt="" width="16" height="16"></a>');
+    }
+    out.push('<a class="ic" id="share" href="#" title="Share" aria-label="Share">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/>' +
+      '<circle cx="18" cy="19" r="2.6"/><path d="M8.3 13.4l7.4 4.3M15.7 6.3l-7.4 4.3"/>' +
+      "</svg></a>");
+    box.innerHTML = out.join("");
+
+    var sb = $("share");
+    if (sb && window.WavesShare) {
+      sb.onclick = function (e) {
+        e.preventDefault();
+        window.WavesShare.open({
+          id: C, to: "mint", name: st.name || "This collection", title: "collection"
+        });
+      };
+    }
+  }
+
   function paint() {
     document.title = st.name + " · WAVES";
     $("name").textContent = st.name;
@@ -86,6 +118,7 @@
     $("pct").textContent = pct.toFixed(1) + "% minted";
     document.querySelector(".sale .foot").textContent =
       "Runs on Robinhood Chain. Nothing custom in the middle.";
+    renderLinks();
 
     var total = st.price + st.fee;
     var out = st.minted >= st.maxSupply;
