@@ -38,9 +38,15 @@ main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
 .who .sym{-webkit-text-fill-color:var(--faint);color:var(--faint);
   font-size:16px;margin-left:10px;letter-spacing:0}
 .socials{display:flex;gap:8px;flex-wrap:wrap}
-.socials a{padding:7px 14px;border:1px solid rgba(255,255,255,.22);border-radius:99px;
-  font-size:12px;color:var(--dim);background:rgba(0,0,0,.4)}
+.socials a{display:inline-flex;align-items:center;gap:6px;
+  padding:7px 14px;border:1px solid rgba(255,255,255,.22);border-radius:99px;
+  font:500 12px Inter,sans-serif;color:var(--dim);background:rgba(0,0,0,.4);
+  transition:color .18s,border-color .18s}
 .socials a:hover{color:var(--ink);border-color:var(--faint)}
+.socials a i{font-style:normal;color:var(--faint);font-size:10px}
+/* socials are marks, not words — a round button per platform */
+.socials a.ic{width:34px;height:34px;padding:0;justify-content:center;border-radius:99px}
+.socials a.ic svg{width:15px;height:15px;display:block;fill:currentColor}
 /* the contract address: a line of text you can click, not a form field */
 .ca{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
   font:400 12.5px "IBM Plex Mono",monospace;color:var(--faint);
@@ -193,6 +199,41 @@ input:focus{outline:none;border-color:var(--accent)}
     load();
   }
 
+  /* The row under the address: where this token lives on chain, then wherever
+   * its creator lives. Explorer links are always available because they are
+   * derived from addresses we already have; socials come from the token's own
+   * metadata, so they are the creator's, not ours to invent. */
+  function explorer(addr) {
+    return "https://explorer.solana.com/address/" + addr +
+      (window.Launch.cluster() === "devnet" ? "?cluster=devnet" : "");
+  }
+  function renderLinks(meta) {
+    var out = ['<a href="' + explorer(MINT) + '" target="_blank" rel="noopener">Contract <i>↗</i></a>'];
+    if (poolHint) {
+      out.push('<a href="' + explorer(poolHint) + '" target="_blank" rel="noopener">Pool <i>↗</i></a>');
+    }
+    // brand marks, so the row stays short whatever a creator fills in
+    var MARK = {
+      website: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 9h-3a15.6 15.6 0 0 0-1.1-5.2A8 8 0 0 1 18.9 11ZM12 4.1c.7 1 1.6 3 1.8 6.9h-3.6c.2-3.9 1.1-5.9 1.8-6.9ZM5.1 11a8 8 0 0 1 4.1-5.2A15.6 15.6 0 0 0 8.1 11Zm0 2h3a15.6 15.6 0 0 0 1.1 5.2A8 8 0 0 1 5.1 13Zm6.9 6.9c-.7-1-1.6-3-1.8-6.9h3.6c-.2 3.9-1.1 5.9-1.8 6.9Zm2.8-1.7a15.6 15.6 0 0 0 1.1-5.2h3a8 8 0 0 1-4.1 5.2Z"/></svg>',
+      twitter: '<svg viewBox="0 0 24 24"><path d="M18.9 2H22l-7 8 8.2 12h-6.4l-5-7.3L5.6 22H2.5l7.5-8.6L2 2h6.6l4.6 6.7Zm-1.1 18h1.7L7.3 3.8H5.5Z"/></svg>',
+      telegram: '<svg viewBox="0 0 24 24"><path d="M21.9 4.3 18.9 19c-.2 1-.8 1.3-1.7.8l-4.6-3.4-2.2 2.1c-.3.3-.5.5-1 .5l.3-4.7L18.3 6c.4-.3-.1-.5-.6-.2L6.9 12.7l-4.6-1.4c-1-.3-1-1 .2-1.5l18-6.9c.8-.3 1.6.2 1.4 1.4Z"/></svg>',
+      discord: '<svg viewBox="0 0 24 24"><path d="M19.3 5.3A16.8 16.8 0 0 0 15.1 4l-.2.4a12.7 12.7 0 0 1 3.7 1.9 13.4 13.4 0 0 0-11.2 0A12.7 12.7 0 0 1 11 4.4L10.9 4a16.8 16.8 0 0 0-4.2 1.3C3.9 9.4 3.2 13.4 3.5 17.4a16.9 16.9 0 0 0 5.1 2.6l.7-1.2a11 11 0 0 1-1.7-.8l.4-.3a12.1 12.1 0 0 0 10 0l.4.3a11 11 0 0 1-1.7.8l.7 1.2a16.9 16.9 0 0 0 5.1-2.6c.4-4.6-.7-8.6-3.2-12.1ZM9.7 15.1c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm4.6 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg>'
+    };
+    var ext = (meta && meta.extensions) || {};
+    var order = [["website", "Website"], ["twitter", "X"], ["telegram", "Telegram"],
+                 ["discord", "Discord"]];
+    order.forEach(function (kv) {
+      var v = ext[kv[0]];
+      if (!v) return;
+      var href = /^https?:/.test(v) ? v
+        : kv[0] === "twitter" ? "https://x.com/" + String(v).replace(/^@/, "")
+        : "https://" + v;
+      out.push('<a class="ic" title="' + kv[1] + '" aria-label="' + kv[1] +
+        '" href="' + esc(href) + '" target="_blank" rel="noopener">' + MARK[kv[0]] + "</a>");
+    });
+    $("socials").innerHTML = out.join("");
+  }
+
   async function load() {
     // identity from the pinned record if we have one; chain has name via
     // metadata uri but the record round-trip is cheaper
@@ -209,7 +250,12 @@ input:focus{outline:none;border-color:var(--accent)}
           if (!id) return;
           if (id.name) $("name").firstChild.textContent = id.name;
           if (id.symbol) $("sym").textContent = "$" + id.symbol;
-        }).catch(function () {});
+          if (!id.uri) return null;
+          return fetch(id.uri).then(function (r) { return r.ok ? r.json() : null; });
+        }).then(function (meta) {
+          renderLinks(meta);
+          if (meta && meta.description) $("desc").textContent = meta.description;
+        }).catch(function () { renderLinks(null); });
         if (rec.icon) $("logo").innerHTML = '<img alt="" src="' + esc(rec.icon) + '">';
         if (rec.banner) {
           $("tbanner-img").src = rec.banner;
