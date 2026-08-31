@@ -47,9 +47,15 @@ a{color:inherit;text-decoration:none}
 .who .desc{margin:0;color:var(--dim);font-size:14px;max-width:56ch;
   display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .links{display:flex;gap:8px;flex-wrap:wrap}
-.links a{padding:7px 14px;border:1px solid rgba(255,255,255,.22);border-radius:99px;
-  font-size:12px;color:var(--dim);background:rgba(0,0,0,.4);transition:color .2s,border-color .2s}
+.links a{display:inline-flex;align-items:center;gap:6px;
+  padding:7px 14px;border:1px solid rgba(255,255,255,.22);border-radius:99px;
+  font:500 12px Inter,sans-serif;color:var(--dim);background:rgba(0,0,0,.4);
+  transition:color .2s,border-color .2s}
 .links a:hover{color:var(--ink);border-color:var(--faint)}
+.links a i{font-style:normal;color:var(--faint);font-size:10px}
+/* socials are marks, not words — one round button per platform */
+.links a.ic{width:34px;height:34px;padding:0;justify-content:center;border-radius:99px}
+.links a.ic svg{width:15px;height:15px;display:block;fill:currentColor}
 
 /* ---- sale panel ---- */
 .sale{background:rgba(10,10,10,.88);backdrop-filter:blur(14px);
@@ -233,6 +239,39 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
     m.innerHTML = html;
   }
 
+  /* The row under the name: where this collection lives on chain, then
+   * wherever its creator lives. The explorer links are always available
+   * because they come from addresses the page already holds; socials come
+   * from the _links.json pinned at launch, so they are the creator's. */
+  var MARK = {
+    website: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 9h-3a15.6 15.6 0 0 0-1.1-5.2A8 8 0 0 1 18.9 11ZM12 4.1c.7 1 1.6 3 1.8 6.9h-3.6c.2-3.9 1.1-5.9 1.8-6.9ZM5.1 11a8 8 0 0 1 4.1-5.2A15.6 15.6 0 0 0 8.1 11Zm0 2h3a15.6 15.6 0 0 0 1.1 5.2A8 8 0 0 1 5.1 13Zm6.9 6.9c-.7-1-1.6-3-1.8-6.9h3.6c-.2 3.9-1.1 5.9-1.8 6.9Zm2.8-1.7a15.6 15.6 0 0 0 1.1-5.2h3a8 8 0 0 1-4.1 5.2Z"/></svg>',
+    x: '<svg viewBox="0 0 24 24"><path d="M18.9 2H22l-7 8 8.2 12h-6.4l-5-7.3L5.6 22H2.5l7.5-8.6L2 2h6.6l4.6 6.7Zm-1.1 18h1.7L7.3 3.8H5.5Z"/></svg>',
+    telegram: '<svg viewBox="0 0 24 24"><path d="M21.9 4.3 18.9 19c-.2 1-.8 1.3-1.7.8l-4.6-3.4-2.2 2.1c-.3.3-.5.5-1 .5l.3-4.7L18.3 6c.4-.3-.1-.5-.6-.2L6.9 12.7l-4.6-1.4c-1-.3-1-1 .2-1.5l18-6.9c.8-.3 1.6.2 1.4 1.4Z"/></svg>',
+    discord: '<svg viewBox="0 0 24 24"><path d="M19.3 5.3A16.8 16.8 0 0 0 15.1 4l-.2.4a12.7 12.7 0 0 1 3.7 1.9 13.4 13.4 0 0 0-11.2 0A12.7 12.7 0 0 1 11 4.4L10.9 4a16.8 16.8 0 0 0-4.2 1.3C3.9 9.4 3.2 13.4 3.5 17.4a16.9 16.9 0 0 0 5.1 2.6l.7-1.2a11 11 0 0 1-1.7-.8l.4-.3a12.1 12.1 0 0 0 10 0l.4.3a11 11 0 0 1-1.7.8l.7 1.2a16.9 16.9 0 0 0 5.1-2.6c.4-4.6-.7-8.6-3.2-12.1ZM9.7 15.1c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm4.6 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg>'
+  };
+  function explorer(addr) {
+    return "https://explorer.solana.com/address/" + addr +
+      (window.Launch.cluster() === "devnet" ? "?cluster=devnet" : "");
+  }
+  function renderLinks(links) {
+    var out = ['<a href="' + explorer(CM) + '" target="_blank" rel="noopener">Machine <i>↗</i></a>'];
+    if (state && state.collection) {
+      out.push('<a href="' + explorer(state.collection) +
+        '" target="_blank" rel="noopener">Collection <i>↗</i></a>');
+    }
+    [["website", "Website"], ["x", "X"], ["telegram", "Telegram"], ["discord", "Discord"]]
+      .forEach(function (kv) {
+        var v = links && links[kv[0]];
+        if (!v) return;
+        var href = /^https?:/.test(v) ? v
+          : kv[0] === "x" ? "https://x.com/" + String(v).replace(/^@/, "")
+          : "https://" + v;
+        out.push('<a class="ic" title="' + kv[1] + '" aria-label="' + kv[1] +
+          '" href="' + esc(href) + '" target="_blank" rel="noopener">' + MARK[kv[0]] + "</a>");
+      });
+    $("links").innerHTML = out.join("");
+  }
+
   /* ---- identity, from the files pinned at launch ---- */
   function loadIdentity() {
     if (!metaDir) return;
@@ -245,18 +284,8 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
         if (col.banner) { $("banner").src = col.banner; $("banner").hidden = false; }
       }).catch(function () {});
     fetch(metaDir + "_links.json").then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (links) {
-        if (!links) return;
-        var order = [["website", "Website"], ["x", "X"], ["telegram", "Telegram"], ["discord", "Discord"]];
-        $("links").innerHTML = order.map(function (kv) {
-          var v = links[kv[0]];
-          if (!v) return "";
-          var href = /^https?:/.test(v) ? v
-            : kv[0] === "x" ? "https://x.com/" + v.replace(/^@/, "")
-            : "https://" + v;
-          return '<a href="' + esc(href) + '" target="_blank" rel="noopener">' + kv[1] + "</a>";
-        }).join("");
-      }).catch(function () {});
+      .then(function (links) { renderLinks(links); })
+      .catch(function () { renderLinks(null); });
   }
 
   /* The pinned wallet lists behind the merkle roots. Public by design —

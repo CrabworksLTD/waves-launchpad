@@ -482,6 +482,7 @@
       opensAt: open ? Number(open.date) * 1000 : null,
       groups: groups,
       firstItemUri: (cm.items && cm.items[0] && cm.items[0].uri) || null,
+      collection: cm.collectionMint ? String(cm.collectionMint) : null,
       authority: String(cm.authority)
     };
   }

@@ -705,7 +705,9 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
       ol.innerHTML = rows.map(function (x) {
         var sym = (x.t.symbol || "?").toUpperCase();
         return rankRow("/token/" + x.t.mint, "$" + sym + " · " + x.t.name,
-          '<span class="th coin">' + esc(sym.slice(0, 1)) + "</span>",
+          '<span class="th coin">' + (x.t.icon
+            ? '<img alt="" loading="lazy" src="' + esc(x.t.icon) + '">'
+            : esc(sym.slice(0, 1))) + "</span>",
           x.m ? (x.m.migrated ? "graduated"
                 : UI.fmt(x.m.raised, 2) + "/" + UI.fmt(x.m.threshold, 0) + " " +
                   x.m.quote + " raised")
