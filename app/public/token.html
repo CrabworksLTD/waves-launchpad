@@ -350,7 +350,15 @@ input:focus{outline:none;border-color:var(--accent)}
     el.addEventListener("click", async function (e) {
       e.preventDefault();
       var d = get();
-      if (navigator.share) {
+      /* The OS share sheet only on a real touch device. Desktop Safari also
+         implements navigator.share, so this opened a macOS panel full of
+         AirDrop targets and contacts when what was wanted was the link. */
+      var touch = false;
+      try {
+        touch = navigator.share && matchMedia("(pointer: coarse)").matches &&
+                /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);
+      } catch (err) {}
+      if (touch) {
         try { await navigator.share({ title: d.title, url: d.url }); return; }
         catch (err) { if (err && err.name === "AbortError") return; }
       }

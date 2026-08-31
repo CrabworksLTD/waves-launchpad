@@ -262,6 +262,15 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
     if (state && state.collection) {
       out.push('<a href="' + explorer(state.collection) +
         '" target="_blank" rel="noopener">Collection <i>↗</i></a>');
+      /* Tensor, not OpenSea: OpenSea has no address-based route for a Solana
+       * collection — it needs a slug it assigns after indexing, and both
+       * opensea.io/assets/solana/<addr> and /collection/<addr> answer 404.
+       * Tensor takes the collection address directly. Mainnet only, because a
+       * devnet collection does not exist on any marketplace. */
+      if (window.Launch.cluster() === "mainnet-beta") {
+        out.push('<a href="https://www.tensor.trade/trade/' + esc(state.collection) +
+          '" target="_blank" rel="noopener">Tensor <i>↗</i></a>');
+      }
     }
     out.push('<a href="#" id="share">Share <i>↗</i></a>');
     [["website", "Website"], ["x", "X"], ["telegram", "Telegram"], ["discord", "Discord"]]
@@ -292,7 +301,15 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
     el.addEventListener("click", async function (e) {
       e.preventDefault();
       var d = get();
-      if (navigator.share) {
+      /* The OS share sheet only on a real touch device. Desktop Safari also
+         implements navigator.share, so this opened a macOS panel full of
+         AirDrop targets and contacts when what was wanted was the link. */
+      var touch = false;
+      try {
+        touch = navigator.share && matchMedia("(pointer: coarse)").matches &&
+                /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);
+      } catch (err) {}
+      if (touch) {
         try { await navigator.share({ title: d.title, url: d.url }); return; }
         catch (err) { if (err && err.name === "AbortError") return; }
       }
