@@ -197,7 +197,16 @@
       '<path fill="url(#shl-g)" d="M0 16h8v8H0ZM8 8h8v8H8Zm8-8h8v8h-8Z"/></svg>';
     // the name rides in every browser tab; pages keep their own first word
     var NM = (window.BRAND && window.BRAND.name) || "WAVES";
-    document.title = NM + " Launchpad";
+    var PAGE_NAMES = {
+      "/": "Launchpad", "/app": "Editor", "/launch": "Launch",
+      "/collections": "Collections", "/tokens": "Tokens", "/stake": "Staking",
+      "/docs": "Docs", "/faq": "FAQ", "/profile": "Profile"
+    };
+    var pg = PAGE_NAMES[location.pathname]
+      || (location.pathname.indexOf("/mint/") === 0 ? "Mint" : null)
+      || (location.pathname.indexOf("/token/") === 0 ? "Token" : null)
+      || "Launchpad";
+    document.title = NM + " " + pg;
 
     /* Launch gate. A curtain for humans while the site is being built —
      * client-side by design, so it keeps out visitors, not attackers. The
