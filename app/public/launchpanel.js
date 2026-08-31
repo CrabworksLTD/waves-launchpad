@@ -95,6 +95,8 @@
       ".lp .prow span{flex:1;color:var(--dim);font-size:12px;white-space:nowrap;",
       "  overflow:hidden;text-overflow:ellipsis}",
       ".lp .prow i{font-style:normal;color:var(--faint);font-size:11px;",
+      // an asset with no market yet: readable, not shouted
+      ".lp .prow i.dim{color:#ffb84d;opacity:.75}",
       "  font-family:ui-monospace,monospace}",
       ".lp .pick{display:flex;justify-content:space-between;align-items:center;gap:10px;",
       "  width:100%;text-align:left;padding:11px 12px}",
@@ -1175,14 +1177,30 @@
         <div class="sharelbl"><span id="tk-sharetxt"></span></div>
       </div>
 
-      <!-- The asset picker that used to sit here let creators promise payouts in
-           any of 526 RWA assets, which the keeper cannot honour: it claims and
-           pays the quote currency and never swaps. Say what actually happens.
-           The picker returns with the Jupiter swap leg. -->
+      /* The reward asset is back, with the truth on the row.
+       *
+       * The catalogue IS the feature — a Disney-themed token paying Disney is
+       * why creators want this. But 354 of the 448 verified assets have no
+       * market at all while still quoting a price. Rather than hide them and
+       * lose the creative surface, or offer them and pay holders something
+       * unsellable, say which is which: an asset nothing trades yet pays out
+       * in the quote currency until it can be sold, and starts paying itself
+       * the moment a pool exists. No migration, no broken promise. */
       <div id="tk-rewardwrap" ${(flow.feeSharePct || 0) > 0 ? "" : raw("hidden")}>
-        <p class="note">Holders are paid in <b>${qLabel}</b>, pro-rata by holdings,
-        on an hourly schedule. Payouts run automatically — you do not claim
-        anything or press anything.</p>
+        <label>Holders are paid in</label>
+        <button class="pick" id="lp-reward">
+          <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
+          <span class="pk-r"><span class="k2 mono">${
+            flow.reward.liquidity === undefined || flow.reward.liquidity >= 1000
+              ? "tradeable" : "not tradeable yet"}</span>
+          <span class="pk-dd">Change ▾</span></span>
+        </button>
+        <p class="note">Paid pro-rata by holdings, automatically — nobody claims
+        anything.${flow.reward.liquidity !== undefined && flow.reward.liquidity < 1000
+          ? raw(" <b>Nothing trades " + esc(flow.reward.symbol) + " yet</b>, so holders " +
+                "receive " + esc(qLabel) + " until it can be sold. It switches by itself " +
+                "once a market exists.")
+          : ""}</p>
       </div>
 
       <div id="tk-fwwrap" ${(flow.feeSharePct || 0) >= 100 ? raw("hidden") : ""}>
@@ -1387,13 +1405,15 @@
 
     var all = null, tab = "all", q = "", hidden = 0;
 
-    // "$1.9M deep" reads better than a raw number to someone choosing what
-    // their holders will be paid in
-    function depth(n) {
-      if (!n) return "";
+    /* What the row tells you. A creator picking what their holders get paid in
+     * needs to know two things: can it be sold, and how deep is it. */
+    var MIN_LIQUIDITY = 1000;
+    function depth(t) {
+      var n = t.liquidity;
+      if (n === undefined) return "";                 // SOL / USDC
+      if (n < MIN_LIQUIDITY) return "not tradeable yet";
       if (n >= 1e6) return "$" + (n / 1e6).toFixed(1) + "M deep";
-      if (n >= 1e3) return "$" + Math.round(n / 1e3) + "k deep";
-      return "$" + Math.round(n) + " deep";
+      return "$" + Math.round(n / 1e3) + "k deep";
     }
 
     function draw() {
@@ -1407,13 +1427,15 @@
       list.innerHTML = rows.map(function (t) {
         return '<button class="prow" data-mint="' + esc(t.mint) + '">' +
           "<b>" + esc(t.symbol) + "</b><span>" + esc(t.name) + "</span>" +
-          "<i>" + esc(depth(t.liquidity) || shortAddr(t.mint)) + "</i></button>";
+          '<i class="' + ((t.liquidity !== undefined && t.liquidity < MIN_LIQUIDITY)
+            ? "dim" : "") + '">' + esc(depth(t) || shortAddr(t.mint)) + "</i></button>";
       }).join("") || '<p class="note" style="padding:12px">Nothing matches.</p>';
       var note = box.querySelector("#lp-hidden");
       if (note) {
         note.textContent = hidden
-          ? hidden + " assets are hidden because nothing trades them — a payout " +
-            "in one could not be sold."
+          ? hidden + " of these have no market yet. Pick one anyway — holders " +
+            "are paid the quote currency until it can be sold, then it switches " +
+            "by itself."
           : "";
       }
       list.querySelectorAll(".prow").forEach(function (b) {
@@ -1424,22 +1446,14 @@
       });
     }
 
-    /* Only assets a holder could actually sell.
-     *
-     * 354 of the 448 verified assets have ZERO liquidity — no route at any
-     * size — and they still carry a price, so a payout in one would show a
-     * dollar figure the holder can never realise. Ondo alone contributes 217
-     * mints sharing $48k between them. A $1k floor cuts exactly the dead ones:
-     * at that depth a few dollars costs well under 1% to exit, and payouts are
-     * small by nature. */
-    var MIN_LIQUIDITY = 1000;
-
+    /* Everything is offered — the catalogue is the point — but tradeable ones
+     * sort first, so a creator browsing sees what works before what does not. */
     window.Token.rwa().then(function (rwa) {
-      var live = (rwa || []).filter(function (t) {
-        return (t.liquidity || 0) >= MIN_LIQUIDITY;
+      var list = (rwa || []).slice().sort(function (a, b) {
+        return (b.liquidity || 0) - (a.liquidity || 0);
       });
-      hidden = (rwa || []).length - live.length;
-      all = BUILTIN_REWARDS.concat(live);
+      hidden = list.filter(function (t) { return (t.liquidity || 0) < MIN_LIQUIDITY; }).length;
+      all = BUILTIN_REWARDS.concat(list);
       draw();
     });
     box.querySelector("#lp-q").addEventListener("input", function (e) {
@@ -1496,7 +1510,10 @@
       <div class="row"><span class="k">Fee sharing</span><b>${(flow.feeSharePct || 0) > 0
         ? flow.feeSharePct + "% to holders / " + (100 - flow.feeSharePct) + "% to you"
         : "You keep everything"}</b></div>
-      ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Holders paid in</span><b>${qLabel}</b></div>` : ""}
+      ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Holders paid in</span><b>${
+        flow.reward.liquidity !== undefined && flow.reward.liquidity < 1000
+          ? qLabel + " — " + flow.reward.symbol + " has no market yet"
+          : (flow.reward.symbol || qLabel)}</b></div>` : ""}
       <div class="row"><span class="k">First buy</span><b>${flow.tbuy > 0 ? flow.tbuy + " " + qLabel : "none"}</b></div>
       ${flow.feeWallet ? H`<div class="row"><span class="k">Fees claim to</span><b>${shortAddr(flow.feeWallet)}</b></div>` : ""}
       <div class="row"><span class="k">Metadata storage</span><b id="lp-fee">quoting…</b></div>
@@ -1620,7 +1637,10 @@
       <div class="row"><span class="k">Fee sharing</span><b>${(flow.feeSharePct || 0) > 0
         ? flow.feeSharePct + "% to holders / " + (100 - flow.feeSharePct) + "% to you"
         : "You keep everything"}</b></div>
-      ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Holders paid in</span><b>${qLabel}</b></div>` : ""}
+      ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Holders paid in</span><b>${
+        flow.reward.liquidity !== undefined && flow.reward.liquidity < 1000
+          ? qLabel + " — " + flow.reward.symbol + " has no market yet"
+          : (flow.reward.symbol || qLabel)}</b></div>` : ""}
       ${raw(caRow("Token CA", res.mint))}
       ${nft ? raw(caRow("Collection", nft.res.collection) + caRow("Candy machine", nft.res.candyMachine)) : ""}
       ${nft ? H`<label>Mint page</label>

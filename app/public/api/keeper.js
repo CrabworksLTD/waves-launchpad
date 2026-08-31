@@ -51,11 +51,19 @@ const PLAN_TTL = 60 * 60 * 24 * 7;  // an unfinished plan is still worth resumin
  *
  * Two rules it has to respect, both learned before writing a line of it:
  *
- * 1. LIQUIDITY FLOOR. 354 of the 448 verified RWA assets have zero liquidity
- *    while still quoting a price, so a payout in one shows a holder a dollar
- *    figure they can never realise. The picker already refuses anything under
- *    $1,000 (launchpanel.js), and the keeper must re-check at payout time —
- *    a list generated weeks ago is not evidence about today.
+ * 1. ROUTABILITY, CHECKED AT PAYOUT. The picker offers every verified asset,
+ *    because the catalogue is the feature — a Disney-themed token paying
+ *    Disney is why creators want this. 354 of the 448 have no market at all
+ *    while still quoting a price, and the launch window says so on the row and
+ *    on the confirm screen: holders receive the quote currency until the asset
+ *    can be sold.
+ *
+ *    So the keeper decides, per round, from the chain and not from a list:
+ *    ask Jupiter for a real quote at the pot's actual size. No route, or under
+ *    REWARD_MIN_LIQUIDITY, means pay the quote currency this round and log why.
+ *    An asset that becomes tradeable starts paying itself with no migration
+ *    and nobody pressing anything — which is the whole point of deciding late
+ *    rather than at launch.
  *
  * 2. HEADROOM. The keeper's buy is the largest single trade in the whole
  *    cycle: it buys the entire pot at once, where each holder later sells only
