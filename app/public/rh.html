@@ -373,11 +373,42 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
       .catch(function () { return []; });
   }
 
+  /* The homepage shows the chain you are on. Records carry which chain they
+   * launched on; the leaderboards and spotlight read only that side's, and
+   * the numbers behind them come from that chain's readers. */
+  var EVM = !!(window.Shell && window.Shell.chain && window.Shell.chain() === "robinhood");
+  function mine(list, key) {
+    return list.filter(function (r) {
+      return EVM ? r.chain === "robinhood" : r.chain !== "robinhood";
+    }).map(function (r) {
+      if (EVM && key === "collections") r.candyMachine = r.address;
+      return r;
+    });
+  }
+
   Promise.all([
     getJson("/api/collections", "collections"),
     getJson("/api/tokens", "tokens"),
     getJson("/templates/index.json", "templates")
-  ]).then(function (r) { draw(r[0], r[1], r[2]); });
+  ]).then(function (r) {
+    if (EVM) {
+      // the EVM readers live in their own files, loaded only on this side
+      return ["/evm-chains.js", "/evm-contract.js", "/evm-collections.js"]
+        .reduce(function (p, src) {
+          return p.then(function () {
+            return new Promise(function (res, rej) {
+              var el = document.createElement("script");
+              el.src = src; el.onload = res;
+              el.onerror = function () { rej(new Error(src)); };
+              document.head.appendChild(el);
+            });
+          });
+        }, Promise.resolve())
+        .then(function () { draw(mine(r[0], "collections"), [], r[2]); })
+        .catch(function () { draw([], [], r[2]); });
+    }
+    draw(mine(r[0], "collections"), mine(r[1], "tokens"), r[2]);
+  });
 
   function bannerTile(name, href) {
     return '<a class="ban" data-name="' + esc(name) + '" href="' + esc(href) + '">' +
@@ -511,9 +542,12 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
     }
     paintList();
     rows.forEach(function (row) {
-      window.Launch.readMachine(row.r.candyMachine).then(function (m) {
-        row.m = m; paintList();
-      }).catch(function () {});
+      var read = EVM
+        ? window.EvmCollections.readOne(row.r.candyMachine).then(function (c) {
+            return { redeemed: c.minted, available: c.maxSupply };
+          })
+        : window.Launch.readMachine(row.r.candyMachine);
+      read.then(function (m) { row.m = m; paintList(); }).catch(function () {});
     });
   }
 

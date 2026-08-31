@@ -49,6 +49,16 @@ th,td{text-align:left;padding:8px 16px 8px 0;border-bottom:1px solid var(--line)
 th{color:var(--faint);font:600 11px "IBM Plex Mono",monospace;letter-spacing:.12em;
   text-transform:uppercase}
 td b{color:var(--ink)}
+/* Chain-specific copy. The selector sets data-chain on <html>; these two
+   rules mean the docs describe the chain the reader is actually on, and a
+   sentence can never claim both. */
+:root:not([data-chain="robinhood"]) .ch-rh{display:none}
+:root[data-chain="robinhood"] .ch-sol{display:none}
+.chainbar{display:flex;align-items:center;gap:10px;margin:0 0 26px;padding:12px 16px;
+  border:1px solid var(--line2);border-radius:10px;background:var(--panel);
+  font-size:13.5px;color:var(--dim)}
+.chainbar img{width:16px;height:16px;flex:none}
+.chainbar b{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -68,6 +78,12 @@ td b{color:var(--ink)}
 
   <article>
     <h1 class="disp">Docs</h1>
+    <div class="chainbar">
+      <img class="ch-sol" src="/art/solana.svg" alt=""><img class="ch-rh" src="/art/robinhood.svg" alt="">
+      <span>Showing <b class="ch-sol">Solana</b><b class="ch-rh">Robinhood Chain</b> —
+      switch chains with the network selector in the top bar.</span>
+    </div>
+
     <p class="lede">Everything on this page describes what the site actually does on
     chain. If something here disagrees with what you see, the docs are wrong —
     <a href="/faq">tell us</a>, or read the plain-English version on the
@@ -79,10 +95,14 @@ td b{color:var(--ink)}
       <li><b>An editor</b> that runs in the browser. You draw the traits — backgrounds,
       bodies, eyes, hats — set how rare each one is, and it generates the whole
       collection with metadata.</li>
-      <li><b>A launchpad</b> that deploys your collection to Solana as a
-      <b>Metaplex Core</b> collection with a <b>Candy Machine</b> handling the mint —
-      price, supply, allowlist waves, team splits, the lot. Tokens launch on a
-      <b>Meteora bonding curve</b> from the same Launch menu.</li>
+      <li><b>A launchpad</b><span class="ch-sol"> that deploys your collection to
+      Solana as a <b>Metaplex Core</b> collection with a <b>Candy Machine</b>
+      handling the mint — price, supply, allowlist waves, team splits, the lot.
+      Tokens launch on a <b>Meteora bonding curve</b> from the same Launch
+      menu.</span><span class="ch-rh"> that deploys your collection to
+      <b>Robinhood Chain</b> as its own <b>ERC-721</b> drop contract — price,
+      supply, per-wallet cap and royalties live in the contract you own.
+      Allowlist waves and token launches are Solana-only for now.</span></li>
       <li><b>A marketplace</b> that lists what launched here. Supply, minted and
       price are read from the chain when the page loads — there is no listing
       fee, no approval queue and no database of numbers we could edit.</li>
@@ -126,7 +146,7 @@ td b{color:var(--ink)}
     folder. Everything below is deployed in your transaction, owned by your
     wallet:</p>
     <ul>
-      <li><b>Price and supply</b> — mint price in SOL (zero is allowed) and how
+      <li><b>Price and supply</b> — mint price in <span class="ch-sol">SOL</span><span class="ch-rh">ETH</span> (zero is allowed) and how
       many exist. Supply is fixed at launch.</li>
       <li><b>Per-wallet cap</b> — a hard on-chain limit per minting wallet.</li>
       <li><b>Allowlist waves</b> — paste wallet lists and give each wave its own
@@ -148,15 +168,20 @@ td b{color:var(--ink)}
 
     <h2 id="storage">Storage &amp; costs</h2>
     <p>Art and metadata go to <b>Arweave</b>, permanent storage the collection's
-    metadata points at forever. You pay the storage cost in SOL at launch —
+    metadata points at forever. You pay the storage cost in <span class="ch-sol">SOL</span><span class="ch-rh">ETH</span> at launch —
     the exact number is quoted in the confirm window before you sign anything.
     Storage is priced by the byte, so it scales with your art, not with your
     supply of nerves.</p>
     <p>Launching is otherwise free: no listing fee, no platform cut of your mint
-    revenue. Solana network fees (fractions of a cent per transaction) apply as
+    revenue. <span class="ch-sol">Solana</span><span class="ch-rh">Robinhood Chain</span>
+    network fees (fractions of a cent per transaction) apply as
     they do everywhere.</p>
 
     <h2 id="tokens">Tokens</h2>
+    <p class="ch-rh"><b>On Robinhood Chain, token launches are not open yet.</b>
+    We are building our own bonding-curve launchpad for this chain rather than
+    routing through anyone else's, and it will open when it has been audited.
+    What follows describes the Solana side.</p>
     <p>A token launches on a <b>bonding curve</b> — Meteora's Dynamic Bonding
     Curve. There is no liquidity pool to create and no LP to manage: the curve
     itself is the liquidity, buys push the price up it, sells push it down.</p>
@@ -176,6 +201,8 @@ td b{color:var(--ink)}
     reads them from the chain and shows them before you sign.</p>
 
     <h2 id="pairs">Pairs &amp; rewards</h2>
+    <p class="ch-rh"><b>Solana only for now</b> — pairing a collection with a
+    token needs the token launchpad above.</p>
     <p>A <b>pair</b> is a collection and a token launched together. The point is the
     fee loop: the token's trading generates fees, the creator's share of those
     fees can pay straight to a reward vault, and that vault funds rewards for
@@ -189,7 +216,8 @@ td b{color:var(--ink)}
     <table>
       <tr><th>Action</th><th>Cost</th></tr>
       <tr><td>Using the editor</td><td><b>Free</b></td></tr>
-      <tr><td>Launching a collection</td><td><b>Storage only</b> — quoted in SOL before you sign</td></tr>
+      <tr><td>Launching a collection</td><td><b>Storage only</b> — quoted in
+      <span class="ch-sol">SOL</span><span class="ch-rh">ETH</span> before you sign</td></tr>
       <tr><td>Launching a token</td><td><b>Free</b> (tiny metadata storage + network fees)</td></tr>
       <tr><td>Minting</td><td>The creator's mint price + network fee</td></tr>
       <tr><td>Trading a token</td><td><b>1%</b> of each swap</td></tr>
@@ -200,7 +228,10 @@ td b{color:var(--ink)}
 
     <h2 id="safety">Wallets &amp; safety</h2>
     <ul>
-      <li>We support Solana wallets through Wallet Standard — Phantom, Solflare,
+      <li class="ch-rh">We support EVM wallets on Robinhood Chain — MetaMask,
+      Rabby, Coinbase Wallet and anything else that announces itself, plus
+      WalletConnect for phones.</li>
+      <li class="ch-sol">We support Solana wallets through Wallet Standard — Phantom, Solflare,
       Backpack and friends, including Ledger through those wallets.</li>
       <li>Every deploy, mint and trade is a transaction <b>you</b> sign in
       <b>your</b> wallet. There is no deposit step and no account to fund.</li>
@@ -208,7 +239,7 @@ td b{color:var(--ink)}
       <li>Your collection, its update authority and its mint revenue belong to
       the wallet that launched it. If this site vanished tomorrow, your
       collection, art and token would keep working — the art is on Arweave,
-      the logic is on Solana.</li>
+      the logic is on <span class="ch-sol">Solana</span><span class="ch-rh">Robinhood Chain</span>.</li>
     </ul>
   </article>
 </main>

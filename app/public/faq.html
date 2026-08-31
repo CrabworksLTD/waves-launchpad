@@ -36,11 +36,27 @@ details[open] summary::after{transform:rotate(45deg);color:var(--accent)}
 .a p{margin:0 0 10px}
 .a p:last-child{margin:0}
 .a b{color:var(--ink)}
+/* Chain-specific copy. The selector sets data-chain on <html>; these two
+   rules mean the docs describe the chain the reader is actually on, and a
+   sentence can never claim both. */
+:root:not([data-chain="robinhood"]) .ch-rh{display:none}
+:root[data-chain="robinhood"] .ch-sol{display:none}
+.chainbar{display:flex;align-items:center;gap:10px;margin:0 0 26px;padding:12px 16px;
+  border:1px solid var(--line2);border-radius:10px;background:var(--panel);
+  font-size:13.5px;color:var(--dim)}
+.chainbar img{width:16px;height:16px;flex:none}
+.chainbar b{color:var(--ink)}
 </style>
 </head>
 <body>
 <main>
   <h1 class="disp">FAQ</h1>
+    <div class="chainbar">
+      <img class="ch-sol" src="/art/solana.svg" alt=""><img class="ch-rh" src="/art/robinhood.svg" alt="">
+      <span>Showing <b class="ch-sol">Solana</b><b class="ch-rh">Robinhood Chain</b> —
+      switch chains with the network selector in the top bar.</span>
+    </div>
+
   <p class="lede">The short answers. The long ones, with all the sharp edges spelled
   out, live in the <a href="/docs">docs</a>.</p>
 
@@ -48,7 +64,8 @@ details[open] summary::after{transform:rotate(45deg);color:var(--accent)}
   <details>
     <summary>What is this site?</summary>
     <div class="a"><p>A place to make and launch NFT collections and tokens on
-    Solana. You can draw your collection here in the browser — no software, no
+    <span class="ch-sol">Solana</span><span class="ch-rh">Robinhood Chain</span>.
+    You can draw your collection here in the browser — no software, no
     code — or bring finished art, then launch it with one wallet signature.</p></div>
   </details>
   <details>
@@ -59,8 +76,10 @@ details[open] summary::after{transform:rotate(45deg);color:var(--accent)}
   </details>
   <details>
     <summary>What do I need before I start?</summary>
-    <div class="a"><p>A Solana wallet (Phantom, Solflare, Backpack…) with a little
-    SOL in it. Drawing is free — you only pay when you launch, and the exact cost
+    <div class="a"><p><span class="ch-sol">A Solana wallet (Phantom, Solflare,
+    Backpack…) with a little SOL in it.</span><span class="ch-rh">An EVM wallet
+    (MetaMask, Rabby, Coinbase Wallet…) with a little ETH on Robinhood Chain in
+    it.</span> Drawing is free — you only pay when you launch, and the exact cost
     is shown before you sign.</p></div>
   </details>
   <details>
@@ -100,7 +119,7 @@ details[open] summary::after{transform:rotate(45deg);color:var(--accent)}
   <h2>Money</h2>
   <details>
     <summary>What does launching cost?</summary>
-    <div class="a"><p>Just the permanent storage for your art, paid in SOL and quoted
+    <div class="a"><p>Just the permanent storage for your art, paid in <span class="ch-sol">SOL</span><span class="ch-rh">ETH</span> and quoted
     before you sign. No listing fee, and <b>we take no cut of your mint
     revenue</b> — your mint price is yours.</p></div>
   </details>
@@ -137,7 +156,9 @@ details[open] summary::after{transform:rotate(45deg);color:var(--accent)}
   </details>
   <details>
     <summary>What can tokens be priced in?</summary>
-    <div class="a"><p>SOL or USDC today, and real-world assets — tokenised stocks
+    <div class="a"><p class="ch-rh"><b>Token launches are Solana-only today</b> —
+    our own launchpad for Robinhood Chain is in the works. This answer is about
+    the Solana side.</p><p>SOL or USDC today, and real-world assets — tokenised stocks
     and gold — where a curve exists for them. The launch window shows exactly
     what's available.</p></div>
   </details>
@@ -166,7 +187,8 @@ details[open] summary::after{transform:rotate(45deg);color:var(--accent)}
   <details>
     <summary>What happens to my collection if this site shuts down?</summary>
     <div class="a"><p>Nothing. The art is on Arweave, the collection and token live
-    on Solana, and both keep working without us. That's the point of building it
+    on <span class="ch-sol">Solana</span><span class="ch-rh">Robinhood Chain</span>,
+    and both keep working without us. That's the point of building it
     this way.</p></div>
   </details>
 </main>
