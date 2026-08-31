@@ -180,6 +180,14 @@ input:focus{outline:none;border-color:var(--accent)}
         poolHint = rec.pool || null;
         $("name").firstChild.textContent = rec.name;
         $("sym").textContent = "$" + rec.symbol;
+        /* Our index is a convenience, not the truth. The name and ticker a
+         * token actually launched with live on its metadata account, so ask
+         * the chain and let it win — a listing can be wrong, the mint cannot. */
+        window.Token.onchainIdentity(MINT).then(function (id) {
+          if (!id) return;
+          if (id.name) $("name").firstChild.textContent = id.name;
+          if (id.symbol) $("sym").textContent = "$" + id.symbol;
+        }).catch(function () {});
         if (rec.icon) $("logo").innerHTML = '<img alt="" src="' + esc(rec.icon) + '">';
         if (rec.banner) {
           $("tbanner-img").src = rec.banner;

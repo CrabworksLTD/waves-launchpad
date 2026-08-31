@@ -636,11 +636,45 @@
     }
   }
 
+  /* Name, symbol and metadata uri straight off the mint's metadata account.
+   *
+   * Our records are a convenience index, not the truth: the symbol in there is
+   * whatever was posted, and a hand-registered listing can simply be wrong (it
+   * was — a token launched as SOLWAVES sat in the index as SWAVE). The chain
+   * is authoritative and cheap to read, so the page asks it.
+   *
+   * Layout: key(1) + updateAuthority(32) + mint(32), then three borsh strings
+   * — each a u32 length followed by its bytes, padded with NULs. */
+  async function onchainIdentity(mintStr) {
+    try {
+      var X = await mx();
+      var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
+      var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
+      var MD = new X.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
+      var mint = new X.PublicKey(mintStr);
+      var pda = X.PublicKey.findProgramAddressSync(
+        [new TextEncoder().encode("metadata"), MD.toBuffer(), mint.toBuffer()], MD)[0];
+      var info = await conn.getAccountInfo(pda);
+      if (!info || !info.data) return null;
+      var d = info.data;
+      var b = d.buffer ? new Uint8Array(d.buffer, d.byteOffset, d.byteLength) : new Uint8Array(d);
+      var dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+      var off = 1 + 32 + 32;
+      function str() {
+        var len = dv.getUint32(off, true); off += 4;
+        var raw = new TextDecoder().decode(b.subarray(off, off + len)); off += len;
+        return raw.replace(/\u0000+$/, "").trim();
+      }
+      return { name: str(), symbol: str(), uri: str() };
+    } catch (e) { return null; }
+  }
+
   window.Token = {
     readMarket: readMarket,
     getQuote: getQuote,
     swap: swap,
     balanceOf: balanceOf,
+    onchainIdentity: onchainIdentity,
     launchToken: launchToken,
     readPool: readPool,
     claimCreatorFeesTo: claimCreatorFeesTo,
