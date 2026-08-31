@@ -70,12 +70,16 @@ describe("waves-staking", () => {
   const vaultBal = async () => (await getAccount(conn, vault)).amount;
 
   before(async () => {
-    // fund the cast
+    /* Fund the cast. 2 SOL each is free on a local validator but real money on
+     * devnet, where the faucet is rate-limited to the point of being unusable —
+     * so take only what the accounts actually need there. Rent for a handful of
+     * Core assets and token accounts plus fees comes in well under 0.1 SOL. */
+    const onDevnet = /devnet/.test(conn.rpcEndpoint);
+    const each = onDevnet ? 0.08 * LAMPORTS_PER_SOL : 2 * LAMPORTS_PER_SOL;
     const tx = new Transaction();
     for (const kp of [staker, staker2, buyer]) {
       tx.add(SystemProgram.transfer({
-        fromPubkey: payer.publicKey, toPubkey: kp.publicKey,
-        lamports: 2 * LAMPORTS_PER_SOL,
+        fromPubkey: payer.publicKey, toPubkey: kp.publicKey, lamports: each,
       }));
     }
     await provider.sendAndConfirm(tx);
