@@ -85,12 +85,14 @@
   }
 
   /* `quote` is "sol", "usdc", or an RWA quote MINT address (only mints with a
-   * signed config appear in rwaQuotes(), so an unknown mint is a bug). */
-  function configKey(quote) {
+   * signed config appear in rwaQuotes(), so an unknown mint is a bug).
+   * `tier` picks the fee tier's config family ("standard" default, "tax"). */
+  function configKey(quote, tier) {
     quote = quote || "sol";
     var B = window.BRAND || {};
     var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
     var m = clusterConfigs();
+    if (tier && tier !== "standard") m = m[tier] || {};
     var c = null;
     if (quote === "sol" || quote === "usdc") {
       c = m[quote] ||
@@ -100,8 +102,8 @@
       c = m.rwa[quote].config;
     }
     if (!c) throw new Error(
-      "No DBC config for " + quote + " on " + cluster +
-      ". Sign one at /config-create, then add it to brand.js dbcConfigs.");
+      "No DBC config for " + quote + (tier && tier !== "standard" ? " (" + tier + " tier)" : "") +
+      " on " + cluster + ". Sign one at /config-create, then add it to brand.js dbcConfigs.");
     return c;
   }
 
@@ -126,10 +128,12 @@
   async function poolByMint(cli, X, M, conn, baseMint) {
     var m = clusterConfigs();
     var cands = [];
-    if (m.sol) cands.push({ q: WSOL, c: m.sol });
-    if (m.usdc) cands.push({ q: USDC, c: m.usdc });
-    Object.keys(m.rwa || {}).forEach(function (mint) {
-      cands.push({ q: mint, c: m.rwa[mint].config });
+    [m, m.tax || {}].forEach(function (fam) {
+      if (fam.sol) cands.push({ q: WSOL, c: fam.sol });
+      if (fam.usdc) cands.push({ q: USDC, c: fam.usdc });
+      Object.keys(fam.rwa || {}).forEach(function (mint) {
+        cands.push({ q: mint, c: fam.rwa[mint].config });
+      });
     });
     if (cands.length) {
       var addrs = cands.map(function (x) {
@@ -168,13 +172,13 @@
   /* The locked economics of a quote's config, read from chain rather than
    * hardcoded — display copy that drifts from the real config is worse than
    * none. Falls back to null and the UI says "shown at launch". */
-  async function describeConfig(quote) {
+  async function describeConfig(quote, tier) {
     try {
       var M = await dbc(), X = await mx();
       var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
       var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
       var cli = new M.DynamicBondingCurveClient(conn, "confirmed");
-      var cfg = await cli.state.getPoolConfig(new X.PublicKey(configKey(quote)));
+      var cfg = await cli.state.getPoolConfig(new X.PublicKey(configKey(quote, tier)));
       var dec = quote === "sol" ? 9
         : quote === "usdc" ? 6
         : ((clusterConfigs().rwa || {})[quote] || { decimals: 6 }).decimals;
@@ -226,7 +230,7 @@
     progress({ step: "pool", state: "signing" });
 
     var args = {
-      config: new c.X.PublicKey(configKey(opts.quote)),
+      config: new c.X.PublicKey(configKey(opts.quote, opts.tier)),
       baseMint: baseMint.publicKey,
       name: opts.name,
       symbol: opts.symbol,
@@ -465,6 +469,10 @@
     quotes: quotes,
     rwaQuotes: rwaQuotes,
     describeConfig: describeConfig,
-    configKey: function () { try { return configKey(); } catch (e) { return null; } }
+    configKey: function (q, t) { try { return configKey(q, t); } catch (e) { return null; } },
+    tiers: function () {
+      var m = clusterConfigs();
+      return { standard: true, tax: !!((m.tax || {}).sol || (m.tax || {}).usdc) };
+    }
   };
 })();

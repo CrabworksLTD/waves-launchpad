@@ -22,6 +22,18 @@
     poolCreationFee: 0                 // free to launch
   };
 
+  /* Fee tiers. Each tier is its own immutable config per quote — "tax token"
+   * on a bonding curve means a bigger SWAP fee with a bigger creator share,
+   * which is the burn/dividend budget the keeper spends. True transfer taxes
+   * need the rewards program (custom transfer hook), not a config.
+   * ⚠️ PROPOSED numbers — Kyle signs off before any mainnet signature. */
+  var TIERS = {
+    standard: { label: "Standard", baseFeeBps: 100,
+                creatorTradingFeePercentage: 25 },   // 0.2% creator / 0.6% us / 0.2% Meteora
+    tax:      { label: "Tax token", baseFeeBps: 500,
+                creatorTradingFeePercentage: 50 }    // 2% creator / 2% us / 1% Meteora
+  };
+
   var QUOTES = {
     sol: {
       mint: "So11111111111111111111111111111111111111112", decimals: 9, label: "SOL",
@@ -56,8 +68,9 @@
    * comment block for why each choice: Immutable metadata, QuoteToken fees,
    * flat fee schedule, LP locked 50/50 permanently.
    * `quote` is "sol"/"usdc" or a QUOTES-shaped object from rwaQuote(). */
-  function buildParams(sdk, quote) {
+  function buildParams(sdk, quote, tier) {
     var Q = typeof quote === "string" ? QUOTES[quote] : quote;
+    var T2 = TIERS[tier || "standard"] || TIERS.standard;
     return {
       initialMarketCap: Q.initialMarketCap,
       migrationMarketCap: Q.migrationMarketCap,
@@ -77,15 +90,15 @@
         baseFeeParams: {
           baseFeeMode: sdk.BaseFeeMode.FeeSchedulerLinear,
           feeSchedulerParam: {
-            startingFeeBps: TERMS.baseFeeBps,
-            endingFeeBps: TERMS.baseFeeBps,
+            startingFeeBps: T2.baseFeeBps,
+            endingFeeBps: T2.baseFeeBps,
             numberOfPeriod: 0,
             totalDuration: 0
           }
         },
         dynamicFeeEnabled: true,
         collectFeeMode: sdk.CollectFeeMode.QuoteToken,
-        creatorTradingFeePercentage: TERMS.creatorTradingFeePercentage,
+        creatorTradingFeePercentage: T2.creatorTradingFeePercentage,
         poolCreationFee: TERMS.poolCreationFee,
         enableFirstSwapWithMinFee: false
       },
@@ -113,5 +126,5 @@
     };
   }
 
-  return { TERMS: TERMS, QUOTES: QUOTES, rwaQuote: rwaQuote, buildParams: buildParams };
+  return { TERMS: TERMS, TIERS: TIERS, QUOTES: QUOTES, rwaQuote: rwaQuote, buildParams: buildParams };
 });

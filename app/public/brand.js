@@ -38,8 +38,11 @@
       // rwa: configs priced in a tokenised asset, keyed by quote mint —
       // { "<mint>": { config, symbol, decimals } }, signed via
       // /config-create?quote=rwa&mint=<address>
+      // .tax holds the 5% "tax token" tier's configs — same shape, its own
+      // immutable keys, signed at /config-create?fee=tax
       "mainnet-beta": { sol: "DdHWKSqE7gvKrCUvcAnEVT7R1YWKY2SknBYFLUKxxsCN",
                         usdc: "9xHSsPYmRuJJtGA3TYB7Q5P2oHWy4zpeugTf9EZ1S491",
+                        tax: { sol: "", usdc: "", rwa: {} },
                         // ⚠️ only classic-SPL mints can quote (DBC rejects
                         // Token-2022): XAUt0 / GOLD / VNXAU of the 526
                         rwa: {
@@ -47,7 +50,8 @@
                             { config: "AWar1Y1GALnT3TjL3d4K1qjH2ZLB5KiqrSw3gmaR9EGA",
                               symbol: "XAUt0", decimals: 6, label: "Gold" }
                         } },
-      devnet: { sol: "97FsuYAZrY1HxSokdSz1GnPVsLWNdpVgdczt3bLqXv8J", usdc: "", rwa: {} }
+      devnet: { sol: "97FsuYAZrY1HxSokdSz1GnPVsLWNdpVgdczt3bLqXv8J", usdc: "",
+                tax: { sol: "", usdc: "", rwa: {} }, rwa: {} }
     },
 
     // Save files. `fileKind` is written into new saves; `readKinds` is what we

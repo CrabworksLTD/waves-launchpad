@@ -85,7 +85,10 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
   var CLUSTER = qs.get("cluster") === "devnet" ? "devnet" : "mainnet-beta";
   window.Launch.cluster(CLUSTER);
   var QUOTE = (qs.get("quote") || "sol").toLowerCase();
+  var TIER = (qs.get("fee") || "standard").toLowerCase();
+  if (!DBC_TERMS.TIERS[TIER]) TIER = "standard";
   var T = DBC_TERMS.TERMS;
+  var TT = DBC_TERMS.TIERS[TIER];
   var $ = function (id) { return document.getElementById(id); };
   var Q = null;                                   // resolved by init()
 
@@ -124,13 +127,14 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
 
   function paintTerms() {
     var cl = $("cl");
-    cl.textContent = CLUSTER + " · " + Q.label + " quote";
+    cl.textContent = CLUSTER + " · " + Q.label + " quote" +
+      (TIER !== "standard" ? " · " + TT.label.toUpperCase() + " TIER" : "");
     cl.className = "cluster " + (CLUSTER === "mainnet-beta" ? "main" : "dev");
 
     /* The review the wallet owner reads before signing. Same derivation as
      * the CLI summary — platform share is (100 - creator%) of the 80% share. */
-    var plat = 80 * (100 - T.creatorTradingFeePercentage) / 100;
-    var crea = 80 * T.creatorTradingFeePercentage / 100;
+    var plat = 80 * (100 - TT.creatorTradingFeePercentage) / 100;
+    var crea = 80 * TT.creatorTradingFeePercentage / 100;
     var fmtQ = function (n) {
       return n >= 100 ? Math.round(n).toLocaleString() : n.toPrecision(4);
     };
@@ -140,7 +144,7 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
         ' price now</span><b>$' + Q.priceUsdAtCreation.toLocaleString() + "</b></div>" : "") +
       '<div class="row"><span class="k">Supply per launch</span><b>' +
         T.totalTokenSupply.toLocaleString() + " · fixed</b></div>" +
-      '<div class="row"><span class="k">Trading fee</span><b>' + (T.baseFeeBps / 100) + "%</b></div>" +
+      '<div class="row"><span class="k">Trading fee</span><b>' + (TT.baseFeeBps / 100) + "%</b></div>" +
       '<div class="row"><span class="k">Split</span><b>' +
         plat + "% platform / " + crea + "% creator / 20% Meteora</b></div>" +
       '<div class="row"><span class="k">Curve</span><b>' +
@@ -178,7 +182,7 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
       var conn = new X.Connection(rpc, "confirmed");
       var cli = new sdk.DynamicBondingCurveClient(conn, "confirmed");
 
-      var curve = sdk.buildCurveWithMarketCap(DBC_TERMS.buildParams(sdk, Q));
+      var curve = sdk.buildCurveWithMarketCap(DBC_TERMS.buildParams(sdk, Q, TIER));
       var owner = new X.PublicKey(w.publicKey);
       var cfgKp = X.Keypair.generate();
 
@@ -203,11 +207,12 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
       await conn.confirmTransaction(sig, "confirmed");
 
       var addr = cfgKp.publicKey.toBase58();
+      var slot = TIER === "standard" ? "" : "." + TIER;
       var entry = QUOTE === "rwa"
-        ? 'dbcConfigs["' + esc(CLUSTER) + '"].rwa["' + esc(Q.mint) + '"] = ' +
+        ? 'dbcConfigs["' + esc(CLUSTER) + '"]' + slot + '.rwa["' + esc(Q.mint) + '"] = ' +
           '{ config: "' + esc(addr) + '", symbol: "' + esc(Q.label) +
           '", decimals: ' + Q.decimals + ' }'
-        : 'dbcConfigs["' + esc(CLUSTER) + '"].' + esc(QUOTE) + ' = "' + esc(addr) + '"';
+        : 'dbcConfigs["' + esc(CLUSTER) + '"]' + slot + '.' + esc(QUOTE) + ' = "' + esc(addr) + '"';
       say("ok",
         "<b>Config created.</b><br>Address: <code>" + esc(addr) + "</code><br>" +
         "Owner: <code>" + esc(w.publicKey) + "</code><br>" +

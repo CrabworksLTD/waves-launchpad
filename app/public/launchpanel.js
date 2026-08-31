@@ -104,6 +104,14 @@
       "  border:1px solid rgba(20,241,149,.35);border-radius:99px;padding:4px 11px;",
       "  white-space:nowrap}",
       ".lp .pick:hover{border-color:var(--accent)}",
+      ".lp .tiers{display:grid;grid-template-columns:1fr 1fr;gap:10px}",
+      ".lp .tier{text-align:left;padding:12px 14px;border-radius:8px;",
+      "  border:1px solid var(--line);background:var(--panel2);cursor:pointer}",
+      ".lp .tier b{display:block;font:700 13px Archivo,sans-serif;margin-bottom:3px}",
+      ".lp .tier span{display:block;font-size:11.5px;color:var(--faint);line-height:1.45}",
+      ".lp .tier.on{border-color:var(--accent)}",
+      ".lp .tier.on b{color:var(--accent)}",
+      ".lp .tier:disabled{opacity:.45;cursor:default}",
       /* long form */
       ".lp .four{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}",
       ".lp .tick{display:flex;gap:10px;align-items:flex-start;margin:16px 0 4px;cursor:pointer}",
@@ -251,6 +259,9 @@
       </div>
       <p class="note">Creator supply is minted to you before the sale opens, taking ids
       from the machine first — free, before price and limits exist.</p>
+      <p class="note"><b>Fees:</b> mint revenue is 100% yours — we take no cut.
+      Storage is the only launch cost. A paired token's trading fees split
+      20% you / 60% platform / 20% Meteora on the standard tier.</p>
 
       <label>Royalty wallet</label>
       <input id="f-royto" value="${d.royTo}" placeholder="optional — defaults to your wallet">
@@ -731,7 +742,9 @@
 
       <div class="fold2" id="tk-econ">
         <div class="row"><span class="k">Total supply</span><b>1,000,000,000 · fixed</b></div>
-        <div class="row"><span class="k">Trading fee</span><b id="tk-fee">1% — 20% you / 60% platform / 20% Meteora</b></div>
+        <div class="row"><span class="k">Trading fee</span><b id="tk-fee">${flow.tier === "tax"
+          ? "5% — 40% you / 40% platform / 20% Meteora"
+          : "1% — 20% you / 60% platform / 20% Meteora"}</b></div>
         <div class="row"><span class="k">Graduates at</span><b id="tk-grad">reading the curve…</b></div>
         <div class="row" style="border-bottom:0"><span class="k">Migrates to</span><b>Meteora DAMM v2, LP locked</b></div>
         <p class="note" style="margin-top:6px">Locked in the launchpad's config — identical
@@ -762,10 +775,18 @@
       <p class="note">Where your 20% of trading fees claims to. A treasury, a
       multisig, or the reward vault.</p>
 
-      <label class="tick"><input type="checkbox" disabled>
-        <span><b>Tax settings — buy/sell rates, burn, dividends</b>
-        <span>Transfer-tax mechanics arrive with the rewards program. The reward
-        asset above already decides what holders get paid in.</span></span></label>
+      <label>Fee tier</label>
+      <div class="tiers" id="tk-tiers">
+        <button data-t="standard" class="tier ${flow.tier !== "tax" ? "on" : ""}">
+          <b>Standard</b><span>1% swap fee — 0.2% of volume to you</span></button>
+        <button data-t="tax" class="tier ${flow.tier === "tax" ? "on" : ""}"
+          ${window.Token.tiers().tax ? "" : raw('disabled title="The tax-tier config has not been signed on this network yet"')}>
+          <b>Tax token</b><span>5% swap fee — 2% of volume to you, the
+          burn/dividend budget${window.Token.tiers().tax ? "" : " (coming)"}</span></button>
+      </div>
+      <p class="note">The tax tier is a bigger swap fee with a bigger creator share —
+      that stream funds burns or dividends via the rewards program. Per-transfer
+      taxes arrive with holder staking.</p>
 
       <div class="two">
         <div><label>Website</label><input id="tk-web" value="${flow.web || ""}" placeholder="site.xyz"></div>
@@ -785,7 +806,7 @@
     `);
 
     // live economics, read from the chain config — not hardcoded copy
-    window.Token.describeConfig(flow.quote).then(function (d) {
+    window.Token.describeConfig(flow.quote, flow.tier).then(function (d) {
       var el = box.querySelector("#tk-grad");
       if (!el) return;
       if (!d) { el.textContent = "shown at launch"; return; }
@@ -830,6 +851,13 @@
         flow.bannerExt = /\.jpe?g$/i.test(f.name) ? "jpg" : "png";
         box.querySelector("#tk-bannername").textContent = f.name;
       });
+    });
+    box.querySelector("#tk-tiers").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-t]");
+      if (!b || b.disabled) return;
+      collect();
+      flow.tier = b.dataset.t;
+      tokenDetails(flow);
     });
     box.querySelector("#tk-quotes").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-q]");
@@ -974,7 +1002,11 @@
       ${flow.feeWallet ? H`<div class="row"><span class="k">Fees claim to</span><b>${shortAddr(flow.feeWallet)}</b></div>` : ""}
       <div class="row"><span class="k">Metadata storage</span><b id="lp-fee">quoting…</b></div>
       <div class="row"><span class="k">Wallet</span><b>${w ? w.name + " · " + shortAddr(w.publicKey) : "not connected"}</b></div>
-      <p class="note">Fee split on every trade: 20% you, 60% platform, 20% Meteora.
+      <div class="row"><span class="k">Fee tier</span><b>${flow.tier === "tax"
+        ? "Tax token — 5% swap fee" : "Standard — 1% swap fee"}</b></div>
+      <p class="note">Fee split on every trade: ${flow.tier === "tax"
+        ? "40% you, 40% platform, 20% Meteora"
+        : "20% you, 60% platform, 20% Meteora"}.
       Your share claims straight to any address — including a reward vault.</p>
       <div id="lp-err"></div>
       <div class="acts"><button id="lp-back">Back</button>
@@ -1041,6 +1073,7 @@
         symbol: flow.tsym,
         uri: meta.uri,
         quote: flow.quote,
+        tier: flow.tier || "standard",
         firstBuySol: flow.tbuy,
         rewardMint: flow.reward.mint,
         feeWallet: flow.feeWallet || null,
