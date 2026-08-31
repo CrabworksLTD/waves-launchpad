@@ -15,7 +15,7 @@
 
 import { ImageResponse } from "@vercel/og";
 
-export const config = { runtime: "nodejs" };
+export const config = { runtime: "edge" };
 
 const BG = "#0a0a0a";
 const RH = { rpc: "https://rpc.mainnet.chain.robinhood.com", label: "ROBINHOOD", accent: "#CCFF00" };
@@ -286,16 +286,12 @@ async function solMintCard(origin, cm) {
 
   let minted = null, supply = null;
   try {
-    // dynamic imports: if the deploy is missing these deps the card still
-    // renders, with dashes, instead of 500ing the unfurl
-    const { createUmi } = await import("@metaplex-foundation/umi-bundle-defaults");
-    const { mplCandyMachine, fetchCandyMachine } =
-      await import("@metaplex-foundation/mpl-core-candy-machine");
-    const { publicKey } = await import("@metaplex-foundation/umi");
-    const umi = createUmi(SOL.rpc, { commitment: "confirmed" }).use(mplCandyMachine());
-    const m = await fetchCandyMachine(umi, publicKey(cm));
-    minted = Number(m.itemsRedeemed);
-    supply = Number(m.data.itemsAvailable);
+    // the SDK reads live in /api/solstats (node runtime) — this render runs
+    // on the edge, where @vercel/og's wasm actually loads
+    const st = await fetch(origin + "/api/solstats?cm=" + cm,
+      { signal: AbortSignal.timeout(6000) }).then((r) => r.json());
+    if (st.failed) failed = true;
+    minted = st.minted; supply = st.supply;
   } catch (e) { failed = true; }
 
   const avatarUri = await toDataUri(arw(rec.avatar));
@@ -318,33 +314,16 @@ async function solTokenCard(origin, mint) {
   const recs = await records(origin, "tokens");
   const rec = recs.find((r) => r.mint === mint) || {};
 
-  let raised = null, threshold = null, quote = rec.quote || "SOL", dec = 9, migrated = false;
+  let raised = null, threshold = null, quote = rec.quote || "SOL", migrated = false;
   try {
-    const w3 = await import("@solana/web3.js");
-    const M = await import("@meteora-ag/dynamic-bonding-curve-sdk");
-    const conn = new w3.Connection(SOL.rpc, "confirmed");
-    const cli = new M.DynamicBondingCurveClient(conn, "confirmed");
-    // WAVES launches always record their pool; without a record the numbers
-    // stay dashes (public RPCs reject the indexed pool-by-mint query anyway)
-    const poolPk = rec.pool ? new w3.PublicKey(rec.pool) : null;
-    const cfgKey = rec.config || null;
-    if (poolPk) {
-      const pool = await cli.state.getPool(poolPk);
-      const st = (pool && (pool.account || pool)) || null;
-      const ps = st && (st.poolState || st);
-      if (ps) {
-        const cfg = DBC_CONFIGS.find((c) => c.key === String(cfgKey || ps.config)) ||
-          DBC_CONFIGS[0];
-        quote = cfg.quote; dec = cfg.dec;
-        raised = Number(BigInt(ps.quoteReserve.toString())) / Math.pow(10, dec);
-        migrated = Number(ps.isMigrated || 0) === 1;
-        const conf = await cli.state.getPoolConfig(ps.config);
-        const cs = (conf && (conf.account || conf)) || null;
-        if (cs && cs.migrationQuoteThreshold) {
-          threshold = Number(BigInt(cs.migrationQuoteThreshold.toString())) / Math.pow(10, dec);
-        }
-      }
-    } else { failed = true; }
+    const q = "mint=" + mint + (rec.pool ? "&pool=" + rec.pool : "") +
+      (rec.config ? "&config=" + rec.config : "");
+    const st = await fetch(origin + "/api/solstats?" + q,
+      { signal: AbortSignal.timeout(8000) }).then((r) => r.json());
+    if (st.failed) failed = true;
+    raised = st.raised; threshold = st.threshold;
+    if (st.quote) quote = st.quote;
+    migrated = !!st.migrated;
   } catch (e) { failed = true; }
 
   const sym = (rec.symbol || "").toUpperCase();
