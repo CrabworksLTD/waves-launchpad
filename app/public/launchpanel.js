@@ -246,7 +246,7 @@
       price: 0, maxPer: 0, dev: 0, roy: 5, royTo: "",
       site: "", x: "", tg: "", dc: "",
       openAt: "", splits: [], allowOn: false, phases: [""], wave: 30,
-      pairOn: !!flow.pair, avatar: null, avatarName: "", banner: null, bannerName: ""
+      pairOn: false, avatar: null, avatarName: "", banner: null, bannerName: ""
     };
 
     var box = shell(H`
