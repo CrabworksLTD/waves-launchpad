@@ -328,8 +328,11 @@
           var mode = a.dataset.mode;
           setOpen(false);
           if (!mode) return;                      // plain link (Explore items)
-          // On the editor page itself the panel handles everything directly.
-          if (window.LaunchPanel && window.LaunchPanel.openMode) {
+          // Only the EDITOR opens launches in place — anywhere else, the
+          // panel being loaded (e.g. a token window opened earlier) must not
+          // hijack Collection/Pair into a popup over the wrong page.
+          if (location.pathname === "/app" &&
+              window.LaunchPanel && window.LaunchPanel.openMode) {
             e.preventDefault();
             window.LaunchPanel.openMode(mode);
             return;
