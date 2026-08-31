@@ -27,6 +27,29 @@ main{max-width:1400px;margin:0 auto;padding:44px 24px 90px}
 h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   letter-spacing:-.02em;margin:0 0 6px}
 .lede{color:var(--dim);margin:0;max-width:56ch;font-size:14.5px}
+/* the explore panel — same treatment as the token marketplace */
+.panel{position:relative;border:1px solid transparent;border-radius:20px;
+  padding:26px 26px 30px;overflow:hidden;
+  background:linear-gradient(var(--void),var(--void)) padding-box,
+             var(--grad) border-box}
+.panel::before,.panel::after{content:"";position:absolute;pointer-events:none;
+  width:520px;height:420px;opacity:.45}
+.panel::before{top:-190px;left:-160px;
+  background:radial-gradient(closest-side,rgba(var(--accent-2-rgb),.75),transparent)}
+.panel::after{bottom:-190px;right:-160px;
+  background:radial-gradient(closest-side,rgba(var(--accent-rgb),.6),transparent)}
+.panel>*{position:relative;z-index:1}
+.count{display:inline-block;margin-left:12px;padding:5px 14px;border-radius:99px;
+  background:var(--panel2);border:1px solid var(--line);vertical-align:middle;
+  font:500 13px "IBM Plex Mono",monospace;color:var(--dim)}
+.seg{display:flex;align-items:center;gap:2px;padding:4px;border-radius:999px;
+  background:var(--panel);border:1px solid var(--line)}
+.seg button{padding:9px 16px;border:0;border-radius:999px;background:transparent;
+  color:var(--dim);font:600 13px Inter,sans-serif;cursor:pointer;white-space:nowrap;
+  transition:color .18s,background .18s}
+.seg button:hover{color:var(--ink)}
+.seg button.on{background:var(--panel2);color:var(--ink)}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .filters{display:flex;gap:8px;flex-wrap:wrap}
 .chip{padding:8px 16px;border:1px solid var(--line2);background:transparent;
   color:var(--dim);font:600 12.5px Inter;cursor:pointer;border-radius:999px;
@@ -83,16 +106,25 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
 </head>
 <body>
 <main>
+  <div class="panel">
   <div class="head">
     <div>
-      <h1 class="disp">Collections</h1>
+      <h1 class="disp">Explore<span class="count" id="count" hidden></span></h1>
       <p class="lede">Every collection launched here. Supply, minted and price are
       read from the chain when the page loads — not from a database we curate.</p>
     </div>
-    <div class="filters" id="filters">
-      <button class="chip on" data-f="all">All</button>
-      <button class="chip" data-f="live">Minting</button>
-      <button class="chip" data-f="out">Sold out</button>
+    <div class="controls">
+      <div class="seg" id="sort">
+        <button data-s="progress" class="on">Closest to minting out</button>
+        <button data-s="minted">Most minted</button>
+        <button data-s="newest">Newest</button>
+        <button data-s="oldest">Oldest</button>
+      </div>
+      <div class="seg" id="filters">
+        <button class="on" data-f="all">All</button>
+        <button data-f="live">Minting</button>
+        <button data-f="out">Sold out</button>
+      </div>
     </div>
   </div>
 
@@ -112,6 +144,7 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
     <a href="/launch?mode=collection">Launch the first →</a>
   </div>
   <p class="note" id="note" hidden></p>
+  </div>
 </main>
 
 <script src="/brand.js"></script>
@@ -130,6 +163,7 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   var $ = function (id) { return document.getElementById(id); };
   var state = [];                                  // {rec, machine|null}
   var filter = "all";
+  var sort = "progress";
 
   var EVM = window.Shell.chain && window.Shell.chain() === "robinhood";
 
@@ -195,6 +229,8 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
       rec.id = rec.candyMachine;
       return { rec: rec, m: null };
     });
+    $("count").textContent = records.length.toLocaleString() + " launched";
+    $("count").hidden = false;
     $("grid").hidden = false;
     draw();
     // machines are read after first paint — names render instantly, numbers
@@ -221,8 +257,40 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
     return filter === "out" ? out : !out;
   }
 
+  /* Ordering, same rule as the token marketplace: the default answers the
+   * question the page is for — what is about to sell out — and finished
+   * collections rank below the ones still minting. */
+  function frac(row) {
+    var m = row.m;
+    if (!m || !m.available) return -1;
+    return m.redeemed / m.available;
+  }
+  function ordered(rows) {
+    var out = rows.slice();
+    if (sort === "newest" || sort === "oldest") {
+      out.sort(function (a, b) {
+        var d = (b.rec.at || 0) - (a.rec.at || 0);
+        return sort === "newest" ? d : -d;
+      });
+      return out;
+    }
+    if (sort === "minted") {
+      out.sort(function (a, b) {
+        return ((b.m && b.m.redeemed) || -1) - ((a.m && a.m.redeemed) || -1);
+      });
+      return out;
+    }
+    out.sort(function (a, b) {
+      var fa = frac(a), fb = frac(b);
+      var da = fa >= 1, db = fb >= 1;
+      if (da !== db) return da ? 1 : -1;
+      return fb - fa;
+    });
+    return out;
+  }
+
   function draw() {
-    $("grid").innerHTML = state.filter(visible).map(function (row) {
+    $("grid").innerHTML = ordered(state.filter(visible)).map(function (row) {
       var r = row.rec, m = row.m;
       var pct = m && m.available ? Math.min(100, 100 * m.redeemed / m.available) : 0;
       var price = "";
@@ -249,14 +317,16 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
     }
   }
 
-  $("filters").addEventListener("click", function (e) {
-    var b = e.target.closest(".chip"); if (!b) return;
-    filter = b.dataset.f;
-    document.querySelectorAll(".chip").forEach(function (x) {
-      x.classList.toggle("on", x === b);
+  function segClick(id, apply) {
+    $(id).addEventListener("click", function (e) {
+      var b = e.target.closest("button"); if (!b) return;
+      apply(b);
+      [].forEach.call($(id).children, function (x) { x.classList.toggle("on", x === b); });
+      draw();
     });
-    draw();
-  });
+  }
+  segClick("filters", function (b) { filter = b.dataset.f; });
+  segClick("sort", function (b) { sort = b.dataset.s; });
 
   document.addEventListener("shell:search", function (e) {
     var q = (e.detail.query || "").trim().toLowerCase();
