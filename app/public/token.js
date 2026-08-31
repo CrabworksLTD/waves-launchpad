@@ -221,9 +221,36 @@
     // wallet signs, or the wallet's signature covers the wrong message.
     if (txish.signers && txish.signers.length) tx.partialSign.apply(tx, txish.signers);
     var signed = await c.wallet.signTransaction(tx);
-    var sig = await c.conn.sendRawTransaction(signed.serialize(), { skipPreflight: false });
-    await c.conn.confirmTransaction(sig, "confirmed");
+    var raw = signed.serialize();
+    var sig = await c.conn.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 5 });
+    await confirmByPolling(c.conn, sig, raw);
     return sig;
+  }
+
+  /* Confirmation for trades, by asking rather than subscribing.
+   *
+   * confirmTransaction waits on a websocket signature subscription; against a
+   * public node that can sit there long after the trade has actually landed,
+   * which is what made a swap feel laggy even when it worked. Polling the
+   * status every 500ms returns the moment the chain has it. The same loop
+   * re-broadcasts every ~6s, because a dropped transaction is otherwise a
+   * silent wait for something that will never arrive. */
+  async function confirmByPolling(conn, sig, raw) {
+    var deadline = Date.now() + 90000;
+    var misses = 0;
+    while (Date.now() < deadline) {
+      var st = null;
+      try { st = await conn.getSignatureStatus(sig, { searchTransactionHistory: true }); }
+      catch (e) { st = null; }
+      var v = st && st.value;
+      if (v && v.err) throw new Error("The trade failed on chain: " + JSON.stringify(v.err));
+      if (v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized")) return sig;
+      if (!v && raw && ++misses % 12 === 0) {
+        try { await conn.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 5 }); } catch (e) {}
+      }
+      await new Promise(function (r) { setTimeout(r, 500); });
+    }
+    throw new Error("The trade is taking longer than usual to confirm — check the explorer before retrying.");
   }
 
   /* Launch a token. `firstBuySol` > 0 uses createPoolWithFirstBuy so the
