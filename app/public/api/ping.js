@@ -4,5 +4,5 @@
 export default async function handler(req, res) {
   let dep = "missing";
   try { await import("@vercel/og"); dep = "resolves"; } catch (e) { dep = "missing: " + (e.message || "").slice(0, 120); }
-  res.status(200).json({ ok: true, node: process.version, og: dep });
+  res.status(200).json({ ok: true, v: 2, node: process.version, og: dep });
 }
