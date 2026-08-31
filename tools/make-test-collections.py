@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw
 
 G = 24                      # pixel grid
 PIECE = 1024                # exported piece size
-N = 10                      # pieces per collection
+N = int(__import__('os').environ.get('N', 30))   # pieces per collection
 
 CHAINS = {
     "solana": {

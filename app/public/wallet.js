@@ -96,9 +96,12 @@
 
   /* Both paths are normalised to the same shape so callers never branch on
      which kind of wallet they got. */
-  function wrapStandard(w) {
+  function wrapStandard(w, silent) {
     var feat = w.features;
-    return feat["standard:connect"].connect().then(function (res) {
+    /* silent: the Wallet Standard way of asking "am I already authorised for
+       this origin?" — it resolves with the account and shows no popup if so. */
+    return feat["standard:connect"].connect(silent ? { silent: true } : undefined)
+      .then(function (res) {
       var acct = res.accounts && res.accounts[0];
       if (!acct) throw new Error("no account returned");
       return {
@@ -149,8 +152,10 @@
     });
   }
 
-  function wrapInjected(prov, name) {
-    return prov.connect().then(function () {
+  function wrapInjected(prov, name, silent) {
+    // the injected-wallet equivalent: Phantom et al. return the account
+    // without prompting when the site is already trusted
+    return prov.connect(silent ? { onlyIfTrusted: true } : undefined).then(function () {
       var pk = prov.publicKey;
       if (!pk) throw new Error("no account returned");
       return {
@@ -170,12 +175,15 @@
     });
   }
 
-  function connect(id) {
+  var REMEMBER = "waves-wallet";
+
+  function connect(id, silent) {
     var found = null, all = list();
     for (var i = 0; i < all.length; i++) if (all[i].id === id) found = all[i];
     if (!found) return Promise.reject(new Error("wallet not found: " + id));
 
-    var p = found._std ? wrapStandard(found._std) : wrapInjected(found._inj, found.name);
+    var p = found._std ? wrapStandard(found._std, silent)
+                       : wrapInjected(found._inj, found.name, silent);
     return p.then(function (w) {
       connected = w;
       // Phantom and friends fire this when the user switches account in the
@@ -189,12 +197,50 @@
         });
         prov.on("disconnect", function () { connected = null; emit("disconnect"); });
       }
+      // remember which wallet, so the next page can restore it without asking
+      try { localStorage.setItem(REMEMBER, id); } catch (e) {}
       emit("connect");
       return w;
     });
   }
 
+  /* Restore an existing connection on page load.
+   *
+   * Nothing was remembered before this, so every navigation dropped the wallet
+   * and the site asked you to connect again on each page — while the wallet
+   * itself still considered the site authorised. This asks the wallet silently:
+   * if it is still authorised we get the account with no popup, and if it is
+   * not we stay disconnected and say nothing.
+   *
+   * Wallets inject asynchronously, so a wallet missing at page load is not
+   * absent — it has just not registered yet. Poll briefly before giving up. */
+  function resume() {
+    if (connected) return Promise.resolve(connected);
+    var id = null;
+    try { id = localStorage.getItem(REMEMBER); } catch (e) {}
+    if (!id) return Promise.resolve(null);
+
+    var deadline = Date.now() + 2500;
+    function attempt() {
+      var all = list();
+      for (var i = 0; i < all.length; i++) {
+        if (all[i].id === id) {
+          return connect(id, true).catch(function () {
+            // not authorised any more — forget it rather than nagging forever
+            try { localStorage.removeItem(REMEMBER); } catch (e) {}
+            return null;
+          });
+        }
+      }
+      if (Date.now() > deadline) return Promise.resolve(null);
+      return new Promise(function (r) { setTimeout(r, 150); }).then(attempt);
+    }
+    return attempt();
+  }
+
   function disconnect() {
+    // an explicit disconnect must not be undone by the next page's resume()
+    try { localStorage.removeItem(REMEMBER); } catch (e) {}
     if (!connected) return Promise.resolve();
     var w = connected;
     connected = null;
@@ -205,6 +251,7 @@
   window.Wallet = {
     list: list,
     connect: connect,
+    resume: resume,
     disconnect: disconnect,
     current: function () { return connected; },
     on: function (kind, fn) { listeners.push(fn); }

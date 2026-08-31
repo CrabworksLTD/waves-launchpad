@@ -570,6 +570,18 @@
     if (window.Wallet) window.Wallet.on("change", paint);
     window.addEventListener("moonpad-wallet", paint);
     paint();
+
+    /* Pick the wallet back up on every page.
+     *
+     * The connection lived only in memory, so moving between pages dropped it
+     * and the site asked you to connect again — on each one — while the wallet
+     * still had the site authorised. resume() asks silently: no popup if we are
+     * still trusted, and nothing at all if we are not. */
+    if (window.Wallet && window.Wallet.resume) {
+      window.Wallet.resume().then(function (w) { if (w) paint(); }).catch(function () {});
+    }
+    // the EVM side already resumes itself from localStorage (evm-wallet.js)
+
     // wallets may register after page load; recheck briefly rather than never
     var n = 0, t = setInterval(function () { paint(); if (++n > 5) clearInterval(t); }, 450);
   }
