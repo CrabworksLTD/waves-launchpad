@@ -475,11 +475,11 @@ body.pixelmode canvas#surface{image-rendering:pixelated}
    so it is reachable from anywhere in the app without stealing a row from the
    toolbar. The accessible name lives on the button; the glyph is aria-hidden,
    because "?" read aloud is not a label. */
-.mini-home{position:fixed;top:14px;left:14px;z-index:60;display:grid;
-  place-items:center;width:36px;height:36px;border-radius:9px;
-  transition:transform .2s}
-.mini-home svg{width:24px;height:24px;display:block}
-.mini-home:hover{transform:translateY(-1px)}
+.mini-home{position:fixed;top:12px;left:14px;z-index:60;display:grid;
+  place-items:center;width:44px;height:44px;border-radius:10px;
+  transition:transform .2s,background .2s}
+.mini-home svg{width:30px;height:30px;display:block}
+.mini-home:hover{transform:translateY(-1px);background:var(--panel2)}
 .howto{
   /* Floating in the viewport corner now that the header is gone. Never inside
      .stagewrap — a button over the drawing surface swallows clicks meant for
