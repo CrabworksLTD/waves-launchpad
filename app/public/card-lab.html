@@ -36,10 +36,11 @@ function card(o) {
   var d = document.createElement("div");
   d.className = "card";
   var S = 210;
-  var mark = [[0, 630 - S, o.gradA], [S, 630 - 2 * S, o.gradM], [2 * S, 0, o.gradB]]
+  var mark = [[0, 630 - S, 0], [S, 630 - 2 * S, 1], [2 * S, 0, 2]]
     .map(function (p) {
       return '<div style="position:absolute;left:' + p[0] + 'px;top:' + p[1] +
-        'px;width:' + S + 'px;height:' + S + 'px;background:' + p[2] + '"></div>';
+        'px;width:' + S + 'px;height:' + S + 'px;background:linear-gradient(45deg,' +
+        o.stops[p[2]] + ',' + o.stops[p[2] + 1] + ')"></div>';
     }).join("");
   d.innerHTML =
     mark +
@@ -55,13 +56,13 @@ function card(o) {
     }).join("") + '</div></div>';
   document.body.appendChild(d);
 }
-card({ accent: "#14F195", gradA: "#9945FF", gradM: "#569BCA", gradB: "#14F195", name: "$WAVE · First Wave",
+card({ accent: "#14F195", stops: ["#9945FF", "#6D7EDC", "#40B8B8", "#14F195"], name: "$WAVE · First Wave",
   chips: "SOLANA  ·  BONDING CURVE",
   stats: [["RAISED", "12.4 / 85 SOL"], ["CURVE", "14.6%"], ["CHAIN", "Solana"]] });
-card({ accent: "#14F195", gradA: "#9945FF", gradM: "#569BCA", gradB: "#14F195", name: "Tide Runners",
+card({ accent: "#14F195", stops: ["#9945FF", "#6D7EDC", "#40B8B8", "#14F195"], name: "Tide Runners",
   chips: "SOLANA  ·  3,333 ITEMS  ·  METAPLEX CORE",
   stats: [["ITEMS", "3,333"], ["MINTED", "1,204 / 3,333"], ["PRICE", "0.1 SOL"], ["CHAIN", "Solana"]] });
-card({ accent: "#CCFF00", gradA: "#CCFF00", gradM: "#D2EC6C", gradB: "#D9D9D9", name: "Hood Cats",
+card({ accent: "#CCFF00", stops: ["#CCFF00", "#D0F248", "#D5E691", "#D9D9D9"], name: "Hood Cats",
   chips: "BY 0x37fd…5bea  ·  ROBINHOOD  ·  500 ITEMS",
   stats: [["ITEMS", "500"], ["MINTED", "212 / 500"], ["PRICE", "0.002 ETH"], ["CHAIN", "Robinhood"]] });
 </script>
