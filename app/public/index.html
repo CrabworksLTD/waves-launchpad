@@ -56,10 +56,12 @@ h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:te
 /* ---- spotlight: wide banner tiles, name inside, visible borders ---- */
 .feature{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px}
 .feature .wide3{grid-template-columns:1fr 1fr 1fr}
-.ban{position:relative;display:block;border:1px solid rgba(255,255,255,.22);
-  border-radius:6px;overflow:hidden;background:var(--panel);aspect-ratio:41/14;
-  transition:border-color .2s}
-.ban:hover{border-color:var(--faint)}
+.ban{position:relative;display:block;border:1px solid transparent;
+  border-radius:6px;overflow:hidden;aspect-ratio:41/14;
+  background:linear-gradient(var(--panel),var(--panel)) padding-box,
+             var(--grad) border-box;
+  transition:filter .2s}
+.ban:hover{filter:brightness(1.1)}
 .ban canvas{position:absolute;inset:0;width:100%;height:100%;display:block;
   image-rendering:pixelated}
 /* bottom scrim so the name survives light banners — text-shadow alone dies on
@@ -81,10 +83,12 @@ h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:te
  * mark, the ticker huge, a curve underline, and a TOKEN tag so nobody reads
  * it as a collection */
 .tokban{position:relative;display:flex;align-items:center;gap:18px;
-  border:1px solid rgba(255,255,255,.22);border-radius:6px;overflow:hidden;
-  background:var(--panel);aspect-ratio:41/14;padding:0 22px;
-  transition:border-color .2s}
-.tokban:hover{border-color:var(--faint)}
+  border:1px solid transparent;border-radius:6px;overflow:hidden;
+  aspect-ratio:41/14;padding:0 22px;
+  background:linear-gradient(var(--panel),var(--panel)) padding-box,
+             var(--grad) border-box;
+  transition:filter .2s}
+.tokban:hover{filter:brightness(1.1)}
 .tokban::before{content:"";position:absolute;inset:0;pointer-events:none;
   background:radial-gradient(120% 160% at 0% 100%,rgba(153,69,255,.16),transparent 55%),
              radial-gradient(120% 160% at 100% 0%,rgba(20,241,149,.12),transparent 55%)}
