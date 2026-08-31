@@ -581,6 +581,8 @@
   /* Sizing probe for the pre-launch quote. storage.js sizes properly against
    * the real file set at upload time; this must not drift from it or the
    * quoted fee will not match the charged fee. */
+  var CARD_BYTES = 400 * 1024;   // generous budget for the composed share card
+
   function estimateBytes(cfg) {
     var f = run.files;
     var bytes = 0, count = 0;
@@ -593,7 +595,35 @@
     // avatar and banner ride in BOTH folders (see storage.js on why)
     if (cfg && cfg.avatar) { bytes += cfg.avatar.byteLength * 2; count += 2; }
     if (cfg && cfg.banner) { bytes += cfg.banner.byteLength * 2; count += 2; }
+    // the share card rides in both folders too. It is composed after this
+    // runs, so budget for it: 1200x630 of flat art is ~250KB, and quoting
+    // short is worse than quoting a fraction of a cent high — the approval
+    // is sized off this number and the upload fails if it does not fit.
+    bytes += CARD_BYTES * 2; count += 2;
     return { bytes: bytes, count: count + 6 };    // +6 for _index, _collection etc.
+  }
+
+  /* What actually went wrong, in words. A launch that fails after money has
+   * moved must never say "Unexpected error": the creator has paid, and the
+   * only way anyone can act on it — them or us — is if the real message,
+   * including whatever the SDK wrapped, comes through. */
+  function describe(e) {
+    if (!e) return "The launch stopped for an unknown reason.";
+    var parts = [];
+    var m = e.message || e.reason || (typeof e === "string" ? e : "");
+    if (m) parts.push(String(m));
+    if (e.cause && e.cause.message && parts.indexOf(e.cause.message) < 0) {
+      parts.push(String(e.cause.message));
+    }
+    for (var k = 0; k < (e.errors || []).length && k < 2; k++) {
+      if (e.errors[k] && e.errors[k].message) parts.push(String(e.errors[k].message));
+    }
+    if (!parts.length) {
+      try { parts.push(JSON.stringify(e).slice(0, 300)); } catch (x) {}
+    }
+    if (!parts.length) parts.push(e.name || String(e));
+    try { console.error("[launch] failed:", e); } catch (x) {}
+    return parts.join(" — ").slice(0, 400);
   }
 
   function stepList(box) {
@@ -695,7 +725,7 @@
       nftDone(cfg, res, up);
     } catch (e) {
       busy = false;
-      fail(box, e.message || String(e));
+      fail(box, describe(e));
       box.insertAdjacentHTML("beforeend",
         '<div class="acts"><button id="lp-close2">Close</button></div>');
       box.querySelector("#lp-close2").onclick = close;
@@ -829,7 +859,7 @@
       evmDone(cfg, res);
     } catch (e) {
       busy = false;
-      fail(box, e.message || String(e));
+      fail(box, describe(e));
       box.insertAdjacentHTML("beforeend",
         '<div class="acts"><button id="lp-close3">Close</button></div>');
       box.querySelector("#lp-close3").onclick = close;
@@ -1470,7 +1500,7 @@
       tokenDone(flow, res);
     } catch (e) {
       busy = false;
-      fail(box, e.message || String(e));
+      fail(box, describe(e));
       box.insertAdjacentHTML("beforeend",
         '<div class="acts"><button id="lp-close2">Close</button></div>');
       box.querySelector("#lp-close2").onclick = close;
