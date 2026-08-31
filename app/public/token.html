@@ -337,6 +337,12 @@ input:focus{outline:none;border-color:var(--accent)}
       var sig = await window.Token.swap(MINT, side, lastQuote.amountIn, lastQuote.minOut, poolHint);
       say("ok", (side === "buy" ? "Bought." : "Sold.") +
         ' <a href="https://explorer.solana.com/tx/' + esc(sig) + '" target="_blank" rel="noopener">View tx ↗</a>');
+      // Clear the amount once it has actually traded. Leaving the old number
+      // sitting there invites a second trade nobody meant to make, and the
+      // quote beside it is stale the moment the curve moves.
+      $("amt").value = "";
+      lastQuote = null;
+      $("est").textContent = "—";
       load();                                      // refresh price, curve, bar
     } catch (e) {
       var m = String(e.message || e);
