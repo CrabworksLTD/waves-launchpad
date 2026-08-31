@@ -3,20 +3,30 @@
   "buildCommand": null,
   "installCommand": "npm install",
   "outputDirectory": ".",
-  "functions": {
-    "api/og.js": { "includeFiles": "node_modules/@vercel/og/dist/hb.wasm" }
-  },
   "rewrites": [
-    { "source": "/mint/:address", "destination": "/mint" },
-    { "source": "/token/:address", "destination": "/token" }
+    {
+      "source": "/mint/:address",
+      "destination": "/mint"
+    },
+    {
+      "source": "/token/:address",
+      "destination": "/token"
+    }
   ],
   "redirects": [
     {
       "source": "/",
       "has": [
-        { "type": "query", "key": "chain", "value": "rh" },
-        { "type": "header", "key": "user-agent",
-          "value": ".*(facebookexternalhit|Twitterbot|Slackbot|Discordbot|TelegramBot|WhatsApp|LinkedInBot|redditbot).*" }
+        {
+          "type": "query",
+          "key": "chain",
+          "value": "rh"
+        },
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Twitterbot|Slackbot|Discordbot|TelegramBot|WhatsApp|LinkedInBot|redditbot).*"
+        }
       ],
       "destination": "/share-rh",
       "permanent": false
@@ -24,20 +34,36 @@
     {
       "source": "/mint/:address",
       "has": [
-        { "type": "header", "key": "user-agent",
-          "value": ".*(facebookexternalhit|Twitterbot|Slackbot|Discordbot|TelegramBot|WhatsApp|LinkedInBot|redditbot).*" }
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Twitterbot|Slackbot|Discordbot|TelegramBot|WhatsApp|LinkedInBot|redditbot).*"
+        }
       ],
-      "missing": [{ "type": "query", "key": "hp" }],
+      "missing": [
+        {
+          "type": "query",
+          "key": "hp"
+        }
+      ],
       "destination": "/api/share?id=:address&to=mint",
       "permanent": false
     },
     {
       "source": "/token/:address",
       "has": [
-        { "type": "header", "key": "user-agent",
-          "value": ".*(facebookexternalhit|Twitterbot|Slackbot|Discordbot|TelegramBot|WhatsApp|LinkedInBot|redditbot).*" }
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Twitterbot|Slackbot|Discordbot|TelegramBot|WhatsApp|LinkedInBot|redditbot).*"
+        }
       ],
-      "missing": [{ "type": "query", "key": "hp" }],
+      "missing": [
+        {
+          "type": "query",
+          "key": "hp"
+        }
+      ],
       "destination": "/api/share?id=:address&to=token",
       "permanent": false
     }
