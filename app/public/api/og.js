@@ -13,9 +13,27 @@
 //    URI whose declared mime disagrees with its bytes renders as nothing
 //  - satori needs <img> src/width/height as real props, not style
 
-import { ImageResponse } from "@vercel/og";
-
 export const config = { runtime: "nodejs" };
+
+// @vercel/og loads its harfbuzz wasm LAZILY, during the render stream —
+// after any try/catch — resolving "./hb.wasm" against the process CWD.
+// vercel.json includeFiles ships the file; chdir aims the lookup at it.
+let IR = null;
+async function getImageResponse() {
+  if (IR) return IR;
+  try {
+    const { createRequire } = await import("node:module");
+    const path = await import("node:path");
+    const fs = await import("node:fs");
+    const req = createRequire(import.meta.url);
+    let dist;
+    try { dist = path.dirname(req.resolve("@vercel/og/dist/index.node.js")); }
+    catch (e) { dist = path.join(path.dirname(req.resolve("@vercel/og/package.json")), "dist"); }
+    if (fs.existsSync(path.join(dist, "hb.wasm"))) process.chdir(dist);
+  } catch (e) {}
+  IR = (await import("@vercel/og")).ImageResponse;
+  return IR;
+}
 
 const BG = "#0a0a0a";
 const RH = { rpc: "https://rpc.mainnet.chain.robinhood.com", label: "ROBINHOOD",
@@ -126,6 +144,7 @@ async function render(req) {
 
   if (url.searchParams.get("test")) {
     const f = await fetch(origin + "/fonts/archivo-extrabold.ttf").then((r) => r.arrayBuffer());
+    const ImageResponse = await getImageResponse();
     return new ImageResponse(
       h("div", { width: "1200px", height: "630px", display: "flex", alignItems: "center",
         justifyContent: "center", backgroundColor: BG, color: SOL.accent,
@@ -223,7 +242,8 @@ function buildCard(o) {
   ].filter(Boolean));
 }
 
-function respond(card, fonts, degraded) {
+async function respond(card, fonts, degraded) {
+  const ImageResponse = await getImageResponse();
   return new ImageResponse(card, {
     width: 1200, height: 630, fonts,
     headers: {

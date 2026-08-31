@@ -3,6 +3,9 @@
   "buildCommand": null,
   "installCommand": "npm install",
   "outputDirectory": ".",
+  "functions": {
+    "api/og.js": { "includeFiles": "node_modules/@vercel/og/dist/hb.wasm" }
+  },
   "rewrites": [
     { "source": "/mint/:address", "destination": "/mint" },
     { "source": "/token/:address", "destination": "/token" }

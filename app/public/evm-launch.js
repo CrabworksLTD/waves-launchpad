@@ -266,10 +266,7 @@
     }
 
     var from = opts.from || await connect();
-    if (!(await hasAccess(from))) {
-      throw new Error("Deploying needs a pass. This wallet holds none of: " +
-        PASSES.map(function (p) { return p.label; }).join(", "));
-    }
+    // WAVES has no launch pass — anyone can deploy; storage is the only cost
     await switchChain(opts.chainId);
 
     var fee = feeFor(opts.chainId);
