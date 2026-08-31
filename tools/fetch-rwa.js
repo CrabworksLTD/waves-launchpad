@@ -51,6 +51,20 @@ const QUERIES = ["xStock", "xStocks", "Ondo"]
   .concat(COMMODITY);               // commodities are not named after letters
 
 const ASSET_TAGS = ["xstocks", "stocks", "equities", "rwa", "commodities"];
+
+// The stuff itself: physical-backed tokens and commodity funds/ETFs.
+// Miners, royalty companies and service companies are equities.
+const COMMODITY_UNDERLYINGS = new Set([
+  "PAXG", "XAUT", "VNXAU", "GOLD",              // physical gold tokens
+  "GLD", "IAU",                                  // gold ETFs
+  "SLV",                                         // silver ETF
+  "PALL", "PPLT",                                // palladium / platinum ETFs
+  "USO", "BNO",                                  // oil funds
+  "UNG",                                         // natural gas fund
+  "CPER",                                        // copper index fund
+  "URA",                                         // uranium ETF
+  "DBC", "FTGC"                                  // broad commodity funds
+]);
 const COMMODITY_WORDS = ["gold", "silver", "oil", "crude", "brent", "platinum",
   "palladium", "copper", "uranium", "natural gas", "bullion", "metal", "commodity"];
 
@@ -130,10 +144,13 @@ async function verifyBatch(addresses) {
       const issuer = id.startsWith("Xs") ? "backed"
                    : /on$/.test(sym) ? "ondo"
                    : "other";
-      // word-boundary match, or Goldman Sachs becomes a commodity ("GOLDman")
-      const name = (t.name || "").toLowerCase();
-      const kind = COMMODITY_WORDS.some((w) =>
-        new RegExp("\\b" + w.replace(" ", "\\s+") + "\\b").test(name)) ? "commodity" : "equity";
+      // Curated: a "commodity" is exposure to the STUFF (physical tokens,
+      // commodity ETFs/funds), never a company that digs it up — First
+      // Majestic Silver and Royal Gold are equities about commodities.
+      // Word-matching names put half the miners in the commodity bucket.
+      const kind = COMMODITY_UNDERLYINGS.has(
+        sym.replace(/x$/, "").replace(/on$/, "").replace(/0$/, "").toUpperCase())
+        ? "commodity" : "equity";
 
       if (!found.has(id)) {
         found.set(id, { symbol: sym, name: t.name, mint: id, issuer: issuer, kind: kind,
