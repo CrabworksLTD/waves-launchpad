@@ -8,3 +8,6 @@ out/
 .dbc-config-*.json
 .dev-records.json
 app/public/.vercel
+.vercel
+program/target/
+program/.anchor/
