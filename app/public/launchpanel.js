@@ -242,7 +242,12 @@
     var P = window.__project || {};
     var supply = run ? run.count : (P.supply || 0);
     var d = flow.d = flow.d || {
-      name: P.name || "Untitled collection", symbol: "", desc: "",
+      /* Empty, not "Untitled collection". That default was a real value that
+       * looked like placeholder text, so leaving the field alone put a
+       * collection literally named "Untitled collection" on chain and on the
+       * explore page — the existing `if (!d.name)` check passed happily,
+       * because the string is truthy. A placeholder cannot be submitted. */
+      name: P.name || "", symbol: "", desc: "",
       price: 0, maxPer: 0, dev: 0, roy: 5, royTo: "",
       site: "", x: "", tg: "", dc: "",
       openAt: "", splits: [], allowOn: false, phases: [""], wave: 30,
@@ -254,7 +259,8 @@
       <p class="sub">${supply} pieces, generated and ready. Nothing is on chain until you confirm.</p>
 
       <div class="two">
-        <div><label>Name</label><input id="f-name" value="${d.name}" maxlength="28"></div>
+        <div><label>Name</label><input id="f-name" value="${d.name}" maxlength="28"
+          placeholder="Your collection's name"></div>
         <div><label>Symbol</label><input id="f-sym" value="${d.symbol}" maxlength="8"
           placeholder="OPTIONAL" style="text-transform:uppercase"></div>
       </div>
