@@ -258,6 +258,7 @@ input:focus{outline:none;border-color:var(--accent)}
 <script src="/shell.js"></script>
 <script src="/launch.js"></script>
 <script src="/token.js"></script>
+<script src="/share-widget.js"></script>
 <script>
 (function () {
   "use strict";
@@ -326,51 +327,15 @@ input:focus{outline:none;border-color:var(--accent)}
         '" href="' + esc(href) + '" target="_blank" rel="noopener">' + MARK[kv[0]] + "</a>");
     });
     $("socials").innerHTML = out.join("");
-    wireShare($("share"), function () {
-      return {
-        url: location.origin + "/token/" + MINT,
-        title: ($("name") ? $("name").firstChild.textContent.trim() : "") +
-               " on WAVES"
-      };
-    });
-  }
-
-  /* Share.
-   *
-   * On a phone this hands off to the OS share sheet, which is where people
-   * actually want it. Everywhere else it copies the link and says so — no
-   * pre-written tweet, because the launch's own share card does the talking
-   * and putting words in someone's mouth is not our job.
-   *
-   * The link is built from the canonical address rather than location.href so
-   * it never carries a stray ?chain= or ?cluster= that would send a stranger
-   * to the wrong side of the site. */
-  function wireShare(el, get) {
-    if (!el) return;
-    el.addEventListener("click", async function (e) {
+    var sb = $("share");
+    if (sb) sb.onclick = function (e) {
       e.preventDefault();
-      var d = get();
-      /* The OS share sheet only on a real touch device. Desktop Safari also
-         implements navigator.share, so this opened a macOS panel full of
-         AirDrop targets and contacts when what was wanted was the link. */
-      var touch = false;
-      try {
-        touch = navigator.share && matchMedia("(pointer: coarse)").matches &&
-                /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);
-      } catch (err) {}
-      if (touch) {
-        try { await navigator.share({ title: d.title, url: d.url }); return; }
-        catch (err) { if (err && err.name === "AbortError") return; }
-      }
-      var label = el.innerHTML;
-      try {
-        await navigator.clipboard.writeText(d.url);
-        el.textContent = "Link copied";
-      } catch (err) {
-        el.textContent = d.url;                 // at least make it selectable
-      }
-      setTimeout(function () { el.innerHTML = label; }, 1600);
-    });
+      window.WavesShare.open({
+        id: MINT, to: "token",
+        name: ($("name") ? $("name").firstChild.textContent.trim() : "This token"),
+        title: "token"
+      });
+    };
   }
 
   /* Recent trades, straight off the pool. Rendered after the page is usable

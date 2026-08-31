@@ -213,6 +213,7 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
 })();
 </script>
 <script src="/launch.js"></script>
+<script src="/share-widget.js"></script>
 <script>
 (function () {
   "use strict";
@@ -284,44 +285,15 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
           '" href="' + esc(href) + '" target="_blank" rel="noopener">' + MARK[kv[0]] + "</a>");
       });
     $("links").innerHTML = out.join("");
-    wireShare($("share"), function () {
-      return {
-        url: location.origin + "/mint/" + CM,
-        title: ($("name").textContent || "This collection") + " on WAVES"
-      };
-    });
-  }
-
-  /* Share. The OS share sheet on a phone, a copied link everywhere else — no
-   * pre-written post, because the launch's own share card does the talking.
-   * Built from the machine address rather than location.href so it never
-   * carries a stray ?chain= or ?cluster= to the wrong side of the site. */
-  function wireShare(el, get) {
-    if (!el) return;
-    el.addEventListener("click", async function (e) {
+    var sb = $("share");
+    if (sb) sb.onclick = function (e) {
       e.preventDefault();
-      var d = get();
-      /* The OS share sheet only on a real touch device. Desktop Safari also
-         implements navigator.share, so this opened a macOS panel full of
-         AirDrop targets and contacts when what was wanted was the link. */
-      var touch = false;
-      try {
-        touch = navigator.share && matchMedia("(pointer: coarse)").matches &&
-                /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);
-      } catch (err) {}
-      if (touch) {
-        try { await navigator.share({ title: d.title, url: d.url }); return; }
-        catch (err) { if (err && err.name === "AbortError") return; }
-      }
-      var label = el.innerHTML;
-      try {
-        await navigator.clipboard.writeText(d.url);
-        el.textContent = "Link copied";
-      } catch (err) {
-        el.textContent = d.url;
-      }
-      setTimeout(function () { el.innerHTML = label; }, 1600);
-    });
+      window.WavesShare.open({
+        id: CM, to: "mint",
+        name: ($("name").textContent || "This collection"),
+        title: "collection"
+      });
+    };
   }
 
   /* ---- identity, from the files pinned at launch ---- */
