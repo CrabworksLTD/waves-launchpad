@@ -554,6 +554,21 @@
     return await send(c, tx);
   }
 
+  /* A mint's decimals, read from the mint account (byte 44). Plain account
+   * read, no index, and cached because it never changes. */
+  var decCache = {};
+  async function baseDecimals(mint, conn, X) {
+    if (decCache[mint] != null) return decCache[mint];
+    try {
+      var info = await conn.getAccountInfo(new X.PublicKey(mint));
+      var d = info && info.data;
+      if (!d) return 6;
+      var buf = d.buffer ? d : new Uint8Array(d);
+      decCache[mint] = new DataView(buf.buffer, buf.byteOffset || 0, buf.byteLength).getUint8(44);
+      return decCache[mint];
+    } catch (e) { return 6; }
+  }
+
   /* The connected wallet's balance of a launch token, in whole tokens.
    * The sell box's percentage chips size against this. */
   async function balanceOf(baseMint) {
@@ -562,13 +577,36 @@
     if (!w) return null;
     var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
     var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
-    var res = await conn.getParsedTokenAccountsByOwner(
-      new X.PublicKey(w.publicKey), { mint: new X.PublicKey(baseMint) });
-    var total = 0;
-    (res.value || []).forEach(function (a) {
-      total += a.account.data.parsed.info.tokenAmount.uiAmount || 0;
-    });
-    return total;
+    /* Read the associated token account directly rather than asking the RPC
+     * to search by owner. getParsedTokenAccountsByOwner is an INDEXED request
+     * and public nodes refuse it outright — publicnode answers 403 "Indexed
+     * requests require a personal token", which surfaced as a wall of JSON in
+     * the sell box. The ATA address is derivable, so no index is needed.
+     *
+     * A wallet that has never held the token has no account at all, which
+     * throws rather than returning zero — that is a balance of zero, not an
+     * error worth showing anyone. */
+    var TOKEN_PROGRAM = new X.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+    var ATA_PROGRAM = new X.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+    var owner = new X.PublicKey(w.publicKey);
+    var mint = new X.PublicKey(baseMint);
+    var ata = X.PublicKey.findProgramAddressSync(
+      [owner.toBuffer(), TOKEN_PROGRAM.toBuffer(), mint.toBuffer()], ATA_PROGRAM)[0];
+    /* getTokenAccountBalance is ALSO refused as indexed by this node, so read
+     * the account and decode it: an SPL token account holds its amount as a
+     * u64 little-endian at byte 64. A plain getAccountInfo is always allowed. */
+    try {
+      var info = await conn.getAccountInfo(ata);
+      if (!info || !info.data) return 0;
+      var d = info.data;
+      var buf = d.buffer ? d : new Uint8Array(d);
+      var dv = new DataView(buf.buffer, buf.byteOffset || 0, buf.byteLength);
+      var raw = dv.getBigUint64(64, true);
+      var dec = await baseDecimals(baseMint, conn, X);
+      return Number(raw) / Math.pow(10, dec);
+    } catch (e) {
+      return 0;
+    }
   }
 
   window.Token = {
