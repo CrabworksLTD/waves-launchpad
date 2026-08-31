@@ -239,8 +239,9 @@
     if (opts.customFeeBps && opts.customFeeBps !== 100) {
       /* Creator-chosen fee: a per-launch config. The program stores the
        * platform wallet as feeClaimer WITHOUT its signature — only the
-       * launcher and the ephemeral config key sign. Split policy for custom
-       * fees: creator% 50 (40% of the total fee each way, 20% Meteora). */
+       * launcher and the ephemeral config key sign. The split is the SAME as
+       * standard — 20% creator / 60% platform / 20% Meteora. A creator who
+       * wants a bigger stream raises the fee %, not the split. */
       if (opts.quote !== "sol" && opts.quote !== "usdc") {
         // an RWA custom-fee curve needs a live price to set its market caps;
         // until that's built, RWA quotes launch on the standard tier
@@ -253,7 +254,7 @@
       var cfgKp = c.X.Keypair.generate();
       var quoteMint = opts.quote === "sol" ? "So11111111111111111111111111111111111111112" : USDC;
       var curve = c.M.buildCurveWithMarketCap(terms.buildParams(c.M, opts.quote,
-        { baseFeeBps: opts.customFeeBps, creatorTradingFeePercentage: 50 }));
+        { baseFeeBps: opts.customFeeBps, creatorTradingFeePercentage: 25 }));
 
       progress({ step: "pool", state: "signing" });
       var pair = await c.cli.partner.createConfigAndPoolWithFirstBuy(Object.assign({

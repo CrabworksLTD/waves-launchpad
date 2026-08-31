@@ -764,9 +764,8 @@
 
       <div class="fold2" id="tk-econ">
         <div class="row"><span class="k">Total supply</span><b>1,000,000,000 · fixed</b></div>
-        <div class="row"><span class="k">Trading fee</span><b id="tk-fee">${flow.customFee
-          ? flow.customFee + "% — 40% you / 40% platform / 20% Meteora"
-          : "1% — 20% you / 60% platform / 20% Meteora"}</b></div>
+        <div class="row"><span class="k">Trading fee</span><b id="tk-fee">${(flow.customFee || 1)
+          + "% — 20% you / 60% platform / 20% Meteora"}</b></div>
         <div class="row"><span class="k">Graduates at</span><b id="tk-grad">reading the curve…</b></div>
         <div class="row" style="border-bottom:0"><span class="k">Migrates to</span><b>Meteora DAMM v2, LP locked</b></div>
         <p class="note" style="margin-top:6px">Locked in the launchpad's config — identical
@@ -789,8 +788,8 @@
         <button data-t="custom" class="tier ${flow.customFee ? "on" : ""}"
           ${flow.quote !== "sol" && flow.quote !== "usdc"
             ? raw('disabled title="Custom fees are SOL/USDC quotes only for now"') : ""}>
-          <b>Tax token — your %</b><span>You keep 40% of the fee — the
-          burn/dividend budget.</span></button>
+          <b>Tax token — your %</b><span>Same 20% share of a bigger fee —
+          the burn/dividend budget.</span></button>
       </div>
       <div id="tk-customrow" ${flow.customFee ? "" : raw("hidden")}>
         <label>Fee percent</label>
@@ -937,8 +936,8 @@
       var pct = parseFloat(box.querySelector("#tk-custompct").value) || 0;
       var el = box.querySelector("#tk-customsplit");
       if (!(pct >= 0.25)) { el.textContent = "Minimum 0.25%."; return; }
-      el.textContent = "Of every trade: " + (pct * 0.4).toFixed(2) + "% to you, " +
-        (pct * 0.4).toFixed(2) + "% to the platform, " + (pct * 0.2).toFixed(2) +
+      el.textContent = "Of every trade: " + (pct * 0.2).toFixed(2) + "% to you, " +
+        (pct * 0.6).toFixed(2) + "% to the platform, " + (pct * 0.2).toFixed(2) +
         "% to Meteora.";
     }
     if (flow.customFee) paintSplit();
@@ -1102,9 +1101,8 @@
       <div class="row"><span class="k">Wallet</span><b>${w ? w.name + " · " + shortAddr(w.publicKey) : "not connected"}</b></div>
       <div class="row"><span class="k">Swap fee</span><b>${flow.customFee
         ? "Tax token — " + flow.customFee + "%" : "Standard — 1%"}</b></div>
-      <p class="note">Fee split on every trade: ${flow.customFee
-        ? "40% you, 40% platform, 20% Meteora"
-        : "20% you, 60% platform, 20% Meteora"}.
+      <p class="note">Fee split on every trade: 20% you, 60% platform, 20% Meteora —
+      the same split at every fee level.
       Your share claims straight to any address — including a reward vault.</p>
       <div id="lp-err"></div>
       <div class="acts"><button id="lp-back">Back</button>

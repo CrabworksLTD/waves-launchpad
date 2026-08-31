@@ -31,7 +31,7 @@
     standard: { label: "Standard", baseFeeBps: 100,
                 creatorTradingFeePercentage: 25 },   // 0.2% creator / 0.6% us / 0.2% Meteora
     tax:      { label: "Tax token", baseFeeBps: 500,
-                creatorTradingFeePercentage: 50 }    // 2% creator / 2% us / 1% Meteora
+                creatorTradingFeePercentage: 25 }    // same split as standard, bigger fee
   };
 
   var QUOTES = {
