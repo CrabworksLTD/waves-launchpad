@@ -131,6 +131,26 @@ async function render(req) {
       { width: 1200, height: 630, fonts: [{ name: "Display", data: f, weight: 700, style: "normal" }] });
   }
 
+  // ?demo=token|mint — the card layouts with representative data, so the
+  // design can be reviewed before anything has launched
+  const demo = url.searchParams.get("demo");
+  if (demo) {
+    const fonts = await loadFonts(origin);
+    const rh = url.searchParams.get("rh");
+    return respond(buildCard(demo === "token" ? {
+      accent: rh ? RH.accent : SOL.accent, name: "$WAVE · First Wave",
+      chips: (rh ? RH.label : SOL.label) + "  ·  BONDING CURVE",
+      avatarUri: null, bannerUri: null,
+      stats: [["RAISED", "12.4 / 85 SOL"], ["CURVE", "14.6%"], ["CHAIN", rh ? "Robinhood" : "Solana"]]
+    } : {
+      accent: rh ? RH.accent : SOL.accent, name: "Tide Runners",
+      chips: (rh ? RH.label : SOL.label) + "  ·  3,333 ITEMS  ·  METAPLEX CORE",
+      avatarUri: null, bannerUri: null,
+      stats: [["ITEMS", "3,333"], ["MINTED", "1,204 / 3,333"], ["PRICE", "0.1 SOL"],
+        ["CHAIN", rh ? "Robinhood" : "Solana"]]
+    }), fonts, true);
+  }
+
   const id = url.searchParams.get("id") || "";
   const to = url.searchParams.get("to") === "token" ? "token" : "mint";
 
