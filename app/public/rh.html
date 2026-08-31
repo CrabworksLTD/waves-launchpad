@@ -71,6 +71,9 @@ h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:te
 /* spotlight cards: square art, a status badge on it, then name, ticker,
    the one number that matters, and where/when it came from */
 .spot{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:20px}
+.spotnone{grid-column:1/-1;border:1px dashed var(--line2);border-radius:14px;
+  padding:38px 24px;text-align:center;color:var(--faint);font-size:13.5px}
+.spotnone a{color:var(--accent)}
 @media (max-width:1180px){.spot{grid-template-columns:repeat(3,1fr)}}
 @media (max-width:720px){.spot{grid-template-columns:repeat(2,1fr)}}
 .scard{display:block;border-radius:14px;overflow:hidden;background:var(--panel);
@@ -527,10 +530,18 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
       items.push({ kind: "col", rec: c, size: -1 });
     });
     items = items.slice(0, 10);
-    if (items.length < 10) {
-      templates.slice(0, 10 - items.length).forEach(function (t) {
-        items.push({ kind: "tpl", rec: t });
-      });
+
+    /* Only real launches belong here. Padding the row with bundled templates
+     * made the pad look busier than it is and put art nobody launched next to
+     * art somebody did — an empty spotlight is more honest than a full one
+     * made of samples. */
+    if (!items.length) {
+      box.innerHTML = '<div class="spotnone">Nothing launched yet — ' +
+        '<a href="/launch">be the first</a>.</div>';
+      drawRankedCollections(live ? collections.slice(0, 10) : null,
+                            live ? null : templates.slice(0, 10));
+      drawRankedTokens(tokens.slice(0, 10));
+      return;
     }
 
     box.innerHTML = items.map(function (it) {
@@ -603,8 +614,7 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
       }).catch(function () {});
     });
 
-    drawRankedCollections(live ? collections.slice(0, 10) : null,
-                          live ? null : templates.slice(0, 10));
+    drawRankedCollections(live ? collections.slice(0, 10) : [], null);
     drawRankedTokens(tokens.slice(0, 10));
   }
 
@@ -631,6 +641,11 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
    * answer; template rows (nothing launched yet) rank by trait count. */
   function drawRankedCollections(live, templates) {
     var ol = document.getElementById("cards");
+    if (live && !live.length) {
+      ol.innerHTML = '<div class="none"><p class="disp">No collections launched yet</p>' +
+        "<span>The first one tops this list by default.</span></div>";
+      return;
+    }
     if (!live) {
       var tps = templates.slice().sort(function (a, b) { return b.traits - a.traits; });
       ol.innerHTML = tps.map(function (x) {
