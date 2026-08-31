@@ -54,6 +54,19 @@
     g.drawImage(im, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
   }
 
+  /* The WAVES staircase: three squares flush bottom-left, climbing off the top
+     edge, each carrying its slice of one continuous sweep. */
+  function staircase(g, pal) {
+    var S = 210;
+    [[0, H - S, 0], [S, H - 2 * S, 1], [2 * S, 0, 2]].forEach(function (p) {
+      var lg = g.createLinearGradient(p[0], p[1] + S, p[0] + S, p[1]);
+      lg.addColorStop(0, pal.stops[p[2]]);
+      lg.addColorStop(1, pal.stops[p[2] + 1]);
+      g.fillStyle = lg;
+      g.fillRect(p[0], p[1], S, S);
+    });
+  }
+
   async function make(o) {
     var pal = PAL[o.chain === "robinhood" ? "robinhood" : "solana"];
     var cv = document.createElement("canvas");
@@ -74,26 +87,31 @@
     var pair = await Promise.all([loadImage(o.banner), loadImage(o.avatar)]);
     var banner = pair[0], avatar = pair[1];
 
+    /* Background, in order of what we actually have.
+     *
+     * A launcher who skipped the banner did not choose a bare card. If there is
+     * a PFP, use it: square art on a 1200x630 canvas would crop to a sliver, so
+     * it is drawn oversized and blurred into a wash of the collection's own
+     * colours, with the WAVES staircase still climbing the empty right side so
+     * the card is unmistakably ours. */
     if (banner) {
       drawCover(g, banner, 0, 0, W, H);
+    } else if (avatar) {
+      g.save();
+      try { g.filter = "blur(48px)"; } catch (e) {}
+      drawCover(g, avatar, -W * 0.25, -H * 0.25, W * 1.5, H * 1.5);
+      g.restore();
+      staircase(g, pal);
     } else {
-      // the WAVES staircase, flush bottom-left and climbing off the top edge,
-      // each square carrying its slice of one continuous sweep
-      var S = 210;
-      [[0, H - S, 0], [S, H - 2 * S, 1], [2 * S, 0, 2]].forEach(function (p) {
-        var lg = g.createLinearGradient(p[0], p[1] + S, p[0] + S, p[1]);
-        lg.addColorStop(0, pal.stops[p[2]]);
-        lg.addColorStop(1, pal.stops[p[2] + 1]);
-        g.fillStyle = lg;
-        g.fillRect(p[0], p[1], S, S);
-      });
+      staircase(g, pal);
     }
 
     // scrim: the body sits on darkness whatever the art is doing
+    var art = !!(banner || avatar);
     var sc = g.createLinearGradient(0, 0, 0, H);
-    sc.addColorStop(0, banner ? "rgba(10,10,10,.25)" : "rgba(10,10,10,.35)");
-    sc.addColorStop(.52, banner ? "rgba(10,10,10,.55)" : "rgba(10,10,10,.66)");
-    sc.addColorStop(1, banner ? "rgba(10,10,10,.96)" : "rgba(10,10,10,.94)");
+    sc.addColorStop(0, art ? "rgba(10,10,10,.25)" : "rgba(10,10,10,.35)");
+    sc.addColorStop(.52, art ? "rgba(10,10,10,.55)" : "rgba(10,10,10,.66)");
+    sc.addColorStop(1, art ? "rgba(10,10,10,.96)" : "rgba(10,10,10,.94)");
     g.fillStyle = sc;
     g.fillRect(0, 0, W, H);
 

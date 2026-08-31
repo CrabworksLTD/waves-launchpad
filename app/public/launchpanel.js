@@ -774,13 +774,13 @@
         return b ? URL.createObjectURL(new Blob([b], { type: "image/png" })) : null;
       };
 
-      /* Fall back to the collection's own art when no PFP or banner was
-       * attached. A card with a letter tile on a generic pattern is the one
-       * thing every share of that launch will show, and a launcher who skipped
-       * the art step did not decide to have no art — they just skipped a step.
-       * Piece #1 is the same fallback the listing avatar already uses. */
+      /* Fall back to the collection's own art when no PFP was attached — the
+       * same piece #1 the listing avatar already falls back to. The BANNER is
+       * left null on purpose: cardmaker washes the avatar across the background
+       * when there is no banner, which looks like the collection rather than
+       * like a stretched thumbnail. */
       var first = null;
-      if (kind === "collection" && (!cfg.avatar || !cfg.banner) && run && run.files) {
+      if (kind === "collection" && !cfg.avatar && run && run.files) {
         var img = (run.files || []).find(function (f) {
           return /\.(png|jpe?g|webp|gif)$/i.test(f.name || "");
         });
@@ -793,7 +793,7 @@
         name: cfg.name,
         sym: cfg.symbol,
         avatar: blobUrl(cfg.avatar) || first,
-        banner: blobUrl(cfg.banner) || first,
+        banner: blobUrl(cfg.banner),
         stats: stats
       });
     } catch (e) { return null; }
