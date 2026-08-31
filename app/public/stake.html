@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WAVES Launchpad</title>
+<meta name="description" content="Burn the paired token, activate your NFTs, claim rewards.">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+/* Staking, after Moonpad's page — but as an HONEST PREVIEW. The burn-to-stake
+ * program is not deployed; nothing here pretends otherwise. The skeleton is
+ * real (earn card, stats, per-asset rows), the actions are visibly parked,
+ * and the pairs list is real data from the records. When the program ships,
+ * this page wakes up instead of being built from scratch. */
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{margin:0;min-height:100%}
+body{background:var(--void);color:var(--ink);font:400 15px/1.6 Inter,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono",monospace}
+a{color:inherit;text-decoration:none}
+main{max-width:1080px;margin:0 auto;padding:44px 24px 100px}
+
+h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
+  letter-spacing:-.02em;margin:0 0 6px}
+.lede{color:var(--dim);margin:0 0 26px;max-width:62ch;font-size:14.5px}
+
+.soon{display:flex;align-items:center;gap:14px;border:1px solid rgba(255,180,80,.35);
+  background:rgba(255,180,80,.06);border-radius:10px;padding:14px 18px;margin:0 0 28px;
+  font-size:13.5px;color:#ffd9a0}
+.soon b{font-family:Archivo}
+.soon .tag{margin-left:auto;flex:none;font:600 10px "IBM Plex Mono",monospace;
+  letter-spacing:.16em;color:#ffb84d;border:1px solid rgba(255,180,80,.45);
+  border-radius:99px;padding:4px 11px;white-space:nowrap}
+
+/* how it works */
+.how{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin:0 0 34px}
+@media (max-width:860px){.how{grid-template-columns:1fr}}
+.step{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:20px 22px}
+.step i{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;
+  font:800 14px Archivo;font-style:normal;color:var(--accent-ink);margin-bottom:12px;
+  background-image:var(--grad);background-repeat:no-repeat;
+  background-size:calc(100% + 2px) 100%;background-position:-1px 0}
+.step b{display:block;font:700 15px Archivo;margin-bottom:6px}
+.step p{margin:0;color:var(--dim);font-size:13px}
+
+/* the panel skeleton */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:22px;margin-bottom:18px;position:relative}
+.preview .card{opacity:.75}
+.earnrow{display:flex;align-items:center;justify-content:space-between;gap:20px;
+  margin-bottom:18px}
+.earn-lab{display:block;font:500 10.5px "IBM Plex Mono",monospace;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:5px}
+.earnrow b{font:800 30px Archivo;letter-spacing:-.02em}
+.go{padding:13px 30px;border-radius:999px;border:0;cursor:default;
+  font:800 14px Archivo;color:var(--accent-ink);opacity:.45;
+  background-image:var(--grad);background-repeat:no-repeat;
+  background-size:calc(100% + 2px) 100%;background-position:-1px 0}
+.statrow{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.statrow>div{background:var(--bg);padding:13px 16px}
+.statrow span{display:block;font:500 10.5px "IBM Plex Mono",monospace;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:4px}
+.statrow b{font:600 17px Archivo}
+
+/* pairs — real data */
+.pairs h2{font-family:Archivo;font-size:20px;font-weight:800;margin:34px 0 4px}
+.pairs .sub{color:var(--dim);font-size:13px;margin:0 0 14px}
+.prow{display:flex;align-items:center;gap:14px;padding:13px 16px;margin-top:8px;
+  border:1px solid var(--line);border-radius:10px;background:var(--panel);
+  transition:border-color .2s}
+.prow:hover{border-color:var(--faint)}
+.prow .coin{width:42px;height:42px;flex:none;border-radius:9px;overflow:hidden;
+  border:2px solid transparent;display:grid;place-items:center;
+  background:linear-gradient(var(--panel2),var(--panel2)) padding-box,var(--grad) border-box;
+  font:800 16px Archivo}
+.prow .coin img{width:100%;height:100%;object-fit:cover}
+.prow .who{min-width:0;flex:1}
+.prow .who b{display:block;font:700 14.5px Archivo}
+.prow .who span{display:block;font-size:12px;color:var(--faint)}
+.prow .st{flex:none;font:600 10px "IBM Plex Mono",monospace;letter-spacing:.14em;
+  color:var(--faint);border:1px solid var(--line2);border-radius:99px;padding:4px 11px}
+.none{border:1px dashed var(--line2);border-radius:10px;padding:34px 22px;text-align:center;
+  color:var(--faint);font-size:13px;margin-top:8px}
+.none a{color:var(--accent)}
+</style>
+</head>
+<body>
+<main>
+  <h1 class="disp">Staking</h1>
+  <p class="lede">Launch a pair and the token's trading fees can flow to the collection's
+  holders. Holders <b>burn</b> the token to activate their NFTs — no unstaking, no vault
+  holding your assets — and claim rewards in whatever the creator chose: SOL, USDC, or
+  tokenized stocks and gold.</p>
+
+  <div class="soon"><b>In development.</b>
+    <span>The staking program is being built and will be audited before it touches real
+    money. Everything below is the real interface, parked until then.</span>
+    <span class="tag">COMING</span>
+  </div>
+
+  <div class="how">
+    <div class="step"><i>1</i><b>Burn to activate</b>
+      <p>Send the paired token to the program — it burns, permanently, and your NFT's
+      tier rises with the amount. Selling the NFT ends its activation.</p></div>
+    <div class="step"><i>2</i><b>Fees accrue</b>
+      <p>Every trade of the paired token pays its creator share into the reward vault.
+      The keeper converts it to the reward asset on a schedule.</p></div>
+    <div class="step"><i>3</i><b>Claim</b>
+      <p>Rewards split across activated NFTs by tier weight. Claim whenever —
+      what you've earned is yours, tracked on chain.</p></div>
+  </div>
+
+  <div class="preview">
+    <div class="card">
+      <div class="earnrow">
+        <div><span class="earn-lab">You've earned</span><b>—</b></div>
+        <button class="go" disabled>Claim all</button>
+      </div>
+      <div class="statrow">
+        <div><span>Your staked</span><b>—</b></div>
+        <div><span>Total weight</span><b>—</b></div>
+        <div><span>Token burned</span><b>—</b></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="pairs">
+    <h2 class="disp">Live pairs</h2>
+    <p class="sub">Collections launched with a paired token — these light up first
+    when staking ships.</p>
+    <div id="pairs"></div>
+  </section>
+</main>
+
+<script src="/brand.js"></script>
+<script src="/ui.js"></script>
+<script src="/wallet.js"></script>
+<script src="/shell.js"></script>
+<script>
+(function () {
+  "use strict";
+  var esc = UI.esc, shortAddr = UI.shortAddr;
+  Shell.mount({ active: "explore", search: false });
+
+  /* The one real dataset: launches that recorded a paired collection. */
+  fetch("/api/tokens").then(function (r) { return r.json(); })
+    .then(function (j) { return (j.tokens || []).filter(function (t) { return t.collection; }); })
+    .catch(function () { return []; })
+    .then(function (pairs) {
+      var box = document.getElementById("pairs");
+      if (!pairs.length) {
+        box.innerHTML = '<div class="none">No pairs launched yet — ' +
+          '<a href="/launch?mode=pair">launch the first</a> and its holders are ' +
+          "first in line.</div>";
+        return;
+      }
+      box.innerHTML = pairs.map(function (t) {
+        var sym = (t.symbol || "?").toUpperCase();
+        return '<a class="prow" href="/token/' + esc(t.mint) + '">' +
+          '<span class="coin">' + (t.icon
+            ? '<img alt="" src="' + esc(t.icon) + '">' : esc(sym.slice(0, 1))) + "</span>" +
+          '<span class="who"><b>$' + esc(sym) + " · " + esc(t.name) + "</b>" +
+          '<span>paired with collection <span class="mono">' +
+          esc(shortAddr(t.collection)) + "</span></span></span>" +
+          '<span class="st">STAKING SOON</span></a>';
+      }).join("");
+    });
+})();
+</script>
+</body>
+</html>

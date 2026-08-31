@@ -35,7 +35,8 @@
     ]},
     { id: "explore", label: "Explore", menu: [
       { label: "Tokens",      href: "/tokens" },
-      { label: "Collections", href: "/collections" }
+      { label: "Collections", href: "/collections" },
+      { label: "Staking",     href: "/stake" }
     ]},
     { id: "docs",        label: "Docs",        href: "/docs" },
     { id: "faq",         label: "FAQ",         href: "/faq" }
