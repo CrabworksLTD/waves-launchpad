@@ -139,7 +139,7 @@ h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:te
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rrow .who span{display:flex;align-items:center;gap:6px;margin-top:3px;
   font:400 12px "IBM Plex Mono",monospace;color:var(--faint)}
-.rrow .who span svg{width:11px;height:11px;flex:none}
+.rrow .who span svg,.rrow .who span img{width:12px;height:auto;flex:none}
 /* minted / bonding-curve progress under the name — short and chunky so
    rows stay narrow enough for the two-column layout */
 .rrow .bar{display:block;width:92px;max-width:100%;height:7px;margin-top:5px;
@@ -434,12 +434,8 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
     drawRankedTokens(tokens.slice(0, 10));
   }
 
-  // the Solana three-bar glyph, gradient — the little chain marker
-  var MINI = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-    '<defs><linearGradient id="rg" x1="0" y1="1" x2="1" y2="0">' +
-    '<stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/>' +
-    '</linearGradient></defs>' +
-    '<path fill="url(#rg)" d="M7.2 4h13.6l-4 4.9H3.2Zm0 13.5h13.6l-4 4.9H3.2Zm9.6-6.8H3.2l4-4.9h13.6z"/></svg>';
+  // the official Solana mark — the little chain marker
+  var MINI = '<img src="/art/solana.svg" width="12" height="10" alt="">';
 
   function rankRow(href, name, thumb, stat, frac) {
     var bar = frac == null ? ""
