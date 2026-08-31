@@ -115,7 +115,10 @@ a{color:inherit;text-decoration:none}
 .pairlink .c img{width:100%;height:100%;object-fit:cover;display:block}
 .pairlink b{font:700 13px Archivo;display:block}
 .pairlink span{display:block;font-size:11px;color:var(--faint)}
-.pairlink .go{margin-left:auto;font:700 16px Archivo;color:var(--accent)}
+.pairlink .arw{margin-left:auto;flex:none;font:700 16px Archivo;color:var(--accent)}
+.pairlink>span:nth-child(2){min-width:0;flex:1}
+.pairlink b,.pairlink span.s,.pairlink span:nth-child(2)>span{
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ---- below: the pieces ---- */
 main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
@@ -546,7 +549,7 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
             ? '<img alt="" src="' + esc(tok.icon) + '">' : esc(sym.slice(0, 1) || "$")) + "</span>" +
           "<span><b>" + (sym ? "$" + esc(sym) : "Paired token") + "</b>" +
           "<span>" + esc(tok.name || "trades on a bonding curve") + "</span></span>" +
-          '<span class="go">→</span>';
+          '<span class="arw">→</span>';
         el.hidden = false;
 
         // and where holders of this collection stake to earn from those fees
@@ -555,7 +558,7 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
         st.innerHTML =
           '<span class="c">◈</span>' +
           "<span><b>Staking</b><span>burn to stake, earn from trading fees</span></span>" +
-          '<span class="go">→</span>';
+          '<span class="arw">→</span>';
         st.hidden = false;
       })
       .catch(function () {});

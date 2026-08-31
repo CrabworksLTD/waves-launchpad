@@ -98,7 +98,10 @@ main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
 .pairlink .c img{width:100%;height:100%;object-fit:cover;display:block}
 .pairlink b{display:block;font:700 13px Archivo}
 .pairlink span.s{display:block;font-size:11px;color:var(--faint)}
-.pairlink .go{margin-left:auto;font:700 16px Archivo;color:var(--accent)}
+.pairlink .arw{margin-left:auto;flex:none;font:700 16px Archivo;color:var(--accent)}
+.pairlink>span:nth-child(2){min-width:0;flex:1}
+.pairlink b,.pairlink span.s,.pairlink span:nth-child(2)>span{
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* stats + curve */
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-bottom:14px}
@@ -356,7 +359,7 @@ input:focus{outline:none;border-color:var(--accent)}
             : esc((rec.name || "?").slice(0, 1))) + "</span>" +
           "<span><b>" + esc(rec.name || "Paired collection") + "</b>" +
           '<span class="s">mint the collection →</span></span>' +
-          '<span class="go">→</span>';
+          '<span class="arw">→</span>';
         el.hidden = false;
 
         var st = $("stakelink");
@@ -365,7 +368,7 @@ input:focus{outline:none;border-color:var(--accent)}
           '<span class="c">◈</span>' +
           "<span><b>Staking</b>" +
           '<span class="s">burn to stake, earn from trading fees</span></span>' +
-          '<span class="go">→</span>';
+          '<span class="arw">→</span>';
         st.hidden = false;
       }).catch(function () {});
   }
