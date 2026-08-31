@@ -579,6 +579,10 @@
   var LAST_KEY = (window.BRAND ? window.BRAND.key("wallet") : "wallet.last");
 
   function connectModal() {
+    // the picker is styled by the shell's stylesheet, which only mount()
+    // injected — on a page that loads the shell without mounting it (the
+    // editor has no top bar) the modal rendered unstyled and unusable
+    ensureCss();
     return new Promise(function (resolve) {
       var old = document.getElementById("shl-pick");
       if (old) old.remove();
