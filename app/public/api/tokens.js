@@ -51,12 +51,9 @@ export default async function handler(req, res) {
 
     try {
       const db = await kv();
-      const first = await db.set("tok:" + mint, 1, { nx: true });
-      if (first !== "OK") return res.status(200).json({ ok: true, duplicate: true });
-
       const okArt = (u) => (typeof u === "string" &&
         /^https:\/\/arweave\.net\/[\w\-\/\.]+$/.test(u)) ? u : null;
-      await db.lpush(KEY, JSON.stringify({
+      const rec = {
         mint,
         name: String(name || "Untitled").slice(0, 40),
         symbol: String(symbol || "").slice(0, 12),
@@ -73,7 +70,31 @@ export default async function handler(req, res) {
         collection: collection || null,
         creator: (creator && B58.test(creator)) ? creator : null,
         at: Date.now()
-      }));
+      };
+      const first = await db.set("tok:" + mint, 1, { nx: true });
+      if (first !== "OK") {
+        /* Already listed. Rather than dropping the payload, fill in anything
+         * the stored record is missing — a launch that recorded before its
+         * art finished uploading, or was repaired by hand, should be able to
+         * complete itself. Existing values are never overwritten, so this
+         * cannot be used to rewrite someone's listing. */
+        const raw = await db.lrange(KEY, 0, MAX - 1);
+        for (let i = 0; i < (raw || []).length; i++) {
+          const cur = typeof raw[i] === "string" ? JSON.parse(raw[i]) : raw[i];
+          if (!cur || cur.mint !== mint) continue;
+          let changed = false;
+          for (const k of Object.keys(rec)) {
+            if ((cur[k] === null || cur[k] === undefined) && rec[k] != null) {
+              cur[k] = rec[k]; changed = true;
+            }
+          }
+          if (changed) await db.lset(KEY, i, JSON.stringify(cur));
+          return res.status(200).json({ ok: true, updated: changed, duplicate: !changed });
+        }
+        return res.status(200).json({ ok: true, duplicate: true });
+      }
+
+      await db.lpush(KEY, JSON.stringify(rec));
       await db.ltrim(KEY, 0, MAX - 1);
       return res.status(200).json({ ok: true });
     } catch (e) {
