@@ -67,5 +67,11 @@
       "destination": "/api/share?id=:address&to=token",
       "permanent": false
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/keeper",
+      "schedule": "0 * * * *"
+    }
   ]
 }
