@@ -1155,15 +1155,14 @@
         <div class="sharelbl"><span id="tk-sharetxt"></span></div>
       </div>
 
-      <div id="tk-rewardwrap">
-        <label>Holder rewards paid in</label>
-        <button class="pick" id="lp-reward">
-          <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
-          <span class="pk-r"><span class="k2 mono">${shortAddr(flow.reward.mint)}</span>
-          <span class="pk-dd">Change ▾</span></span>
-        </button>
-        <p class="note">What the keeper pays holders in. Distributions run on a
-        schedule, pro-rata by holdings.</p>
+      <!-- The asset picker that used to sit here let creators promise payouts in
+           any of 526 RWA assets, which the keeper cannot honour: it claims and
+           pays the quote currency and never swaps. Say what actually happens.
+           The picker returns with the Jupiter swap leg. -->
+      <div id="tk-rewardwrap" ${(flow.feeSharePct || 0) > 0 ? "" : raw("hidden")}>
+        <p class="note">Holders are paid in <b>${qLabel}</b>, pro-rata by holdings,
+        on an hourly schedule. Payouts run automatically — you do not claim
+        anything or press anything.</p>
       </div>
 
       <div id="tk-fwwrap" ${(flow.feeSharePct || 0) >= 100 ? raw("hidden") : ""}>
@@ -1325,7 +1324,10 @@
       if (nft) { recordCollection(nft.cfg, nft.res, null, nft.up); nftDone(nft.cfg, nft.res, nft.up); }
       else modeSelect();
     };
-    box.querySelector("#lp-reward").onclick = function () { collect(); rewardPicker(flow); };
+    // the reward-asset picker is out until the keeper can swap; guarded rather
+    // than deleted so rewardPicker stays wired for when it comes back
+    var rewardBtn = box.querySelector("#lp-reward");
+    if (rewardBtn) rewardBtn.onclick = function () { collect(); rewardPicker(flow); };
     box.querySelector("#lp-next").onclick = function () {
       collect();
       var name = flow.tname.trim();
@@ -1443,7 +1445,7 @@
       <div class="row"><span class="k">Fee sharing</span><b>${(flow.feeSharePct || 0) > 0
         ? flow.feeSharePct + "% to holders / " + (100 - flow.feeSharePct) + "% to you"
         : "You keep everything"}</b></div>
-      ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Rewards in</span><b>${flow.reward.symbol}</b></div>` : ""}
+      ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Holders paid in</span><b>${qLabel}</b></div>` : ""}
       <div class="row"><span class="k">First buy</span><b>${flow.tbuy > 0 ? flow.tbuy + " " + qLabel : "none"}</b></div>
       ${flow.feeWallet ? H`<div class="row"><span class="k">Fees claim to</span><b>${shortAddr(flow.feeWallet)}</b></div>` : ""}
       <div class="row"><span class="k">Metadata storage</span><b id="lp-fee">quoting…</b></div>
@@ -1567,7 +1569,7 @@
       <div class="row"><span class="k">Fee sharing</span><b>${(flow.feeSharePct || 0) > 0
         ? flow.feeSharePct + "% to holders / " + (100 - flow.feeSharePct) + "% to you"
         : "You keep everything"}</b></div>
-      ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Rewards in</span><b>${flow.reward.symbol}</b></div>` : ""}
+      ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Holders paid in</span><b>${qLabel}</b></div>` : ""}
       ${raw(caRow("Token CA", res.mint))}
       ${nft ? raw(caRow("Collection", nft.res.collection) + caRow("Candy machine", nft.res.candyMachine)) : ""}
       ${nft ? H`<label>Mint page</label>

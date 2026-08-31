@@ -40,7 +40,7 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-    const { mint, name, symbol, cluster, rewardMint, collection, creator, icon, banner, pool, config, feeShare, feeSharePct } = body;
+    const { mint, name, symbol, cluster, rewardMint, collection, creator, icon, banner, pool, config, feeShare, feeSharePct, feeWallet } = body;
 
     if (!B58.test(mint || "")) return res.status(400).json({ error: "bad mint" });
     // both optional; validated when present so a bad value is dropped loudly
@@ -66,6 +66,10 @@ export default async function handler(req, res) {
         pool: (pool && B58.test(pool)) ? pool : null,
         feeShare: feeShare === "holders" ? "holders" : "keep",
         feeSharePct: Math.max(0, Math.min(100, parseInt(feeSharePct, 10) || 0)),
+        // where the creator's KEPT portion goes. Dropped on the floor until
+        // 2026-08-31, so the keeper always paid the deployer wallet while the
+        // launch window promised it would route here.
+        feeWallet: (feeWallet && B58.test(feeWallet)) ? feeWallet : null,
         config: (config && B58.test(config)) ? config : null,
         collection: collection || null,
         creator: (creator && B58.test(creator)) ? creator : null,

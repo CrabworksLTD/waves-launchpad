@@ -34,9 +34,15 @@
     // Auto-shared launches set the POOL CREATOR to this keeper instead of the
     // launcher — that is what makes "share with holders" enforced on chain:
     // the launcher cannot claim a stream they pledged away, and the keeper
-    // (tools/fee-share-keeper.js) claims + distributes it to holders.
-    // Same wallet as feeOwner until a dedicated hot keeper key exists.
-    feeKeeper: "BU9dYi7fGw5G3Wd54CUTmt1Y58jEJaPq8LKiL72ydeKJ",
+    // (api/keeper.js) claims + distributes it to holders.
+    //
+    // ⚠️ This MUST be the public key of KEEPER_SECRET. It was feeOwner (Kyle's
+    // wallet) until 2026-08-31, which meant a pledged launch handed its fee
+    // stream to a wallet the keeper cannot sign for: every run skipped the pool
+    // with "keeper is not this pool's creator" and the launcher had already
+    // signed the stream away. Nothing had pledged yet, so nothing was misrouted.
+    // If you rotate KEEPER_SECRET, rotate this in the same commit.
+    feeKeeper: "EFFY1LjZbzzEYuUr24udxWponKqtta8MaxZxs6HGPswH",
 
     // DBC partner configs, one per cluster per quote currency. Created once
     // each by tools/create-dbc-config.js; a missing entry disables that
