@@ -71,6 +71,25 @@ export default async function handler(req, res) {
         creator: (creator && B58.test(creator)) ? creator : null,
         at: Date.now()
       };
+      /* Maintenance correction. Filling blanks is open to anyone (it cannot
+       * destroy data); CHANGING a value that is already there is not, or a
+       * listing could be rewritten by a stranger. Vercel's cron secret is the
+       * key, so only someone who can already deploy can do it. */
+      const admin = process.env.CRON_SECRET &&
+        req.headers.authorization === "Bearer " + process.env.CRON_SECRET;
+      if (admin) {
+        const raw = await db.lrange(KEY, 0, MAX - 1);
+        for (let i = 0; i < (raw || []).length; i++) {
+          const cur = typeof raw[i] === "string" ? JSON.parse(raw[i]) : raw[i];
+          if (!cur || cur.mint !== mint) continue;
+          for (const k of Object.keys(rec)) {
+            if (k !== "at" && rec[k] != null) cur[k] = rec[k];
+          }
+          await db.lset(KEY, i, JSON.stringify(cur));
+          return res.status(200).json({ ok: true, corrected: true });
+        }
+      }
+
       const first = await db.set("tok:" + mint, 1, { nx: true });
       if (first !== "OK") {
         /* Already listed. Rather than dropping the payload, fill in anything
