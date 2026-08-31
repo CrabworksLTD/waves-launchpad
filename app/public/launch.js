@@ -41,6 +41,47 @@
    * providers sign transaction objects, and umi hands us a web3.js
    * VersionedTransaction either way. So the standard path serialises on the way
    * in and deserialises on the way out. */
+  /* Confirmation, done by asking rather than waiting.
+   *
+   * web3's confirmTransaction watches a websocket subscription and gives up at
+   * the blockhash's last valid block height. Against our RPC that verdict is
+   * wrong in the worst direction: three storage payments landed on chain and
+   * every one of them was reported to the creator as "block height exceeded",
+   * so a launch died after the money moved — and a naive retry pays twice.
+   *
+   * Polling getSignatureStatus over plain HTTP asks the chain the only
+   * question that matters: is this signature there? It costs a request every
+   * 1.2s and cannot be wrong about a transaction that landed.
+   *
+   * Installed on the umi instance, so every sendAndConfirm in this file and in
+   * the launch panel gets it without a call-site change. */
+  function usePolledConfirm(mx, umi, rpcUrl) {
+    var conn = new mx.Connection(rpcUrl, "confirmed");
+    umi.rpc.confirmTransaction = async function (signature, options) {
+      var sig = typeof signature === "string"
+        ? signature : mx.base58.deserialize(signature)[0];
+      var deadline = Date.now() + 120000;
+      var missing = 0;
+      while (Date.now() < deadline) {
+        var st = null;
+        try { st = await conn.getSignatureStatus(sig, { searchTransactionHistory: true }); }
+        catch (e) { st = null; }
+        var v = st && st.value;
+        if (v && v.err) {
+          throw new Error("The transaction failed on chain: " + JSON.stringify(v.err));
+        }
+        if (v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized")) {
+          return { context: { slot: v.slot || 0 }, value: { err: null } };
+        }
+        if (!v) missing++;
+        await new Promise(function (r) { setTimeout(r, 1200); });
+      }
+      throw new Error("Timed out waiting for " + sig.slice(0, 8) +
+        "… to confirm. It may still land — check the explorer before retrying.");
+    };
+    return umi;
+  }
+
   function asAdapter(mx, w) {
     var isStandard = !!w._account;
     return {
@@ -74,6 +115,7 @@
       .use(mx.mplCore())
       .use(mx.mplCandyMachine())
       .use(mx.walletAdapterIdentity(asAdapter(mx, w)));
+    usePolledConfirm(mx, umi, conf.rpc);
     return { mx: mx, umi: umi, conf: conf };
   }
 
@@ -418,6 +460,7 @@
     // shim straight back to the adapter, which reads .message.version off it
     // — a launch died there after the storage payment was already signed.
     asAdapter: asAdapter,
+    usePolledConfirm: usePolledConfirm,
     deploy: deploy,
     mintOne: mintOne,
     readMachine: readMachine,

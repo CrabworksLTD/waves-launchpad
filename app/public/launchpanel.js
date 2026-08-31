@@ -969,8 +969,12 @@
      * so the round trip has to serialize in and rehydrate out. This panel had
      * its own copy that skipped the rehydrate, and a launch died on it after
      * the storage payment had been signed. */
-    var umi = mx.createUmi(window.Launch.clusters[window.Launch.cluster()].rpc, "confirmed")
+    var rpcUrl = window.Launch.clusters[window.Launch.cluster()].rpc;
+    var umi = mx.createUmi(rpcUrl, "confirmed")
       .use(mx.walletAdapterIdentity(window.Launch.asAdapter(mx, w)));
+    // ask the chain whether the payment landed instead of trusting a websocket
+    // that reported three successful payments as expired
+    window.Launch.usePolledConfirm(mx, umi, rpcUrl);
 
     /* A blockhash lives about a minute. Between building the transfer and the
      * wallet prompt being approved — plus a public RPC that may be a few
@@ -983,13 +987,21 @@
      * exact signature first, and only rebuild when it genuinely is not there. */
     var conn = new mx.Connection(window.Launch.clusters[window.Launch.cluster()].rpc, "confirmed");
 
+    /* Give the chain a few seconds to admit it has the transaction before
+     * concluding it does not. Asking once, immediately, is what let a retry
+     * send a second payment three seconds after the first — both landed. */
     async function landed(sig) {
-      try {
-        var st = await conn.getSignatureStatus(sig, { searchTransactionHistory: true });
-        return !!(st && st.value && !st.value.err &&
-          (st.value.confirmationStatus === "confirmed" ||
-           st.value.confirmationStatus === "finalized"));
-      } catch (e) { return false; }
+      for (var i = 0; i < 8; i++) {
+        try {
+          var st = await conn.getSignatureStatus(sig, { searchTransactionHistory: true });
+          var v = st && st.value;
+          if (v && v.err) return false;
+          if (v && (v.confirmationStatus === "confirmed" ||
+                    v.confirmationStatus === "finalized")) return true;
+        } catch (e) {}
+        await new Promise(function (r) { setTimeout(r, 1500); });
+      }
+      return false;
     }
 
     for (var attempt = 0; attempt < 2; attempt++) {
