@@ -82,10 +82,10 @@
         showQrModal: true,
         rpcMap: { 4663: "https://rpc.mainnet.chain.robinhood.com" },
         metadata: {
-          name: "Moonpad",
-          description: "Launch and mint NFT collections on Robinhood Chain.",
+          name: "WAVES",
+          description: "One of a kind token and NFT launchpad.",
           url: location.origin,
-          icons: [location.origin + "/art/moon-192.png"]
+          icons: [location.origin + "/art/pfp.png"]
         }
       });
       wcProvider.on("accountsChanged", function (a) {
@@ -291,7 +291,7 @@
       // and no extension: open the site inside the wallet app's own browser.
       var note = document.createElement("p");
       note.className = "mw-note";
-      note.textContent = "On a phone and don’t see your wallet? Open moonpad.online in your wallet app’s built-in browser to connect there.";
+      note.textContent = "On a phone and don’t see your wallet? Open this site in your wallet app’s built-in browser to connect there.";
       card.appendChild(note);
 
       var foot = document.createElement("p");

@@ -1,15 +1,14 @@
 /* Robinhood Chain collection reads, for the explore + mint pages.
  *
- * There is no database behind the EVM side either — the list is read out of
- * the on-chain registry (ownerless, shared with Moonpad: both sites are
- * frontends over the same protocol), and every number on every tile comes off
- * the collection contract itself. Requires evm-chains.js (MoonpadRPC),
- * evm-contract.js and evm-registry.js (selector maps). */
+ * The list of collections comes from OUR records (/api/collections, same as
+ * the Solana side) — WAVES stands alone; nothing here reads another site's
+ * registry. Every number on every tile still comes off the collection
+ * contract itself. Requires evm-chains.js (MoonpadRPC) and evm-contract.js
+ * (selector map). */
 (function () {
   "use strict";
 
   var drop = function () { return (window.MOONPAD_CONTRACT || {}).selectors || {}; };
-  var reg = function () { return (window.MOONPAD_REGISTRY || {}).selectors || {}; };
   function rhChain() {
     return (window.MOONPAD_CHAINS || []).find(function (c) { return c.id === 4663; });
   }
@@ -33,24 +32,6 @@
     var b = h.slice(128, 128 + len * 2), out = "";
     for (var i = 0; i < b.length; i += 2) out += String.fromCharCode(parseInt(b.substr(i, 2), 16));
     try { return decodeURIComponent(escape(out)); } catch (e) { return out; }
-  }
-
-  // latest() returns Entry[] — four words per entry after offset + length
-  function decodeEntries(hex) {
-    var h = (hex || "").replace(/^0x/, "");
-    if (h.length < 128) return [];
-    var n = parseInt(h.slice(64, 128), 16) || 0;
-    var out = [];
-    for (var i = 0; i < n; i++) {
-      var at = 128 + i * 256;
-      out.push({
-        collection: "0x" + h.slice(at + 24, at + 64),
-        creator: "0x" + h.slice(at + 88, at + 128),
-        at: parseInt(h.slice(at + 128, at + 192), 16) || 0,
-        vault: "0x" + h.slice(at + 216, at + 256)
-      });
-    }
-    return out;
   }
 
   // ---- art (lifted from the donor: gateway race + one retry, because a
@@ -89,13 +70,6 @@
   }
 
   // ---- reads
-  async function listEntries(limit) {
-    var c = rhChain();
-    var hex = await call(c.registry, "0x" + reg()["latest(uint256,uint256)"] +
-      word(0) + word(limit || 24));
-    return decodeEntries(hex);
-  }
-
   async function readOne(address) {
     async function one(sig, dec) {
       try { return dec(await call(address, "0x" + drop()[sig])); }
@@ -141,7 +115,7 @@
   }
 
   window.EvmCollections = {
-    chain: rhChain, listEntries: listEntries, readOne: readOne,
+    chain: rhChain, readOne: readOne,
     artFor: artFor, imageUrl: imageUrl, fmtEth: fmtEth
   };
 })();

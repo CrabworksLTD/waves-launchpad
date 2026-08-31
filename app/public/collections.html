@@ -146,42 +146,46 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
     }, Promise.resolve());
   }
 
-  if (EVM) {
-    /* Robinhood Chain: the list comes off the on-chain registry, every number
-     * off the collection contract — no database on this side either. */
-    loadScripts(["/evm-chains.js", "/evm-contract.js", "/evm-registry.js", "/evm-collections.js"])
-      .then(function () { return window.EvmCollections.listEntries(24); })
-      .then(loadEvm)
-      .catch(function () { $("skel").hidden = true; $("empty").hidden = false; });
-  } else {
-    fetch("/api/collections").then(function (r) { return r.json(); })
-      .then(function (j) { return (j.collections || []); })
-      .catch(function () { return []; })
-      .then(load);
-  }
+  /* Both chains list from OUR records — WAVES only shows what launched on
+   * WAVES. The live numbers still come off the chain the record names. */
+  fetch("/api/collections").then(function (r) { return r.json(); })
+    .then(function (j) { return (j.collections || []); })
+    .catch(function () { return []; })
+    .then(function (records) {
+      var mine = records.filter(function (c) {
+        return EVM ? c.chain === "robinhood" : c.chain !== "robinhood";
+      });
+      return EVM ? loadEvm(mine) : load(mine);
+    });
 
-  function loadEvm(entries) {
+  function loadEvm(records) {
     $("skel").hidden = true;
-    if (!entries.length) { $("empty").hidden = false; return; }
-    state = entries.map(function (e) {
-      return { rec: { name: "…", id: e.collection }, m: null };
-    });
-    $("grid").hidden = false;
-    draw();
-    state.forEach(function (row) {
-      window.EvmCollections.readOne(row.rec.id).then(function (c) {
-        row.rec.name = c.name;
-        row.m = {
-          redeemed: c.minted, available: c.maxSupply, open: c.saleOpen,
-          priceText: c.price === 0n ? "free"
-            : "<b>" + window.EvmCollections.fmtEth(c.price) + "</b> ETH"
-        };
+    if (!records.length) { $("empty").hidden = false; return; }
+    loadScripts(["/evm-chains.js", "/evm-contract.js", "/evm-collections.js"])
+      .then(function () {
+        state = records.map(function (rec) {
+          rec.id = rec.address;
+          return { rec: rec, m: null };
+        });
+        $("grid").hidden = false;
         draw();
-        return window.EvmCollections.artFor(c);
-      }).then(function (art) {
-        if (art) { row.rec.avatar = art; draw(); }
-      }).catch(function () {});
-    });
+        state.forEach(function (row) {
+          window.EvmCollections.readOne(row.rec.id).then(function (c) {
+            if (!row.rec.name) row.rec.name = c.name;
+            row.m = {
+              redeemed: c.minted, available: c.maxSupply, open: c.saleOpen,
+              priceText: c.price === 0n ? "free"
+                : "<b>" + window.EvmCollections.fmtEth(c.price) + "</b> ETH"
+            };
+            draw();
+            if (row.rec.avatar) return null;
+            return window.EvmCollections.artFor(c);
+          }).then(function (art) {
+            if (art) { row.rec.avatar = art; draw(); }
+          }).catch(function () {});
+        });
+      })
+      .catch(function () { $("empty").hidden = false; });
   }
 
   function load(records) {

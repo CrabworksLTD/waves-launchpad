@@ -32,6 +32,8 @@ function kv() {
 // base58, 32 bytes — same shape check as upload-url, kept local so neither
 // file has to import the other.
 const B58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+// EVM address, for Robinhood Chain launches
+const EVM = /^0x[0-9a-fA-F]{40}$/;
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
@@ -52,28 +54,39 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-    const { candyMachine, collection, name, cluster, tokenMint, creator, avatar } = body;
+    const { candyMachine, collection, name, cluster, tokenMint, creator, avatar,
+            chain, address } = body;
 
-    if (!B58.test(candyMachine || "")) return res.status(400).json({ error: "bad candyMachine" });
-    if (!B58.test(collection || "")) return res.status(400).json({ error: "bad collection" });
-    // Mainnet only. A devnet test collection on the homepage is a bug that
-    // looks like a scam.
-    if (cluster && cluster !== "mainnet-beta") return res.status(200).json({ ok: true, skipped: "not mainnet" });
+    const isEvm = chain === "robinhood";
+    if (isEvm) {
+      // A Robinhood Chain launch records the drop contract's address; the
+      // explore page reads everything else off the contract live.
+      if (!EVM.test(address || "")) return res.status(400).json({ error: "bad address" });
+    } else {
+      if (!B58.test(candyMachine || "")) return res.status(400).json({ error: "bad candyMachine" });
+      if (!B58.test(collection || "")) return res.status(400).json({ error: "bad collection" });
+      // Mainnet only. A devnet test collection on the homepage is a bug that
+      // looks like a scam.
+      if (cluster && cluster !== "mainnet-beta") return res.status(200).json({ ok: true, skipped: "not mainnet" });
+    }
 
     try {
       const db = await kv();
       // Idempotent: relaunching the same machine must not double-list it.
-      const first = await db.set("cm:" + candyMachine, 1, { nx: true });
+      const dupeKey = isEvm ? "evm:" + address.toLowerCase() : "cm:" + candyMachine;
+      const first = await db.set(dupeKey, 1, { nx: true });
       if (first !== "OK") return res.status(200).json({ ok: true, duplicate: true });
 
       await db.lpush(KEY, JSON.stringify({
-        candyMachine,
-        collection,
+        candyMachine: isEvm ? null : candyMachine,
+        collection: isEvm ? null : collection,
+        chain: isEvm ? "robinhood" : null,
+        address: isEvm ? address : null,
         name: String(name || "Untitled").slice(0, 40),
         // only arweave art, never an arbitrary URL someone POSTs at us
         avatar: (typeof avatar === "string" && /^https:\/\/arweave\.net\/[\w\-\/\.]+$/.test(avatar)) ? avatar : null,
         tokenMint: (tokenMint && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(tokenMint)) ? tokenMint : null,
-        creator: (creator && B58.test(creator)) ? creator : null,
+        creator: (creator && (B58.test(creator) || EVM.test(creator))) ? creator : null,
         at: Date.now()
       }));
       await db.ltrim(KEY, 0, MAX - 1);

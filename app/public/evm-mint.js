@@ -94,9 +94,8 @@
     if (!st.saleOpen) { go.disabled = true; go.textContent = "Sale not open"; return; }
     if (st.gateActive) {
       go.disabled = true; go.textContent = "Allowlist phase";
-      say("err", "This collection is in a gated allowlist phase — gated waves run on " +
-        '<a href="https://moonpad.online/mint/' + esc(C) + '" target="_blank" rel="noopener">Moonpad</a> ' +
-        "until the public phase opens here.");
+      say("err", "This collection is in a gated allowlist phase. " +
+        "Minting opens here when the public phase begins.");
       return;
     }
     go.disabled = false;

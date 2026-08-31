@@ -78,53 +78,9 @@ window.MOONPAD_MOON = {
 // its own page — every other paired launch carries the panel on its own mint
 // page, where its buyers already are. Null until it is deployed, and both pages
 // read it from here so they cannot disagree about which one it is.
-window.MOONPAD_MOONBABIES = {
-  chainId: 4663,
-  collection: "0x7b74b4b390cd07a608513bc3d5043637a963b664",   // launched 2026-08-20, 6:38 PM ET; vault feeTo 0x379dfa6b…5bea
-  // The direct Node upload that rescued the launch skipped _avatar.png, so the
-  // collection has no logo and the pages fall back to token #1 (Jason, a 1/1).
-  // Point the PFP at #16 — the purple-beanie moonbaby meant to be the face —
-  // which already sits in the (separate, still-addressable) image folder.
-  avatar: "https://arweave.net/LDrWAAfkWYBH_F89tueuGVoJDPAl48LWn3A64PSQZD4/16.png",
-  // The rescue upload wrote a token image where _banner.png should be (both
-  // folders), so the real banner is unreachable on chain. The creator's actual
-  // 1500x500 X banner, bundled here as the override until it is re-uploaded.
-  banner: "/art/moonbabies-banner.png",
-  // _links.json is likewise the scrambled token file, so the socials cannot be
-  // read on chain either. The real links, overridden here.
-  links: { x: "https://x.com/moonbabyRH" }
-};
-
-// Curated promotions for the marketplace Spotlight band. Order here is the order
-// shown. `blurb` is the one-line pitch under the name (optional). There is no
-// database — a spotlighted collection is read on-chain like any other; if it is
-// not on the registry page the marketplace fetches it by address so a feature
-// never silently drops. To feature a contest winner, add a row here.
-window.MOONPAD_SPOTLIGHT = [
-  {
-    chainId: 4663,
-    collection: "0x7b74b4b390cd07a608513bc3d5043637a963b664",   // Moonbabies
-    blurb: "999 hand-drawn pixel babies. Burn $MOON to stake them and receive rewards from every mint on Moonpad."
-  }
-];
-
-// Collections to hide from the marketplace grid. Listing is on-chain and cannot
-// be un-done, so a bad/test/mistaken listing is filtered out here by address
-// (lowercase) instead. The registry entry still exists; it just does not render.
-window.MOONPAD_HIDDEN = [
-  "0x1dda8a75f79aa6a11b220c61dace798aef599c2b",  // Hood Monkees (test/mistaken launch)
-  "0x0bd90bb53a74c566c015441a8098d4b81d20c4d2"   // Hood Monkees (relaunch test)
-];
-
-// The launch contest ribbon shown above Spotlight. Set active:false to retire it
-// (the band then shows Spotlight alone). Kept here so the terms live in one place.
-window.MOONPAD_CONTEST = {
-  active: true,
-  badge: "Contest",
-  text: "Design and launch a collection of 500+ on Moonpad. The first five creators to ship get 5 Moonbabies, a Spotlight slot on this page, and a promo on X.",
-  ctaText: "Start a collection →",
-  ctaHref: "/launch"
-};
+/* WAVES stands alone: no spotlight/hidden/contest site config here, and no
+ * ties to any other launchpad's collections. What WAVES lists comes from its
+ * own records; this file is chain plumbing only. */
 
 // The activation ladder: what a tier costs, and the share it earns.
 //
@@ -189,28 +145,15 @@ window.MOONPAD_CHAINS = [
     symbol: "ETH",
     decimals: 18,
     live: true,
-    // MoonpadRegistry, deployed 2026-08-12. Ownerless and permanent: nothing
-    // here can pause, edit or delist it, including us. Replacing this address
-    // starts an empty index and orphans everything already listed against the
-    // old one, so it changes only if the contract itself has to change.
-    registry: "0xc71baad9fed8bab0c8224715f980eeea919c4890",
+    // WAVES keeps no on-chain registry — launches are recorded in our own
+    // records API, same as the Solana side.
+    registry: null,
 
-    // The platform mint fee sweeps here — the Moonbabies staking vault — for
-    // EVERY collection launched on this chain. That breadth is the point, not a
-    // bug: the fee is Moonpad's cut, and Moonpad's cut is paid to MOON stakers.
-    // Every drop that launches on the pad, paired or not, pays 0.001 ETH/token
-    // (the floor) + 2.5% into the vault, and the vault splits it across everyone
-    // staked. More launches -> more staker yield -> more reason to hold. A
-    // collection's OWN holder rewards, if it wants them, come separately from
-    // its paired token's trading fees (a different vault it deploys), never from
-    // this.
-    //
-    // The vault takes arbitrary ETH by design (receive() -> _take), so a
-    // stranger's Drop paying in is exactly what it expects; the Drop caps the
-    // fee send at 200k gas, well above the accPerWeight write. Immutable per
-    // collection once deployed, and disclosed on-chain before anyone launches,
-    // so it is a fee people opt into, not one sprung on them.
-    feeTo: "0x379dfa6b91aea7a6081f280e07524fe1edac5bea",   // Moonbabies vault, 2026-08-21: platform mint fee -> MOON stakers
+    // ⚠️ WAVES needs its own EVM fee wallet before launches charge a platform
+    // mint fee here. null means feeFor() resolves to zero fee — launches are
+    // free until Kyle supplies a WAVES treasury address. Do NOT point this at
+    // another site's vault.
+    feeTo: null,
     // A $-token (coin) allowlist reads holder balances at the block the sale
     // opened on, for the whole wave. This RPC prunes that state after ~10 min
     // (measured live 2026-08-20), so a longer wave locks holders out — the gate
