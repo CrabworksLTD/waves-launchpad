@@ -818,7 +818,7 @@
         <div class="sharelbl"><span id="tk-sharetxt"></span></div>
       </div>
 
-      <div id="tk-rewardwrap" ${(flow.feeSharePct || 0) > 0 ? "" : raw("hidden")}>
+      <div id="tk-rewardwrap">
         <label>Holder rewards paid in</label>
         <button class="pick" id="lp-reward">
           <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
@@ -920,7 +920,6 @@
         ? "You keep everything — claim whenever you like."
         : pct + "% to your holders, " + (100 - pct) + "% to you — paid out " +
           "automatically by the keeper.";
-      box.querySelector("#tk-rewardwrap").hidden = pct === 0;
       box.querySelector("#tk-fwwrap").hidden = pct >= 100;
     }
     paintShare();
