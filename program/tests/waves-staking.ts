@@ -26,6 +26,7 @@ import {
 } from "@metaplex-foundation/mpl-core";
 import {
   keypairIdentity, generateSigner, publicKey as umiPk,
+  createSignerFromKeypair,
 } from "@metaplex-foundation/umi";
 import {
   fromWeb3JsKeypair, toWeb3JsPublicKey,
@@ -198,14 +199,13 @@ describe("waves-staking", () => {
   });
 
   it("a sold NFT's new owner claims what accrues after the sale", async () => {
-    // staker sells asset1 to buyer
+    // staker sells asset1 to buyer — the owner must be the signing authority
     await transfer(umi, {
       asset: await fetchAsset(umi, umiPk(asset1.toBase58())),
       collection: { publicKey: umiPk(collection.toBase58()) } as any,
-      authority: umi.eddsa ? undefined as any : undefined,
+      authority: createSignerFromKeypair(umi, fromWeb3JsKeypair(staker)),
       newOwner: umiPk(buyer.publicKey.toBase58()),
-    } as any).sendAndConfirm(
-      umi.use(keypairIdentity(fromWeb3JsKeypair(staker), true)));
+    } as any).sendAndConfirm(umi);
 
     await deposit(300_000);
     // the SELLER can no longer claim
