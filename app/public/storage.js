@@ -395,7 +395,7 @@
     var PLACEHOLDER = "0000000000000000000000000000000000000000000";
     var probe = files.concat([{ id: "_t", name: "token.json", text: buildJson(PLACEHOLDER) }]);
     var totalBytes = bytesOf(probe);
-    var totalCount = probe.length;
+    var totalCount = probe.length + 1;   // two manifests now, art then metadata
 
     var auth = { address: opts.address, sig: opts.sig, ts: opts.ts };
     if (!auth.sig && opts.payer) {
@@ -405,16 +405,28 @@
     }
 
     var up = await prepareUploader(totalBytes, totalCount, auth, opts.onProgress);
-    var set = files.concat([{ id: "_t", name: "token.json", text: buildJson(PLACEHOLDER) }]);
-    // Single folder: upload once, then the json inside points at the same
-    // manifest for the icon — an Arweave manifest id is 43 chars, so the
-    // placeholder-sized upload matches the final bytes exactly.
-    var cid = await uploadWith(up, set, "token metadata", opts.onProgress);
+
+    /* Two folders, exactly like a collection — images first, then the json
+     * that points at them.
+     *
+     * This used to be one folder with the placeholder cid left in: token.json
+     * cannot name the manifest it lives inside, so the id it carried was
+     * literally 0000…000, and every launched token pointed its image at a
+     * folder that does not exist. The icon was uploaded and unreachable, so
+     * wallets and explorers showed nothing. Pinning the art first gives the
+     * json a real id to reference; the byte total is unchanged, so the quote
+     * the creator already paid still covers it. */
+    var artCid = files.length
+      ? await uploadWith(up, files, "token art", opts.onProgress)
+      : PLACEHOLDER;
+    var cid = await uploadWith(up,
+      [{ id: "_t", name: "token.json", text: buildJson(artCid) }],
+      "token metadata", opts.onProgress);
     return {
       uri: "https://arweave.net/" + cid + "/token.json", cid: cid,
-      iconUri: opts.icon ? "https://arweave.net/" + cid + "/" + iconName : null,
-      bannerUri: opts.banner ? "https://arweave.net/" + cid + "/" + bannerName : null,
-      cardUri: opts.card ? "https://arweave.net/" + cid + "/card.png" : null
+      iconUri: opts.icon ? "https://arweave.net/" + artCid + "/" + iconName : null,
+      bannerUri: opts.banner ? "https://arweave.net/" + artCid + "/" + bannerName : null,
+      cardUri: opts.card ? "https://arweave.net/" + artCid + "/card.png" : null
     };
   }
 
