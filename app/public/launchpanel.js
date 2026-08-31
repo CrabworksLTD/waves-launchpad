@@ -794,7 +794,7 @@
       <div id="tk-customrow" ${flow.customFee ? "" : raw("hidden")}>
         <label>Fee percent</label>
         <input id="tk-custompct" type="number" min="0.25" max="20" step="0.25"
-          value="${flow.customFee || 5}">
+          value="${flow.customFee || 1}">
         <div class="ptabs" id="tk-feechips">
           <button data-v="1">1%</button><button data-v="2">2%</button>
           <button data-v="3">3%</button><button data-v="5">5%</button>
@@ -928,9 +928,17 @@
     box.querySelector("#tk-tiers").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-t]");
       if (!b || b.disabled) return;
-      collect();
-      flow.customFee = b.dataset.t === "custom" ? (flow.customFee || 5) : 0;
-      tokenDetails(flow);
+      // toggle IN PLACE — a full re-render scrolls the window back to the
+      // top, which reads as a jump
+      flow.customFee = b.dataset.t === "custom"
+        ? (parseFloat(box.querySelector("#tk-custompct").value) || 1) : 0;
+      box.querySelectorAll("#tk-tiers .tier").forEach(function (x) {
+        x.classList.toggle("on", x === b);
+      });
+      box.querySelector("#tk-customrow").hidden = !flow.customFee;
+      box.querySelector("#tk-fee").textContent =
+        (flow.customFee || 1) + "% — 20% you / 60% platform / 20% Meteora";
+      if (flow.customFee) paintSplit();
     });
     function paintSplit() {
       var pct = parseFloat(box.querySelector("#tk-custompct").value) || 0;
@@ -944,6 +952,8 @@
     box.querySelector("#tk-custompct").addEventListener("input", function () {
       flow.customFee = Math.min(20, Math.max(0.25,
         parseFloat(box.querySelector("#tk-custompct").value) || 0)) || flow.customFee;
+      box.querySelector("#tk-fee").textContent =
+        flow.customFee + "% — 20% you / 60% platform / 20% Meteora";
       paintSplit();
     });
     box.querySelector("#tk-feechips").addEventListener("click", function (e) {
@@ -951,6 +961,8 @@
       if (!b) return;
       flow.customFee = +b.dataset.v;
       box.querySelector("#tk-custompct").value = b.dataset.v;
+      box.querySelector("#tk-fee").textContent =
+        flow.customFee + "% — 20% you / 60% platform / 20% Meteora";
       paintSplit();
     });
     box.querySelector("#tk-quotes").addEventListener("click", function (e) {
