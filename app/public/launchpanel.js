@@ -972,12 +972,44 @@
     var umi = mx.createUmi(window.Launch.clusters[window.Launch.cluster()].rpc, "confirmed")
       .use(mx.walletAdapterIdentity(window.Launch.asAdapter(mx, w)));
 
-    var res = await mx.transferSol(umi, {
-      destination: mx.publicKey(q.feeTo),
-      amount: mx.lamports(BigInt(q.feeLamports))
-    }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
+    /* A blockhash lives about a minute. Between building the transfer and the
+     * wallet prompt being approved — plus a public RPC that may be a few
+     * slots behind — that window can close, and the send comes back "block
+     * height exceeded".
+     *
+     * Retrying is right, but retrying blind would charge twice. An expiry
+     * error is not proof the payment failed: the transaction may have landed
+     * while confirmation timed out. So on failure we ask the chain about that
+     * exact signature first, and only rebuild when it genuinely is not there. */
+    var conn = new mx.Connection(window.Launch.clusters[window.Launch.cluster()].rpc, "confirmed");
 
-    return mx.base58.deserialize(res.signature)[0];
+    async function landed(sig) {
+      try {
+        var st = await conn.getSignatureStatus(sig, { searchTransactionHistory: true });
+        return !!(st && st.value && !st.value.err &&
+          (st.value.confirmationStatus === "confirmed" ||
+           st.value.confirmationStatus === "finalized"));
+      } catch (e) { return false; }
+    }
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        var res = await mx.transferSol(umi, {
+          destination: mx.publicKey(q.feeTo),
+          amount: mx.lamports(BigInt(q.feeLamports))
+        }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
+        return mx.base58.deserialize(res.signature)[0];
+      } catch (e) {
+        var msg = String((e && e.message) || e);
+        // the signature is in the error text when a send times out
+        var found = msg.match(/[1-9A-HJ-NP-Za-km-z]{80,90}/);
+        if (found && await landed(found[0])) return found[0];
+        var expired = /expired|block height exceeded|timed? ?out/i.test(msg);
+        if (attempt === 0 && expired) continue;   // fresh blockhash, one more go
+        throw e;
+      }
+    }
+    throw new Error("The storage payment could not be confirmed — nothing was charged twice; try again.");
   }
 
   /* ================= Token flow ================= */
