@@ -57,6 +57,9 @@
     // the wallet pill answers to a different chain now
     if (net === "robinhood") window.Shell.ensureEvmStack().catch(function () {});
     if (shellPaintWallet) shellPaintWallet();
+    // and so does the tab's favicon
+    var fv = document.querySelector('link[rel="icon"]');
+    if (fv) fv.href = net === "robinhood" ? "/mark-rh.svg" : "/mark.svg";
     // the address bar carries the chain, so a copied link shares the same
     // side of the site (and gets the matching share card)
     try {
@@ -310,10 +313,12 @@
       inp.addEventListener("keydown", function (e) { if (e.key === "Enter") tryPass(); });
       inp.focus();
     })();
-    // favicon rides along on every page the shell mounts on
+    // favicon rides along on every page the shell mounts on — in the colours
+    // of whichever chain the visitor is on
     if (!document.querySelector('link[rel="icon"]')) {
       var fav = document.createElement("link");
-      fav.rel = "icon"; fav.type = "image/svg+xml"; fav.href = "/mark.svg";
+      fav.rel = "icon"; fav.type = "image/svg+xml";
+      fav.href = currentChain() === "robinhood" ? "/mark-rh.svg" : "/mark.svg";
       document.head.appendChild(fav);
     }
 
