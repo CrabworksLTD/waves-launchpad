@@ -631,14 +631,20 @@
      * label meant a finished run read "Confirming on chain — 1s" where it
      * should say "Paying for storage", so the list stopped describing what
      * had actually happened. */
+    var started = {};
     return function mark(k, state, extra) {
       var li = box.querySelector('[data-k="' + k + '"]');
       if (!li) return;
+      if (!started[k]) started[k] = Date.now();
+      if (state === "done" && !extra) {
+        var secs = Math.round((Date.now() - started[k]) / 1000);
+        if (secs >= 2) extra = secs + "s";
+      }
       li.className = state;
       li.querySelector("i").textContent = state === "done" ? "✓" : "›";
       var span = li.querySelector("span");
       if (!span.dataset.label) span.dataset.label = span.textContent;
-      span.textContent = span.dataset.label + (extra && state !== "done" ? " — " + extra : "");
+      span.textContent = span.dataset.label + (extra ? " — " + extra : "");
     };
   }
 

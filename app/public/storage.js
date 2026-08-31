@@ -177,7 +177,7 @@
     var res = await raceTimeout(up.client.uploadFolder({
       files: fileObjs,
       dataItemOpts: { paidBy: [up.paidBy] },
-      maxConcurrentUploads: 10,
+      maxConcurrentUploads: 16,
       throwOnFailure: true
     }), total, label);
     var id = res && res.manifestResponse && res.manifestResponse.id;

@@ -76,14 +76,15 @@
         ? signature : mx.base58.deserialize(signature)[0];
       var started = Date.now();
       var deadline = started + 120000;
-      var missing = 0;
+      var missing = 0, resent = 0;
       while (Date.now() < deadline) {
         // Say what is happening. Polling in silence for two minutes is
         // indistinguishable from a hang, and the last thing a creator needs
         // after signing a payment is a dialog that looks dead.
         if (typeof window.Launch.onWait === "function") {
-          window.Launch.onWait("Confirming on chain — " +
-            Math.round((Date.now() - started) / 1000) + "s");
+          var secs = Math.round((Date.now() - started) / 1000);
+          window.Launch.onWait("confirming " + secs + "s" +
+            (resent ? " · re-sent " + resent + "x" : ""));
         }
         var st = null;
         try { st = await conn.getSignatureStatus(sig, { searchTransactionHistory: true }); }
@@ -98,12 +99,14 @@
         if (!v) {
           missing++;
           // every ~6s of not seeing it, put it back on the wire
-          if (lastRaw && missing % 5 === 0) {
-            try { await conn.sendRawTransaction(lastRaw, { skipPreflight: true, maxRetries: 5 }); }
-            catch (e) {}
+          if (lastRaw && missing % 12 === 0) {
+            try {
+              await conn.sendRawTransaction(lastRaw, { skipPreflight: true, maxRetries: 5 });
+              resent++;
+            } catch (e) {}
           }
         }
-        await new Promise(function (r) { setTimeout(r, 1200); });
+        await new Promise(function (r) { setTimeout(r, 500); });
       }
       throw new Error("Timed out waiting for " + sig.slice(0, 8) +
         "… to confirm. It may still land — check the explorer before retrying.");
