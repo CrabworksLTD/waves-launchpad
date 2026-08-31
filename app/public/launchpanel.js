@@ -1066,6 +1066,12 @@
    * (buy/sell rates, burn/dividend allocation) is FLAP's transfer-fee
    * machinery: ours arrives with the rewards program, and the section says so
    * instead of pretending. */
+  /* The reward asset offers the whole catalogue with its status on each row.
+   * 354 of the 448 verified assets have no market while still quoting a price;
+   * hiding them would cut the creative surface that makes tokenised stocks
+   * worth having, and offering them silently would pay holders something
+   * unsellable. So each row says which it is, and the keeper pays the quote
+   * currency until an asset can actually be sold. */
   function tokenDetails(flow) {
     flow = flow || {};
     var nft = flow.nft;
@@ -1177,15 +1183,6 @@
         <div class="sharelbl"><span id="tk-sharetxt"></span></div>
       </div>
 
-      /* The reward asset is back, with the truth on the row.
-       *
-       * The catalogue IS the feature — a Disney-themed token paying Disney is
-       * why creators want this. But 354 of the 448 verified assets have no
-       * market at all while still quoting a price. Rather than hide them and
-       * lose the creative surface, or offer them and pay holders something
-       * unsellable, say which is which: an asset nothing trades yet pays out
-       * in the quote currency until it can be sold, and starts paying itself
-       * the moment a pool exists. No migration, no broken promise. */
       <div id="tk-rewardwrap" ${(flow.feeSharePct || 0) > 0 ? "" : raw("hidden")}>
         <label>Holders are paid in</label>
         <button class="pick" id="lp-reward">
