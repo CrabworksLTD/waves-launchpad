@@ -353,8 +353,8 @@
           <div class="menu">
             <a href="#" data-net="solana"><img src="/art/solana.svg" width="13" height="13" alt="">
               Solana</a>
-            <a href="#" data-net="robinhood"><img src="/art/robinhood.svg" width="13" height="13" alt="">
-              Robinhood Chain <span class="soon">SOON</span></a>
+            <a href="#" data-net="robinhood" class="soon"><img src="/art/robinhood.svg" width="13" height="13" alt="">
+              Robinhood Chain <i>SOON</i></a>
           </div>
         </div>
         <div class="shl-dd r" id="shl-wmenu">
@@ -443,6 +443,17 @@
           nd.classList.remove("open");
           var net = a.dataset.net;
           if (net === currentChain()) return;          // already there
+
+          /* Robinhood is not selectable yet. Its launch flow has never been
+           * run, and there is nothing recorded on that side to browse — so
+           * switching to it lands a visitor on an empty site that cannot do
+           * the thing the site is for. The row stays visible with its SOON
+           * tag, because it is a real part of the plan; it just does not go
+           * anywhere until launching works there. */
+          if (net === "robinhood") {
+            alertBar("Robinhood Chain is coming — launches run on Solana for now.");
+            return;
+          }
 
           /* Switching chains goes home, rather than re-skinning the page you
            * are standing on.
