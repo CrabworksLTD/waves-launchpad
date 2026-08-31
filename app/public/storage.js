@@ -59,11 +59,19 @@
     return mx.base58.deserialize(secret)[0];
   }
 
+  // which chain pays for this upload — the shell's selected network. The
+  // server prices and verifies in that chain's currency.
+  function payChain() {
+    return (window.Shell && window.Shell.chain && window.Shell.chain() === "robinhood")
+      ? "robinhood" : "solana";
+  }
+
   async function uploadApproval(signerAddress, bytes, count, auth) {
     var body = credentials();
     body.signerAddress = signerAddress;
     body.bytes = bytes;
     body.count = count;
+    body.chain = payChain();
     // Three ways the server grants the credit share, cheapest first:
     //  - team password (carried by credentials())
     //  - a pass holder who signed the launch message (address + sig + ts):
@@ -93,13 +101,14 @@
     var r = await fetch(SIGN, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ quote: true, bytes: bytes, count: count })
+      body: JSON.stringify({ quote: true, bytes: bytes, count: count, chain: payChain() })
     });
     var j = await r.json().catch(function () { return {}; });
-    if (!r.ok || !j.feeLamports) {
+    if (!r.ok || !(j.feeLamports || j.feeWei)) {
       throw new Error(j.detail || j.error || ("Could not price the upload (" + r.status + ")"));
     }
-    return j; // { feeLamports, feeSol, feeTo }
+    // Solana: { feeLamports, feeSol, feeTo } · Robinhood: { feeWei, feeEth, feeTo, chain }
+    return j;
   }
 
   function bytesOf(fileList) {

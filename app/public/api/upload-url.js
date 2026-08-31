@@ -149,6 +149,63 @@ async function quoteFeeLamports(bytes, count) {
   return BigInt(Math.ceil(feeSol * LAMPORTS));
 }
 
+/* ---- Robinhood Chain: the same quote and guard, in ETH ----
+ *
+ * A launch on the EVM side pays for its own Arweave storage exactly like the
+ * Solana side does; only the money moves differently. EVM gives us tx.value
+ * directly (no balance-delta reconstruction), but everything else — live
+ * rates, the 1.5x margin, the age limit, the Redis replay claim — is the
+ * same policy, deliberately. */
+const FEE_TO_EVM = process.env.FEE_TO_EVM || "";
+const RH_RPC = process.env.RH_RPC || "https://rpc.mainnet.chain.robinhood.com";
+const WEI = 1e18;
+
+async function evmRpc(method, params) {
+  const r = await fetch(RH_RPC, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params })
+  }).then((x) => x.json());
+  if (r.error) throw new Error(r.error.message || "rpc error");
+  return r.result;
+}
+
+async function quoteFeeWei(bytes, count) {
+  const rates = await fetch("https://payment.ardrive.io/v1/rates").then((r) => r.json());
+  const gibWinc = Number(rates.winc);
+  const gibUsd = Number(rates.fiat.usd);
+  const perItem = Number(rates.perDataItemFeeWinc);
+  const costWinc = count * perItem + bytes * (gibWinc / GiB);
+  const costUsd = (costWinc / gibWinc) * gibUsd;
+  const px = await fetch("https://api.coinbase.com/v2/prices/ETH-USD/spot").then((r) => r.json());
+  const ethUsd = Number(px.data.amount);
+  if (!(gibWinc > 0) || !(gibUsd > 0) || !(ethUsd > 0)) throw new Error("bad rate quote");
+  const feeEth = (costUsd / ethUsd) * MARGIN;
+  return BigInt(Math.ceil(feeEth * WEI));
+}
+
+async function paymentFreshEvm(txHash, minWei) {
+  if (!/^0x[0-9a-fA-F]{64}$/.test(txHash || "")) return false;
+  if (!FEE_TO_EVM) throw new Error("FEE_TO_EVM is not set on this deployment");
+
+  const [tx, rec] = await Promise.all([
+    evmRpc("eth_getTransactionByHash", [txHash]),
+    evmRpc("eth_getTransactionReceipt", [txHash])
+  ]);
+  if (!tx || !rec || rec.status !== "0x1") return false;
+  if (String(tx.to || "").toLowerCase() !== FEE_TO_EVM.toLowerCase()) return false;
+  if (BigInt(tx.value || "0x0") < (minWei * 85n) / 100n) return false;
+
+  // age limit, same hour as the Solana path
+  const blk = await evmRpc("eth_getBlockByNumber", [rec.blockNumber, false]);
+  if (!blk || !blk.timestamp) return false;
+  if (Math.floor(Date.now() / 1000) - parseInt(blk.timestamp, 16) > 3600) return false;
+
+  const { Redis } = await import("@upstash/redis");
+  const kv = new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN });
+  const claimed = await kv.set("paid:" + txHash.toLowerCase(), Date.now(), { nx: true, ex: 86400 });
+  return claimed === "OK";
+}
+
 // True only if `signature` is a confirmed transfer to FEE_TO worth at least
 // `minLamports` AND has not been used before.
 //
@@ -234,6 +291,8 @@ export default async function handler(req, res) {
 
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
   const { key, address, sig, ts, signerAddress, bytes, count, signature, quote } = body;
+  // which chain is paying — Robinhood Chain pays in ETH, Solana in SOL
+  const evm = body.chain === "robinhood";
 
   const size = Math.max(1, parseInt(bytes, 10) || 0);
   const files = Math.min(Math.max(1, parseInt(count, 10) || 1), MAX_FILES);
@@ -242,6 +301,15 @@ export default async function handler(req, res) {
   // Quote mode — a public price, grants nothing.
   if (quote) {
     try {
+      if (evm) {
+        const feeWei = await quoteFeeWei(size, files);
+        return res.status(200).json({
+          feeWei: feeWei.toString(),
+          feeEth: Number(feeWei) / WEI,
+          feeTo: FEE_TO_EVM,
+          chain: "robinhood"
+        });
+      }
       const feeLamports = await quoteFeeLamports(size, files);
       return res.status(200).json({
         feeLamports: feeLamports.toString(),
@@ -276,8 +344,13 @@ export default async function handler(req, res) {
       }
     }
     if (!allowed && signature) {
-      const feeLamports = await quoteFeeLamports(size, files);
-      allowed = await paymentFresh(signature, feeLamports);
+      if (evm) {
+        const feeWei = await quoteFeeWei(size, files);
+        allowed = await paymentFreshEvm(signature, feeWei);
+      } else {
+        const feeLamports = await quoteFeeLamports(size, files);
+        allowed = await paymentFresh(signature, feeLamports);
+      }
     }
   } catch (e) {
     // A failure verifying the payment (rpc, rates, or Redis) must deny, never

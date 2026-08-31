@@ -698,7 +698,29 @@
     return evmP;
   }
 
+  /* The deploy half of the EVM stack: the drop contract's ABI + bytecode
+   * (45KB) and the launch primitives. Loaded only when someone actually
+   * launches, not for browsing. */
+  var evmLaunchP = null;
+  function ensureEvmLaunch() {
+    if (window.MoonpadLaunch) return Promise.resolve();
+    if (evmLaunchP) return evmLaunchP;
+    evmLaunchP = ensureEvmStack().then(function () {
+      return ["/evm-contract.js", "/evm-launch.js"].reduce(function (p, src) {
+        return p.then(function () {
+          return new Promise(function (res, rej) {
+            var el = document.createElement("script");
+            el.src = src; el.onload = res;
+            el.onerror = function () { rej(new Error("failed to load " + src)); };
+            document.head.appendChild(el);
+          });
+        });
+      }, Promise.resolve());
+    });
+    return evmLaunchP;
+  }
+
   window.Shell = { mount: mount, connect: connectModal,
     ensureLaunchStack: ensureLaunchStack, ensureEvmStack: ensureEvmStack,
-    chain: currentChain };
+    ensureEvmLaunch: ensureEvmLaunch, chain: currentChain };
 })();

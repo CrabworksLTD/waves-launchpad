@@ -475,17 +475,22 @@
   }
 
   async function nftConfirm(cfg, flow) {
-    var w = window.Wallet.current();
+    var evm = isEvm();
+    var mw = evm ? (window.MoonpadWallet || {}) : null;
+    var w = evm
+      ? (mw.account ? { name: "EVM wallet", publicKey: mw.account } : null)
+      : window.Wallet.current();
+    var CUR = evm ? "ETH" : "SOL";
     var waveTxt = cfg.waves
       ? cfg.waves.phases.map(function (p) { return p.wallets.length; }).join(" + ") +
         " wallets · " + cfg.waves.minutes + " min waves"
       : "no — public from open";
     var box = shell(H`
       <h2>Confirm</h2>
-      <p class="sub">Two things get paid for: permanent storage, and Solana rent plus fees.</p>
+      <p class="sub">Two things get paid for: permanent storage, and ${evm ? "gas" : "Solana rent plus fees"}.</p>
       <div class="row"><span class="k">Collection</span><b>${cfg.name}${cfg.symbol ? " · " + cfg.symbol : ""}</b></div>
       <div class="row"><span class="k">Supply</span><b>${cfg.supply}${cfg.devTotal ? " (" + cfg.devTotal + " to the team first)" : ""}</b></div>
-      <div class="row"><span class="k">Mint price</span><b>${cfg.priceSol} SOL${cfg.maxPerWallet ? " · max " + cfg.maxPerWallet + "/wallet" : ""}</b></div>
+      <div class="row"><span class="k">Mint price</span><b>${cfg.priceSol} ${CUR}${cfg.maxPerWallet ? " · max " + cfg.maxPerWallet + "/wallet" : ""}</b></div>
       <div class="row"><span class="k">Royalty</span><b>${cfg.royaltyPercent}%${cfg.royaltyTo ? " → " + shortAddr(cfg.royaltyTo) : ""}</b></div>
       <div class="row"><span class="k">Allowlist</span><b>${waveTxt}</b></div>
       <div class="row"><span class="k">Opens</span><b>${cfg.openAt ? new Date(cfg.openAt).toLocaleString() : "immediately"}</b></div>
@@ -505,7 +510,9 @@
     try {
       var probe = estimateBytes(cfg);
       await window.Storage.quoteUpload(probe.bytes, probe.count).then(function (quote) {
-        box.querySelector("#lp-fee").textContent = Number(quote.feeSol).toFixed(4) + " SOL";
+        box.querySelector("#lp-fee").textContent = evm
+          ? Number(quote.feeEth).toFixed(6) + " ETH"
+          : Number(quote.feeSol).toFixed(4) + " SOL";
       });
     } catch (e) {
       box.querySelector("#lp-fee").textContent = "unavailable";
@@ -516,9 +523,13 @@
     var go = box.querySelector("#lp-go");
     go.disabled = false;
     go.onclick = w
-      ? function () { doNftLaunch(cfg, flow); }
+      ? function () { (evm ? doEvmNftLaunch : doNftLaunch)(cfg, flow); }
       : async function () {
-          var w2 = await (window.Shell ? Shell.connect() : Promise.resolve(null));
+          var w2 = evm
+            ? await window.Shell.ensureEvmStack().then(function () {
+                return window.MoonpadWallet.connect();
+              }).catch(function () { return null; })
+            : await (window.Shell ? Shell.connect() : Promise.resolve(null));
           if (w2) nftConfirm(cfg, flow);
         };
   }
@@ -637,6 +648,162 @@
         '<div class="acts"><button id="lp-close2">Close</button></div>');
       box.querySelector("#lp-close2").onclick = close;
     }
+  }
+
+  /* ---- Robinhood Chain launch ----
+   * Same shape as the Solana runner: pay for storage, upload the art and
+   * metadata, then put the collection on chain. The chain step is one
+   * transaction — a drop contract carrying its own supply, price, per-wallet
+   * cap and royalty — instead of Solana's collection + machine + item lines,
+   * so this path has fewer stages, not different ones.
+   *
+   * Allowlist waves are Solana-only for now: the gated path needs a signer
+   * service WAVES does not run, and a launch that half-arms its allowlist is
+   * worse than one that says so. nftDetails hides the wave controls on this
+   * chain; the guard here is the backstop. */
+  function isEvm() {
+    return !!(window.Shell && window.Shell.chain && window.Shell.chain() === "robinhood");
+  }
+
+  async function doEvmNftLaunch(cfg, flow) {
+    busy = true;
+    var stages = [
+      ["storage", "Paying for storage"],
+      ["images", "Uploading art"],
+      ["metadata", "Uploading metadata"],
+      ["deploy", "Deploying the collection"]
+    ];
+    if (cfg.devTotal > 0) stages.push(["dev", "Minting the creator supply"]);
+    var box = shell(H`
+      <h2>Launching</h2>
+      <p class="sub">Leave this tab open. Each step needs a signature.</p>
+      <ul class="steps">${raw(stages.map(function (s) {
+        return '<li data-k="' + s[0] + '"><i>·</i><span>' + esc(s[1]) + "</span></li>";
+      }).join(""))}</ul>
+      <div id="lp-err"></div>
+    `);
+    var mark = stepList(box);
+
+    try {
+      await window.Shell.ensureEvmLaunch();
+      if (cfg.waves) throw new Error("Allowlist waves are not available on Robinhood Chain yet.");
+
+      var up = await window.Storage.uploadCollection({
+        files: run.files,
+        name: cfg.name,
+        symbol: cfg.symbol,
+        description: cfg.description,
+        avatar: cfg.avatar,
+        banner: cfg.banner,
+        links: cfg.links,
+        allowlist: null,
+        onProgress: function (p) {
+          if (p.phase === "images" && p.state === "quoting") mark("storage", "on");
+          if (p.phase === "images") mark("images", p.state === "done" ? "done" : "on");
+          if (p.phase === "metadata") mark("metadata", p.state === "done" ? "done" : "on");
+        },
+        payer: async function (q) {
+          mark("storage", "on");
+          var h = await payStorageEvm(q);
+          mark("storage", "done");
+          return h;
+        }
+      });
+
+      mark("deploy", "on");
+      var priceWei = BigInt(Math.round(Number(cfg.priceSol || 0) * 1e18));
+      var me = window.MoonpadWallet.account;
+      var dep = await window.MoonpadLaunch.deploy({
+        chainId: 4663,
+        from: me,
+        name: cfg.name,
+        symbol: cfg.symbol || "",
+        baseUri: up.baseUri,
+        maxSupply: cfg.supply,
+        priceWei: "0x" + priceWei.toString(16),
+        maxPerWallet: cfg.maxPerWallet || 0,
+        owner: me,
+        royaltyBps: Math.round((cfg.royaltyPercent || 0) * 100),
+        reserveQty: cfg.devTotal || 0,
+        openAtDeploy: !cfg.openAt,
+        gateSigner: "0x0000000000000000000000000000000000000000",
+        gateSeconds: 0
+      });
+      var addr = await window.MoonpadLaunch.waitForContract(dep.hash, 4663);
+      mark("deploy", "done");
+      if (cfg.devTotal > 0) mark("dev", "done");
+
+      busy = false;
+      var res = {
+        address: addr,
+        chain: dep.chain,
+        mintUrl: location.origin + "/mint/" + addr,
+        explorer: dep.chain.explorer + "/address/" + addr
+      };
+      recordEvmCollection(cfg, res, up);
+      evmDone(cfg, res);
+    } catch (e) {
+      busy = false;
+      fail(box, e.message || String(e));
+      box.insertAdjacentHTML("beforeend",
+        '<div class="acts"><button id="lp-close3">Close</button></div>');
+      box.querySelector("#lp-close3").onclick = close;
+    }
+  }
+
+  // A plain ETH transfer to the fee wallet, signed by the creator. The server
+  // verifies value, recipient, age and single-use before granting the credit.
+  async function payStorageEvm(q) {
+    if (!q.feeTo) throw new Error("Storage fees are not configured for Robinhood Chain yet");
+    var mw = window.MoonpadWallet;
+    if (!mw || !mw.account) await window.MoonpadWallet.connect();
+    mw = window.MoonpadWallet;
+    await window.MOONPAD_SWITCH_CHAIN(4663);
+    var tx = { from: mw.account, to: q.feeTo,
+      value: "0x" + BigInt(q.feeWei).toString(16) };
+    var hash = await mw.provider.request({ method: "eth_sendTransaction", params: [tx] });
+    // the server reads the receipt, so wait for it to exist
+    for (var i = 0; i < 90; i++) {
+      var r = await window.MoonpadRPC.send(
+        window.EvmCollections ? window.EvmCollections.chain().rpc
+          : "https://rpc.mainnet.chain.robinhood.com",
+        "eth_getTransactionReceipt", [hash]).catch(function () { return null; });
+      if (r && r.status === "0x1") return hash;
+      if (r && r.status === "0x0") throw new Error("The storage payment reverted.");
+      await new Promise(function (res) { setTimeout(res, 2000); });
+    }
+    throw new Error("The storage payment is taking a while — check the explorer.");
+  }
+
+  function recordEvmCollection(cfg, res, up) {
+    fetch("/api/collections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chain: "robinhood",
+        address: res.address,
+        name: cfg.name,
+        avatar: (up && up.avatarUri) || null,
+        creator: (window.MoonpadWallet || {}).account || null
+      })
+    }).catch(function () {});
+  }
+
+  function evmDone(cfg, res) {
+    var box = shell(H`
+      <h2>Live</h2>
+      <p class="sub">${cfg.name} is on Robinhood Chain.</p>
+      <div class="row"><span class="k">Items</span><b>${cfg.supply}</b></div>
+      ${raw(caRow("Contract", res.address))}
+      <label>Mint page</label>
+      <input readonly value="${res.mintUrl}" onclick="this.select()">
+      <p class="note"><a href="${res.explorer}" target="_blank" rel="noopener">View on the explorer ↗</a></p>
+      <div class="acts"><button id="lp-done2">Close</button>
+      <button class="go" id="lp-open2">Open mint page</button></div>
+    `);
+    bindCopy(box);
+    box.querySelector("#lp-done2").onclick = close;
+    box.querySelector("#lp-open2").onclick = function () { location.href = res.mintUrl; };
   }
 
   function recordCollection(cfg, res, tokenMint, up) {
