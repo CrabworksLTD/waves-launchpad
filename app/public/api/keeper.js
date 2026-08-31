@@ -43,6 +43,38 @@ const GAS_FLOOR = 20000000n;        // 0.02 SOL — the keeper pays gas from its
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const PLAN_TTL = 60 * 60 * 24 * 7;  // an unfinished plan is still worth resuming a week later
 
+/* ── The reward-asset swap leg, when it gets built ───────────────────────────
+ *
+ * Creators can pick a tokenised stock or commodity for holders to be paid in.
+ * That is a novelty and everyone knows it — holders sell them — but it costs
+ * little and it is the thing that makes a WAVES launch look different.
+ *
+ * Two rules it has to respect, both learned before writing a line of it:
+ *
+ * 1. LIQUIDITY FLOOR. 354 of the 448 verified RWA assets have zero liquidity
+ *    while still quoting a price, so a payout in one shows a holder a dollar
+ *    figure they can never realise. The picker already refuses anything under
+ *    $1,000 (launchpanel.js), and the keeper must re-check at payout time —
+ *    a list generated weeks ago is not evidence about today.
+ *
+ * 2. HEADROOM. The keeper's buy is the largest single trade in the whole
+ *    cycle: it buys the entire pot at once, where each holder later sells only
+ *    their slice. Buying and selling back is cheap when the pool can absorb it
+ *    — about 0.6%, being the two swap fees, because the impact reverses — but
+ *    that stops holding once the pot is a meaningful fraction of the pool.
+ *
+ *    So: if pot > REWARD_HEADROOM of the asset's liquidity, pay that round in
+ *    the quote currency instead and log why. A successful token should not be
+ *    punished for outgrowing the asset its creator picked in week one.
+ *
+ * Also worth remembering: a holder receiving an asset they do not already own
+ * pays ~0.002 SOL of rent to open the account. On a $2 payout that is 10% —
+ * far more than any slippage — which is its own argument for paying the quote
+ * currency on small pots regardless of headroom.
+ */
+const REWARD_HEADROOM = 0.02;      // 2% of the reward asset's liquidity
+const REWARD_MIN_LIQUIDITY = 1000; // matches the picker in launchpanel.js
+
 function kv() {
   /* No credentials means no store, not a broken one. The Upstash client
    * constructs happily without a url and then fails every command with
