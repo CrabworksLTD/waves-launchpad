@@ -164,6 +164,7 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
       <button class="btn" id="go" disabled>Loading…</button>
       <div class="msg" id="msg"></div>
       <a class="pairlink" id="pairlink" hidden></a>
+      <a class="pairlink" id="stakelink" hidden></a>
       <p class="foot">Runs on Metaplex Core. Nothing custom in the middle.</p>
     </div>
   </div>
@@ -547,6 +548,15 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
           "<span>" + esc(tok.name || "trades on a bonding curve") + "</span></span>" +
           '<span class="go">→</span>';
         el.hidden = false;
+
+        // and where holders of this collection stake to earn from those fees
+        var st = $("stakelink");
+        st.href = "/stake";
+        st.innerHTML =
+          '<span class="c">◈</span>' +
+          "<span><b>Staking</b><span>burn to stake, earn from trading fees</span></span>" +
+          '<span class="go">→</span>';
+        st.hidden = false;
       })
       .catch(function () {});
   }
