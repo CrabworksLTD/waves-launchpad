@@ -244,6 +244,9 @@
     var imageSet = files.images.slice();
     if (opts.avatar) imageSet.push({ id: "_avatar", name: "_avatar.png", bytes: opts.avatar });
     if (opts.banner) imageSet.push({ id: "_banner", name: "_banner.png", bytes: opts.banner });
+    // the share card, composed in the browser at launch — one more file in an
+    // upload already happening, and the only card that survives us
+    if (opts.card) imageSet.push({ id: "_card", name: "_card.png", bytes: opts.card });
 
     // Called twice: once with a placeholder to size the upload before paying,
     // then with the real id after the images land. Both produce identical byte
@@ -262,6 +265,7 @@
 
       if (opts.avatar) meta.push({ id: "_avatar", name: "_avatar.png", bytes: opts.avatar });
       if (opts.banner) meta.push({ id: "_banner", name: "_banner.png", bytes: opts.banner });
+      if (opts.card) meta.push({ id: "_card", name: "_card.png", bytes: opts.card });
 
       if (opts.links && Object.keys(opts.links).length) {
         meta.push({ id: "_links", name: "_links.json", text: JSON.stringify(opts.links, null, 2) });
@@ -339,7 +343,8 @@
       index: "https://arweave.net/" + metaCid + "/_index.json",
       avatarUri: opts.avatar
         ? "https://arweave.net/" + metaCid + "/_avatar.png"
-        : "https://arweave.net/" + imageCid + "/1.png"
+        : "https://arweave.net/" + imageCid + "/1.png",
+      cardUri: opts.card ? "https://arweave.net/" + metaCid + "/_card.png" : null
     };
   }
 

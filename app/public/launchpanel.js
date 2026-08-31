@@ -585,6 +585,11 @@
     var mark = stepList(box);
 
     try {
+      var card = await makeCard(cfg, "collection", [
+        ["items", String(cfg.supply)],
+        ["price", Number(cfg.priceSol) ? cfg.priceSol + " SOL" : "Free"],
+        ["chain", "Solana"]
+      ]);
       var up = await window.Storage.uploadCollection({
         files: run.files,
         name: cfg.name,
@@ -592,6 +597,7 @@
         description: cfg.description,
         avatar: cfg.avatar,
         banner: cfg.banner,
+        card: card,
         links: cfg.links,
         allowlist: cfg.waves
           ? { waveMinutes: cfg.waves.minutes, phases: cfg.waves.phases }
@@ -665,6 +671,33 @@
     return !!(window.Shell && window.Shell.chain && window.Shell.chain() === "robinhood");
   }
 
+  /* The share card for a launch, composed here and pinned with the art. Never
+   * fatal: a launch that succeeded must not be reported as failed because a
+   * picture did not draw — a missing card simply falls back to the brand one. */
+  async function makeCard(cfg, kind, stats) {
+    try {
+      if (!window.CardMaker) {
+        await new Promise(function (res, rej) {
+          var el = document.createElement("script");
+          el.src = "/cardmaker.js"; el.onload = res; el.onerror = rej;
+          document.head.appendChild(el);
+        });
+      }
+      var blobUrl = function (b) {
+        return b ? URL.createObjectURL(new Blob([b], { type: "image/png" })) : null;
+      };
+      return await window.CardMaker.make({
+        kind: kind,
+        chain: isEvm() ? "robinhood" : "solana",
+        name: cfg.name,
+        sym: cfg.symbol,
+        avatar: blobUrl(cfg.avatar),
+        banner: blobUrl(cfg.banner),
+        stats: stats
+      });
+    } catch (e) { return null; }
+  }
+
   async function doEvmNftLaunch(cfg, flow) {
     busy = true;
     var stages = [
@@ -688,6 +721,11 @@
       await window.Shell.ensureEvmLaunch();
       if (cfg.waves) throw new Error("Allowlist waves are not available on Robinhood Chain yet.");
 
+      var card = await makeCard(cfg, "collection", [
+        ["items", String(cfg.supply)],
+        ["price", Number(cfg.priceSol) ? cfg.priceSol + " ETH" : "Free"],
+        ["chain", "Robinhood"]
+      ]);
       var up = await window.Storage.uploadCollection({
         files: run.files,
         name: cfg.name,
@@ -695,6 +733,7 @@
         description: cfg.description,
         avatar: cfg.avatar,
         banner: cfg.banner,
+        card: card,
         links: cfg.links,
         allowlist: null,
         onProgress: function (p) {
@@ -784,6 +823,7 @@
         address: res.address,
         name: cfg.name,
         avatar: (up && up.avatarUri) || null,
+        card: (up && up.cardUri) || null,
         creator: (window.MoonpadWallet || {}).account || null
       })
     }).catch(function () {});
@@ -816,6 +856,7 @@
         candyMachine: res.candyMachine, collection: res.collection,
         name: cfg.name, cluster: res.cluster, tokenMint: tokenMint || null,
         avatar: (up && up.avatarUri) || null,
+        card: (up && up.cardUri) || null,
         creator: (window.Wallet.current() || {}).publicKey || null
       })
     }).catch(function () {});

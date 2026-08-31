@@ -64,6 +64,7 @@ export default async function handler(req, res) {
         // is paired with — consumed by the staking keeper later, displayed now
         rewardMint: rewardMint || null,
         // only arweave art, never an arbitrary URL someone POSTs at us
+        card: (typeof body.card === "string" && /^https:\/\/arweave\.net\/[\w\-\/\.]+$/.test(body.card)) ? body.card : null,
         icon: okArt(icon), banner: okArt(banner),
         pool: (pool && B58.test(pool)) ? pool : null,
         feeShare: feeShare === "holders" ? "holders" : "keep",

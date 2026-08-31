@@ -63,9 +63,9 @@ h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:te
 .panel::before,.panel::after{content:"";position:absolute;pointer-events:none;
   width:520px;height:420px;opacity:.5}
 .panel::before{top:-190px;left:-160px;
-  background:radial-gradient(closest-side,rgba(var(--accent-2-rgb),.75),transparent)}
+  background:radial-gradient(closest-side,rgba(var(--grad-a-rgb),.7),transparent)}
 .panel::after{bottom:-190px;right:-160px;
-  background:radial-gradient(closest-side,rgba(var(--accent-rgb),.6),transparent)}
+  background:radial-gradient(closest-side,rgba(var(--grad-b-rgb),.6),transparent)}
 .panel>*{position:relative;z-index:1}
 .panel .sechead{margin-top:0}
 /* spotlight cards: square art, a status badge on it, then name, ticker,
@@ -514,13 +514,18 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
     var live = collections && collections.length;
     var box = document.getElementById("spot");
 
-    // tokens lead the row — most people are here for those — then collections,
-    // then templates while nothing has launched yet
+    /* Spotlight is the biggest thing on the pad, whatever it is: tokens and
+     * collections compete in one list, ordered by size. Tokens are sized by
+     * what the curve has raised, collections by mint revenue (price x minted),
+     * both converted to nothing — they are compared in their own chain's
+     * currency, which is the honest comparison when both launched here.
+     * Numbers arrive after the first paint, so the grid re-orders once. */
     var items = [];
-    tokens.slice(0, 5).forEach(function (t) { items.push({ kind: "token", rec: t }); });
-    (live ? collections : []).slice(0, 10 - items.length).forEach(function (c) {
-      items.push({ kind: "col", rec: c });
+    tokens.forEach(function (t) { items.push({ kind: "token", rec: t, size: -1 }); });
+    (live ? collections : []).forEach(function (c) {
+      items.push({ kind: "col", rec: c, size: -1 });
     });
+    items = items.slice(0, 10);
     if (items.length < 10) {
       templates.slice(0, 10 - items.length).forEach(function (t) {
         items.push({ kind: "tpl", rec: t });
@@ -544,7 +549,7 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
         });
       }
       return spotCard({
-        name: r.name, sym: "Ready to launch",
+        name: r.name, sym: "Not launched yet",
         href: "/app", canvas: true, badge: "TEMPLATE"
       });
     }).join("");
@@ -560,11 +565,14 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
           paint(cv, tp);
           rerolls.push({ cv: cv, tp: tp });
         }).catch(function () {});
-        setStat(statEl, String(it.rec.traits || ""), "traits");
+        // a template has no supply yet — what it has is how many pieces it
+        // could make, which is the honest number to show before a launch
+        setStat(statEl, (it.rec.combinations || 0).toLocaleString(), "possible");
         return;
       }
       if (it.kind === "token") {
         window.Token.readMarket(it.rec.mint).then(function (m) {
+          it.size = m.raised || 0;
           if (m.migrated) {
             card.querySelector(".badge").textContent = "GRADUATED";
             card.querySelector(".badge").className = "badge done";
@@ -583,6 +591,9 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
           })
         : window.Launch.readMachine(it.rec.candyMachine);
       read.then(function (m) {
+        it.size = (m.redeemed || 0) * (m.priceSol || m.price || 0);
+        var symEl = card.querySelector(".sym");
+        if (symEl) symEl.textContent = m.available.toLocaleString() + " supply";
         var out = m.redeemed >= m.available;
         var b = card.querySelector(".badge");
         b.textContent = out ? "SOLD OUT" : "MINTING";
