@@ -11,7 +11,7 @@ and a sun that sets in the chain's own gradient.
 
 Writes <outdir>/<chain>/{1..N}.png, pfp.png, banner.png.
 """
-import os, sys, random
+import os, sys, json, random
 from PIL import Image, ImageDraw
 
 G = 24                      # pixel grid
@@ -21,6 +21,8 @@ N = 10                      # pieces per collection
 CHAINS = {
     "solana": {
         "name": "Solana Waves",
+        "symbol": "SWAVE",
+        "desc": "A test collection for WAVES on Solana. Pixel seascapes with the staircase climbing out of the water.",
         "bg":   ["#0a0a12", "#12081f", "#0d0a18", "#160a24"],
         "sky":  ["#2b1a4d", "#3a1f63", "#241546"],
         "a":    "#9945FF",   # gradient start
@@ -29,6 +31,8 @@ CHAINS = {
     },
     "robinhood": {
         "name": "Robinhood Waves",
+        "symbol": "RWAVE",
+        "desc": "A test collection for WAVES on Robinhood Chain. Pixel seascapes with the staircase climbing out of the water.",
         "bg":   ["#0a0a0a", "#0d0f08", "#0b0d06", "#101208"],
         "sky":  ["#2f3a12", "#3d4a18", "#25300e"],
         "a":    "#CCFF00",
@@ -52,13 +56,24 @@ def mix(c1, c2, t):
     return tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
 
+# names for the choices, so the metadata reads like a real collection
+SKY_N = ["Deep Night", "Twilight", "Dusk", "Midnight"]
+TIDE_N = {3: "Calm", 4: "Rolling", 5: "Heavy Swell"}
+SUN_N = ["High Sun", "Setting", "Half Sunk", "None"]
+STAIR_N = {2: "Small Steps", 3: "Tall Steps", 0: "None"}
+
+
 def draw_piece(pal, rnd):
-    """One 24x24 piece. Every choice is a 'trait' — recorded in the name so a
-    launch has something to show in its attributes if we ever wire them."""
-    im = Image.new("RGB", (G, G), hx(rnd.choice(pal["bg"])))
+    """One 24x24 piece, and the traits that made it. Returns (image, attrs) so
+    the metadata describes what was actually drawn rather than a guess."""
+    attrs = []
+    bgi = rnd.randrange(len(pal["bg"]))
+    im = Image.new("RGB", (G, G), hx(pal["bg"][bgi]))
     d = ImageDraw.Draw(im)
+    attrs.append(("Sky", SKY_N[bgi % len(SKY_N)]))
 
     horizon = rnd.choice([13, 14, 15])
+    attrs.append(("Horizon", {13: "High", 14: "Even", 15: "Low"}[horizon]))
 
     # sky band, darker at the top
     sky = rnd.choice(pal["sky"])
@@ -70,15 +85,21 @@ def draw_piece(pal, rnd):
     if rnd.random() < 0.85:
         sr = rnd.choice([2, 3, 3, 4])
         sx = rnd.randint(sr + 1, G - sr - 2)
-        sy = horizon - rnd.choice([0, 1, 2])
+        sunk = rnd.choice([0, 1, 2])
+        sy = horizon - sunk
+        attrs.append(("Sun", SUN_N[2 - sunk]))
         col = hx(rnd.choice(pal["sun"]))
         d.ellipse([sx - sr, sy - sr, sx + sr, sy + sr], fill=col)
         # a couple of scan lines through it, like a sunset stripe
         for yy in range(sy - sr, sy + sr + 1, 2):
             d.line([(sx - sr, yy), (sx + sr, yy)], fill=mix("#000000", "#ffffff", .05))
 
+    else:
+        attrs.append(("Sun", "None"))
+
     # waves: stacked bands running the chain's gradient as they recede
     bands = rnd.choice([3, 4, 4, 5])
+    attrs.append(("Tide", TIDE_N[bands]))
     for i in range(bands):
         t = i / max(1, bands - 1)
         col = mix(pal["a"], pal["b"], t)
@@ -96,6 +117,7 @@ def draw_piece(pal, rnd):
     # the staircase, climbing out of the water
     if rnd.random() < 0.9:
         s = rnd.choice([2, 3])
+        attrs.append(("Staircase", STAIR_N[s]))
         bx = rnd.randint(1, G - 3 * s - 1)
         by = horizon - rnd.choice([2, 3, 4])
         for k in range(3):
@@ -103,12 +125,17 @@ def draw_piece(pal, rnd):
             x0, y0 = bx + k * s, by - k * s
             d.rectangle([x0, y0, x0 + s - 1, y0 + s - 1], fill=col)
 
+    else:
+        attrs.append(("Staircase", "None"))
+
     # sparkles
-    for _ in range(rnd.choice([0, 2, 3, 5])):
+    stars = rnd.choice([0, 2, 3, 5])
+    attrs.append(("Stars", {0: "Clear", 2: "Few", 3: "Scattered", 5: "Many"}[stars]))
+    for _ in range(stars):
         x, y = rnd.randint(0, G - 1), rnd.randint(0, horizon - 1)
         d.point((x, y), fill=mix("#ffffff", pal["b"], rnd.random()))
 
-    return im
+    return im, attrs
 
 
 def banner(pal, rnd):
@@ -169,8 +196,18 @@ def main():
         os.makedirs(d, exist_ok=True)
         rnd = random.Random(sum(ord(ch) * (i + 7) for i, ch in enumerate(key)))
         for i in range(1, N + 1):
-            draw_piece(pal, rnd).resize((PIECE, PIECE), Image.NEAREST) \
-                .save(os.path.join(d, "%d.png" % i))
+            im, attrs = draw_piece(pal, rnd)
+            im.resize((PIECE, PIECE), Image.NEAREST).save(os.path.join(d, "%d.png" % i))
+            # the launch page pairs <n>.json with <n>.png and keeps our name and
+            # attributes; without it every piece would just be "#n" with no traits
+            meta = {
+                "name": "%s #%d" % (pal["name"], i),
+                "symbol": pal["symbol"],
+                "description": pal["desc"],
+                "attributes": [{"trait_type": k, "value": v} for k, v in attrs],
+            }
+            with open(os.path.join(d, "%d.json" % i), "w") as f:
+                json.dump(meta, f, indent=2)
         pfp(pal).save(os.path.join(d, "pfp.png"))
         banner(pal, rnd).save(os.path.join(d, "banner.png"))
         print("%-10s %s  (%d pieces + pfp + banner)" % (pal["name"], d, N))
