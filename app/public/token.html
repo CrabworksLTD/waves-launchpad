@@ -92,6 +92,10 @@ main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
 .stat:last-child{border-right:0}
 .stat .k{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
 .stat b{display:block;font:600 15px "IBM Plex Mono",monospace;margin-top:2px}
+.stat em{display:block;font:600 11px "IBM Plex Mono",monospace;font-style:normal;
+  margin-top:2px;color:var(--faint)}
+.stat em.up{color:var(--accent)}
+.stat em.down{color:#ff8f8f}
 #curve{width:100%;height:400px;display:block}
 .bar{height:7px;border-radius:99px;background:var(--raise);overflow:hidden;margin-top:12px}
 .bar i{display:block;height:100%;width:0;transition:width .5s;
@@ -173,7 +177,8 @@ input:focus{outline:none;border-color:var(--accent)}
 
     <div class="panel chartp">
       <div class="stats">
-        <div class="stat"><span class="k">Price</span><b id="s-price">—</b></div>
+        <div class="stat"><span class="k">Price</span><b id="s-price">—</b>
+          <em id="s-chg"></em></div>
         <div class="stat"><span class="k">Raised</span><b id="s-raised">—</b></div>
         <div class="stat"><span class="k">Graduates at</span><b id="s-grad">—</b></div>
         <div class="stat"><span class="k">Status</span><b id="s-status">—</b></div>
@@ -286,6 +291,22 @@ input:focus{outline:none;border-color:var(--accent)}
         return;
       }
       $("hist-note").textContent = list.length + " shown";
+      /* Same reads, two uses: oldest first, price = SOL per token. Trades with
+       * no token or no SOL side (a pool creation, say) carry no price. */
+      var series = list.filter(function (t) { return t.tokens > 0 && t.sol > 0; })
+        .map(function (t) { return { at: t.at, price: t.sol / t.tokens }; })
+        .sort(function (a, b) { return a.at - b.at; });
+      if (series.length >= 2) {
+        drawPrice(series);
+        var first = series[0].price, now = series[series.length - 1].price;
+        var chg = first > 0 ? ((now - first) / first) * 100 : 0;
+        $("s-price").textContent = now.toPrecision(3);
+        var cel = $("s-chg");
+        if (cel) {
+          cel.textContent = (chg >= 0 ? "+" : "") + chg.toFixed(1) + "%";
+          cel.className = chg >= 0 ? "up" : "down";
+        }
+      }
       $("hist").innerHTML = list.map(function (t) {
         return '<a class="trow" href="https://explorer.solana.com/tx/' + esc(t.sig) +
           '" target="_blank" rel="noopener">' +
@@ -365,6 +386,92 @@ input:focus{outline:none;border-color:var(--accent)}
    * behaves: price rises smoothly to the graduation point. X is progress
    * toward the raise target, Y is relative price; the dot is where the pool
    * is NOW. Deterministic from state — no indexer, no candles, no pretending. */
+  /* The price chart, built from the trades themselves.
+   *
+   * Every trade carries both sides — SOL in or out and tokens out or in — so
+   * its price is simply one divided by the other. Plotting those in order is
+   * a real price history, from the same reads that fill the trades panel. No
+   * indexer, no third party, and it is honest: if a token has two trades, it
+   * draws two points and says so rather than inventing a line.
+   *
+   * The theoretical curve stays as the fallback for a token that has not
+   * traded yet — a brand new launch should still show its shape. */
+  function drawPrice(points) {
+    var cv = $("curve"), dpr = window.devicePixelRatio || 1;
+    var W = cv.clientWidth, H = cv.clientHeight || 400;
+    cv.width = W * dpr; cv.height = H * dpr;
+    var g = cv.getContext("2d");
+    g.scale(dpr, dpr);
+    var padL = 8, padR = 62, padT = 14, padB = 22;
+    var w = W - padL - padR, h = H - padT - padB;
+
+    var lo = Math.min.apply(null, points.map(function (p) { return p.price; }));
+    var hi = Math.max.apply(null, points.map(function (p) { return p.price; }));
+    if (!(hi > lo)) { hi = lo * 1.08 || 1; lo = lo * 0.92 || 0; }
+    var t0 = points[0].at, t1 = points[points.length - 1].at;
+    var span = Math.max(1, t1 - t0);
+    function xy(p) {
+      return [padL + ((p.at - t0) / span) * w,
+              padT + h - ((p.price - lo) / (hi - lo)) * h];
+    }
+
+    var cs = getComputedStyle(document.documentElement);
+    var GA = cs.getPropertyValue("--grad-a").trim() || "#9945FF";
+    var GB = cs.getPropertyValue("--grad-b").trim() || "#14F195";
+    var ARGB = cs.getPropertyValue("--accent-rgb").trim() || "20,241,149";
+
+    // horizontal guides, labelled at the right like the reference
+    g.font = '10px "IBM Plex Mono", monospace';
+    g.textAlign = "left";
+    g.textBaseline = "middle";
+    [0, .5, 1].forEach(function (f) {
+      var y = padT + h - f * h;
+      g.beginPath(); g.setLineDash([3, 4]);
+      g.moveTo(padL, y); g.lineTo(padL + w, y);
+      g.strokeStyle = "rgba(255,255,255,.07)"; g.lineWidth = 1; g.stroke();
+      g.setLineDash([]);
+      g.fillStyle = "rgba(255,255,255,.34)";
+      g.fillText((lo + (hi - lo) * f).toPrecision(3), padL + w + 8, y);
+    });
+
+    // filled area under the line
+    var pts = points.map(xy);
+    var fill = g.createLinearGradient(0, padT, 0, padT + h);
+    fill.addColorStop(0, "rgba(" + ARGB + ",.30)");
+    fill.addColorStop(1, "rgba(" + ARGB + ",0)");
+    g.beginPath();
+    g.moveTo(pts[0][0], padT + h);
+    pts.forEach(function (p) { g.lineTo(p[0], p[1]); });
+    g.lineTo(pts[pts.length - 1][0], padT + h);
+    g.closePath();
+    g.fillStyle = fill; g.fill();
+
+    // the line
+    var line = g.createLinearGradient(padL, 0, padL + w, 0);
+    line.addColorStop(0, GA); line.addColorStop(1, GB);
+    g.beginPath();
+    pts.forEach(function (p, i) { i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); });
+    g.strokeStyle = line; g.lineWidth = 2.5;
+    g.lineJoin = "round"; g.lineCap = "round";
+    g.stroke();
+
+    // where it is now
+    var last = pts[pts.length - 1];
+    g.beginPath(); g.arc(last[0], last[1], 4.5, 0, 7);
+    g.fillStyle = GB; g.fill();
+
+    // time range along the bottom
+    g.fillStyle = "rgba(255,255,255,.34)";
+    g.textBaseline = "alphabetic";
+    var fmtT = function (ms) {
+      var d = new Date(ms);
+      return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    };
+    g.fillText(fmtT(t0), padL, H - 6);
+    g.textAlign = "right";
+    g.fillText(fmtT(t1), padL + w, H - 6);
+  }
+
   function drawCurve(progress) {
     var cv = $("curve"), dpr = window.devicePixelRatio || 1;
     var W = cv.clientWidth, H = 400;
