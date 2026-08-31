@@ -336,11 +336,11 @@
           <div><label>Ticker</label>
           <input id="f-tsym" placeholder="WAVE" maxlength="10" value="${d.tsym}"></div>
         </div>
-        <p class="note">Start it here if you like — the token step opens once the
-        collection is on chain, carrying whatever you put above. There you set
-        what it is priced in (SOL, USDC or a tokenised stock), your first buy,
-        how much of the trading fee goes to holders, and the reward asset.
-        <b>Nothing about the token is signed until you confirm that step.</b></p>
+        <p class="note">Start it here if you like. <b>Continue opens the full
+        token setup</b> — what it is priced in (SOL, USDC or a tokenised stock),
+        your first buy, the swap fee and how much of it goes to holders, the
+        reward asset, your fee wallet and links — and you confirm the whole
+        launch, both halves, before anything is signed.</p>
       </div>
 
       <label class="tick"><input type="checkbox" disabled>
@@ -484,7 +484,7 @@
       flow.pair = d.pairOn;
       flow.preTname = d.tname;
       flow.preTsym = d.tsym;
-      nftConfirm({
+      var cfg = {
         name: d.name, symbol: d.symbol, description: d.desc,
         priceSol: d.price, maxPerWallet: d.maxPer, royaltyPercent: d.roy,
         royaltyTo: d.royTo || null,
@@ -496,7 +496,18 @@
         avatar: d.avatar, banner: d.banner,
         openAt: d.openAt ? new Date(d.openAt).toISOString() : null,
         waves: phases.length ? { minutes: d.wave, phases: phases } : null
-      }, flow);
+      };
+      /* Pairing sets the token up BEFORE anything is signed. The token still
+       * deploys after the collection — it pairs to a collection that has to
+       * exist — but a creator should see and decide every part of what they
+       * are launching first, not meet the second half after paying for the
+       * first. tokenDetails returns here when it is done. */
+      if (d.pairOn) {
+        flow.cfg = cfg;
+        flow.preconfig = true;
+        return tokenDetails(flow);
+      }
+      nftConfirm(cfg, flow);
     };
   }
 
@@ -520,11 +531,14 @@
       <div class="row"><span class="k">Royalty</span><b>${cfg.royaltyPercent}%${cfg.royaltyTo ? " → " + shortAddr(cfg.royaltyTo) : ""}</b></div>
       <div class="row"><span class="k">Allowlist</span><b>${waveTxt}</b></div>
       <div class="row"><span class="k">Opens</span><b>${cfg.openAt ? new Date(cfg.openAt).toLocaleString() : "immediately"}</b></div>
-      ${flow && flow.pair ? H`<div class="row"><span class="k">Then</span><b>a paired token</b></div>
-      <p class="note">After the collection is on chain you set the token up —
-      name, ticker, what it is priced in, your first buy, and how much of the
-      trading fee goes to holders. Nothing about the token is signed until you
-      confirm that step.</p>` : ""}
+      ${flow && flow.pair && flow.tname ? H`
+      <div class="row"><span class="k">Then — token</span><b>${flow.tname} · $${flow.tsym}</b></div>
+      <div class="row"><span class="k">Priced in</span><b>${String(flow.quote || "sol").toUpperCase()}${
+        flow.tbuy ? " · first buy " + flow.tbuy : ""}</b></div>
+      <div class="row"><span class="k">Fee sharing</span><b>${
+        (flow.feeSharePct || 0) > 0 ? flow.feeSharePct + "% to holders" : "you keep it all"}</b></div>
+      <p class="note">The collection deploys first, then the token pairs to it.
+      Both are signed from here.</p>` : ""}
       <div class="row"><span class="k">Storage fee</span><b id="lp-fee">quoting…</b></div>
       <div class="row"><span class="k">Wallet</span><b>${w ? w.name + " · " + shortAddr(w.publicKey) : "not connected"}</b></div>
       <p class="note">Storage is a one-off payment to Arweave for permanent hosting,
@@ -671,6 +685,8 @@
 
       if (flow && flow.pair) {
         flow.nft = { cfg: cfg, res: res, up: up };
+        // configured and confirmed before any of this was signed
+        if (flow.preconfig) { doTokenLaunch(flow); return; }
         tokenDetails(flow);
         return;
       }
@@ -1241,6 +1257,7 @@
       }
       flow.tname = name; flow.tsym = sym;
       flow.tbuy = parseFloat(flow.tbuy) || 0;
+      if (flow.preconfig) return nftConfirm(flow.cfg, flow);
       tokenConfirm(flow);
     };
   }
