@@ -106,7 +106,12 @@
       ".lp .pick:hover{border-color:var(--accent)}",
       ".lp .sharebox{padding:6px 2px 2px}",
       ".lp .sharebox input[type=range]{width:100%;accent-color:var(--accent)}",
-      ".lp .sharelbl{font-size:12px;color:var(--dim);margin-top:6px}",
+      ".lp .shareticks{display:flex;justify-content:space-between;margin-top:2px;",
+      "  font:500 10.5px 'IBM Plex Mono',monospace;color:var(--faint)}",
+      ".lp .shareticks span{width:28px;text-align:center}",
+      ".lp .shareticks span:first-child{text-align:left}",
+      ".lp .shareticks span:last-child{text-align:right}",
+      ".lp .sharelbl{font-size:12px;color:var(--dim);margin-top:8px}",
       ".lp .artbtn{width:100%;padding:12px;border:1px dashed var(--line2);",
       "  border-radius:8px;background:var(--void);color:var(--dim);cursor:pointer;",
       "  font:600 12.5px Inter,sans-serif;overflow:hidden;text-overflow:ellipsis;",
@@ -772,8 +777,13 @@
 
       <label>Fee sharing — how much of your share goes to holders</label>
       <div class="sharebox">
-        <input id="tk-sharepct" type="range" min="0" max="100" step="5"
-          value="${flow.feeSharePct || 0}">
+        <input id="tk-sharepct" type="range" min="0" max="6" step="1"
+          value="${[0,10,25,50,75,90,100].indexOf(flow.feeSharePct || 0) >= 0
+            ? [0,10,25,50,75,90,100].indexOf(flow.feeSharePct || 0) : 0}">
+        <div class="shareticks">
+          <span>0</span><span>10</span><span>25</span><span>50</span>
+          <span>75</span><span>90</span><span>100</span>
+        </div>
         <div class="sharelbl"><span id="tk-sharetxt"></span></div>
       </div>
 
@@ -889,8 +899,9 @@
         bb.textContent = "✓ " + f.name; bb.classList.add("has");
       });
     });
+    var SHARE_STOPS = [0, 10, 25, 50, 75, 90, 100];
     function paintShare() {
-      var pct = +box.querySelector("#tk-sharepct").value;
+      var pct = SHARE_STOPS[+box.querySelector("#tk-sharepct").value] || 0;
       flow.feeSharePct = pct;
       flow.feeShare = pct > 0 ? "holders" : "keep";
       box.querySelector("#tk-sharetxt").textContent = pct === 0
