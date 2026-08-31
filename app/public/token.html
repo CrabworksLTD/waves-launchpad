@@ -48,6 +48,9 @@ main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
 /* socials are marks, not words — a round button per platform */
 .socials a.ic{width:34px;height:34px;padding:0;justify-content:center;border-radius:99px}
 .socials a.ic svg{width:15px;height:15px;display:block;fill:currentColor}
+/* the share mark is drawn with strokes, not fills — the rule above would
+   flood its open paths */
+.socials a#share svg{fill:none;stroke:currentColor;stroke-width:2}
 /* the contract address: a line of text you can click, not a form field */
 .ca{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
   font:400 12.5px "IBM Plex Mono",monospace;color:var(--faint);
@@ -301,12 +304,10 @@ input:focus{outline:none;border-color:var(--accent)}
   }
   function renderLinks(meta) {
     var out = ['<a href="' + explorer(MINT) + '" target="_blank" rel="noopener">Contract <i>↗</i></a>'];
-    if (poolHint) {
-      out.push('<a href="' + explorer(poolHint) + '" target="_blank" rel="noopener">Pool <i>↗</i></a>');
-    }
-    // sits with the explorer links because it is the same kind of thing: a way
-    // out of the page. Every launch has a share card waiting on the other end.
-    out.push('<a href="#" id="share">Share <i>↗</i></a>');
+    // Share is a mark, like the socials — the row reads as icons, not a
+    // sentence, and the glyph is understood everywhere.
+    out.push('<a class="ic" id="share" href="#" title="Share" aria-label="Share">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 13.4l7.4 4.3M15.7 6.3l-7.4 4.3"/></svg>' + "</a>");
     // brand marks, so the row stays short whatever a creator fills in
     var MARK = {
       website: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 9h-3a15.6 15.6 0 0 0-1.1-5.2A8 8 0 0 1 18.9 11ZM12 4.1c.7 1 1.6 3 1.8 6.9h-3.6c.2-3.9 1.1-5.9 1.8-6.9ZM5.1 11a8 8 0 0 1 4.1-5.2A15.6 15.6 0 0 0 8.1 11Zm0 2h3a15.6 15.6 0 0 0 1.1 5.2A8 8 0 0 1 5.1 13Zm6.9 6.9c-.7-1-1.6-3-1.8-6.9h3.6c-.2 3.9-1.1 5.9-1.8 6.9Zm2.8-1.7a15.6 15.6 0 0 0 1.1-5.2h3a8 8 0 0 1-4.1 5.2Z"/></svg>',
