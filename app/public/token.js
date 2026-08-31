@@ -57,10 +57,16 @@
     return rwaCache;
   }
 
-  // Commodities only, for a "pay my holders in gold" style choice.
+  /* Commodities only, for a "pay my holders in gold" style choice — and only
+   * ones something actually trades. 354 of the 448 verified assets have zero
+   * liquidity while still carrying a price, so an unfiltered list offers
+   * payouts that show a dollar figure and cannot be sold. */
+  var MIN_REWARD_LIQUIDITY = 1000;
   function loadCommodities() {
     return loadRwa().then(function (list) {
-      return list.filter(function (t) { return t.kind === "commodity"; });
+      return list.filter(function (t) {
+        return t.kind === "commodity" && (t.liquidity || 0) >= MIN_REWARD_LIQUIDITY;
+      });
     });
   }
 

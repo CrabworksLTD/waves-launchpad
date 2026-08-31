@@ -1372,7 +1372,7 @@
     var box = shell(H`
       <h2>Reward asset</h2>
       <p class="sub">Trading fees are converted into this before distribution.</p>
-      <input id="lp-q" type="search" placeholder="Search 400+ verified assets" autocomplete="off">
+      <input id="lp-q" type="search" placeholder="Search tradeable assets" autocomplete="off">
       <div class="ptabs" id="lp-tabs">
         <button data-t="all" class="on">All</button>
         <button data-t="native">SOL &amp; USDC</button>
@@ -1380,11 +1380,21 @@
         <button data-t="commodity">Commodities</button>
       </div>
       <div class="plist" id="lp-list"><p class="note" style="padding:12px">Loading…</p></div>
+      <p class="note" id="lp-hidden"></p>
       <div class="acts"><button id="lp-x">Back</button></div>
     `);
     box.querySelector("#lp-x").onclick = function () { tokenDetails(flow); };
 
-    var all = null, tab = "all", q = "";
+    var all = null, tab = "all", q = "", hidden = 0;
+
+    // "$1.9M deep" reads better than a raw number to someone choosing what
+    // their holders will be paid in
+    function depth(n) {
+      if (!n) return "";
+      if (n >= 1e6) return "$" + (n / 1e6).toFixed(1) + "M deep";
+      if (n >= 1e3) return "$" + Math.round(n / 1e3) + "k deep";
+      return "$" + Math.round(n) + " deep";
+    }
 
     function draw() {
       if (!all) return;
@@ -1397,8 +1407,15 @@
       list.innerHTML = rows.map(function (t) {
         return '<button class="prow" data-mint="' + esc(t.mint) + '">' +
           "<b>" + esc(t.symbol) + "</b><span>" + esc(t.name) + "</span>" +
-          "<i>" + esc(shortAddr(t.mint)) + "</i></button>";
+          "<i>" + esc(depth(t.liquidity) || shortAddr(t.mint)) + "</i></button>";
       }).join("") || '<p class="note" style="padding:12px">Nothing matches.</p>';
+      var note = box.querySelector("#lp-hidden");
+      if (note) {
+        note.textContent = hidden
+          ? hidden + " assets are hidden because nothing trades them — a payout " +
+            "in one could not be sold."
+          : "";
+      }
       list.querySelectorAll(".prow").forEach(function (b) {
         b.onclick = function () {
           flow.reward = all.find(function (t) { return t.mint === b.dataset.mint; });
@@ -1407,8 +1424,22 @@
       });
     }
 
+    /* Only assets a holder could actually sell.
+     *
+     * 354 of the 448 verified assets have ZERO liquidity — no route at any
+     * size — and they still carry a price, so a payout in one would show a
+     * dollar figure the holder can never realise. Ondo alone contributes 217
+     * mints sharing $48k between them. A $1k floor cuts exactly the dead ones:
+     * at that depth a few dollars costs well under 1% to exit, and payouts are
+     * small by nature. */
+    var MIN_LIQUIDITY = 1000;
+
     window.Token.rwa().then(function (rwa) {
-      all = BUILTIN_REWARDS.concat(rwa);
+      var live = (rwa || []).filter(function (t) {
+        return (t.liquidity || 0) >= MIN_LIQUIDITY;
+      });
+      hidden = (rwa || []).length - live.length;
+      all = BUILTIN_REWARDS.concat(live);
       draw();
     });
     box.querySelector("#lp-q").addEventListener("input", function (e) {
