@@ -1084,6 +1084,41 @@
       return false;
     }
 
+    /* Prefer signAndSendTransaction: the wallet simulates and broadcasts it
+     * itself, rather than handing signed bytes back to this page to send
+     * wherever it likes. That second shape is what a drainer relies on and it
+     * is a signal wallet scanners weigh — and this transfer, a bare payment to
+     * an unfamiliar address moments after connecting, is already the most
+     * drainer-shaped thing WAVES asks anyone to do. Phantom blocks the domain
+     * outright today; this removes one reason to.
+     *
+     * Falls back to the umi path for wallets without the feature. */
+    var w2 = window.Wallet.current();
+    if (w2 && w2.canSignAndSend) {
+      var web3 = mx;
+      var conn2 = new web3.Connection(rpcUrl, "confirmed");
+      var tx2 = new web3.Transaction().add(web3.SystemProgram.transfer({
+        fromPubkey: new web3.PublicKey(w2.publicKey),
+        toPubkey: new web3.PublicKey(q.feeTo),
+        lamports: Number(q.feeLamports)
+      }));
+      tx2.feePayer = new web3.PublicKey(w2.publicKey);
+      tx2.recentBlockhash = (await conn2.getLatestBlockhash("confirmed")).blockhash;
+      var sig2 = await w2.signAndSendTransaction(tx2);
+      // the wallet has broadcast it; wait for the chain to agree
+      for (var t2 = 0; t2 < 90; t2++) {
+        var st2 = await conn2.getSignatureStatus(sig2, { searchTransactionHistory: true })
+          .catch(function () { return null; });
+        var v2 = st2 && st2.value;
+        if (v2 && v2.err) throw new Error("The storage payment failed on chain.");
+        if (v2 && (v2.confirmationStatus === "confirmed" ||
+                   v2.confirmationStatus === "finalized")) return rememberPaid(sig2, q);
+        await new Promise(function (r) { setTimeout(r, 1000); });
+      }
+      throw new Error("The storage payment did not confirm in 90s. Nothing further " +
+        "was charged — its signature was " + sig2);
+    }
+
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
         var res = await mx.transferSol(umi, {

@@ -109,6 +109,37 @@
         icon: w.icon || "",
         publicKey: acct.address,
         _account: acct,
+        /* Sign AND broadcast, letting the wallet do both.
+         *
+         * signTransaction hands the signed bytes back to the site, which then
+         * sends them wherever it likes — the shape a drainer relies on, and a
+         * signal wallet security scanners weigh. signAndSendTransaction lets
+         * Phantom simulate and submit it itself, so it sees the outcome and the
+         * site never holds a signed payload.
+         *
+         * Returns a base58 signature rather than bytes, so callers that need
+         * to poll for confirmation still can. Absent on some wallets, hence
+         * the capability check at the call site. */
+        canSignAndSend: !!feat["solana:signAndSendTransaction"],
+        signAndSendTransaction: function (tx, chain) {
+          var f = feat["solana:signAndSendTransaction"];
+          if (!f) return Promise.reject(new Error("wallet cannot sign and send"));
+          var bytes = tx instanceof Uint8Array ? tx
+            : tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+          return f.signAndSendTransaction({
+            account: acct, chain: chain || "solana:mainnet", transaction: bytes
+          }).then(function (r) {
+            var sigBytes = r[0].signature;
+            // base58, because that is what every explorer and RPC expects
+            var A = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+            var n = 0n;
+            for (var i = 0; i < sigBytes.length; i++) n = (n << 8n) | BigInt(sigBytes[i]);
+            var out = "";
+            while (n > 0n) { out = A[Number(n % 58n)] + out; n /= 58n; }
+            for (var j = 0; j < sigBytes.length && sigBytes[j] === 0; j++) out = "1" + out;
+            return out;
+          });
+        },
         /* Wallet Standard signs BYTES and returns bytes — handing it a
          * Transaction object makes the wallet try to iterate it ("e is not
          * iterable" from Phantom). Callers may pass either form; they get
