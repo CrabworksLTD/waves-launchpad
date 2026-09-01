@@ -75,7 +75,13 @@
       // /config-create?quote=rwa&mint=<address>
       // .tax holds the 5% "tax token" tier's configs — same shape, its own
       // immutable keys, signed at /config-create?fee=tax
-      "mainnet-beta": { sol: "DdHWKSqE7gvKrCUvcAnEVT7R1YWKY2SknBYFLUKxxsCN",
+      /* ⚠️ sol was DdHWKSqE7gvKrCUvcAnEVT7R1YWKY2SknBYFLUKxxsCN until
+       * 2026-09-01. That config names the TREASURY as feeClaimer, so its
+       * platform fees can only be claimed by hand at /fees — $MOAR is on it.
+       * The replacement names the keeper's claim key, so fees sweep hourly.
+       * Pools keep the config they launched against; this only affects new
+       * launches. */
+      "mainnet-beta": { sol: "3HLkZDZzcJAvdQWsQNWLP98qA9pPL2jtaRbhiE8t6tko",
                         usdc: "9xHSsPYmRuJJtGA3TYB7Q5P2oHWy4zpeugTf9EZ1S491",
                         tax: { sol: "", usdc: "", rwa: {} },
                         // ⚠️ only classic-SPL mints can quote (DBC rejects
