@@ -225,8 +225,6 @@ export default async function handler(req, res) {
       }];
       log.push("explicit job: " + q.mint);
     } else {
-      const proto = req.headers["x-forwarded-proto"] || "https";
-      const origin = proto + "://" + (req.headers["x-forwarded-host"] || req.headers.host);
       const j = await fetch(origin + "/api/tokens").then((r) => r.json()).catch(() => ({}));
       jobs = (j.tokens || []).filter(
         (t) => (t.feeSharePct || 0) > 0 || t.feeShare === "holders");
@@ -246,6 +244,9 @@ export default async function handler(req, res) {
      * configs (which name the treasury) still have to be claimed by hand at
      * /fees — that page is the creator-facing tool and stays as it is.
      */
+    const proto = req.headers["x-forwarded-proto"] || "https";
+    const origin = proto + "://" + (req.headers["x-forwarded-host"] || req.headers.host);
+
     if (process.env.PARTNER_CLAIMER_SECRET && process.env.FEE_TO) {
       try {
         const claimer = w3.Keypair.fromSecretKey(
