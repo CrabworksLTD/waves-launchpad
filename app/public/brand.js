@@ -21,14 +21,14 @@
 
     /* Launch gate: sha256 of the password, empty = open.
      *
-     * OPENED 2026-08-31. Solana token and NFT launches are public. Put the
-     * hash back to close the doors again — shell.js reads this and nothing
-     * else, and it only ever covered the front pages, never a mint or token
-     * link somebody had been sent.
+     * CLOSED again 2026-08-31 — opened for about an hour, then Kyle asked for
+     * the whole site back behind it. shell.js reads this and nothing else, so
+     * setting it to "" reopens everything.
      *
-     * Robinhood Chain is still browse-and-mint only; its launch flow has not
-     * been run, and the launch window says so on arrival. */
-    gate: "",
+     * It is client-side: anyone reading source can walk past it. That is fine
+     * for a curtain and not fine as security — do not put anything behind it
+     * that would matter if it were read. Password is with Kyle. */
+    gate: "53d3ecce08c0327fbcce4ee44ffcb3e8f0f02e2c486f840dc561427377c6bc5e",
 
     // The wallet that owns the platform's fee share. Creator-chosen-fee
     // launches create their own config naming this as feeClaimer — the

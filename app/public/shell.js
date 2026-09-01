@@ -267,9 +267,13 @@
     (function () {
       var gh = window.BRAND && window.BRAND.gate;
       if (!gh || /^(localhost|127\.)/.test(location.hostname)) return;
-      // the lock is on the front doors only — inner pages stay open
-      if (location.pathname !== "/" && location.pathname !== "/index.html" &&
-          location.pathname !== "/rh" && location.pathname !== "/rh.html") return;
+      /* Every page, not just the front doors. Kyle asked for the whole site
+       * locked; the previous version let anyone with a /mint/<address> or
+       * /token/<mint> link walk straight past it, which is the right trade
+       * when launches are public and the wrong one when nothing should be
+       * reachable yet. Crawler unfurls are unaffected — /api/share renders
+       * server-side and never runs this. To go back to front-doors-only,
+       * restore the pathname check. */
       try { if (sessionStorage.getItem("shl.gate") === gh) return; } catch (e) {}
       var ov = document.createElement("div");
       ov.id = "shl-gate";
