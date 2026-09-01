@@ -44,8 +44,14 @@
                 creatorTradingFeePercentage: 25 }    // same split as standard, bigger fee
   };
 
-  /* The rungs in the order they are offered. */
-  var LADDER = ["standard", "t2", "t3", "tax"];
+  /* The rungs in the order they are offered.
+   *
+   * Two, deliberately. Every rung is an immutable on-chain config somebody has
+   * to sign and pay rent for, and a wall of near-identical percentages is a
+   * worse choice than one clear one. 3% is the tax rung; the 2% and 5% configs
+   * stay defined above so an existing pool can still be read, but neither is
+   * offered to a new launch. */
+  var LADDER = ["standard", "t3"];
 
   var QUOTES = {
     sol: {

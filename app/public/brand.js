@@ -91,10 +91,17 @@
                          * launch window hides it rather than trying to create
                          * one mid-launch. */
                         t2:  { sol: "", usdc: "", rwa: {} },
-                        t3:  { sol: "", usdc: "", rwa: {} },
-                        // 5% tax rung, signed 2026-09-01; feeClaimer is the
-                        // sweep key, so its platform fees claim hourly rather
-                        // than by hand at /fees
+                        /* The tax rung — 3%, signed 2026-09-01, both quotes.
+                         * Verified on chain before wiring: feeClaimer is the
+                         * sweep key, so platform fees claim hourly instead of
+                         * by hand at /fees. */
+                        t3:  { sol: "9wYcHGs7Jtyg4CYtpLgTE3vCUUmBorn5ncu3Gtmb4RyH",
+                               usdc: "F22Pjfu2FLafWVGDyoXLPVUBUaF9tFB7HhuURBn9yX1u",
+                               rwa: {} },
+                        /* 5% config, signed 2026-09-01 and then superseded by
+                         * the 3% rung above. Kept because it is immutable and
+                         * paid for; not in LADDER, so nothing new launches on
+                         * it. */
                         tax: { sol: "39FwtFMZJfp97WzKqFs3rcC6xE5YewCgPxw5LV6BEQdp",
                                usdc: "", rwa: {} },
                         /* ⚠️ Only classic-SPL mints can be a QUOTE — DBC
