@@ -48,6 +48,19 @@
     // If you rotate KEEPER_SECRET, rotate this in the same commit.
     feeKeeper: "EFFY1LjZbzzEYuUr24udxWponKqtta8MaxZxs6HGPswH",
 
+    /* The wallet named as feeClaimer on NEW configs.
+     *
+     * Not feeOwner. A config's feeClaimer is fixed at creation and must sign
+     * every claim, so naming the treasury meant platform revenue could only be
+     * collected by hand — 0.74 SOL sat in the $MOAR pool until someone noticed.
+     * This is a dedicated hot key held by api/keeper.js (PARTNER_CLAIMER_SECRET)
+     * that can do exactly one thing: trigger a claim, always into feeOwner. It
+     * never holds a balance, so losing it costs an hour of unclaimed fees.
+     *
+     * ⚠️ Configs created before 2026-09-01 name feeOwner and cannot be swept —
+     * their pools are claimed manually at /fees. */
+    partnerClaimer: "9cHofwC8aDWLnSvdhR3qf4MsK9kfHBB4PktRWPXQekaT",
+
     // DBC partner configs, one per cluster per quote currency. Created once
     // each by tools/create-dbc-config.js; a missing entry disables that
     // currency in the token launch window rather than hiding the field.

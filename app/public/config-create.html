@@ -67,6 +67,7 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
   <p class="note">Cost is ~0.03 SOL of rent plus the network fee, paid by the signing
   wallet. After it confirms, the config address goes into brand.js — the address is
   public, the ownership is what the signature just decided.</p>
+  <p class="note" id="roles"></p>
 </main>
 
 <script src="/brand.js"></script>
@@ -186,25 +187,59 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
       var owner = new X.PublicKey(w.publicKey);
       var cfgKp = X.Keypair.generate();
 
+      /* feeClaimer is the dedicated claimer key, NOT this wallet.
+       *
+       * It is fixed forever at creation and must sign every claim, so naming
+       * the treasury is what made platform revenue a manual chore. The claimer
+       * only ever triggers claims and the keeper always sends the proceeds to
+       * feeOwner, which stays cold. leftoverReceiver is still the treasury —
+       * that is the post-graduation remainder and should land straight there. */
+      var claimer = new X.PublicKey(window.BRAND.partnerClaimer);
+      var treasury = new X.PublicKey(window.BRAND.feeOwner);
+
       var tx = await cli.partner.createConfig(Object.assign({
         config: cfgKp.publicKey,
-        feeClaimer: owner,
-        leftoverReceiver: owner,
+        feeClaimer: claimer,
+        leftoverReceiver: treasury,
         payer: owner,
         quoteMint: new X.PublicKey(Q.mint)
       }, curve));
 
-      tx.feePayer = owner;
-      tx.recentBlockhash = (await conn.getLatestBlockhash("confirmed")).blockhash;
-      // the new config account signs for its own creation; the wallet's
-      // signature must cover a message that already includes it
-      tx.partialSign(cfgKp);
+      /* A blockhash lasts about a minute and the clock starts before the wallet
+       * prompt appears — with Phantom's warning screen in the way that is
+       * easily exceeded, and the send then fails with "Blockhash not found".
+       * Fetch it late and retry once with a fresh one. */
+      var sig = null;
+      for (var attempt = 0; attempt < 2 && !sig; attempt++) {
+        try {
+          tx.signatures = [];
+          tx.feePayer = owner;
+          tx.recentBlockhash = (await conn.getLatestBlockhash("confirmed")).blockhash;
+          // the new config account signs for its own creation; the wallet's
+          // signature must cover a message that already includes it
+          tx.partialSign(cfgKp);
+          go.textContent = "Confirm in your wallet…";
+          var signed = await w.signTransaction(tx);
+          go.textContent = "Sending…";
+          sig = await conn.sendRawTransaction(signed.serialize(), { skipPreflight: false });
+        } catch (err) {
+          var stale = /blockhash not found|block height exceeded|expired/i
+            .test(String((err && err.message) || err));
+          if (attempt === 0 && stale) { go.textContent = "Blockhash expired — asking again…"; continue; }
+          throw err;
+        }
+      }
 
-      go.textContent = "Confirm in your wallet…";
-      var signed = await w.signTransaction(tx);
-      go.textContent = "Sending…";
-      var sig = await conn.sendRawTransaction(signed.serialize(), { skipPreflight: false });
-      await conn.confirmTransaction(sig, "confirmed");
+      /* Ask the chain, do not wait on a subscription: confirmTransaction has
+       * reported landed transactions as expired all week. */
+      for (var w8 = 0; w8 < 90; w8++) {
+        var st = await conn.getSignatureStatus(sig, { searchTransactionHistory: true })
+          .catch(function () { return null; });
+        var v = st && st.value;
+        if (v && v.err) throw new Error("The config transaction failed on chain.");
+        if (v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized")) break;
+        await new Promise(function (r) { setTimeout(r, 1000); });
+      }
 
       var addr = cfgKp.publicKey.toBase58();
       var slot = TIER === "standard" ? "" : "." + TIER;
@@ -245,6 +280,21 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
     }, 500);
   })();
 })();
+
+  /* Spell out the two roles. Both are fixed forever by this signature and
+     neither is the wallet signing it, which is surprising enough to say out
+     loud rather than leave in the code. */
+  (function () {
+    var el = document.getElementById("roles");
+    if (!el || !window.BRAND) return;
+    var short = function (a) { return a.slice(0, 4) + "…" + a.slice(-4); };
+    el.innerHTML =
+      "<b>Fees will be claimable by " + short(window.BRAND.partnerClaimer) + "</b> " +
+      "(the keeper's claim key, so platform revenue sweeps itself hourly) " +
+      "and paid to " + short(window.BRAND.feeOwner) + ". Both are fixed by this " +
+      "signature and cannot be changed afterwards \u2014 a config's claimer is " +
+      "permanent.";
+  })();
 </script>
 </body>
 </html>
