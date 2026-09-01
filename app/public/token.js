@@ -238,7 +238,8 @@
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
         tx.feePayer = c.owner;
-        tx.recentBlockhash = (await c.conn.getLatestBlockhash("confirmed")).blockhash;
+        var bh = (await c.conn.getLatestBlockhash("confirmed")).blockhash;
+        tx.recentBlockhash = bh;
         // Extra keypairs the SDK needs to sign for (the new mint, usually) are
         // returned alongside the transaction and have to be applied before the
         // wallet signs, or the wallet's signature covers the wrong message.
@@ -264,7 +265,7 @@
             setTimeout(function () { rej(new Error("The RPC did not answer in 45s.")); }, 45000);
           })
         ]);
-        await confirmByPolling(c.conn, sig, raw);
+        await confirmByPolling(c.conn, sig, raw, bh);
         return sig;
       } catch (e) {
         if (attempt === 0 && isStaleBlockhash(e)) {
@@ -286,7 +287,7 @@
    * status every 500ms returns the moment the chain has it. The same loop
    * re-broadcasts every ~6s, because a dropped transaction is otherwise a
    * silent wait for something that will never arrive. */
-  async function confirmByPolling(conn, sig, raw) {
+  async function confirmByPolling(conn, sig, raw, hash) {
     var deadline = Date.now() + 90000;
     var misses = 0;
     while (Date.now() < deadline) {
@@ -297,6 +298,19 @@
       if (v && v.err) throw new Error("The trade failed on chain: " + JSON.stringify(v.err));
       if (v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized")) return sig;
       if (!v && raw && ++misses % 12 === 0) {
+        /* Re-broadcasting a transaction whose blockhash has expired is shouting
+         * down a well: the RPC accepts it, the leader drops it, and nothing ever
+         * appears. That is a launch sitting on "creating the pool" for a minute
+         * and a half before saying something unhelpful about the explorer.
+         *
+         * Once the hash is dead the answer is certain — this signature can never
+         * land — so stop and say so in the one word the caller acts on. */
+        if (hash) {
+          var live = true;
+          try { live = (await conn.isBlockhashValid(hash, { commitment: "confirmed" })).value; }
+          catch (e) { live = true; }
+          if (!live) throw new Error("blockhash expired before the transaction landed");
+        }
         try { await conn.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 5 }); } catch (e) {}
       }
       await new Promise(function (r) { setTimeout(r, 500); });

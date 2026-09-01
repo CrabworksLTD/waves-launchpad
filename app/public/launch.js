@@ -64,10 +64,12 @@
      * the last step to silence. Keep the signed bytes from the send and
      * re-broadcast them while we wait: the network dedupes by signature, so
      * repeating is free and only the first landing counts. */
-    var lastRaw = null;
+    var lastRaw = null, lastHash = null;
     var send = umi.rpc.sendTransaction.bind(umi.rpc);
     umi.rpc.sendTransaction = function (tx, options) {
       try { lastRaw = umi.transactions.serialize(tx); } catch (e) { lastRaw = null; }
+      // kept so the confirm loop can tell a slow transaction from a dead one
+      try { lastHash = tx.message.blockhash; } catch (e) { lastHash = null; }
       return send(tx, Object.assign({ maxRetries: 5 }, options || {}));
     };
 
@@ -100,6 +102,20 @@
           missing++;
           // every ~6s of not seeing it, put it back on the wire
           if (lastRaw && missing % 12 === 0) {
+            /* An expired blockhash makes re-sending pointless — the RPC takes
+             * it, the leader drops it, and the loop keeps counting up at a
+             * signature that can never land. Stop as soon as that is certain
+             * rather than at the two-minute mark. */
+            if (lastHash) {
+              var live = true;
+              try { live = (await conn.isBlockhashValid(lastHash, { commitment: "confirmed" })).value; }
+              catch (e) { live = true; }
+              if (!live) {
+                throw new Error("The wallet took long enough to approve that the " +
+                  "transaction expired before it reached the chain. Nothing was " +
+                  "charged for it — try that step again.");
+              }
+            }
             try {
               await conn.sendRawTransaction(lastRaw, { skipPreflight: true, maxRetries: 5 });
               resent++;
