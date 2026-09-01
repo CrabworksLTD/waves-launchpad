@@ -299,6 +299,29 @@ async function tokenProgramOf(conn, w3, mint, splToken) {
     ? splToken.TOKEN_2022_PROGRAM_ID : splToken.TOKEN_PROGRAM_ID;
 }
 
+
+/* The pool's quote currency and its decimals.
+ *
+ * Needed to size a swap, and neither is on the pool account — the mint is on
+ * the config, and the decimals are on the mint. Read once per pool per run.
+ * Defaults to SOL's 9, which is right for the common case and harmless as a
+ * fallback because a wrong decimals only mis-sizes the USD comparison, which
+ * then fails the headroom check and pays the quote currency. */
+async function quoteInfo(conn, w3, cli, ps) {
+  let mint = ps && ps.quoteMint ? String(ps.quoteMint) : null;
+  if (!mint) {
+    const cfgKey = ps && (ps.config || ps.poolConfig);
+    if (cfgKey) {
+      const cfg = await cli.state.getPoolConfig(new w3.PublicKey(String(cfgKey)))
+        .catch(() => null);
+      if (cfg && cfg.quoteMint) mint = String(cfg.quoteMint);
+    }
+  }
+  if (!mint) return { mint: null, decimals: 9 };
+  const info = await conn.getAccountInfo(new w3.PublicKey(mint)).catch(() => null);
+  const decimals = info && info.data && info.data.length > 44 ? info.data[44] : 9;
+  return { mint, decimals };
+}
 export default async function handler(req, res) {
   // Vercel signs scheduled invocations; a stranger hitting this URL must not
   // be able to start a payout run.
@@ -548,8 +571,9 @@ export default async function handler(req, res) {
            * says why, which is a real payout rather than a failure. */
           let reward = null;
           if (job.rewardMint && pot > 0n && pays.length) {
+            const qi = await quoteInfo(conn, w3, cli, ps);
             const decision = await rewardPlan(
-              job.rewardMint, String(ps.quoteMint || ""), pot, quoteDec, pays.length);
+              job.rewardMint, qi.mint, pot, qi.decimals, pays.length);
             if (decision && decision.skip) {
               log.push(job.mint + ": paying " + (job.quote || "the quote currency") +
                        " — " + decision.skip);
