@@ -1519,10 +1519,20 @@
         t + "%, var(--raise) " + t + "%, var(--raise) 100%)";
       flow.feeSharePct = pct;
       flow.feeShare = pct > 0 ? "holders" : "keep";
+      /* Say what holders actually earn, not what fraction of a fraction they
+       * get. "90% to holders" reads as 90% of every trade; the real number is
+       * 90% of the creator's fifth of the swap fee. Quoting the percentage of
+       * volume is the figure a buyer can check against the chart, and the one
+       * safe to repeat publicly. */
+      var ofVolume = tierPct(flow) * 0.2;           // the creator's share of a trade
+      var toHolders = ofVolume * pct / 100;
+      var fmtPct = function (n) {
+        return (n < 0.01 && n > 0 ? n.toFixed(3) : n.toFixed(2)).replace(/0+$/, "").replace(/\.$/, "");
+      };
       box.querySelector("#tk-sharetxt").textContent = pct === 0
         ? "You keep everything — claim whenever you like."
-        : pct + "% to your holders, " + (100 - pct) + "% to you — paid out " +
-          "automatically by the keeper.";
+        : "Holders earn " + fmtPct(toHolders) + "% of every trade, paid " +
+          "automatically. You keep " + fmtPct(ofVolume - toHolders) + "%.";
       box.querySelector("#tk-fwwrap").hidden = pct >= 100;
     }
     paintShare();
