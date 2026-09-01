@@ -274,6 +274,17 @@ input:focus{outline:none;border-color:var(--accent)}
   var MINT = (location.pathname.match(/\/token\/([1-9A-HJ-NP-Za-km-z]{32,44})/) || [])[1]
           || qs.get("mint") || "";
   var $ = function (id) { return document.getElementById(id); };
+
+  /* Read art through the mirror.
+   *
+   * arweave.net cannot serve a fresh upload for minutes, and that is exactly
+   * when a launch is being looked at. /api/mirror returns our short-lived copy
+   * if it has one and redirects to Arweave otherwise, so this is safe to use
+   * unconditionally and needs no knowledge of which case applies. */
+  function art(u) {
+    return u && /^https:\/\/arweave\.net\//.test(u)
+      ? "/api/mirror?u=" + encodeURIComponent(u) : u;
+  }
   var side = "buy", market = null, lastQuote = null, quoteSeq = 0, poolHint = null;
 
   function say(k, h) { var m = $("msg"); m.className = "msg " + k; m.innerHTML = h; }
@@ -614,16 +625,16 @@ input:focus{outline:none;border-color:var(--accent)}
             var tries = 0;
             var retry = setInterval(function () {
               if (++tries > 10) return clearInterval(retry);   // ~5 minutes
-              lg.src = rec.icon + "?r=" + tries;
+              lg.src = art(rec.icon) + "&r=" + tries;
             }, 30000);
           };
-          lg.src = rec.icon;
+          lg.src = art(rec.icon);
         }
         if (rec.banner) {
           var bn = $("tbanner-img");
           bn.onload = function () { bn.hidden = false; };
           bn.onerror = function () { bn.hidden = true; };
-          bn.src = rec.banner;
+          bn.src = art(rec.banner);
         }
       }
     }).catch(function () {});

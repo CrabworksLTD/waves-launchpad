@@ -28,7 +28,15 @@ export default async function handler(req, res) {
     if (rec && typeof rec.card === "string" && ARWEAVE.test(rec.card)) card = rec.card;
   } catch (e) {}
 
-  if (!card) card = origin + (isEvm ? "/art/og-rh.png" : "/art/og.png");
+  /* Through the mirror, not straight at Arweave.
+   *
+   * A share card is fetched by X, Telegram and Discord within seconds of a
+   * launch — before arweave.net can serve a fresh upload — and those platforms
+   * cache the unfurl they get. /api/mirror serves our short-lived copy when it
+   * has one and redirects to Arweave when it does not, so the card is right
+   * from the first share instead of after propagation. */
+  if (card) card = origin + "/api/mirror?u=" + encodeURIComponent(card);
+  else card = origin + (isEvm ? "/art/og-rh.png" : "/art/og.png");
   res.setHeader("cache-control", "public, s-maxage=300, stale-while-revalidate=3600");
   res.redirect(302, card);
 }

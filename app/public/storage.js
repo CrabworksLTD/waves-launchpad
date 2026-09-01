@@ -157,6 +157,31 @@
     });
   }
 
+  /* Mirror the art we just uploaded.
+   *
+   * The browser already holds these bytes — it just sent them to Arweave — so
+   * a copy costs one POST and nothing else. It exists because arweave.net
+   * cannot serve a fresh upload for minutes, which is exactly when a creator
+   * is sharing their launch. See api/mirror.js.
+   *
+   * Fire and forget on purpose: a launch must never fail, or even wait, for a
+   * convenience cache. */
+  function mirror(url, bytes) {
+    if (!url || !bytes) return;
+    try {
+      var blob = new Blob([bytes], { type: "image/png" });
+      var fr = new FileReader();
+      fr.onload = function () {
+        fetch("/api/mirror", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: url, dataUrl: fr.result })
+        }).catch(function () {});
+      };
+      fr.readAsDataURL(blob);
+    } catch (e) {}
+  }
+
   // A folder upload that never settles must fail loudly, not sit on "Storing
   // the images…" forever. The ceiling scales with the payload — three minutes
   // plus twenty seconds a megabyte — so a real large upload has room while a
@@ -370,7 +395,7 @@
     var meta = buildMeta(imageCid);
     var metaCid = await uploadWith(up, meta, "metadata", opts.onProgress);
 
-    return {
+    var ret = {
       imageCid: imageCid,
       metadataCid: metaCid,
       // Plain https, not ar://: wallets and marketplace indexers do not speak
@@ -385,6 +410,10 @@
         : "https://arweave.net/" + imageCid + "/1.png",
       cardUri: opts.card ? "https://arweave.net/" + metaCid + "/_card.png" : null
     };
+    mirror(ret.avatarUri, opts.avatar || (files[0] && files[0].bytes));
+    mirror(ret.cardUri, opts.card);
+    mirror(ret.bannerUri, opts.banner);
+    return ret;
   }
 
   /* One small folder for a token launch: token.json plus an optional icon.
@@ -450,12 +479,16 @@
     var cid = await uploadWith(up,
       [{ id: "_t", name: "token.json", text: buildJson(artCid) }],
       "token metadata", opts.onProgress);
-    return {
+    var out = {
       uri: "https://arweave.net/" + cid + "/token.json", cid: cid,
       iconUri: opts.icon ? "https://arweave.net/" + artCid + "/" + iconName : null,
       bannerUri: opts.banner ? "https://arweave.net/" + artCid + "/" + bannerName : null,
       cardUri: opts.card ? "https://arweave.net/" + artCid + "/card.png" : null
     };
+    mirror(out.iconUri, opts.icon);
+    mirror(out.bannerUri, opts.banner);
+    mirror(out.cardUri, opts.card);
+    return out;
   }
 
   window.Storage = {

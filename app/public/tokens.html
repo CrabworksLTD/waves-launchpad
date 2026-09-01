@@ -186,6 +186,17 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
 (function () {
   "use strict";
   var esc = UI.esc, shortAddr = UI.shortAddr;
+  /* Read art through the mirror.
+   *
+   * arweave.net cannot serve a fresh upload for minutes, and that is exactly
+   * when a launch is being looked at. /api/mirror returns our short-lived copy
+   * if it has one and redirects to Arweave otherwise, so this is safe to use
+   * unconditionally and needs no knowledge of which case applies. */
+  function art(u) {
+    return u && /^https:\/\/arweave\.net\//.test(u)
+      ? "/api/mirror?u=" + encodeURIComponent(u) : u;
+  }
+
   Shell.mount({ active: "explore", search: true });
   var qs = new URLSearchParams(location.search);
   if (qs.get("cluster")) window.Launch.cluster(qs.get("cluster"));
@@ -311,7 +322,7 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
       return '<a class="tk" data-name="' + esc(r.name + " " + sym) +
         '" href="/token/' + esc(r.mint) + '">' +
         '<span class="art">' +
-          (r.icon ? '<img alt="" loading="lazy" src="' + esc(r.icon) + '">'
+          (r.icon ? '<img alt="" loading="lazy" src="' + esc(art(r.icon)) + '">'
                   : '<span class="ltr">' + esc(sym.slice(0, 1) || "$") + "</span>") +
           (m ? '<span class="tag ' + (m.migrated ? "grad" : "curve") + '">' +
                 (m.migrated ? "Graduated" : "On the curve") + "</span>" : "") +
