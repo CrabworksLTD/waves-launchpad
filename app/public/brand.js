@@ -92,7 +92,11 @@
                          * one mid-launch. */
                         t2:  { sol: "", usdc: "", rwa: {} },
                         t3:  { sol: "", usdc: "", rwa: {} },
-                        tax: { sol: "", usdc: "", rwa: {} },
+                        // 5% tax rung, signed 2026-09-01; feeClaimer is the
+                        // sweep key, so its platform fees claim hourly rather
+                        // than by hand at /fees
+                        tax: { sol: "39FwtFMZJfp97WzKqFs3rcC6xE5YewCgPxw5LV6BEQdp",
+                               usdc: "", rwa: {} },
                         /* ⚠️ Only classic-SPL mints can be a QUOTE — DBC
                          * rejects Token-2022, and 49 of the 50 most liquid
                          * tokenised assets are Token-2022. Gold is effectively

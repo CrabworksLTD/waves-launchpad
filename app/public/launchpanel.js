@@ -1390,9 +1390,10 @@
 
       <label>Swap fee</label>
       <div class="tiers" id="tk-tiers">${raw(tierButtons(flow))}</div>
-      <p class="note">A tax token is a bigger swap fee with a bigger creator share —
-      that stream funds burns or dividends via the rewards program. Per-transfer
-      taxes arrive with holder staking.</p>
+      ${tierRungs(flow).length > 1 ? raw('<p class="note">A tax token is a bigger ' +
+        "swap fee with a bigger creator share — that stream funds burns or " +
+        "dividends via the rewards program. Per-transfer taxes arrive with " +
+        "holder staking.</p>") : ""}
 
       <label>Fee sharing — how much of your share goes to holders</label>
       <div class="sharebox">
