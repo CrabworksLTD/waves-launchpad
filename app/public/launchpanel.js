@@ -1095,16 +1095,18 @@
      * Falls back to the umi path for wallets without the feature. */
     var w2 = window.Wallet.current();
     if (w2 && w2.canSignAndSend) {
-      var web3 = mx;
-      var conn2 = new web3.Connection(rpcUrl, "confirmed");
-      var tx2 = new web3.Transaction().add(web3.SystemProgram.transfer({
-        fromPubkey: new web3.PublicKey(w2.publicKey),
-        toPubkey: new web3.PublicKey(q.feeTo),
-        lamports: Number(q.feeLamports)
-      }));
-      tx2.feePayer = new web3.PublicKey(w2.publicKey);
-      tx2.recentBlockhash = (await conn2.getLatestBlockhash("confirmed")).blockhash;
-      var sig2 = await w2.signAndSendTransaction(tx2);
+      /* Built through umi, not web3 primitives: the vendor bundle exports
+       * Transaction, Connection and PublicKey but NOT SystemProgram, so
+       * composing the transfer by hand threw "cannot read properties of
+       * undefined (reading 'transfer')" on the first step of a launch.
+       * transferSol is exported and is the same instruction. */
+      var conn2 = new mx.Connection(rpcUrl, "confirmed");
+      var bh2 = await umi.rpc.getLatestBlockhash();
+      var built2 = mx.transferSol(umi, {
+        destination: mx.publicKey(q.feeTo),
+        amount: mx.lamports(BigInt(q.feeLamports))
+      }).setBlockhash(bh2).build(umi);
+      var sig2 = await w2.signAndSendTransaction(umi.transactions.serialize(built2));
       // the wallet has broadcast it; wait for the chain to agree
       for (var t2 = 0; t2 < 90; t2++) {
         var st2 = await conn2.getSignatureStatus(sig2, { searchTransactionHistory: true })
