@@ -260,6 +260,21 @@ export default async function handler(req, res) {
           if (!t.pool) continue;
           try {
             const p = new w3.PublicKey(t.pool);
+
+            /* Only pools whose config actually names our claim key. A config's
+             * feeClaimer is fixed at creation, so pools launched before the
+             * claim key existed name the treasury and can only ever be claimed
+             * by hand. Attempting them anyway produced a failed simulation in
+             * the log every single run, which is noise that hides real
+             * problems. */
+            const poolState = await cli.state.getPool(p);
+            const psx = (poolState && (poolState.account || poolState)) || {};
+            const ps2 = psx.poolState || psx;
+            const cfgKey = ps2.config || ps2.poolConfig;
+            if (!cfgKey) continue;
+            const cfg = await cli.state.getPoolConfig(new w3.PublicKey(String(cfgKey)));
+            if (!cfg || String(cfg.feeClaimer) !== claimer.publicKey.toBase58()) continue;
+
             const m = await cli.state.getPoolFeeMetrics(p);
             const owed = BigInt(m.current.partnerQuoteFee.toString());
             if (owed === 0n) continue;
