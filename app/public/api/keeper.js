@@ -559,7 +559,11 @@ export default async function handler(req, res) {
 
           const pot = (claimed * pct) / 100n;
           const creatorCut = claimed - pot;
-          const pays = holders
+          /* `let`, because a successful swap re-cuts these in the reward asset
+           * below. As a const it threw "Assignment to constant variable" AFTER
+           * the swap had already spent the pot — the first time this leg ever
+           * ran, it bought the reward and then could not pay anyone. */
+          let pays = holders
             .map((h) => ({ owner: h.owner, lamports: ((pot * h.amount) / held).toString() }))
             .filter((p) => BigInt(p.lamports) >= DUST_MIN_LAMPORTS);
 
@@ -586,6 +590,24 @@ export default async function handler(req, res) {
                              decimals: got.decimals, swapSig: got.sig };
                   log.push(job.mint + ": swapped the pot into " +
                            job.rewardMint.slice(0, 6) + "… (" + got.sig.slice(0, 12) + "…)");
+                  /* Write it down NOW.
+                   *
+                   * The plan is normally persisted a few steps below, after the
+                   * shares are re-cut — but by this line the pot is already
+                   * spent, and anything that throws between here and there
+                   * leaves reward tokens in the keeper with nothing recording
+                   * who they belong to. That is exactly what happened the first
+                   * time this ran. A plan written here is resumable; one
+                   * written after is a promise that the swap will not be the
+                   * last thing to succeed. */
+                  if (db) {
+                    await db.set(planKey, JSON.stringify({
+                      mint: job.mint, claimSig, claimed: claimed.toString(),
+                      creatorCut: creatorCut.toString(),
+                      creatorDest: job.feeWallet || job.creator || null,
+                      reward: got, pays: [], done: 0, at: Date.now(), partial: true
+                    }), { ex: PLAN_TTL });
+                  }
                 }
               } catch (e) {
                 // the pot is still in the quote currency and still gets paid out
