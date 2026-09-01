@@ -183,6 +183,10 @@ function readSwap(tx, baseMint, sig, blockTime) {
     sig,
     at: (blockTime || 0) * 1000,
     who: String(trader.owner || ""),
+    // the pool authority, so the holder list can exclude the curve's own
+    // unsold supply — it is not a holder, and it is usually the largest
+    // balance by far
+    poolOwner: String(poolSide.owner || ""),
     side: poolQuote.delta > 0n ? "buy" : "sell",    // pool gained quote = a buy
     tokens: baseAmt,
     quote: quoteAmt,
@@ -322,12 +326,22 @@ export default async function handler(req, res) {
            * anyone checks on a new token — how concentrated is it, is the
            * creator dumping — and it is the same read either way, so not
            * keeping it would mean doing this work twice. */
+          /* Exclude the pool. Its vault holds every token the curve has not
+           * sold — 77% of $MOAR on the day it launched — and listing that as
+           * the top holder tells a visitor the supply is dangerously
+           * concentrated when the truth is the opposite: it has not been
+           * bought yet. The authority is whoever sat on the pool side of a
+           * swap, which the parser above already works out. */
+          const poolOwner = (trades.length && trades[trades.length - 1].poolOwner) ||
+            (prev && prev.poolOwner) || null;
           const rows = [];
           for (const a of accts) {
             const d = Buffer.from(a.account.data[0], "base64");
             const amt = d.readBigUInt64LE(64);
             if (amt === 0n) continue;
-            rows.push({ owner: bs58FromBuf(d.subarray(32, 64)), amt });
+            const owner = bs58FromBuf(d.subarray(32, 64));
+            if (poolOwner && owner === poolOwner) continue;
+            rows.push({ owner, amt });
           }
           holders = rows.length;
           const totalHeld = rows.reduce((a, b) => a + b.amt, 0n);
@@ -371,6 +385,8 @@ export default async function handler(req, res) {
           mcapUsd: price != null && supply != null && qusd != null
             ? price * supply * qusd : null,
           supply, decimals, holders, top,
+          poolOwner: (trades.length && trades[trades.length - 1].poolOwner) ||
+            (prev && prev.poolOwner) || null,
           ath, athAt,
           vol24h: sum(d1, (x) => x.quote),
           vol7d: sum(since(604800000), (x) => x.quote),
