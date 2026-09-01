@@ -473,10 +473,25 @@
     var totalCount = probe.length + 1;   // two manifests now, art then metadata
 
     var auth = { address: opts.address, sig: opts.sig, ts: opts.ts };
-    if (!auth.sig && opts.payer) {
+    if (!auth.sig) {
       var q = await quoteUpload(totalBytes, totalCount);
-      auth.signature = await opts.payer(q);
-      if (!auth.signature) throw new Error("Storage fee was not paid — launch cancelled.");
+      if (opts.deferPayment) {
+        /* Upload now, charge in the launch transaction.
+         *
+         * The fee used to be collected here, in its own transaction, purely
+         * because the URI has to exist before the pool transaction that embeds
+         * it. That ordering cost every launch a second wallet approval. The
+         * cost is the same either way — it just rides along with the pool
+         * instead of arriving ahead of it.
+         *
+         * The server allows this only for launch-sized uploads and caps them
+         * per hour, so an abandoned launch costs us a few hundred kilobytes
+         * rather than an open door. */
+        if (opts.onDeferredFee) opts.onDeferredFee(q);
+      } else if (opts.payer) {
+        auth.signature = await opts.payer(q);
+        if (!auth.signature) throw new Error("Storage fee was not paid — launch cancelled.");
+      }
     }
 
     var up = await prepareUploader(totalBytes, totalCount, auth, opts.onProgress);

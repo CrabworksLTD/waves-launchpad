@@ -267,6 +267,44 @@ async function paymentFresh(signature, minLamports) {
 // market. MAX_FILES bounds a single approval; this bounds the number of them.
 const HOLDER_APPROVALS_PER_HOUR = 5;
 
+/* A token launch's art can be uploaded before it is paid for.
+ *
+ * Charging for storage in its own transaction is what made launching cost two
+ * wallet approvals: the fee had to be paid BEFORE the upload, because the URI
+ * has to exist before the pool transaction that embeds it. Folding the fee into
+ * the pool transaction removes that approval — but it also means the upload
+ * happens on trust, so this is what bounds the trust.
+ *
+ * A token launch is an icon, a banner and a metadata file. Anything bigger is a
+ * collection, which is expensive and still pays first. The exposure is
+ * therefore a few hundred kilobytes per allowance, capped per address per hour,
+ * and only for people who abandon a launch after uploading.
+ */
+const LAUNCH_FREE_BYTES = 3 * 1024 * 1024;
+const LAUNCH_FREE_FILES = 5;
+const LAUNCH_UPLOADS_PER_HOUR = 6;
+
+function isLaunchSized(size, files) {
+  return size <= LAUNCH_FREE_BYTES && files <= LAUNCH_FREE_FILES;
+}
+
+async function underLaunchLimit(who) {
+  try {
+    const { Redis } = await import("@upstash/redis");
+    const kv = new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN });
+    const key = "rlu:" + who + ":" + Math.floor(Date.now() / 3600000);
+    const n = await kv.incr(key);
+    if (n === 1) await kv.expire(key, 3600);
+    return n <= LAUNCH_UPLOADS_PER_HOUR;
+  } catch (e) {
+    /* Fail CLOSED, unlike the holder limit above. A holder has already proved
+     * who they are and paid for a pass; this path has proved nothing, so an
+     * unreachable counter must not become an unmetered one. Falling back to
+     * paying first still gets the launch done, one approval the poorer. */
+    return false;
+  }
+}
+
 async function underHolderLimit(address) {
   try {
     const { Redis } = await import("@upstash/redis");
@@ -340,6 +378,20 @@ export default async function handler(req, res) {
         return res.status(429).json({
           error: "That wallet has started " + HOLDER_APPROVALS_PER_HOUR +
                  " uploads this hour. Try again shortly, or pay the storage fee to continue now."
+        });
+      }
+    }
+    /* No payment yet, but small enough to be a launch: allow it, and let the
+     * fee ride in the pool transaction. Checked after the paid and holder
+     * paths so neither loses its higher limits to this one. */
+    if (!allowed && !signature && isLaunchSized(size, files)) {
+      const who = (isAddress(address) && address) ||
+        String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "anon";
+      allowed = await underLaunchLimit(who);
+      if (!allowed) {
+        return res.status(429).json({
+          error: "Too many launches started from here this hour. " +
+                 "Try again shortly, or pay the storage fee to continue now."
         });
       }
     }

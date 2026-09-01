@@ -1817,7 +1817,12 @@
         ["swap fee", tierPct(flow) + "%"],
         ["chain", "Solana"]
       ]);
+      /* Checked before the upload rather than at a payment prompt — with the
+       * fee folded into the pool transaction there is no prompt left to hang
+       * this on, and an upload from a stale tab is wasted either way. */
+      await assertFreshBuild();
       // the credit is spent the moment an upload redeems it
+      var heldCredit = paidCredit();
       var meta = await window.Storage.uploadTokenMeta({
         name: flow.tname,
         card: tcard,
@@ -1828,11 +1833,15 @@
         banner: flow.banner || null,
         bannerExt: flow.bannerExt || "png",
         links: { website: flow.web, x: flow.x, telegram: flow.tg },
-        payer: async function (q) {
-          await assertFreshBuild();
-          var held = paidCredit();
-          return held ? held.sig : payStorage(q);
-        }
+        /* A token launch charges for storage inside the pool transaction, so
+         * there is nothing to approve here. An unspent credit from an earlier
+         * attempt is still honoured — it has already been paid for, and
+         * charging again in the pool would be charging twice. */
+        deferPayment: !heldCredit,
+        onDeferredFee: function (q) {
+          flow.storageFee = { to: q.feeTo, lamports: String(q.feeLamports) };
+        },
+        payer: heldCredit ? function () { return heldCredit.sig; } : null
       });
       forgetPaid();
       mark("meta", "done");
@@ -1862,6 +1871,7 @@
         uri: meta.uri,
         quote: flow.quote,
         tier: flow.tier || "standard",
+        storageFee: flow.storageFee || null,
         feeShare: flow.feeShare || "keep",
         feeSharePct: flow.feeSharePct || 0,
         firstBuySol: flow.tbuy,

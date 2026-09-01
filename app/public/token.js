@@ -329,6 +329,10 @@
       try {
         tx.feePayer = c.owner;
         withPriorityFee(c.X, tx);
+        if (txish.storageFee) {
+          addStorageFee(c.X, tx, txish.storageFee.to, txish.storageFee.lamports);
+          delete txish.storageFee;        // a retry must not charge twice
+        }
         var bh = (await c.conn.getLatestBlockhash("confirmed")).blockhash;
         tx.recentBlockhash = bh;
         // Extra keypairs the SDK needs to sign for (the new mint, usually) are
@@ -427,6 +431,11 @@
 
   async function assertEnoughSol(c, opts) {
     var need = POOL_RENT_LAMPORTS;
+    // the storage fee now rides in the same transaction, so it is part of what
+    // the launcher must actually hold
+    if (opts.storageFee && opts.storageFee.lamports) {
+      need += Number(opts.storageFee.lamports) || 0;
+    }
     // a SOL-quoted dev buy comes out of the same balance
     if ((opts.quote || "sol") === "sol" && opts.firstBuySol) {
       need += Math.round(Number(opts.firstBuySol) * 1e9);
@@ -441,6 +450,33 @@
       String(opts.quote || "sol").toUpperCase() + ". Add roughly " +
       short.toFixed(3) + " SOL and try again; your storage payment is already " +
       "made and will be reused.");
+  }
+
+  /* The storage fee, carried by the pool transaction.
+   *
+   * It used to be its own transaction, only because the metadata URI has to
+   * exist before the pool that embeds it — so the fee was collected first, and
+   * every launch cost two wallet approvals for one launch. Riding along with
+   * the pool makes it one. Same payer, same amount, same recipient.
+   *
+   * Built by hand: the vendor bundle exports no SystemProgram (the same gap
+   * that made the priority fee a silent no-op). Transfer is opcode 2 followed
+   * by a little-endian u64 of lamports. */
+  function addStorageFee(X, tx, feeTo, lamports) {
+    if (!feeTo || !lamports) return tx;
+    var amount = BigInt(lamports);
+    if (amount <= 0n) return tx;
+    var data = new Uint8Array(12);
+    var dv = new DataView(data.buffer);
+    dv.setUint32(0, 2, true);
+    dv.setBigUint64(4, amount, true);
+    tx.instructions.push({
+      keys: [{ pubkey: tx.feePayer, isSigner: true, isWritable: true },
+             { pubkey: new X.PublicKey(feeTo), isSigner: false, isWritable: true }],
+      programId: new X.PublicKey("11111111111111111111111111111111"),
+      data: data
+    });
+    return tx;
   }
 
   /* ⚠️ A pledged launch names the KEEPER as poolCreator at creation — see the
@@ -509,7 +545,8 @@
         }
       } : {}));
       await send(c, { transaction: pair.createConfigTx, signers: [cfgKp] });
-      sig = await send(c, { transaction: pair.createPoolWithFirstBuyTx, signers: [baseMint] });
+      sig = await send(c, { transaction: pair.createPoolWithFirstBuyTx, signers: [baseMint],
+        storageFee: opts.storageFee });
       configPk = cfgKp.publicKey;
     } else {
       configPk = new c.X.PublicKey(configKey(opts.quote, opts.tier));
@@ -548,7 +585,7 @@
         built = await c.cli.creator.createPool(args);
       }
       var tx = built.createPoolTx || built.transaction || built;
-      sig = await send(c, { transaction: tx, signers: [baseMint] });
+      sig = await send(c, { transaction: tx, signers: [baseMint], storageFee: opts.storageFee });
     }
 
     // the pool address is deterministic — record it so lookups never need an
