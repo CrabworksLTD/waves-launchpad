@@ -108,6 +108,15 @@ main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
 .trow .val span{display:block;font:400 11px "IBM Plex Mono",monospace;color:var(--faint)}
 .hist .empty{padding:26px 6px;text-align:center;color:var(--faint);font-size:13px}
 
+/* holding this token pays you — the single most relevant fact to someone
+   looking at the buy box, and it was nowhere on the page */
+.rewards{margin-top:12px;padding:12px 13px;border-radius:10px;
+  border:1px solid rgba(var(--accent-rgb),.35);background:rgba(var(--accent-rgb),.06)}
+.rewards b{display:block;font:700 13px Archivo;color:var(--accent)}
+.rewards span{display:block;margin-top:3px;font-size:11.5px;color:var(--dim)}
+.rewards .asset{display:inline-flex;align-items:center;gap:5px;
+  font:600 11.5px "IBM Plex Mono",monospace;color:var(--ink)}
+
 /* the collection this token was paired with, and where its holders stake */
 .pairlink{display:flex;align-items:center;gap:10px;margin-top:12px;padding:11px 13px;
   border:1px solid transparent;border-radius:10px;text-decoration:none;
@@ -228,6 +237,7 @@ input:focus{outline:none;border-color:var(--accent)}
       <div class="msg" id="msg"></div>
       <a class="pairlink" id="pairlink" hidden></a>
       <a class="pairlink" id="stakelink" hidden></a>
+      <div class="rewards" id="rewards" hidden></div>
       <p class="note">Trades run against the bonding curve — no order book, no LP.
       1% trading fee: 20% creator / 60% platform / 20% Meteora.</p>
     </div>
@@ -608,6 +618,43 @@ input:focus{outline:none;border-color:var(--accent)}
     });
   }
 
+  /* What holding this token actually pays.
+   *
+   * A pledged launch sends a share of every trade to the people holding it,
+   * hourly and automatically — which is the most relevant fact to anyone
+   * looking at the buy box, and it appeared nowhere on the page. The reward
+   * asset is the creator's choice; when nothing trades it yet, holders are
+   * paid the quote currency until it can be sold, and saying so here is the
+   * same honesty the launch window owes the creator. */
+  function drawRewards(rec) {
+    var pct = rec && rec.feeSharePct;
+    if (!pct || pct <= 0) return;
+    var box = $("rewards");
+    var asset = rec.rewardMint || null;
+
+    function paint(sym, tradeable) {
+      box.innerHTML =
+        "<b>Holders earn " + pct + "% of trading fees</b>" +
+        "<span>Paid out automatically every hour, pro-rata by how much you " +
+        "hold. Nothing to claim." +
+        (sym
+          ? " Paid in <span class=\"asset\">" + esc(sym) + "</span>" +
+            (tradeable ? "." : " once it is tradeable \u2014 " + esc(QUOTE) +
+             " until then.")
+          : " Paid in " + esc(QUOTE) + ".") +
+        "</span>";
+      box.hidden = false;
+    }
+
+    if (!asset) return paint(null, true);
+    // the picker's list carries both the ticker and whether anything trades it
+    window.Token.rwa().then(function (list) {
+      var hit = (list || []).find(function (t) { return t.mint === asset; });
+      if (!hit) return paint(null, true);
+      paint(hit.symbol, (hit.liquidity || 0) >= 1000);
+    }).catch(function () { paint(null, true); });
+  }
+
   /* A paired launch links both ways. Someone who arrived at the token should
    * be one click from the collection its fees reward, and from where those
    * holders stake — otherwise the pairing is a fact in our database that
@@ -693,6 +740,7 @@ input:focus{outline:none;border-color:var(--accent)}
           };
           lg.src = art(rec.icon);
         }
+        drawRewards(rec);
         if (rec.banner) {
           var bn = $("tbanner-img");
           bn.onload = function () { bn.hidden = false; };

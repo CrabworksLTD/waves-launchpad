@@ -95,6 +95,8 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tk .sym{display:block;margin-top:1px;font:400 12px "IBM Plex Mono",monospace;
   color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tk .pays{display:block;margin-top:5px;font:600 10px "IBM Plex Mono",monospace;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
 .tk .big{display:block;margin-top:9px;font:600 16px "IBM Plex Mono",monospace;
   font-variant-numeric:tabular-nums;white-space:nowrap}
 .tk .big i{font-style:normal;font-weight:400;font-size:11px;color:var(--faint);
@@ -330,6 +332,9 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
         '<span class="body">' +
           "<b>" + esc(r.name || "Token") + "</b>" +
           '<span class="sym">$' + esc(sym) + "</span>" +
+          // a token that pays its holders is worth saying so on the card
+          ((r.feeSharePct || 0) > 0
+            ? '<span class="pays">pays holders ' + r.feeSharePct + '%</span>' : "") +
           /* Market cap when the indexer knows it, because that is the number
            * people compare tokens by. Falls back to the curve's own raised /
            * threshold until a launch has been indexed. */
