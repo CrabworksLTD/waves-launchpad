@@ -195,6 +195,7 @@ export default async function handler(req, res) {
   }
 
   const log = [];
+  const U64MAX = "18446744073709551615";
   let keeperAddr = null;
   try {
     const w3 = await import("@solana/web3.js");
@@ -231,6 +232,55 @@ export default async function handler(req, res) {
         (t) => (t.feeSharePct || 0) > 0 || t.feeShare === "holders");
     }
 
+    /* The platform's own revenue, swept before anything else.
+     *
+     * Partner fees accrue inside each pool and move only when the config's
+     * feeClaimer signs — they do not arrive on their own, and 0.74 SOL sat in
+     * the $MOAR pool until someone noticed. The claimer is a dedicated hot key
+     * (PARTNER_CLAIMER_SECRET), never the treasury: it can trigger a claim and
+     * nothing else, and the receiver is always FEE_TO, so a compromise costs
+     * at most an hour of unclaimed fees rather than the balance.
+     *
+     * ⚠️ Only works on pools whose config was created naming that claimer. A
+     * config's feeClaimer is fixed at creation, so pools on the original
+     * configs (which name the treasury) still have to be claimed by hand at
+     * /fees — that page is the creator-facing tool and stays as it is.
+     */
+    if (process.env.PARTNER_CLAIMER_SECRET && process.env.FEE_TO) {
+      try {
+        const claimer = w3.Keypair.fromSecretKey(
+          bs58.decode(process.env.PARTNER_CLAIMER_SECRET.trim()));
+        const j2 = await fetch(origin + "/api/tokens").then((r) => r.json()).catch(() => ({}));
+        for (const t of (j2.tokens || [])) {
+          if (!t.pool) continue;
+          try {
+            const p = new w3.PublicKey(t.pool);
+            const m = await cli.state.getPoolFeeMetrics(p);
+            const owed = BigInt(m.current.partnerQuoteFee.toString());
+            if (owed === 0n) continue;
+            const tx = await cli.partner.claimPartnerTradingFeeToReceiver({
+              feeClaimer: claimer.publicKey,
+              payer: claimer.publicKey,
+              pool: p,
+              receiver: new w3.PublicKey(process.env.FEE_TO),
+              maxBaseAmount: new BN(U64MAX), maxQuoteAmount: new BN(U64MAX)
+            });
+            await signSend(conn, tx, claimer);
+            log.push("platform: claimed " + owed + " from " + (t.symbol || t.mint));
+          } catch (e) {
+            // a config that names the treasury refuses this signer — expected
+            // for pools created before the claimer existed, so keep it quiet
+            const msg = String((e && e.message) || e);
+            if (!/signature|unauthor|constraint/i.test(msg)) {
+              log.push("platform: " + (t.symbol || t.mint) + " — " + msg.slice(0, 90));
+            }
+          }
+        }
+      } catch (e) {
+        log.push("platform sweep failed: " + String((e && e.message) || e).slice(0, 120));
+      }
+    }
+
     if (!jobs.length) {
       return res.status(200).json({ ok: true, keeper: keeperAddr, pledged: 0, log });
     }
@@ -252,7 +302,6 @@ export default async function handler(req, res) {
       });
     }
 
-    const U64MAX = "18446744073709551615";
     for (const job of jobs) {
       try {
         if (!job.pool) { log.push(job.mint + ": no recorded pool, skipped"); continue; }
