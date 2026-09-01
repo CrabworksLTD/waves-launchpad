@@ -278,6 +278,51 @@
       String((e && e.message) || e));
   }
 
+  /* Ask the server for the keeper's signature when a transaction needs it.
+   *
+   * A pledged launch names the keeper as the pool's creator in the same
+   * transaction that creates the pool, which means the keeper is a required
+   * signer and the browser has no key for it. Sending anyway produced a
+   * transaction one signature short — accepted by a node that does not
+   * simulate, then silently dropped.
+   *
+   * Runs after the message is final (fee payer, priority fee, blockhash, mint)
+   * and before the wallet signs, because every signature covers the same
+   * message. api/cosign.js is what decides whether the request is legitimate. */
+  function toBase64(bytes) {
+    var s = "";
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s);
+  }
+  function fromBase64(b64) {
+    var bin = atob(b64), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+
+  async function cosignIfNeeded(c, tx) {
+    var keeper = window.BRAND && window.BRAND.feeKeeper;
+    if (!keeper) return tx;
+    var msg = tx.compileMessage();
+    var idx = -1;
+    for (var i = 0; i < msg.accountKeys.length; i++) {
+      if (msg.accountKeys[i].toBase58() === keeper) { idx = i; break; }
+    }
+    if (idx < 0 || idx >= msg.header.numRequiredSignatures) return tx;   // not needed
+
+    var raw = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+    var r = await fetch("/api/cosign", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tx: toBase64(raw) })
+    });
+    var j = await r.json().catch(function () { return {}; });
+    if (!r.ok || !j.tx) {
+      throw new Error("Could not co-sign the launch: " + (j.error || r.status));
+    }
+    return c.X.Transaction.from(fromBase64(j.tx));
+  }
+
   async function send(c, txish) {
     var tx = txish.transaction ? txish.transaction : txish;
     for (var attempt = 0; attempt < 2; attempt++) {
@@ -290,6 +335,7 @@
         // returned alongside the transaction and have to be applied before the
         // wallet signs, or the wallet's signature covers the wrong message.
         if (txish.signers && txish.signers.length) tx.partialSign.apply(tx, txish.signers);
+        tx = await cosignIfNeeded(c, tx);
         /* A wallet that never answers must not hang the launch. Phantom can
          * fail to surface its window — especially behind its own "this dApp may
          * be malicious" screen — and without a ceiling the step simply sits
