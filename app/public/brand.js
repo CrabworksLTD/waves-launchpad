@@ -82,13 +82,24 @@
        * Pools keep the config they launched against; this only affects new
        * launches. */
       "mainnet-beta": { sol: "3HLkZDZzcJAvdQWsQNWLP98qA9pPL2jtaRbhiE8t6tko",
-                        usdc: "9xHSsPYmRuJJtGA3TYB7Q5P2oHWy4zpeugTf9EZ1S491",
+                        // was 9xHSsPYmRuJJtGA3TYB7Q5P2oHWy4zpeugTf9EZ1S491,
+                        // which names the treasury as claimer — see sol above
+                        usdc: "CkggbyU3nA7DLxT5Cw6xZBysB9tQK1Bt4SstY7cdcNGe",
                         tax: { sol: "", usdc: "", rwa: {} },
-                        // ⚠️ only classic-SPL mints can quote (DBC rejects
-                        // Token-2022): XAUt0 / GOLD / VNXAU of the 526
+                        /* ⚠️ Only classic-SPL mints can be a QUOTE — DBC
+                         * rejects Token-2022, and 49 of the 50 most liquid
+                         * tokenised assets are Token-2022. Gold is effectively
+                         * the only real-world quote available.
+                         *
+                         * This does not limit REWARDS: Jupiter routes SOL into
+                         * NVDAx, SPYx, TSLAx and AAPLx at ~0% impact despite
+                         * all four being Token-2022. Paying holders in stocks
+                         * needs the keeper's swap leg, not a different quote
+                         * mint — and not a different launchpad. */
                         rwa: {
+                          // was AWar1Y1GALnT3TjL3d4K1qjH2ZLB5KiqrSw3gmaR9EGA
                           "AymATz4TCL9sWNEEV9Kvyz45CHVhDZ6kUgjTJPzLpU9P":
-                            { config: "AWar1Y1GALnT3TjL3d4K1qjH2ZLB5KiqrSw3gmaR9EGA",
+                            { config: "CoYJxuQZsTSfdGJfadZNfiVwr1pTtKN5tsGKH6K12WGc",
                               symbol: "XAUt0", decimals: 6, label: "Gold" }
                         } },
       devnet: { sol: "97FsuYAZrY1HxSokdSz1GnPVsLWNdpVgdczt3bLqXv8J", usdc: "",
