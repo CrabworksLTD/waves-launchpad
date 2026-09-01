@@ -76,6 +76,23 @@ main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
   border-radius:14px;padding:18px}
 .hist .hh{display:flex;align-items:center;gap:12px;margin-bottom:6px}
 .hist .hh b{font:800 15px Archivo}
+.htab{background:none;border:0;padding:0 0 6px;margin-right:18px;cursor:pointer;
+  font:800 15px Archivo;color:var(--faint);border-bottom:2px solid transparent;
+  transition:color .18s,border-color .18s}
+.htab:hover{color:var(--dim)}
+.htab.on{color:var(--ink);border-bottom-color:var(--accent)}
+/* a holder row: rank, who, how much, and the share that actually matters */
+.hrow{display:flex;align-items:center;gap:12px;padding:11px 6px;
+  border-top:1px solid var(--line);font-size:13px}
+.hrow:first-of-type{border-top:0}
+.hrow .rk{width:22px;flex:none;font:600 12px "IBM Plex Mono",monospace;color:var(--faint)}
+.hrow .who{flex:1;min-width:0;font:400 12.5px "IBM Plex Mono",monospace;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrow .amt2{flex:none;text-align:right;font:500 12.5px "IBM Plex Mono",monospace;
+  color:var(--dim)}
+.hrow .pct{flex:none;width:64px;text-align:right;
+  font:600 13px "IBM Plex Mono",monospace}
+.hrow.big .pct{color:var(--accent)}
 .hist .hh span{margin-left:auto;font:400 11.5px "IBM Plex Mono",monospace;color:var(--faint)}
 .trow{display:flex;align-items:center;gap:12px;padding:11px 6px;
   border-top:1px solid var(--line);font-size:13px}
@@ -251,8 +268,13 @@ input:focus{outline:none;border-color:var(--accent)}
   </div>
 
   <div class="hist">
-    <div class="hh"><b>Recent trades</b><span id="hist-note">reading the chain…</span></div>
+    <div class="hh">
+      <button class="htab on" data-h="trades">Recent trades</button>
+      <button class="htab" data-h="holders">Holders</button>
+      <span id="hist-note">reading the chain…</span>
+    </div>
     <div id="hist"></div>
+    <div id="holders" hidden></div>
   </div>
 </main>
 
@@ -466,6 +488,8 @@ input:focus{outline:none;border-color:var(--accent)}
             ? "only one trade in this window" : "no trades in this window";
         }
 
+        drawHolders(s);
+
         if (d.trades && d.trades.length) {
           $("hist-note").textContent = d.trades.length + " shown";
           $("hist").innerHTML = d.trades.map(function (t) {
@@ -486,6 +510,45 @@ input:focus{outline:none;border-color:var(--accent)}
       })
       .catch(function () { return false; });
   }
+
+  /* Who holds it, and how much of it.
+   *
+   * The first question anyone asks about a new token is how concentrated it
+   * is — one wallet holding 40% is the whole story, and it is the thing a
+   * chart cannot tell you. The indexer already reads every token account to
+   * count holders, so the list costs nothing extra. */
+  function drawHolders(s) {
+    var box = $("holders");
+    var top = (s && s.top) || null;
+    if (!top || !top.length) {
+      box.innerHTML = '<div class="empty">' +
+        (s && s.holders ? "Holder list is still being read." : "Nobody holds it yet.") +
+        "</div>";
+      return;
+    }
+    var sym = ($("sym").textContent || "").replace(/^\$/, "");
+    box.innerHTML = top.map(function (h, i) {
+      return '<a class="hrow' + (h.pct >= 10 ? " big" : "") +
+        '" href="https://explorer.solana.com/address/' + esc(h.owner) +
+        '" target="_blank" rel="noopener">' +
+        '<span class="rk">' + (i + 1) + "</span>" +
+        '<span class="who">' + esc(shortWho(h.owner)) + "</span>" +
+        '<span class="amt2">' + UI.fmt(h.amount, 0) + " " + esc(sym) + "</span>" +
+        '<span class="pct">' + h.pct.toFixed(1) + "%</span></a>";
+    }).join("");
+  }
+
+  // the two panes share one header; only one is ever visible
+  document.querySelector(".hist .hh").addEventListener("click", function (e) {
+    var b = e.target.closest(".htab");
+    if (!b) return;
+    var want = b.dataset.h;
+    this.querySelectorAll(".htab").forEach(function (t) {
+      t.classList.toggle("on", t === b);
+    });
+    $("hist").hidden = want !== "trades";
+    $("holders").hidden = want !== "holders";
+  });
 
   function setChange(chg) {
     var cel = $("s-chg");

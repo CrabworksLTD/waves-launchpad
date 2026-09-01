@@ -40,6 +40,18 @@ const MAX_BACKFILL = 2000;       // signatures per run, so one busy pool cannot
                                  // eat the whole 300s budget
 const PAGE = 1000;               // getSignaturesForAddress maximum
 
+
+/* base58, for turning a 32-byte owner into an address. Pulling in bs58 for one
+ * encode in a function that already avoids dependencies is not worth it. */
+const B58ALPHA = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+function bs58FromBuf(buf) {
+  let n = 0n;
+  for (const b of buf) n = (n << 8n) | BigInt(b);
+  let out = "";
+  while (n > 0n) { out = B58ALPHA[Number(n % 58n)] + out; n /= 58n; }
+  for (const b of buf) { if (b === 0) out = "1" + out; else break; }
+  return out;
+}
 function kv() {
   /* No credentials means no store, not a broken one. The Upstash client
    * constructs happily without a url and then fails every command with
@@ -295,7 +307,7 @@ export default async function handler(req, res) {
         const trades = all.slice(-MAX_TRADES);
 
         // supply and holders — both need an RPC that answers indexed requests
-        let supply = null, decimals = 6, holders = null;
+        let supply = null, decimals = 6, holders = null, top = null;
         try {
           const s = await rpc("getTokenSupply", [t.mint]);
           supply = Number(s.value.amount) / Math.pow(10, s.value.decimals);
@@ -306,12 +318,25 @@ export default async function handler(req, res) {
             encoding: "base64",
             filters: [{ dataSize: 165 }, { memcmp: { offset: 0, bytes: t.mint } }]
           }]);
-          let n = 0;
+          /* Count them, and keep the top few. A holder list is the first thing
+           * anyone checks on a new token — how concentrated is it, is the
+           * creator dumping — and it is the same read either way, so not
+           * keeping it would mean doing this work twice. */
+          const rows = [];
           for (const a of accts) {
             const d = Buffer.from(a.account.data[0], "base64");
-            if (d.readBigUInt64LE(64) > 0n) n++;
+            const amt = d.readBigUInt64LE(64);
+            if (amt === 0n) continue;
+            rows.push({ owner: bs58FromBuf(d.subarray(32, 64)), amt });
           }
-          holders = n;
+          holders = rows.length;
+          const totalHeld = rows.reduce((a, b) => a + b.amt, 0n);
+          rows.sort((a, b) => (b.amt > a.amt ? 1 : b.amt < a.amt ? -1 : 0));
+          top = rows.slice(0, 20).map((r) => ({
+            owner: r.owner,
+            amount: Number(r.amt) / Math.pow(10, decimals),
+            pct: totalHeld > 0n ? Number((r.amt * 10000n) / totalHeld) / 100 : 0
+          }));
         } catch (e) { /* leave null; the page says "—" rather than a wrong number */ }
 
         /* ATH is cumulative: trades get trimmed, so the previous high has to
@@ -345,7 +370,7 @@ export default async function handler(req, res) {
           mcap: price != null && supply != null ? price * supply : null,
           mcapUsd: price != null && supply != null && qusd != null
             ? price * supply * qusd : null,
-          supply, decimals, holders,
+          supply, decimals, holders, top,
           ath, athAt,
           vol24h: sum(d1, (x) => x.quote),
           vol7d: sum(since(604800000), (x) => x.quote),
