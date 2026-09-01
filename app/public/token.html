@@ -876,17 +876,39 @@ input:focus{outline:none;border-color:var(--accent)}
       g.fillText((lo + (hi - lo) * f).toPrecision(3), padL + w + 8, y);
     });
 
-    // filled area under the line
+    /* The area carries the same gradient as the line.
+     *
+     * It used to be a single accent colour fading down, so the line ran
+     * purple to green above a fill that was green everywhere — two different
+     * charts stacked on each other. Canvas gradients only run along one axis,
+     * so this fills horizontally in the brand gradient and then erases
+     * downward with destination-out, which gives the fade without needing a
+     * second colour stop system. */
     var pts = points.map(xy);
-    var fill = g.createLinearGradient(0, padT, 0, padT + h);
-    fill.addColorStop(0, "rgba(" + ARGB + ",.30)");
-    fill.addColorStop(1, "rgba(" + ARGB + ",0)");
+    g.save();
     g.beginPath();
     g.moveTo(pts[0][0], padT + h);
     pts.forEach(function (p) { g.lineTo(p[0], p[1]); });
     g.lineTo(pts[pts.length - 1][0], padT + h);
     g.closePath();
-    g.fillStyle = fill; g.fill();
+    g.clip();
+
+    var across = g.createLinearGradient(padL, 0, padL + w, 0);
+    across.addColorStop(0, GA);
+    across.addColorStop(1, GB);
+    g.globalAlpha = 0.32;
+    g.fillStyle = across;
+    g.fillRect(padL, padT, w, h);
+
+    // fade it toward the baseline
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = "destination-out";
+    var fade = g.createLinearGradient(0, padT, 0, padT + h);
+    fade.addColorStop(0, "rgba(0,0,0,0)");
+    fade.addColorStop(1, "rgba(0,0,0,1)");
+    g.fillStyle = fade;
+    g.fillRect(padL, padT, w, h);
+    g.restore();
 
     // the line
     var line = g.createLinearGradient(padL, 0, padL + w, 0);
@@ -901,6 +923,9 @@ input:focus{outline:none;border-color:var(--accent)}
     var last = pts[pts.length - 1];
     g.beginPath(); g.arc(last[0], last[1], 4.5, 0, 7);
     g.fillStyle = GB; g.fill();
+    // a soft halo so the head of the line reads as "now" rather than a full stop
+    g.beginPath(); g.arc(last[0], last[1], 9, 0, 7);
+    g.fillStyle = "rgba(" + ARGB + ",.18)"; g.fill();
 
     // time range along the bottom
     g.fillStyle = "rgba(255,255,255,.34)";
