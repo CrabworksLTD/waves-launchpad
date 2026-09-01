@@ -292,7 +292,9 @@ input:focus{outline:none;border-color:var(--accent)}
     <div class="hh">
       <button class="htab on" data-h="trades">Recent trades</button>
       <button class="htab" data-h="holders">Holders</button>
-      <span id="hist-note">reading the chain…</span>
+      <!-- only ever real status: "no pool recorded", a read failure.
+           A count of visible rows is not news. -->
+      <span id="hist-note"></span>
     </div>
     <div id="hist"></div>
     <div id="holders" hidden></div>
@@ -512,7 +514,7 @@ input:focus{outline:none;border-color:var(--accent)}
         drawHolders(s);
 
         if (d.trades && d.trades.length) {
-          $("hist-note").textContent = d.trades.length + " shown";
+          $("hist-note").textContent = "";
           $("hist").innerHTML = d.trades.map(function (t) {
             return '<a class="trow" href="https://explorer.solana.com/tx/' + esc(t.sig) +
               '" target="_blank" rel="noopener">' +
@@ -599,7 +601,7 @@ input:focus{outline:none;border-color:var(--accent)}
         $("hist").innerHTML = '<div class="empty">No trades yet — the first one shows up here.</div>';
         return;
       }
-      $("hist-note").textContent = list.length + " shown";
+      $("hist-note").textContent = "";
       /* Same reads, two uses: oldest first, price = SOL per token. Trades with
        * no token or no SOL side (a pool creation, say) carry no price. */
       var series = list.filter(function (t) { return t.tokens > 0 && t.sol > 0; })
