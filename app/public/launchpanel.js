@@ -1395,6 +1395,7 @@
         "dividends via the rewards program. Per-transfer taxes arrive with " +
         "holder staking.</p>") : ""}
 
+      <div id="tk-sharewrap" ${(flow.tier || "standard") === "standard" ? raw("hidden") : ""}>
       <label>Fee sharing — how much of your share goes to holders</label>
       <div class="sharebox">
         <input id="tk-sharepct" type="range" min="0" max="6" step="1"
@@ -1406,7 +1407,8 @@
         </div>
         <div class="sharelbl"><span id="tk-sharetxt"></span></div>
       </div>
-
+      <!-- the reward picker belongs to sharing: it answers "paid in what?",
+           which is only a question once something is being shared -->
       <div id="tk-rewardwrap">
         <label>Holders are paid in</label>
         <button class="pick" id="lp-reward">
@@ -1423,6 +1425,7 @@
                 "once a market exists.")
           : ""}</p>
       </div>
+      </div><!-- /tk-sharewrap -->
 
       <div id="tk-fwwrap" ${(flow.feeSharePct || 0) >= 100 ? raw("hidden") : ""}>
         <label>Creator fee wallet</label>
@@ -1561,6 +1564,17 @@
       box.querySelectorAll("#tk-tiers .tier").forEach(function (x) {
         x.classList.toggle("on", x === b);
       });
+      /* Sharing is the point of a tax token, and noise on a standard one. Hide
+       * it AND zero it — a slider left at 90% behind a hidden panel would
+       * quietly pledge fees the creator can no longer see. */
+      var sw = box.querySelector("#tk-sharewrap");
+      var isStd = flow.tier === "standard";
+      if (sw) sw.hidden = isStd;
+      if (isStd) {
+        flow.feeSharePct = 0;
+        var sl2 = box.querySelector("#tk-sharepct");
+        if (sl2) { sl2.value = 0; sl2.dispatchEvent(new Event("input")); }
+      }
       box.querySelector("#tk-fee").textContent = tierPct(flow) +
         "% — 20% you / 60% platform / 20% Meteora";
       paintEconomics();          // the rung has its own curve, not just its own fee
