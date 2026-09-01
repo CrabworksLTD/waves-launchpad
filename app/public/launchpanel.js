@@ -1149,15 +1149,41 @@
    * relies on the gateway's CORS headers, which arweave.net sends. */
   async function waitForUri(uri, onTick) {
     if (!uri) return false;
+
+    /* Ask every gateway that could have it, not just the slowest one.
+     *
+     * arweave.net will not serve an upload until the bundle is posted and
+     * indexed — twenty minutes and counting on $MOAR, which is far too long to
+     * hold a launch. But Turbo's receipt lists gateways that hold the data
+     * immediately, and any of them answering means the upload is real and
+     * propagating rather than lost.
+     *
+     * That is the thing actually worth waiting for. The on-chain URI still
+     * points at arweave.net, which is the address that outlives us, and our own
+     * pages read through the mirror in the meantime — so proceeding once the
+     * data is provably published costs nothing and saves minutes. */
+    var urls = [uri];
+    try {
+      var fast = window.__turboFast;
+      if (fast && fast.hosts && fast.hosts.length) {
+        var path = uri.replace(/^https:\/\/arweave\.net/, "");
+        fast.hosts.slice(0, 4).forEach(function (h) {
+          var host = /^https?:/.test(h) ? h : "https://" + h;
+          urls.push(host.replace(/\/$/, "") + path);
+        });
+      }
+    } catch (e) {}
+
     var started = Date.now();
-    var LIMIT = 240000;                      // four minutes
+    var LIMIT = 90000;                       // ninety seconds, not four minutes
     while (Date.now() - started < LIMIT) {
-      try {
-        var r = await fetch(uri, { cache: "no-store" });
-        if (r.ok) return true;
-      } catch (e) { /* network hiccup or CORS — keep waiting */ }
+      var hit = await Promise.all(urls.map(function (u) {
+        return fetch(u, { cache: "no-store" }).then(function (r) { return r.ok; })
+          .catch(function () { return false; });
+      }));
+      if (hit.some(Boolean)) return true;
       if (onTick) onTick(Math.round((Date.now() - started) / 1000));
-      await new Promise(function (res) { setTimeout(res, 5000); });
+      await new Promise(function (res) { setTimeout(res, 2500); });
     }
     return false;
   }

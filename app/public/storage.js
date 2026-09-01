@@ -235,6 +235,24 @@
     }), total, label);
     var id = res && res.manifestResponse && res.manifestResponse.id;
     if (!id) throw new Error("Upload finished but returned no manifest id");
+
+    /* Turbo tells us where the data is ALREADY readable.
+     *
+     * arweave.net has to see the bundle posted and indexed before it will
+     * serve anything — twenty minutes and counting on $MOAR. But Turbo's
+     * receipt carries fastFinalityIndexes: gateways that have the data now,
+     * optimistically, before it is settled. Publishing them lets the launch
+     * stop waiting on the slowest path.
+     *
+     * Recorded rather than used as the canonical URL: the on-chain metadata
+     * must still point at arweave.net, which is the address that outlives
+     * everyone. This is only for knowing when to stop waiting. */
+    try {
+      var r = res.manifestResponse;
+      var fast = (r && (r.fastFinalityIndexes || r.dataCaches)) || [];
+      if (fast.length) window.__turboFast = { id: id, hosts: fast };
+    } catch (e) {}
+
     if (onProgress) onProgress({ phase: label, state: "done", cid: id });
     return id;
   }
