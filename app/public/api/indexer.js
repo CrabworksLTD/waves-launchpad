@@ -344,13 +344,22 @@ export default async function handler(req, res) {
             rows.push({ owner, amt });
           }
           holders = rows.length;
-          const totalHeld = rows.reduce((a, b) => a + b.amt, 0n);
           rows.sort((a, b) => (b.amt > a.amt ? 1 : b.amt < a.amt ? -1 : 0));
-          top = rows.slice(0, 20).map((r) => ({
-            owner: r.owner,
-            amount: Number(r.amt) / Math.pow(10, decimals),
-            pct: totalHeld > 0n ? Number((r.amt * 10000n) / totalHeld) / 100 : 0
-          }));
+          /* Percentage of TOTAL SUPPLY, not of the circulating float.
+           *
+           * Against the float, the numbers add to 100% and read as though the
+           * token is fully distributed — on $MOAR that made nine wallets look
+           * like they held everything, when between them they held under a
+           * quarter of the supply and the curve still had the rest. Supply is
+           * the denominator people mean when they ask how much someone owns. */
+          top = rows.slice(0, 20).map((r) => {
+            const amount = Number(r.amt) / Math.pow(10, decimals);
+            return {
+              owner: r.owner,
+              amount,
+              pct: supply ? (amount / supply) * 100 : 0
+            };
+          });
         } catch (e) { /* leave null; the page says "—" rather than a wrong number */ }
 
         /* ATH is cumulative: trades get trimmed, so the previous high has to

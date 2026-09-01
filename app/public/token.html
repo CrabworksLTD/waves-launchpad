@@ -86,12 +86,15 @@ main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
   border-top:1px solid var(--line);font-size:13px}
 .hrow:first-of-type{border-top:0}
 .hrow .rk{width:22px;flex:none;font:600 12px "IBM Plex Mono",monospace;color:var(--faint)}
-.hrow .who{flex:1;min-width:0;font:400 12.5px "IBM Plex Mono",monospace;
+.hrow .who{flex:none;width:96px;font:400 12.5px "IBM Plex Mono",monospace;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hrow .amt2{flex:none;text-align:right;font:500 12.5px "IBM Plex Mono",monospace;
-  color:var(--dim)}
-.hrow .pct{flex:none;width:64px;text-align:right;
-  font:600 13px "IBM Plex Mono",monospace}
+/* the amount takes the slack so the percentage sits in a fixed column;
+   tabular figures keep the digits from wandering row to row */
+.hrow .amt2{flex:1;min-width:0;text-align:right;
+  font:500 12.5px "IBM Plex Mono",monospace;color:var(--dim);
+  font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden}
+.hrow .pct{flex:none;width:68px;text-align:right;
+  font:600 13px "IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
 .hrow.big .pct{color:var(--accent)}
 .hist .hh span{margin-left:auto;font:400 11.5px "IBM Plex Mono",monospace;color:var(--faint)}
 .trow{display:flex;align-items:center;gap:12px;padding:11px 6px;
