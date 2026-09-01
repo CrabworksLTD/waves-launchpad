@@ -568,6 +568,22 @@
       if (out > 0) price = (0.001) / (out / 1e6);  // quote per token, 6-dec base
     } catch (e) { /* price stays null, page says so */ }
 
+    /* Total supply, decoded from the mint account rather than getTokenSupply —
+     * public nodes refuse indexed requests but serve a plain account read. u64
+     * at byte 36 of the SPL mint layout, decimals at 44. With it, a page can
+     * show market cap the instant a token exists, without waiting for an
+     * indexer to have seen a trade. */
+    var supply = null;
+    try {
+      var mi = await c.conn.getAccountInfo(new c.X.PublicKey(baseMint));
+      if (mi && mi.data && mi.data.length >= 45) {
+        var b = mi.data;
+        var v = 0n;
+        for (var i = 7; i >= 0; i--) v = (v << 8n) | BigInt(b[36 + i]);
+        supply = Number(v) / Math.pow(10, b[44]);
+      }
+    } catch (e) { /* market cap simply stays unknown */ }
+
     return {
       pool: String(c.pool.publicKey),
       migrated: !!acct.isMigrated,
@@ -575,6 +591,8 @@
       threshold: threshold,
       progress: threshold > 0 ? Math.min(1, raised / threshold) : 0,
       price: price,
+      supply: supply,
+      mcap: (price != null && supply != null) ? price * supply : null,
       quote: c.quoteSym,
       creator: String(acct.creator)
     };

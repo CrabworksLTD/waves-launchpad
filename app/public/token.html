@@ -656,6 +656,38 @@ input:focus{outline:none;border-color:var(--accent)}
     $("pct").textContent = (market.progress * 100).toFixed(1) + "% to graduation";
     drawCurve(market.progress);
     QUOTE = market.quote || "SOL";
+    // the rate, so a token the indexer has not seen still shows dollars
+    if (USD == null) {
+      try {
+        var ur = await fetch("/api/stats?usd=" + encodeURIComponent(QUOTE.toLowerCase()))
+          .then(function (r) { return r.json(); });
+        if (ur && ur.usd) USD = ur.usd;
+      } catch (e) {}
+    }
+
+    /* Fill the stats from the chain immediately.
+     *
+     * The indexer runs on a ten-minute cron, so a token launched a minute ago
+     * has no indexed history — but the curve knows its price right now, and the
+     * mint knows its supply, so price, market cap and graduation progress need
+     * nobody's permission. loadStats() overwrites these with indexed figures
+     * (24h volume, ATH, holders, the chart) the moment it has them.
+     *
+     * Before this, a brand new token showed dashes in every box at exactly the
+     * moment its creator was showing it to people. */
+    if (market.price != null) {
+      $("s-price").textContent = USD ? money(market.price * USD) : market.price.toPrecision(3);
+    }
+    if (market.mcap != null) {
+      $("s-mcap").textContent = USD ? money(market.mcap * USD) : native(market.mcap);
+      if (market.supply) $("s-supply").textContent = UI.fmt(market.supply, 0) + " supply";
+    }
+    $("s-raised").textContent = USD ? money(market.raised * USD) : native(market.raised);
+    $("s-raised-n").textContent = native(market.raised);
+    $("s-grad").textContent = USD ? money(market.threshold * USD) : native(market.threshold, 0);
+    $("s-grad-n").textContent = native(market.threshold, 0);
+    if ($("s-vol").textContent === "—") $("s-vol").textContent = USD ? money(0) : native(0);
+    if ($("s-trades").textContent === "") $("s-trades").textContent = "0 trades";
     /* Indexed history if we have it, the chain if we do not — a token launched
      * between cron runs still shows its trades. */
     loadStats().then(function (ok) { if (!ok) loadTrades(); });
@@ -892,7 +924,12 @@ input:focus{outline:none;border-color:var(--accent)}
       $("amt").value = "";
       lastQuote = null;
       $("est").textContent = "—";
-      load();                                      // refresh price, curve, bar
+      /* Index this trade before reloading, so the chart, volume and feed show
+       * it now rather than at the next ten-minute cron. A person who just
+       * bought and sees nothing change assumes the page is broken. */
+      fetch("/api/indexer?mint=" + encodeURIComponent(MINT))
+        .catch(function () {})
+        .then(function () { load(); });
     } catch (e) {
       var m = String(e.message || e);
       if (/reject/i.test(m)) m = "You cancelled the transaction.";

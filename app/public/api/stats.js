@@ -58,7 +58,33 @@ function bucket(trades, from, to, want) {
   return out.map((p) => ({ at: p.at, price: p.price, vol: p.vol, n: p.n }));
 }
 
+const QUOTE_MINTS = {
+  sol:  "So11111111111111111111111111111111111111112",
+  usdc: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+};
+
+/* The dollar rate for a quote currency, independent of any token being
+ * indexed. A launch is minutes old before the indexer has seen it, but its
+ * page still wants to show dollars rather than falling back to raw SOL — so
+ * this answers from the same source the indexer uses, cached at the edge. */
+async function quoteUsd(sym) {
+  const mint = QUOTE_MINTS[String(sym || "sol").toLowerCase()];
+  if (!mint) return null;
+  try {
+    const j = await fetch("https://lite-api.jup.ag/price/v3?ids=" + mint).then((r) => r.json());
+    const v = j && j[mint] && j[mint].usdPrice;
+    return typeof v === "number" && v > 0 ? v : null;
+  } catch (e) { return null; }
+}
+
 export default async function handler(req, res) {
+  // ?usd=sol — just the rate, for a page whose token is not indexed yet
+  if (req.query && req.query.usd) {
+    const usd = await quoteUsd(req.query.usd);
+    res.setHeader("Cache-Control", "public, s-maxage=120, stale-while-revalidate=600");
+    return res.status(200).json({ usd });
+  }
+
   /* Bulk mode: ?mints=a,b,c returns just the headline figures for each, so the
    * explore page can price a whole grid in dollars with one request instead of
    * one per card. No trades, no series — those are only wanted on a detail

@@ -1716,6 +1716,11 @@
       });
       mark("pool", "done");
 
+      /* Index the new token straight away. The record was written a moment
+       * ago, so the sweep would not reach it for up to ten minutes — and its
+       * page is being opened right now, by the person who just made it. */
+      fetch("/api/indexer?mint=" + encodeURIComponent(res.mint)).catch(function () {});
+
       // Link the records both ways for a pair.
       if (flow.nft) recordCollection(flow.nft.cfg, flow.nft.res, res.mint, flow.nft.up);
 

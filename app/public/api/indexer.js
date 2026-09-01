@@ -182,11 +182,19 @@ function readSwap(tx, baseMint, sig, blockTime) {
 }
 
 export default async function handler(req, res) {
+  /* Two ways in.
+   *
+   * The cron sweeps everything and needs the secret. But a launch and a trade
+   * both want their token indexed NOW — waiting up to ten minutes to see your
+   * own buy appear is the difference between a page that feels live and one
+   * that feels broken — and neither a launch panel nor a trading page can hold
+   * a secret. So a single named mint may be indexed without one, rate-limited
+   * per mint, and only if we already have a record of it. The work is bounded:
+   * it reads the signatures since that pool's cursor and stops. */
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.authorization || "";
-    if (auth !== "Bearer " + secret) return res.status(401).json({ error: "no" });
-  }
+  const authed = !secret || req.headers.authorization === "Bearer " + secret;
+  const only = (req.query && req.query.mint) || null;
+  if (!authed && !only) return res.status(401).json({ error: "no" });
 
   const log = [];
   try {
@@ -195,7 +203,17 @@ export default async function handler(req, res) {
     const origin = proto + "://" + (req.headers["x-forwarded-host"] || req.headers.host);
     const j = await fetch(origin + "/api/tokens").then((r) => r.json()).catch(() => ({}));
     const toks = (j.tokens || []).filter((t) => t.pool && t.mint);
-    const only = (req.query && req.query.mint) || null;
+
+    /* An unauthenticated caller may only name a mint we have already recorded,
+     * and only once every 20 seconds. That bounds it to work we would do on the
+     * next cron sweep anyway. */
+    if (!authed) {
+      if (!toks.some((t) => t.mint === only)) {
+        return res.status(404).json({ error: "not a launch we know about" });
+      }
+      const gate = await db.set("ixhit:" + only, 1, { nx: true, ex: 20 }).catch(() => "OK");
+      if (gate !== "OK") return res.status(200).json({ ok: true, throttled: true });
+    }
 
     for (const t of only ? toks.filter((x) => x.mint === only) : toks) {
       try {
