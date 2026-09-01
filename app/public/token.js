@@ -962,6 +962,9 @@
     onchainIdentity: onchainIdentity,
     recentTrades: recentTrades,
     launchToken: launchToken,
+    // throws when a rung has no config, which is how the launch
+    // window decides what to offer
+    configFor: configKey,
     assertEnoughSol: async function (opts) { return assertEnoughSol(await client(), opts); },
     readPool: readPool,
     claimCreatorFeesTo: claimCreatorFeesTo,

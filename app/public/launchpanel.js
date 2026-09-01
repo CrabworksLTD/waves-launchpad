@@ -1267,6 +1267,52 @@
    * worth having, and offering them silently would pay holders something
    * unsellable. So each row says which it is, and the keeper pays the quote
    * currency until an asset can actually be sold. */
+  /* Each rung is a config that already exists on chain, so choosing one costs
+   * nothing extra at launch. A rung with no config for the selected quote is
+   * not offered — silently creating one mid-launch is what turned a launch into
+   * two signatures and a failure point. */
+  function tierSpec(flow) {
+    var T = window.DBC_TERMS;
+    return (T && T.TIERS && T.TIERS[flow.tier || "standard"]) ||
+           { label: "Standard", pct: 1, baseFeeBps: 100 };
+  }
+  function tierPct(flow) { return tierSpec(flow).pct; }
+
+  function tierRungs(flow) {
+    var T = window.DBC_TERMS;
+    if (!T || !T.LADDER) return [];
+    var out = [];
+    for (var i = 0; i < T.LADDER.length; i++) {
+      var name = T.LADDER[i], spec = T.TIERS[name];
+      if (!spec) continue;
+      var ready = true;
+      try { window.Token.configFor(flow.quote, name); } catch (e) { ready = false; }
+      if (ready) out.push({ name: name, spec: spec });
+    }
+    return out;
+  }
+
+  function tierButtons(flow) {
+    var rungs = tierRungs(flow);
+    if (!rungs.length) return "";
+    var cur = flow.tier || "standard";
+    // a rung that vanished with the quote must not stay selected
+    if (!rungs.some(function (r) { return r.name === cur; })) {
+      cur = rungs[0].name;
+      flow.tier = cur;
+    }
+    return rungs.map(function (r) {
+      var pct = r.spec.pct;
+      return '<button data-t="' + r.name + '" class="tier' + (r.name === cur ? " on" : "") + '">' +
+        "<b>" + esc(r.spec.label) + " — " + pct + "%</b><span>" +
+        (r.name === "standard"
+          ? "You keep 20% of the fee (" + (pct * 0.2).toFixed(1) + "% of volume)."
+          : "Same 20% share of a bigger fee — " + (pct * 0.2).toFixed(1) +
+            "% of volume to you.") +
+        "</span></button>";
+    }).join("");
+  }
+
   function tokenDetails(flow) {
     flow = flow || {};
     var nft = flow.nft;
@@ -1324,7 +1370,7 @@
 
       <div class="fold2" id="tk-econ">
         <div class="row"><span class="k">Total supply</span><b>1,000,000,000 · fixed</b></div>
-        <div class="row"><span class="k">Trading fee</span><b id="tk-fee">${(flow.customFee || 1)
+        <div class="row"><span class="k">Trading fee</span><b id="tk-fee">${tierPct(flow)
           + "% — 20% you / 60% platform / 20% Meteora"}</b></div>
         <div class="row"><span class="k">Graduates at</span><b id="tk-grad">reading the curve…</b></div>
         <div class="row" style="border-bottom:0"><span class="k">Migrates to</span><b>Meteora DAMM v2, LP locked</b></div>
@@ -1343,26 +1389,7 @@
       the opening price ahead of you.</p>
 
       <label>Swap fee</label>
-      <div class="tiers" id="tk-tiers">
-        <button data-t="standard" class="tier ${!flow.customFee ? "on" : ""}">
-          <b>Standard — 1%</b><span>You keep 20% of the fee (0.2% of volume).</span></button>
-        <button data-t="custom" class="tier ${flow.customFee ? "on" : ""}"
-          ${flow.quote !== "sol" && flow.quote !== "usdc"
-            ? raw('disabled title="Custom fees are SOL/USDC quotes only for now"') : ""}>
-          <b>Tax token — your %</b><span>Same 20% share of a bigger fee —
-          the burn/dividend budget.</span></button>
-      </div>
-      <div id="tk-customrow" ${flow.customFee ? "" : raw("hidden")}>
-        <label>Fee percent</label>
-        <input id="tk-custompct" type="number" min="0.25" max="20" step="0.25"
-          value="${flow.customFee || 1}">
-        <div class="ptabs" id="tk-feechips">
-          <button data-v="1">1%</button><button data-v="2">2%</button>
-          <button data-v="3">3%</button><button data-v="5">5%</button>
-          <button data-v="10">10%</button>
-        </div>
-        <p class="note" id="tk-customsplit"></p>
-      </div>
+      <div class="tiers" id="tk-tiers">${raw(tierButtons(flow))}</div>
       <p class="note">A tax token is a bigger swap fee with a bigger creator share —
       that stream funds burns or dividends via the rewards program. Per-transfer
       taxes arrive with holder staking.</p>
@@ -1422,16 +1449,21 @@
       <button class="go" id="lp-next" ${window.Token.configKey() ? "" : raw("disabled")}>Continue</button></div>
     `);
 
-    // live economics, read from the chain config — not hardcoded copy
-    window.Token.describeConfig(flow.quote).then(function (d) {
-      var el = box.querySelector("#tk-grad");
-      if (!el) return;
-      if (!d) { el.textContent = "shown at launch"; return; }
-      el.textContent = UI.fmt(d.graduation) + " " + qLabel + " raised";
-      if (d.feePct && !flow.customFee) box.querySelector("#tk-fee").textContent =
-        d.feePct + "% — " + Math.round(80 * d.creatorShare / 100) + "% you / " +
-        Math.round(80 * (100 - d.creatorShare) / 100) + "% platform / 20% Meteora";
-    });
+    /* Live economics, read from the config this launch will actually use — not
+     * hardcoded copy, and not the standard rung's numbers shown against a rung
+     * the creator picked instead. Re-read when the rung changes. */
+    function paintEconomics() {
+      window.Token.describeConfig(flow.quote, flow.tier || "standard").then(function (d) {
+        var el = box.querySelector("#tk-grad");
+        if (!el) return;
+        if (!d) { el.textContent = "shown at launch"; return; }
+        el.textContent = UI.fmt(d.graduation) + " " + qLabel + " raised";
+        if (d.feePct) box.querySelector("#tk-fee").textContent =
+          d.feePct + "% — " + Math.round(80 * d.creatorShare / 100) + "% you / " +
+          Math.round(80 * (100 - d.creatorShare) / 100) + "% platform / 20% Meteora";
+      });
+    }
+    paintEconomics();
 
     function collect() {
       flow.tname = box.querySelector("#lp-tname").value;
@@ -1524,40 +1556,13 @@
       if (!b || b.disabled) return;
       // toggle IN PLACE — a full re-render scrolls the window back to the
       // top, which reads as a jump
-      flow.customFee = b.dataset.t === "custom"
-        ? (parseFloat(box.querySelector("#tk-custompct").value) || 1) : 0;
+      flow.tier = b.dataset.t;
       box.querySelectorAll("#tk-tiers .tier").forEach(function (x) {
         x.classList.toggle("on", x === b);
       });
-      box.querySelector("#tk-customrow").hidden = !flow.customFee;
-      box.querySelector("#tk-fee").textContent =
-        (flow.customFee || 1) + "% — 20% you / 60% platform / 20% Meteora";
-      if (flow.customFee) paintSplit();
-    });
-    function paintSplit() {
-      var pct = parseFloat(box.querySelector("#tk-custompct").value) || 0;
-      var el = box.querySelector("#tk-customsplit");
-      if (!(pct >= 0.25)) { el.textContent = "Minimum 0.25%."; return; }
-      el.textContent = "Of every trade: " + (pct * 0.2).toFixed(2) + "% to you, " +
-        (pct * 0.6).toFixed(2) + "% to the platform, " + (pct * 0.2).toFixed(2) +
-        "% to Meteora.";
-    }
-    if (flow.customFee) paintSplit();
-    box.querySelector("#tk-custompct").addEventListener("input", function () {
-      flow.customFee = Math.min(20, Math.max(0.25,
-        parseFloat(box.querySelector("#tk-custompct").value) || 0)) || flow.customFee;
-      box.querySelector("#tk-fee").textContent =
-        flow.customFee + "% — 20% you / 60% platform / 20% Meteora";
-      paintSplit();
-    });
-    box.querySelector("#tk-feechips").addEventListener("click", function (e) {
-      var b = e.target.closest("button[data-v]");
-      if (!b) return;
-      flow.customFee = +b.dataset.v;
-      box.querySelector("#tk-custompct").value = b.dataset.v;
-      box.querySelector("#tk-fee").textContent =
-        flow.customFee + "% — 20% you / 60% platform / 20% Meteora";
-      paintSplit();
+      box.querySelector("#tk-fee").textContent = tierPct(flow) +
+        "% — 20% you / 60% platform / 20% Meteora";
+      paintEconomics();          // the rung has its own curve, not just its own fee
     });
     box.querySelector("#tk-quotes").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-q]");
@@ -1740,8 +1745,8 @@
       ${flow.feeWallet ? H`<div class="row"><span class="k">Fees claim to</span><b>${shortAddr(flow.feeWallet)}</b></div>` : ""}
       <div class="row"><span class="k">Metadata storage</span><b id="lp-fee">quoting…</b></div>
       <div class="row"><span class="k">Wallet</span><b>${w ? w.name + " · " + shortAddr(w.publicKey) : "not connected"}</b></div>
-      <div class="row"><span class="k">Swap fee</span><b>${flow.customFee
-        ? "Tax token — " + flow.customFee + "%" : "Standard — 1%"}</b></div>
+      <div class="row"><span class="k">Swap fee</span><b>${
+        tierSpec(flow).label + " — " + tierPct(flow) + "%"}</b></div>
       <p class="note">Fee split on every trade: 20% you, 60% platform, 20% Meteora —
       the same split at every fee level.
       Your share claims straight to any address — including a reward vault.</p>
@@ -1809,7 +1814,7 @@
         avatar: flow.icon || null, banner: flow.banner || null
       }, "token", [
         ["priced in", (flow.quote || "SOL").toUpperCase()],
-        ["swap fee", (flow.customFeeBps ? (flow.customFeeBps / 100) : 1) + "%"],
+        ["swap fee", tierPct(flow) + "%"],
         ["chain", "Solana"]
       ]);
       // the credit is spent the moment an upload redeems it
@@ -1856,7 +1861,7 @@
         symbol: flow.tsym,
         uri: meta.uri,
         quote: flow.quote,
-        customFeeBps: flow.customFee ? Math.round(flow.customFee * 100) : 0,
+        tier: flow.tier || "standard",
         feeShare: flow.feeShare || "keep",
         feeSharePct: flow.feeSharePct || 0,
         firstBuySol: flow.tbuy,

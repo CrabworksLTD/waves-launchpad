@@ -27,12 +27,25 @@
    * which is the burn/dividend budget the keeper spends. True transfer taxes
    * need the rewards program (custom transfer hook), not a config.
    * ⚠️ PROPOSED numbers — Kyle signs off before any mainnet signature. */
+  /* A rung is a whole config, created once and reused by every launch that
+   * picks it. That is the difference between a launch costing one signature and
+   * costing two: a free-form percentage has no config to point at, so each
+   * launch had to create its own first — the transaction that kept stranding
+   * launches on 2026-09-01. The ladder is short on purpose; each rung is an
+   * immutable on-chain account somebody has to sign for. */
   var TIERS = {
-    standard: { label: "Standard", baseFeeBps: 100,
+    standard: { label: "Standard", pct: 1, baseFeeBps: 100,
                 creatorTradingFeePercentage: 25 },   // 0.2% creator / 0.6% us / 0.2% Meteora
-    tax:      { label: "Tax token", baseFeeBps: 500,
+    t2:       { label: "Tax token", pct: 2, baseFeeBps: 200,
+                creatorTradingFeePercentage: 25 },
+    t3:       { label: "Tax token", pct: 3, baseFeeBps: 300,
+                creatorTradingFeePercentage: 25 },
+    tax:      { label: "Tax token", pct: 5, baseFeeBps: 500,
                 creatorTradingFeePercentage: 25 }    // same split as standard, bigger fee
   };
+
+  /* The rungs in the order they are offered. */
+  var LADDER = ["standard", "t2", "t3", "tax"];
 
   var QUOTES = {
     sol: {
@@ -127,5 +140,5 @@
     };
   }
 
-  return { TERMS: TERMS, TIERS: TIERS, QUOTES: QUOTES, rwaQuote: rwaQuote, buildParams: buildParams };
+  return { TERMS: TERMS, TIERS: TIERS, LADDER: LADDER, QUOTES: QUOTES, rwaQuote: rwaQuote, buildParams: buildParams };
 });

@@ -85,6 +85,13 @@
                         // was 9xHSsPYmRuJJtGA3TYB7Q5P2oHWy4zpeugTf9EZ1S491,
                         // which names the treasury as claimer — see sol above
                         usdc: "CkggbyU3nA7DLxT5Cw6xZBysB9tQK1Bt4SstY7cdcNGe",
+                        /* Fee-ladder rungs. Each is its own immutable config,
+                         * signed once at /config-create?fee=<rung>. An empty
+                         * string means that rung is simply not offered — the
+                         * launch window hides it rather than trying to create
+                         * one mid-launch. */
+                        t2:  { sol: "", usdc: "", rwa: {} },
+                        t3:  { sol: "", usdc: "", rwa: {} },
                         tax: { sol: "", usdc: "", rwa: {} },
                         /* ⚠️ Only classic-SPL mints can be a QUOTE — DBC
                          * rejects Token-2022, and 49 of the 50 most liquid
