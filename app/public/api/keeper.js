@@ -348,9 +348,18 @@ export default async function handler(req, res) {
       }];
       log.push("explicit job: " + q.mint);
     } else {
-      const j = await fetch(origin + "/api/tokens").then((r) => r.json()).catch(() => ({}));
-      jobs = (j.tokens || []).filter(
-        (t) => (t.feeSharePct || 0) > 0 || t.feeShare === "holders");
+      /* Straight from KV, not from our own HTTP API. The self-fetch has
+       * returned nothing at least twice — and here that means every pledged
+       * launch is silently skipped and holders do not get paid, while the run
+       * reports success with "pledged: 0". A failure now says so. */
+      let all = [];
+      try {
+        const raw = await db.lrange("tokens", 0, 199);
+        all = (raw || []).map((r) => (typeof r === "string" ? JSON.parse(r) : r)).filter(Boolean);
+      } catch (e) {
+        log.push("could not read the launch list: " + String((e && e.message) || e).slice(0, 80));
+      }
+      jobs = all.filter((t) => (t.feeSharePct || 0) > 0 || t.feeShare === "holders");
     }
 
     /* The platform's own revenue, swept before anything else.
@@ -371,8 +380,10 @@ export default async function handler(req, res) {
       try {
         const claimer = w3.Keypair.fromSecretKey(
           bs58.decode(process.env.PARTNER_CLAIMER_SECRET.trim()));
-        const j2 = await fetch(origin + "/api/tokens").then((r) => r.json()).catch(() => ({}));
-        for (const t of (j2.tokens || [])) {
+        const rawAll = await db.lrange("tokens", 0, 199).catch(() => []);
+        const allToks = (rawAll || [])
+          .map((r) => (typeof r === "string" ? JSON.parse(r) : r)).filter(Boolean);
+        for (const t of allToks) {
           if (!t.pool) continue;
           try {
             const p = new w3.PublicKey(t.pool);
