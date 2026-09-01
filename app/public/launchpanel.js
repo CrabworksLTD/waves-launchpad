@@ -1252,6 +1252,7 @@
         <button data-v="0.1">0.1</button><button data-v="0.5">0.5</button>
         <button data-v="1">1</button><button data-v="5">5</button>
       </div>
+      <p class="note" id="tk-buyshare"></p>
       <p class="note">Lands in the same transaction as the pool, so nobody can snipe
       the opening price ahead of you.</p>
 
@@ -1404,6 +1405,34 @@
     }
     paintShare();
     box.querySelector("#tk-sharepct").addEventListener("input", paintShare);
+    /* What the first buy actually gets you.
+     *
+     * "1 SOL" tells a launcher nothing about the position they are taking. The
+     * curve starts at a known market cap, so the share is simply the amount
+     * over that cap — 1 SOL into a 28 SOL curve is ~3.5% of supply. Slightly
+     * generous, because the buy walks the price up as it fills, and marked
+     * approximate for that reason. It matters because this is the one number
+     * that decides whether a launch looks fair or looks like a rug. */
+    function paintBuyShare() {
+      var el = box.querySelector("#tk-buyshare");
+      if (!el) return;
+      var amt = parseFloat(box.querySelector("#lp-tbuy").value) || 0;
+      var terms = window.DBC_TERMS;
+      var q = terms && terms.QUOTES && terms.QUOTES[flow.quote];
+      var cap = q && q.initialMarketCap;
+      if (!amt || !cap) { el.textContent = ""; return; }
+      var supply = (terms.TERMS && terms.TERMS.totalTokenSupply) || 1e9;
+      var pct = Math.min(100, (amt / cap) * 100);
+      el.innerHTML = "That buys you roughly <b>" + pct.toFixed(2) + "% of supply</b> — " +
+        "about " + UI.fmt(supply * pct / 100, 0) + " tokens" +
+        (pct >= 10 ? " <b>— buyers will read that as a large insider position.</b>" : ".");
+    }
+    paintBuyShare();
+    box.querySelector("#lp-tbuy").addEventListener("input", paintBuyShare);
+    box.querySelector("#tk-chips").addEventListener("click", function () {
+      setTimeout(paintBuyShare, 0);      // after the chip has written the value
+    });
+
     box.querySelector("#tk-tiers").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-t]");
       if (!b || b.disabled) return;
@@ -1620,7 +1649,8 @@
         flow.reward.liquidity !== undefined && flow.reward.liquidity < 1000
           ? qLabel + " — " + flow.reward.symbol + " has no market yet"
           : (flow.reward.symbol || qLabel)}</b></div>` : ""}
-      <div class="row"><span class="k">First buy</span><b>${flow.tbuy > 0 ? flow.tbuy + " " + qLabel : "none"}</b></div>
+      <div class="row"><span class="k">First buy</span><b>${flow.tbuy > 0
+        ? flow.tbuy + " " + qLabel + buyShareSuffix(flow) : "none"}</b></div>
       ${flow.feeWallet ? H`<div class="row"><span class="k">Fees claim to</span><b>${shortAddr(flow.feeWallet)}</b></div>` : ""}
       <div class="row"><span class="k">Metadata storage</span><b id="lp-fee">quoting…</b></div>
       <div class="row"><span class="k">Wallet</span><b>${w ? w.name + " · " + shortAddr(w.publicKey) : "not connected"}</b></div>
@@ -1770,6 +1800,17 @@
         '<div class="acts"><button id="lp-close2">Close</button></div>');
       box.querySelector("#lp-close2").onclick = close;
     }
+  }
+
+  /* The first buy as a share of supply, for the confirm screen. Same
+   * arithmetic as the launch window: the curve opens at a known market cap, so
+   * the share is the amount over that cap. */
+  function buyShareSuffix(flow) {
+    var terms = window.DBC_TERMS;
+    var q = terms && terms.QUOTES && terms.QUOTES[flow.quote];
+    if (!q || !q.initialMarketCap || !(flow.tbuy > 0)) return "";
+    var pct = Math.min(100, (flow.tbuy / q.initialMarketCap) * 100);
+    return "  ·  ~" + pct.toFixed(2) + "% of supply";
   }
 
   function tokenDone(flow, res) {
