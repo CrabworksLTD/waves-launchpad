@@ -210,6 +210,11 @@ export default async function handler(req, res) {
     const cli = new M.DynamicBondingCurveClient(conn, "confirmed");
     const db = await kv().catch(() => null);
 
+    // declared before both the platform sweep and the pledged-job list, which
+    // each fetch the records through it
+    const proto = req.headers["x-forwarded-proto"] || "https";
+    const origin = proto + "://" + (req.headers["x-forwarded-host"] || req.headers.host);
+
     /* An explicit single job, instead of the live listing. This is how the
      * distribution path gets rehearsed against a local validator before it is
      * trusted with real fees — same deployed code, a pool that does not matter.
@@ -244,9 +249,6 @@ export default async function handler(req, res) {
      * configs (which name the treasury) still have to be claimed by hand at
      * /fees — that page is the creator-facing tool and stays as it is.
      */
-    const proto = req.headers["x-forwarded-proto"] || "https";
-    const origin = proto + "://" + (req.headers["x-forwarded-host"] || req.headers.host);
-
     if (process.env.PARTNER_CLAIMER_SECRET && process.env.FEE_TO) {
       try {
         const claimer = w3.Keypair.fromSecretKey(
