@@ -209,7 +209,7 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
        * prompt appears — with Phantom's warning screen in the way that is
        * easily exceeded, and the send then fails with "Blockhash not found".
        * Fetch it late and retry once with a fresh one. */
-      var sig = null;
+      var sig = null, rawBytes = null;
       for (var attempt = 0; attempt < 2 && !sig; attempt++) {
         try {
           tx.signatures = [];
@@ -225,8 +225,9 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
              Without a ceiling the button sits on "Sending…" forever, which is
              indistinguishable from a frozen page — and that is exactly what it
              did the first time this was used. */
+          rawBytes = signed.serialize();
           sig = await Promise.race([
-            conn.sendRawTransaction(signed.serialize(), { skipPreflight: false }),
+            conn.sendRawTransaction(rawBytes, { skipPreflight: false }),
             new Promise(function (_, rej) {
               setTimeout(function () {
                 rej(new Error("The RPC did not answer in 45s. Nothing was created — try again."));
@@ -243,9 +244,15 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
 
       /* Ask the chain, do not wait on a subscription: confirmTransaction has
        * reported landed transactions as expired all week. */
+      /* Re-broadcast while waiting. Solana drops transactions — this one was
+       * accepted by the RPC, given a signature, and then simply never included
+       * in a block, which is indistinguishable from a slow confirmation until
+       * the window closes. launch.js and the keeper have re-sent for exactly
+       * this reason since the launch bugs; this page was written separately and
+       * never got it, so the first two attempts to create a config vanished. */
       var landed = false;
+      var lastSend = Date.now();
       for (var w8 = 0; w8 < 90; w8++) {
-        // say what it is doing — ninety silent seconds reads as a hang
         go.textContent = "Confirming… " + w8 + "s";
         var st = await conn.getSignatureStatus(sig, { searchTransactionHistory: true })
           .catch(function () { return null; });
@@ -253,6 +260,11 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
         if (v && v.err) throw new Error("The config transaction failed on chain.");
         if (v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized")) {
           landed = true; break;
+        }
+        if (rawBytes && Date.now() - lastSend > 5000) {
+          lastSend = Date.now();
+          conn.sendRawTransaction(rawBytes, { skipPreflight: true, maxRetries: 5 })
+            .catch(function () {});
         }
         await new Promise(function (r) { setTimeout(r, 1000); });
       }

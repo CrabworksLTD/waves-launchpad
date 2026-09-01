@@ -123,14 +123,27 @@ const DRY = process.argv.includes("--dry-run");
   const client = new DynamicBondingCurveClient(conn, "confirmed");
   const config = Keypair.generate();
 
-  console.log("  owner        " + payer.publicKey.toBase58());
+  console.log("  payer        " + payer.publicKey.toBase58());
+  console.log("  feeClaimer   " + (process.env.FEE_CLAIMER || payer.publicKey.toBase58()));
+  console.log("  leftoverTo   " + (process.env.LEFTOVER_RECEIVER || payer.publicKey.toBase58()));
   console.log("  config       " + config.publicKey.toBase58());
   console.log();
 
   const tx = await client.partner.createConfig({
     config: config.publicKey,
-    feeClaimer: payer.publicKey,
-    leftoverReceiver: payer.publicKey,
+    /* These are addresses stored in the config, not signers — only the payer
+     * and the new config account sign. So the wallet paying for this does not
+     * have to be the one that claims from it, which is what lets the keeper's
+     * claim key own the claim role while the treasury stays cold.
+     *
+     *   FEE_CLAIMER        who may claim platform fees, forever. Defaults to
+     *                      the payer, which is the old behaviour.
+     *   LEFTOVER_RECEIVER  where the post-graduation remainder lands.
+     */
+    feeClaimer: process.env.FEE_CLAIMER
+      ? new PublicKey(process.env.FEE_CLAIMER) : payer.publicKey,
+    leftoverReceiver: process.env.LEFTOVER_RECEIVER
+      ? new PublicKey(process.env.LEFTOVER_RECEIVER) : payer.publicKey,
     payer: payer.publicKey,
     quoteMint: new PublicKey(QUOTE.mint),
     ...curve
