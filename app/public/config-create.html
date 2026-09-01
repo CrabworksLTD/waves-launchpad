@@ -221,7 +221,18 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
           go.textContent = "Confirm in your wallet…";
           var signed = await w.signTransaction(tx);
           go.textContent = "Sending…";
-          sig = await conn.sendRawTransaction(signed.serialize(), { skipPreflight: false });
+          /* The public RPC can accept a connection and then never answer.
+             Without a ceiling the button sits on "Sending…" forever, which is
+             indistinguishable from a frozen page — and that is exactly what it
+             did the first time this was used. */
+          sig = await Promise.race([
+            conn.sendRawTransaction(signed.serialize(), { skipPreflight: false }),
+            new Promise(function (_, rej) {
+              setTimeout(function () {
+                rej(new Error("The RPC did not answer in 45s. Nothing was created — try again."));
+              }, 45000);
+            })
+          ]);
         } catch (err) {
           var stale = /blockhash not found|block height exceeded|expired/i
             .test(String((err && err.message) || err));
@@ -232,13 +243,22 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
 
       /* Ask the chain, do not wait on a subscription: confirmTransaction has
        * reported landed transactions as expired all week. */
+      var landed = false;
       for (var w8 = 0; w8 < 90; w8++) {
+        // say what it is doing — ninety silent seconds reads as a hang
+        go.textContent = "Confirming… " + w8 + "s";
         var st = await conn.getSignatureStatus(sig, { searchTransactionHistory: true })
           .catch(function () { return null; });
         var v = st && st.value;
         if (v && v.err) throw new Error("The config transaction failed on chain.");
-        if (v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized")) break;
+        if (v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized")) {
+          landed = true; break;
+        }
         await new Promise(function (r) { setTimeout(r, 1000); });
+      }
+      if (!landed) {
+        throw new Error("Sent, but not confirmed within 90s. Check the wallet's " +
+          "history before signing again — the signature was " + sig);
       }
 
       var addr = cfgKp.publicKey.toBase58();
