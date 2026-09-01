@@ -687,12 +687,19 @@
         },
         payer: async function (q) {
           waitingOn = "storage";
+          var held = paidCredit();
+          if (held) {
+            // paid already on a run that did not finish; the credit is unspent
+            mark("storage", "done", "Using the storage payment you already made");
+            return held.sig;
+          }
           mark("storage", "on", "Approve the payment in your wallet…");
           var sig = await payStorage(q);
           mark("storage", "done");
           return sig;
         }
       });
+      forgetPaid();          // the upload redeemed it; a retry must pay afresh
 
       var res = await window.Launch.deploy({
         name: cfg.name,
@@ -983,6 +990,40 @@
     box.querySelector("#lp-open").onclick = function () { location.href = res.mintUrl; };
   }
 
+  /* A paid-for launch that dies must not cost the money twice.
+   *
+   * The server grants the upload credit against a payment signature and only
+   * marks it spent when an upload actually redeems it — so a signature from a
+   * launch that failed before uploading is still worth exactly what was paid.
+   * Nothing remembered it, though: a frozen window on 2026-08-31 took a
+   * payment and orphaned it, and the credit expired unspent an hour later.
+   *
+   * ⚠️ That hour is the server's rule (api/upload-url rejects payments older
+   * than 3600s), so a resume offer must state the time left rather than
+   * pretend the credit keeps. */
+  var PAID_KEY = "waves.paidStorage";
+  var PAID_TTL = 55 * 60 * 1000;        // just inside the server's hour
+
+  function rememberPaid(sig, q) {
+    try {
+      localStorage.setItem(PAID_KEY, JSON.stringify({
+        sig: sig, at: Date.now(),
+        lamports: String(q && q.feeLamports || ""), chain: "solana"
+      }));
+    } catch (e) {}
+    return sig;
+  }
+  function paidCredit() {
+    try {
+      var v = JSON.parse(localStorage.getItem(PAID_KEY) || "null");
+      if (!v || !v.sig) return null;
+      if (Date.now() - v.at > PAID_TTL) { forgetPaid(); return null; }
+      v.minutesLeft = Math.max(0, Math.round((PAID_TTL - (Date.now() - v.at)) / 60000));
+      return v;
+    } catch (e) { return null; }
+  }
+  function forgetPaid() { try { localStorage.removeItem(PAID_KEY); } catch (e) {} }
+
   // A plain SOL transfer to the fee wallet, signed by the creator. The server
   // verifies it as a balance delta before granting the upload credit.
   async function payStorage(q) {
@@ -1037,12 +1078,12 @@
           destination: mx.publicKey(q.feeTo),
           amount: mx.lamports(BigInt(q.feeLamports))
         }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
-        return mx.base58.deserialize(res.signature)[0];
+        return rememberPaid(mx.base58.deserialize(res.signature)[0], q);
       } catch (e) {
         var msg = String((e && e.message) || e);
         // the signature is in the error text when a send times out
         var found = msg.match(/[1-9A-HJ-NP-Za-km-z]{80,90}/);
-        if (found && await landed(found[0])) return found[0];
+        if (found && await landed(found[0])) return rememberPaid(found[0], q);
         var expired = /expired|block height exceeded|timed? ?out/i.test(msg);
         if (attempt === 0 && expired) continue;   // fresh blockhash, one more go
         throw e;
@@ -1577,6 +1618,7 @@
         ["swap fee", (flow.customFeeBps ? (flow.customFeeBps / 100) : 1) + "%"],
         ["chain", "Solana"]
       ]);
+      // the credit is spent the moment an upload redeems it
       var meta = await window.Storage.uploadTokenMeta({
         name: flow.tname,
         card: tcard,
@@ -1587,8 +1629,12 @@
         banner: flow.banner || null,
         bannerExt: flow.bannerExt || "png",
         links: { website: flow.web, x: flow.x, telegram: flow.tg },
-        payer: function (q) { return payStorage(q); }
+        payer: function (q) {
+          var held = paidCredit();
+          return held ? Promise.resolve(held.sig) : payStorage(q);
+        }
       });
+      forgetPaid();
       mark("meta", "done");
 
       mark("pool", "on");

@@ -93,12 +93,12 @@
     if (auth && auth.sig) { body.sig = auth.sig; body.ts = auth.ts; }
     if (auth && auth.signature) body.signature = auth.signature;
 
-    var r = await fetch(SIGN, {
+    var got = await fetchJson(SIGN, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
-    });
-    var j = await r.json().catch(function () { return {}; });
+    }, 45000, "The upload slot request");
+    var r = got.r, j = got.j;
     if (!r.ok || !j.paidBy) {
       throw new Error(j.detail || j.error || ("Could not get an upload slot (" + r.status + ")"));
     }
@@ -109,12 +109,12 @@
   // server. Grants nothing — just a price, so a non-holder can be shown and
   // charged the real number before any credit is spent.
   async function quoteUpload(bytes, count) {
-    var r = await fetch(SIGN, {
+    var got = await fetchJson(SIGN, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ quote: true, bytes: bytes, count: count, chain: payChain() })
-    });
-    var j = await r.json().catch(function () { return {}; });
+    }, 30000, "The storage price request");
+    var r = got.r, j = got.j;
     if (!r.ok || !(j.feeLamports || j.feeWei)) {
       throw new Error(j.detail || j.error || ("Could not price the upload (" + r.status + ")"));
     }
@@ -128,6 +128,33 @@
       total += f.bytes ? new Blob([f.bytes]).size : new Blob([f.text]).size;
     });
     return total;
+  }
+
+  /* Nothing in this file may wait forever.
+   *
+   * fetch() has no default timeout: a request that never answers leaves the
+   * launch panel sitting on a step with no error and no way out. That is what
+   * froze a launch on 2026-08-31, immediately after the storage payment had
+   * been taken — the worst possible moment, because the money was already
+   * gone and the credit expires in an hour.
+   *
+   * Every network call here now fails loudly instead. */
+  function withTimeout(p, ms, what) {
+    var timer;
+    var stop = new Promise(function (_, reject) {
+      timer = setTimeout(function () {
+        reject(new Error(what + " did not respond in " + Math.round(ms / 1000) +
+          "s. Nothing further was charged — try again."));
+      }, ms);
+    });
+    return Promise.race([p, stop]).finally(function () { clearTimeout(timer); });
+  }
+
+  function fetchJson(url, opts, ms, what) {
+    return withTimeout(fetch(url, opts), ms || 30000, what).then(function (r) {
+      return r.json().catch(function () { return {}; })
+        .then(function (j) { return { r: r, j: j }; });
+    });
   }
 
   // A folder upload that never settles must fail loudly, not sit on "Storing
@@ -154,11 +181,12 @@
   // cannot try to spend an already-claimed payment.
   async function prepareUploader(totalBytes, totalCount, auth, onProgress) {
     if (onProgress) onProgress({ phase: "images", state: "signing" });
-    var T = await turbo();
+    var T = await withTimeout(turbo(), 60000, "Loading the upload library");
 
     var key = await throwawayKey();
     var client = T.TurboFactory.authenticated({ privateKey: key, token: "solana" });
-    var me = await client.signer.getNativeAddress();
+    var me = await withTimeout(client.signer.getNativeAddress(), 20000,
+      "Preparing the upload signer");
 
     var paidBy = await uploadApproval(me, totalBytes, totalCount, auth);
     return { client: client, paidBy: paidBy };
