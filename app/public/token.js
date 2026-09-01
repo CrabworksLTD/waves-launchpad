@@ -70,21 +70,25 @@
     });
   }
 
+  /* web3's Connection rejects a relative path, so the endpoint is absolute
+
+   * from the moment it is defined rather than fixed up at each use. */
+
+  var ORIGIN = window.location.origin;
+
   var CLUSTERS = {
     /* Our own passthrough, not a public endpoint. A free node accepts a send,
      * returns a signature and then fails to get the bytes to the leader — which
      * killed two pool creations in a row with an expired blockhash while the
      * small config transaction beside them landed fine. /api/rpc forwards to
      * the same node the indexer uses. */
-    "mainnet-beta": "/api/rpc",
+    "mainnet-beta": ORIGIN + "/api/rpc",
     devnet: "https://api.devnet.solana.com",
     localnet: "http://127.0.0.1:8899"
   };
 
-  /* Relative paths are ours; anything else is an absolute endpoint as given. */
   function rpcUrl(cluster) {
-    var u = CLUSTERS[cluster] || CLUSTERS["mainnet-beta"];
-    return u.charAt(0) === "/" ? window.location.origin + u : u;
+    return CLUSTERS[cluster] || CLUSTERS["mainnet-beta"];
   }
 
   /* Ask to be included.

@@ -18,8 +18,9 @@
   var CLUSTERS = {
     // NOT api.mainnet-beta.solana.com — Solana's public endpoint 403s
     // browser-origin requests; publicnode serves them
-    // our passthrough — a free public node drops large sends (see api/rpc.js)
-    "mainnet-beta": { rpc: "/api/rpc", label: "Mainnet", explorer: "" },
+    /* Our passthrough — a free public node drops large sends (see api/rpc.js).
+     * Absolute: web3's Connection and umi both reject a relative path. */
+    "mainnet-beta": { rpc: window.location.origin + "/api/rpc", label: "Mainnet", explorer: "" },
     devnet:         { rpc: "https://api.devnet.solana.com",       label: "Devnet",  explorer: "?cluster=devnet" },
     // the local mainnet-clone validator (see memory: sunpad-chain-testing)
     localnet:       { rpc: "http://127.0.0.1:8899",               label: "Localnet", explorer: "?cluster=custom&customUrl=http%3A%2F%2F127.0.0.1%3A8899" }
