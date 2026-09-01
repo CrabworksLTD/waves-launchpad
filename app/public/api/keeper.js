@@ -43,7 +43,7 @@ const GAS_FLOOR = 20000000n;        // 0.02 SOL — the keeper pays gas from its
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const PLAN_TTL = 60 * 60 * 24 * 7;  // an unfinished plan is still worth resuming a week later
 
-/* ── The reward-asset swap leg, when it gets built ───────────────────────────
+/* ── The reward-asset swap leg ───────────────────────────────────────────────
  *
  * Creators can pick a tokenised stock or commodity for holders to be paid in.
  * That is a novelty and everyone knows it — holders sell them — but it costs
@@ -75,6 +75,12 @@ const PLAN_TTL = 60 * 60 * 24 * 7;  // an unfinished plan is still worth resumin
  *    the quote currency instead and log why. A successful token should not be
  *    punished for outgrowing the asset its creator picked in week one.
  *
+ * 3. ACCOUNT RENT. A holder receiving an asset they do not already own pays
+ *    ~0.002 SOL for an account to hold it, funded by the keeper. On a small pot
+ *    that is most of the payout, so the swap is skipped when rent would exceed
+ *    10% of the pot — holders would rather have the quote currency than a dust
+ *    position that cost more to create than it holds.
+ *
  * Also worth remembering: a holder receiving an asset they do not already own
  * pays ~0.002 SOL of rent to open the account. On a $2 payout that is 10% —
  * far more than any slippage — which is its own argument for paying the quote
@@ -82,6 +88,8 @@ const PLAN_TTL = 60 * 60 * 24 * 7;  // an unfinished plan is still worth resumin
  */
 const REWARD_HEADROOM = 0.02;      // 2% of the reward asset's liquidity
 const REWARD_MIN_LIQUIDITY = 1000; // matches the picker in launchpanel.js
+const REWARD_SLIPPAGE_BPS = 150;   // 1.5% — these are thin books, not majors
+const ATA_RENT_LAMPORTS = 2040000n; // what a holder's new token account costs
 
 function kv() {
   /* No credentials means no store, not a broken one. The Upstash client
@@ -184,6 +192,113 @@ async function payOnce(conn, keeper, plan, slot, build, save) {
 let _bs58 = null;
 function bs58encode(buf) { return _bs58.encode(buf); }
 
+
+/* ── The reward swap ─────────────────────────────────────────────────────────
+ *
+ * Claimed fees arrive in the pool's quote currency. A creator who chose a
+ * reward asset wants their holders paid in THAT, so the keeper buys it before
+ * distributing. Everything below decides whether doing so is actually in the
+ * holders' interest, and pays the quote currency when it is not.
+ *
+ * ⚠️ This is the one part of the keeper that cannot be rehearsed on a local
+ * validator: Jupiter does not exist there. It has to be proven on mainnet with
+ * a small pot.
+ */
+
+// Jupiter, with the same plain-text-429 handling the indexer needs
+async function jup(path) {
+  for (let i = 0; i < 4; i++) {
+    const r = await fetch("https://lite-api.jup.ag" + path);
+    const text = await r.text();
+    try { return JSON.parse(text); } catch (e) { /* rate limited */ }
+    await new Promise((s) => setTimeout(s, 500 * (i + 1)));
+  }
+  return null;
+}
+
+/* Would swapping actually serve the holders? Four ways the answer is no, each
+ * of which pays the quote currency instead — that is a real payout in an asset
+ * every wallet already holds, not a failure. */
+async function rewardPlan(rewardMint, quoteMint, potLamports, quoteDecimals, holders) {
+  if (!rewardMint || rewardMint === quoteMint) return null;
+
+  const price = await jup("/price/v3?ids=" + rewardMint);
+  const info = price && price[rewardMint];
+  const liquidity = (info && info.liquidity) || 0;
+  if (liquidity < REWARD_MIN_LIQUIDITY) {
+    return { skip: "nothing trades " + rewardMint.slice(0, 6) + "… yet" };
+  }
+
+  /* Headroom. The keeper buys the whole pot at once, where each holder later
+   * sells only a slice, so the keeper is the largest trade in the cycle. Above
+   * a couple of percent of the pool the holders are paying for our impact. */
+  const potUsd = (Number(potLamports) / Math.pow(10, quoteDecimals)) *
+    ((await jup("/price/v3?ids=" + quoteMint))?.[quoteMint]?.usdPrice || 0);
+  if (potUsd > liquidity * REWARD_HEADROOM) {
+    return { skip: "pot is " + (potUsd / liquidity * 100).toFixed(1) +
+      "% of that asset's liquidity — too big to buy without moving it" };
+  }
+
+  /* Account rent. A holder receiving an asset they do not already own pays for
+   * an account to hold it — about 0.002 SOL, which the keeper funds. On a small
+   * pot that overhead is most of the payout, and holders would rather have the
+   * quote currency than a dust position that cost more to create than it holds. */
+  const rentCost = Number(ATA_RENT_LAMPORTS) * holders;
+  if (rentCost > Number(potLamports) * 0.1) {
+    return { skip: "account rent for " + holders + " holders would eat more than " +
+      "10% of the pot" };
+  }
+
+  const quote = await jup("/swap/v1/quote?inputMint=" + quoteMint +
+    "&outputMint=" + rewardMint + "&amount=" + potLamports.toString() +
+    "&slippageBps=" + REWARD_SLIPPAGE_BPS);
+  if (!quote || quote.error || !quote.outAmount) {
+    return { skip: "no route to " + rewardMint.slice(0, 6) + "…" };
+  }
+  return { quote, liquidity };
+}
+
+
+/* Execute the swap Jupiter quoted, signing with the keeper. Returns how much of
+ * the reward asset actually arrived — measured from the keeper's own balance,
+ * not from the quote, because a quote is a promise and slippage is real. */
+async function doSwap(conn, w3, keeper, quote, rewardMint, splToken) {
+  const built = await fetch("https://lite-api.jup.ag/swap/v1/swap", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      quoteResponse: quote,
+      userPublicKey: keeper.publicKey.toBase58(),
+      wrapAndUnwrapSol: true,
+      dynamicComputeUnitLimit: true
+    })
+  }).then((r) => r.json());
+  if (!built || !built.swapTransaction) throw new Error("Jupiter returned no transaction");
+
+  const raw = Buffer.from(built.swapTransaction, "base64");
+  const tx = w3.VersionedTransaction.deserialize(raw);
+  tx.sign([keeper]);
+  const bytes = tx.serialize();
+  const sig = await conn.sendRawTransaction(bytes, { maxRetries: 5 });
+  await confirmed(conn, sig, bytes, 120000);
+
+  const ata = splToken.getAssociatedTokenAddressSync(
+    new w3.PublicKey(rewardMint), keeper.publicKey, true,
+    await tokenProgramOf(conn, w3, rewardMint, splToken));
+  const bal = await conn.getTokenAccountBalance(ata).catch(() => null);
+  return { sig, amount: BigInt((bal && bal.value && bal.value.amount) || "0"),
+           decimals: (bal && bal.value && bal.value.decimals) || 0 };
+}
+
+/* Which token program owns a mint. Nearly every tokenised stock is Token-2022,
+ * and using the classic program's addresses for one derives an account that
+ * does not exist. */
+async function tokenProgramOf(conn, w3, mint, splToken) {
+  const info = await conn.getAccountInfo(new w3.PublicKey(mint)).catch(() => null);
+  return info && info.owner && info.owner.toBase58() === splToken.TOKEN_2022_PROGRAM_ID.toBase58()
+    ? splToken.TOKEN_2022_PROGRAM_ID : splToken.TOKEN_PROGRAM_ID;
+}
+
 export default async function handler(req, res) {
   // Vercel signs scheduled invocations; a stranger hitting this URL must not
   // be able to start a payout run.
@@ -203,6 +318,7 @@ export default async function handler(req, res) {
     const w3 = await import("@solana/web3.js");
     const M = await import("@meteora-ag/dynamic-bonding-curve-sdk");
     const bs58 = (await import("bs58")).default;
+    const splToken = await import("@solana/spl-token");
     _bs58 = bs58;   // payOnce encodes signatures with it
     const BN = (await import("bn.js")).default;
 
@@ -413,11 +529,57 @@ export default async function handler(req, res) {
             .map((h) => ({ owner: h.owner, lamports: ((pot * h.amount) / held).toString() }))
             .filter((p) => BigInt(p.lamports) >= DUST_MIN_LAMPORTS);
 
+          /* ── the reward asset, if the creator chose one and it makes sense ──
+           *
+           * Only the holders' pot is swapped. The creator's kept share stays in
+           * the quote currency — they chose what their HOLDERS are paid in, not
+           * what they are. Any reason not to swap pays the quote currency and
+           * says why, which is a real payout rather than a failure. */
+          let reward = null;
+          if (job.rewardMint && pot > 0n && pays.length) {
+            const decision = await rewardPlan(
+              job.rewardMint, String(ps.quoteMint || ""), pot, quoteDec, pays.length);
+            if (decision && decision.skip) {
+              log.push(job.mint + ": paying " + (job.quote || "the quote currency") +
+                       " — " + decision.skip);
+            } else if (decision && decision.quote) {
+              try {
+                const got = await doSwap(conn, w3, keeper, decision.quote,
+                                         job.rewardMint, splToken);
+                if (got.amount > 0n) {
+                  reward = { mint: job.rewardMint, amount: got.amount.toString(),
+                             decimals: got.decimals, swapSig: got.sig };
+                  log.push(job.mint + ": swapped the pot into " +
+                           job.rewardMint.slice(0, 6) + "… (" + got.sig.slice(0, 12) + "…)");
+                }
+              } catch (e) {
+                // the pot is still in the quote currency and still gets paid out
+                log.push(job.mint + ": swap failed, paying the quote currency — " +
+                         String((e && e.message) || e).slice(0, 90));
+              }
+            }
+          }
+
+          /* Re-cut the shares in the asset actually held. Percentages come from
+           * the token balances already read, so this is the same split. */
+          if (reward) {
+            const total = BigInt(reward.amount);
+            let assigned = 0n;
+            pays = holders
+              .map((h) => {
+                const share = (total * h.amount) / held;
+                assigned += share;
+                return { owner: h.owner, amount: share.toString() };
+              })
+              .filter((p) => BigInt(p.amount) > 0n);
+          }
+
           // ── step 4: write the plan down before spending it ─────────────────
           plan = {
             mint: job.mint, claimSig, claimed: claimed.toString(),
             creatorCut: creatorCut.toString(),
             creatorDest: job.feeWallet || job.creator || null,
+            reward,
             pays, done: 0, at: Date.now()
           };
           if (db) await db.set(planKey, JSON.stringify(plan), { ex: PLAN_TTL });
@@ -443,16 +605,51 @@ export default async function handler(req, res) {
             })), save);
         }
 
+        /* Paying in a token is not paying in SOL: each holder needs an account
+         * for that mint, which the keeper creates and funds. Fewer per
+         * transaction, because an account creation is far bigger than a
+         * lamport transfer. */
+        const rewardPay = plan.reward || null;
+        let tokenProgram = null, rewardPk = null;
+        if (rewardPay) {
+          rewardPk = new w3.PublicKey(rewardPay.mint);
+          tokenProgram = await tokenProgramOf(conn, w3, rewardPay.mint, splToken);
+        }
+        const batchSize = rewardPay ? 5 : BATCH;
+
         while (plan.done < plan.pays.length) {
           const at = plan.done;
-          const slice = plan.pays.slice(at, at + BATCH);
+          const slice = plan.pays.slice(at, at + batchSize);
           await payOnce(conn, keeper, plan, "batch" + at, () => {
             const t = new w3.Transaction();
-            for (const p of slice) {
-              t.add(w3.SystemProgram.transfer({
-                fromPubkey: keeper.publicKey, toPubkey: new w3.PublicKey(p.owner),
-                lamports: Number(p.lamports)
-              }));
+            if (rewardPay) {
+              const from = splToken.getAssociatedTokenAddressSync(
+                rewardPk, keeper.publicKey, true, tokenProgram);
+              for (const p of slice) {
+                const owner = new w3.PublicKey(p.owner);
+                const to = splToken.getAssociatedTokenAddressSync(
+                  rewardPk, owner, true, tokenProgram);
+                // idempotent: a holder who already owns the asset keeps theirs,
+                // and a re-run after a crash cannot fail on "already exists"
+                t.add(splToken.createAssociatedTokenAccountIdempotentInstruction(
+                  keeper.publicKey, to, owner, rewardPk, tokenProgram));
+                /* transferChecked, not transfer: Token-2022 mints carrying a
+                 * TransferFeeConfig reject the unchecked instruction, and 49 of
+                 * the 50 most liquid tokenised assets are Token-2022. It also
+                 * makes the transfer assert the mint's decimals, which is a
+                 * free guard against paying the right number in the wrong
+                 * units. */
+                t.add(splToken.createTransferCheckedInstruction(
+                  from, rewardPk, to, keeper.publicKey,
+                  BigInt(p.amount), rewardPay.decimals, [], tokenProgram));
+              }
+            } else {
+              for (const p of slice) {
+                t.add(w3.SystemProgram.transfer({
+                  fromPubkey: keeper.publicKey, toPubkey: new w3.PublicKey(p.owner),
+                  lamports: Number(p.lamports)
+                }));
+              }
             }
             return t;
           }, save);
