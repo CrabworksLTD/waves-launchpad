@@ -71,11 +71,52 @@
   }
 
   var CLUSTERS = {
-    // NOT api.mainnet-beta.solana.com — it 403s browser-origin requests
-    "mainnet-beta": "https://solana-rpc.publicnode.com",
+    /* Our own passthrough, not a public endpoint. A free node accepts a send,
+     * returns a signature and then fails to get the bytes to the leader — which
+     * killed two pool creations in a row with an expired blockhash while the
+     * small config transaction beside them landed fine. /api/rpc forwards to
+     * the same node the indexer uses. */
+    "mainnet-beta": "/api/rpc",
     devnet: "https://api.devnet.solana.com",
     localnet: "http://127.0.0.1:8899"
   };
+
+  /* Relative paths are ours; anything else is an absolute endpoint as given. */
+  function rpcUrl(cluster) {
+    var u = CLUSTERS[cluster] || CLUSTERS["mainnet-beta"];
+    return u.charAt(0) === "/" ? window.location.origin + u : u;
+  }
+
+  /* Ask to be included.
+   *
+   * A pool creation with a first buy is the largest transaction this site
+   * sends, and with no priority fee it competes for block space at the bottom
+   * of the queue — which is how it kept expiring rather than failing. A tenth
+   * of a cent buys a place in line. The SDK does not set one, but check anyway
+   * so this never double-adds. */
+  var COMPUTE_BUDGET = "ComputeBudget111111111111111111111111111111";
+
+  function withPriorityFee(X, tx, micro) {
+    if (!tx || !tx.instructions) return tx;
+    for (var i = 0; i < tx.instructions.length; i++) {
+      if (String(tx.instructions[i].programId) === COMPUTE_BUDGET) return tx;
+    }
+    /* Built by hand: the vendor bundle exports PublicKey and Transaction but
+     * neither ComputeBudgetProgram nor TransactionInstruction, and reaching for
+     * the missing helper inside a try/catch would leave the fee silently unset
+     * — which is the failure this is meant to fix. The compiler duck-types an
+     * instruction, so {keys, programId, data} is enough.
+     *
+     * setComputeUnitPrice is opcode 3 followed by the price as a little-endian
+     * u64 of microlamports per compute unit. */
+    var data = new Uint8Array(9);
+    data[0] = 3;
+    new DataView(data.buffer).setBigUint64(1, BigInt(micro || 200000), true);
+    tx.instructions.unshift({
+      keys: [], programId: new X.PublicKey(COMPUTE_BUDGET), data: data
+    });
+    return tx;
+  }
 
   var dbcMod = null, mxMod = null;
   function dbc() { if (!dbcMod) dbcMod = import("/vendor/dbc.esm.js"); return dbcMod; }
@@ -189,7 +230,7 @@
     try {
       var M = await dbc(), X = await mx();
       var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
-      var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
+      var conn = new X.Connection(rpcUrl(cluster), "confirmed");
       var cli = new M.DynamicBondingCurveClient(conn, "confirmed");
       var cfg = await cli.state.getPoolConfig(new X.PublicKey(configKey(quote, tier)));
       var dec = quote === "sol" ? 9
@@ -210,7 +251,7 @@
     var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
     // web3.js Connection, which is what the DBC SDK expects — it predates umi
     // and takes a raw connection plus signers rather than an identity.
-    var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
+    var conn = new X.Connection(rpcUrl(cluster), "confirmed");
     return {
       M: M, X: X, conn: conn, wallet: w,
       cli: new M.DynamicBondingCurveClient(conn, "confirmed"),
@@ -238,6 +279,7 @@
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
         tx.feePayer = c.owner;
+        withPriorityFee(c.X, tx);
         var bh = (await c.conn.getLatestBlockhash("confirmed")).blockhash;
         tx.recentBlockhash = bh;
         // Extra keypairs the SDK needs to sign for (the new mint, usually) are
@@ -508,7 +550,7 @@
   async function readPool(baseMint) {
     var M = await dbc(), X = await mx();
     var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
-    var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
+    var conn = new X.Connection(rpcUrl(cluster), "confirmed");
     var cli = new M.DynamicBondingCurveClient(conn, "confirmed");
 
     var pool = await poolByMint(cli, X, M, conn, baseMint);
@@ -585,7 +627,7 @@
   async function readCtx(baseMint, poolHint) {
     var M = await dbc(), X = await mx();
     var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
-    var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
+    var conn = new X.Connection(rpcUrl(cluster), "confirmed");
     var cli = new M.DynamicBondingCurveClient(conn, "confirmed");
     var pool = await poolByMint(cli, X, M, conn, baseMint, poolHint);
     if (!pool) throw new Error("No pool for that mint on " + cluster);
@@ -725,7 +767,7 @@
     var w = window.Wallet.current();
     if (!w) return null;
     var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
-    var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
+    var conn = new X.Connection(rpcUrl(cluster), "confirmed");
     /* Read the associated token account directly rather than asking the RPC
      * to search by owner. getParsedTokenAccountsByOwner is an INDEXED request
      * and public nodes refuse it outright — publicnode answers 403 "Indexed
@@ -771,7 +813,7 @@
     try {
       var X = await mx();
       var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
-      var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
+      var conn = new X.Connection(rpcUrl(cluster), "confirmed");
       var MD = new X.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
       var mint = new X.PublicKey(mintStr);
       var pda = X.PublicKey.findProgramAddressSync(
@@ -804,7 +846,7 @@
   async function recentTrades(baseMint, poolAddr, limit) {
     var X = await mx();
     var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
-    var conn = new X.Connection(CLUSTERS[cluster] || CLUSTERS["mainnet-beta"], "confirmed");
+    var conn = new X.Connection(rpcUrl(cluster), "confirmed");
     var pool = new X.PublicKey(poolAddr);
     var sigs = await conn.getSignaturesForAddress(pool, { limit: limit || 20 });
     var dec = await baseDecimals(baseMint, conn, X);
