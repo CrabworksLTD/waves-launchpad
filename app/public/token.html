@@ -861,6 +861,20 @@ input:focus{outline:none;border-color:var(--accent)}
               padT + h - ((p.price - lo) / (hi - lo)) * h];
     }
 
+    /* Label the axis in market cap, not raw price.
+     *
+     * A launch token's price is "2.87e-8", which is a number nobody holds in
+     * their head and cannot be compared to anything. The same point as a market
+     * cap — $28.7K — is immediately meaningful, and it is the figure every
+     * other terminal charts. Supply is fixed, so it is the same curve either
+     * way, just readable. Falls back to price if we do not know the supply or
+     * the rate yet. */
+    function axisLabel(price) {
+      if (market && market.supply && USD) return money(price * market.supply * USD);
+      if (USD) return money(price * USD);
+      return price.toPrecision(3);
+    }
+
     var cs = getComputedStyle(document.documentElement);
     var GA = cs.getPropertyValue("--grad-a").trim() || "#9945FF";
     var GB = cs.getPropertyValue("--grad-b").trim() || "#14F195";
@@ -877,7 +891,7 @@ input:focus{outline:none;border-color:var(--accent)}
       g.strokeStyle = "rgba(255,255,255,.07)"; g.lineWidth = 1; g.stroke();
       g.setLineDash([]);
       g.fillStyle = "rgba(255,255,255,.34)";
-      g.fillText((lo + (hi - lo) * f).toPrecision(3), padL + w + 8, y);
+      g.fillText(axisLabel(lo + (hi - lo) * f), padL + w + 8, y);
     });
 
     /* The area carries the same gradient as the line.
