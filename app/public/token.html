@@ -566,10 +566,23 @@ input:focus{outline:none;border-color:var(--accent)}
   }
 
   async function load() {
-    // identity from the pinned record if we have one; chain has name via
-    // metadata uri but the record round-trip is cheaper
-    fetch("/api/tokens").then(function (r) { return r.json(); }).then(function (j) {
-      var rec = (j.tokens || []).find(function (t) { return t.mint === MINT; });
+    /* The record has to be read BEFORE the market, because it carries the pool
+     * address. This was fire-and-forget, so readMarket ran with poolHint still
+     * null and fell back to deriving the pool from the configs in brand.js — a
+     * launch on any config not listed there then reported "No pool for that
+     * mint" on its own trading page, with the address sitting in the record the
+     * whole time.
+     *
+     * Identity still paints from the record as soon as it lands; only the pool
+     * is waited on. */
+    var recPromise = fetch("/api/tokens")
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        return (j.tokens || []).find(function (t) { return t.mint === MINT; }) || null;
+      })
+      .catch(function () { return null; });
+
+    await Promise.resolve(recPromise).then(function (rec) {
       if (rec) {
         poolHint = rec.pool || null;
         $("name").firstChild.textContent = rec.name;
@@ -587,10 +600,30 @@ input:focus{outline:none;border-color:var(--accent)}
           renderLinks(meta);
           if (meta && meta.description) $("desc").textContent = meta.description;
         }).catch(function () { renderLinks(null); });
-        if (rec.icon) $("logo").innerHTML = '<img alt="" src="' + esc(rec.icon) + '">';
+        /* Art is pinned to Arweave at launch, and the gateway can take a
+         * while to serve a fresh upload — Turbo returns the id immediately but
+         * the bundle is posted and seeded after. So a token is at its most
+         * shared exactly when its images 404. Fall back to the letter tile and
+         * retry quietly rather than showing a broken-image icon, and let the
+         * art appear on its own once the gateway catches up. */
+        if (rec.icon) {
+          var lg = document.createElement("img");
+          lg.alt = "";
+          lg.onload = function () { $("logo").innerHTML = ""; $("logo").appendChild(lg); };
+          lg.onerror = function () {
+            var tries = 0;
+            var retry = setInterval(function () {
+              if (++tries > 10) return clearInterval(retry);   // ~5 minutes
+              lg.src = rec.icon + "?r=" + tries;
+            }, 30000);
+          };
+          lg.src = rec.icon;
+        }
         if (rec.banner) {
-          $("tbanner-img").src = rec.banner;
-          $("tbanner-img").hidden = false;
+          var bn = $("tbanner-img");
+          bn.onload = function () { bn.hidden = false; };
+          bn.onerror = function () { bn.hidden = true; };
+          bn.src = rec.banner;
         }
       }
     }).catch(function () {});

@@ -1681,7 +1681,11 @@
 
   function tokenDone(flow, res) {
     var nft = flow.nft;
-    var jup = "https://jup.ag/swap/SOL-" + res.mint;
+    /* The token's own page is where it trades. Jupiter cannot route a token
+     * that is still on its bonding curve — it only appears there after the
+     * curve graduates into DAMM — so sending a creator to Jupiter the moment
+     * they launch points them at an empty search result for their own token. */
+    var page = location.origin + "/token/" + res.mint;
     var box = shell(H`
       <h2>Live</h2>
       <p class="sub">$${flow.tsym} is trading on ${res.cluster}.</p>
@@ -1696,14 +1700,19 @@
       ${nft ? raw(caRow("Collection", nft.res.collection) + caRow("Candy machine", nft.res.candyMachine)) : ""}
       ${nft ? H`<label>Mint page</label>
       <input readonly value="${nft.res.mintUrl}" onclick="this.select()">` : ""}
-      <p class="note"><a href="${jup}" target="_blank" rel="noopener">Trade on Jupiter ↗</a></p>
+      <label>Token page</label>
+      <input readonly value="${page}" onclick="this.select()">
+      <p class="note">Share this — it is where people buy, and it unfurls with
+      your launch card. Jupiter lists the token once the curve graduates.</p>
       <div class="acts"><button id="lp-done">Close</button>
-      ${nft ? H`<button class="go" id="lp-open">Open mint page</button>` : ""}</div>
+      ${nft ? H`<button id="lp-open">Mint page</button>` : ""}
+      <button class="go" id="lp-token">Open token page</button></div>
     `);
     bindCopy(box);
     box.querySelector("#lp-done").onclick = close;
     var open = box.querySelector("#lp-open");
     if (open) open.onclick = function () { location.href = nft.res.mintUrl; };
+    box.querySelector("#lp-token").onclick = function () { location.href = page; };
   }
 
   /* ---------- public surface ---------- */
