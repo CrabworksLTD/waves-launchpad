@@ -218,19 +218,46 @@
     };
   }
 
+  /* A blockhash is only good for about a minute, and that clock starts before
+   * the wallet even shows a prompt. Between reading the hash, the user finding
+   * the window, Phantom's "this dApp may be malicious — proceed anyway" screen
+   * and the actual approval, a minute goes easily — and then the send fails
+   * with "Blockhash not found", which reads like a broken transaction rather
+   * than an expired one. It killed the first real fee claim.
+   *
+   * So: fetch the hash as late as possible, and on an expiry rebuild and ask
+   * again with a fresh one. Only expiry is retried — anything else is a real
+   * failure and must surface. */
+  function isStaleBlockhash(e) {
+    return /blockhash not found|block height exceeded|expired/i.test(
+      String((e && e.message) || e));
+  }
+
   async function send(c, txish) {
     var tx = txish.transaction ? txish.transaction : txish;
-    tx.feePayer = c.owner;
-    tx.recentBlockhash = (await c.conn.getLatestBlockhash("confirmed")).blockhash;
-    // Extra keypairs the SDK needs to sign for (the new mint, usually) are
-    // returned alongside the transaction and have to be applied before the
-    // wallet signs, or the wallet's signature covers the wrong message.
-    if (txish.signers && txish.signers.length) tx.partialSign.apply(tx, txish.signers);
-    var signed = await c.wallet.signTransaction(tx);
-    var raw = signed.serialize();
-    var sig = await c.conn.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 5 });
-    await confirmByPolling(c.conn, sig, raw);
-    return sig;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        tx.feePayer = c.owner;
+        tx.recentBlockhash = (await c.conn.getLatestBlockhash("confirmed")).blockhash;
+        // Extra keypairs the SDK needs to sign for (the new mint, usually) are
+        // returned alongside the transaction and have to be applied before the
+        // wallet signs, or the wallet's signature covers the wrong message.
+        if (txish.signers && txish.signers.length) tx.partialSign.apply(tx, txish.signers);
+        var signed = await c.wallet.signTransaction(tx);
+        var raw = signed.serialize();
+        var sig = await c.conn.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 5 });
+        await confirmByPolling(c.conn, sig, raw);
+        return sig;
+      } catch (e) {
+        if (attempt === 0 && isStaleBlockhash(e)) {
+          // a signed transaction cannot be re-signed — drop the signatures and
+          // rebuild against a fresh hash
+          try { tx.signatures = []; } catch (e2) {}
+          continue;
+        }
+        throw e;
+      }
+    }
   }
 
   /* Confirmation for trades, by asking rather than subscribing.
