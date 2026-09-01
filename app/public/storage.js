@@ -448,14 +448,20 @@
     // the launch's share card, composed in the browser (see cardmaker.js)
     if (opts.card) files.push({ id: "_card", name: "card.png", bytes: opts.card });
 
+    // same reasoning as the uri below — the picture has to answer on the
+
+    // first fetch, not the first fetch after arweave.net indexes
+
+    var ORIGIN = window.location.origin;
+
     function buildJson(cid) {
       var j = {
         name: opts.name,
         symbol: opts.symbol,
         description: opts.description || ""
       };
-      if (opts.icon) j.image = "https://arweave.net/" + cid + "/" + iconName;
-      if (opts.banner) j.banner = "https://arweave.net/" + cid + "/" + bannerName;
+      if (opts.icon) j.image = ORIGIN + "/m/" + cid + "/" + iconName;
+      if (opts.banner) j.banner = ORIGIN + "/m/" + cid + "/" + bannerName;
       // the extensions shape Jupiter and the explorers read socials from
       if (opts.links) {
         var ext = {};
@@ -512,11 +518,24 @@
     var cid = await uploadWith(up,
       [{ id: "_t", name: "token.json", text: buildJson(artCid) }],
       "token metadata", opts.onProgress);
+    /* Published through our own path rather than arweave.net directly.
+     *
+     * An aggregator fetches a token's URI once, when it first sees the pool,
+     * and caches whatever it gets. arweave.net did not know $MOAR's upload
+     * existed 45 minutes after launch, so GMGN cached a 404 and the token has
+     * no picture and no website link for good — the metadata is immutable, so
+     * there is nothing to repoint.
+     *
+     * /m/ answers from whichever gateway actually has the bytes, trying
+     * arweave.net first. The data is still on Arweave and still permanent;
+     * this only changes which door a caller knocks on while the canonical
+     * gateway catches up. See api/meta.js. */
+    var base = ORIGIN + "/m/";
     var out = {
-      uri: "https://arweave.net/" + cid + "/token.json", cid: cid,
-      iconUri: opts.icon ? "https://arweave.net/" + artCid + "/" + iconName : null,
-      bannerUri: opts.banner ? "https://arweave.net/" + artCid + "/" + bannerName : null,
-      cardUri: opts.card ? "https://arweave.net/" + artCid + "/card.png" : null
+      uri: base + cid + "/token.json", cid: cid,
+      iconUri: opts.icon ? base + artCid + "/" + iconName : null,
+      bannerUri: opts.banner ? base + artCid + "/" + bannerName : null,
+      cardUri: opts.card ? base + artCid + "/card.png" : null
     };
     mirror(out.iconUri, opts.icon);
     mirror(out.bannerUri, opts.banner);

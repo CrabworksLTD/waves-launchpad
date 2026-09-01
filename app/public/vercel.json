@@ -11,6 +11,10 @@
     {
       "source": "/token/:address",
       "destination": "/token"
+    },
+    {
+      "source": "/m/:id/:file",
+      "destination": "/api/meta?id=:id&file=:file"
     }
   ],
   "redirects": [

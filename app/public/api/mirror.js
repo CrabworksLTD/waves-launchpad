@@ -24,7 +24,11 @@ export const config = { runtime: "nodejs" };
 
 const TTL = 60 * 60 * 48;                    // two days
 const MAX_BYTES = 900 * 1024;                // a launch icon runs ~400KB
-const ARWEAVE = /^https:\/\/arweave\.net\/([\w-]{43})\/([\w.-]{1,40})$/;
+/* Both the addresses a launch's art can be published at: arweave.net directly
+ * (collections) and our own /m/ path (tokens, since api/meta.js). Either way
+ * the key is the transaction id and the file name, so a mirror written under
+ * one is found under the other. */
+const ARWEAVE = /^https:\/\/(?:arweave\.net|[\w.-]+\/m)\/([\w-]{43})\/([\w.-]{1,40})$/;
 
 function kv() {
   if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
