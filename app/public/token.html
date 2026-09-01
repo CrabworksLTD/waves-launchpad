@@ -569,6 +569,9 @@ input:focus{outline:none;border-color:var(--accent)}
     });
     $("hist").hidden = want !== "trades";
     $("holders").hidden = want !== "holders";
+    // that count belongs to the trade feed; on the holders tab it was just a
+    // number from the other pane sitting above an unrelated list
+    $("hist-note").hidden = want !== "trades";
   });
 
   function setChange(chg) {
