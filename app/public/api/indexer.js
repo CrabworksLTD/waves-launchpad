@@ -223,10 +223,20 @@ export default async function handler(req, res) {
   const log = [];
   try {
     const db = await kv();
-    const proto = req.headers["x-forwarded-proto"] || "https";
-    const origin = proto + "://" + (req.headers["x-forwarded-host"] || req.headers.host);
-    const j = await fetch(origin + "/api/tokens").then((r) => r.json()).catch(() => ({}));
-    const toks = (j.tokens || []).filter((t) => t.pool && t.mint);
+    /* Read the launches straight from KV rather than calling our own API over
+     * HTTP. The self-fetch failed silently at least once — an empty list, an
+     * empty loop, and a run that reported success having done nothing — and it
+     * was never a good idea: same data, an extra network hop, a CDN cache in
+     * the middle, and a failure mode that looks like "no launches yet". */
+    let toks = [];
+    try {
+      const raw = await db.lrange("tokens", 0, 199);
+      toks = (raw || [])
+        .map((r) => (typeof r === "string" ? JSON.parse(r) : r))
+        .filter((t) => t && t.pool && t.mint);
+    } catch (e) {
+      log.push("could not read the launch list: " + String((e && e.message) || e).slice(0, 80));
+    }
 
     /* An unauthenticated caller may only name a mint we have already recorded,
      * and only once every 20 seconds. That bounds it to work we would do on the
