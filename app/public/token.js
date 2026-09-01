@@ -243,9 +243,27 @@
         // returned alongside the transaction and have to be applied before the
         // wallet signs, or the wallet's signature covers the wrong message.
         if (txish.signers && txish.signers.length) tx.partialSign.apply(tx, txish.signers);
-        var signed = await c.wallet.signTransaction(tx);
+        /* A wallet that never answers must not hang the launch. Phantom can
+         * fail to surface its window — especially behind its own "this dApp may
+         * be malicious" screen — and without a ceiling the step simply sits
+         * there looking identical to a slow confirmation. */
+        var signed = await Promise.race([
+          c.wallet.signTransaction(tx),
+          new Promise(function (_, rej) {
+            setTimeout(function () {
+              rej(new Error("The wallet did not respond in 2 minutes. Check for a " +
+                "pending request in your wallet, then try again — nothing further " +
+                "has been charged."));
+            }, 120000);
+          })
+        ]);
         var raw = signed.serialize();
-        var sig = await c.conn.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 5 });
+        var sig = await Promise.race([
+          c.conn.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 5 }),
+          new Promise(function (_, rej) {
+            setTimeout(function () { rej(new Error("The RPC did not answer in 45s.")); }, 45000);
+          })
+        ]);
         await confirmByPolling(c.conn, sig, raw);
         return sig;
       } catch (e) {
