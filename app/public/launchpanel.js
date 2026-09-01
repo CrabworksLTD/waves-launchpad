@@ -167,6 +167,34 @@
     if (el) { el.remove(); el = null; }
   }
 
+  /* Keep the panel where it is between renders.
+   *
+   * The backdrop centres its card, so every render that changes height moves
+   * the whole panel — picking a reward asset swaps a one-line note for a
+   * three-line one and the dialog visibly jumps out from under the cursor. The
+   * first render centres as before; after that the top edge is pinned and new
+   * content grows downward, which is what the eye expects.
+   *
+   * The pin is clamped so a panel that grows tall cannot be pushed off the top
+   * of the screen, and it is dropped on resize and on close so the next open
+   * centres normally. */
+  function pinTop(top) {
+    var card = el.querySelector(".lp");
+    if (!card) return;
+    var margin = 24;
+    var room = window.innerHeight - card.offsetHeight - margin;
+    var at = Math.max(margin, Math.min(top, room));
+    if (room < margin) { unpin(); return; }   // taller than the viewport: centre/scroll as before
+    el.style.alignItems = "start";
+    el.style.paddingTop = at + "px";
+  }
+  function unpin() {
+    if (!el) return;
+    el.style.alignItems = "";
+    el.style.paddingTop = "";
+  }
+  window.addEventListener("resize", unpin);
+
   function shell(node) {
     css();
     if (!el) {
@@ -175,7 +203,12 @@
       el.addEventListener("click", function (e) { if (e.target === el) close(); });
       document.body.appendChild(el);
     }
+    // where the panel sits right now, before it is replaced
+    var prev = el.querySelector(".lp");
+    var top = prev ? prev.getBoundingClientRect().top : null;
+
     el.innerHTML = '<div class="lp">' + (node.s || node) + "</div>";
+    if (top !== null) pinTop(top);
     return el.querySelector(".lp");
   }
 
