@@ -166,10 +166,10 @@
    *
    * Fire and forget on purpose: a launch must never fail, or even wait, for a
    * convenience cache. */
-  function mirror(url, bytes) {
+  function mirror(url, bytes, type) {
     if (!url || !bytes) return;
     try {
-      var blob = new Blob([bytes], { type: "image/png" });
+      var blob = new Blob([bytes], { type: type || "image/png" });
       var fr = new FileReader();
       fr.onload = function () {
         fetch("/api/mirror", {
@@ -515,8 +515,9 @@
     var artCid = files.length
       ? await uploadWith(up, files, "token art", opts.onProgress)
       : PLACEHOLDER;
+    var metaText = buildJson(artCid);
     var cid = await uploadWith(up,
-      [{ id: "_t", name: "token.json", text: buildJson(artCid) }],
+      [{ id: "_t", name: "token.json", text: metaText }],
       "token metadata", opts.onProgress);
     /* Published through our own path rather than arweave.net directly.
      *
@@ -537,6 +538,14 @@
       bannerUri: opts.banner ? base + artCid + "/" + bannerName : null,
       cardUri: opts.card ? base + artCid + "/card.png" : null
     };
+    /* The json too, not only the pictures.
+     *
+     * /m/ asks the gateways first and falls back to this. Art was covered and
+     * metadata was not, so in the minutes before any gateway has the bundle the
+     * images would serve while the file naming them 404'd — and an aggregator
+     * that reads a token once would cache that. This is the file that matters
+     * most and it was the one thing not kept. */
+    mirror(out.uri, metaText, "application/json");
     mirror(out.iconUri, opts.icon);
     mirror(out.bannerUri, opts.banner);
     mirror(out.cardUri, opts.card);

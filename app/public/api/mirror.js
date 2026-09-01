@@ -77,8 +77,11 @@ export default async function handler(req, res) {
     const key = keyOf(body.url);
     if (!key) return res.status(400).json({ error: "bad url" });
     const dataUrl = body.dataUrl;
-    if (typeof dataUrl !== "string" || !/^data:image\/(png|jpeg);base64,/.test(dataUrl)) {
-      return res.status(400).json({ error: "expected a png or jpeg data url" });
+    /* json as well as images: the metadata file is the one an aggregator reads
+     * first, and it was the one thing this did not keep. */
+    if (typeof dataUrl !== "string" ||
+        !/^data:(image\/(png|jpeg)|application\/json);base64,/.test(dataUrl)) {
+      return res.status(400).json({ error: "expected a png, jpeg or json data url" });
     }
     const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
     if (b64.length * 0.75 > MAX_BYTES) return res.status(413).json({ error: "too large" });
