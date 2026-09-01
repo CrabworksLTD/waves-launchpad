@@ -636,6 +636,7 @@
       ["storage", "Paying for storage"],
       ["images", "Uploading art"],
       ["metadata", "Uploading metadata"],
+      ["live", "Waiting for the artwork to go live"],
       ["collection", "Creating collection"],
       ["machine", "Creating candy machine"],
       ["lines", "Loading items"]
@@ -700,6 +701,17 @@
         }
       });
       forgetPaid();          // the upload redeemed it; a retry must pay afresh
+
+      /* Same reason as the token flow: marketplaces and wallets read a
+       * collection's metadata once and cache it, and a fresh Arweave upload is
+       * not servable for minutes. Wait before the machine goes on chain. */
+      if (up && up.collectionUri) {
+        mark("live", "on", "Arweave is still publishing it — this is worth the wait");
+        var ok = await waitForUri(up.collectionUri, function (secs) {
+          mark("live", "on", "Arweave is still publishing it — " + secs + "s");
+        });
+        mark("live", "done", ok ? "" : "still publishing — launching anyway");
+      }
 
       var res = await window.Launch.deploy({
         name: cfg.name,
@@ -1090,6 +1102,27 @@
       }
     }
     throw new Error("The storage payment could not be confirmed — nothing was charged twice; try again.");
+  }
+
+  /* Poll a freshly uploaded URI until the gateway serves it.
+   *
+   * Capped, because a launch cannot hang forever — if it is still not up we
+   * proceed and say so, since the alternative is stranding a paid-for launch.
+   * no-cors is not usable here (an opaque response hides the status), so this
+   * relies on the gateway's CORS headers, which arweave.net sends. */
+  async function waitForUri(uri, onTick) {
+    if (!uri) return false;
+    var started = Date.now();
+    var LIMIT = 240000;                      // four minutes
+    while (Date.now() - started < LIMIT) {
+      try {
+        var r = await fetch(uri, { cache: "no-store" });
+        if (r.ok) return true;
+      } catch (e) { /* network hiccup or CORS — keep waiting */ }
+      if (onTick) onTick(Math.round((Date.now() - started) / 1000));
+      await new Promise(function (res) { setTimeout(res, 5000); });
+    }
+    return false;
   }
 
   /* ================= Token flow ================= */
@@ -1593,6 +1626,7 @@
     busy = true;
     var stages = [
       ["meta", "Storing token metadata"],
+      ["live", "Waiting for the artwork to go live"],
       ["pool", "Creating the pool" + (flow.tbuy > 0 ? " + your first buy" : "")]
     ];
     if (flow.feeShare === "holders") {
@@ -1644,6 +1678,24 @@
       });
       forgetPaid();
       mark("meta", "done");
+
+      /* Wait for the gateway before putting the URI on chain.
+       *
+       * Turbo returns an id the instant it accepts the upload, but arweave.net
+       * cannot serve it until the bundle is posted and indexed — minutes, not
+       * seconds. Aggregators (GMGN, Axiom, Photon), wallets and explorers all
+       * fetch this URI ONCE, when they first see the pool, and cache what they
+       * get. $MOAR launched into that window and shows as a letter placeholder
+       * on GMGN with no image, which no amount of later propagation undoes.
+       *
+       * So the pool waits for the metadata to actually resolve. It costs a few
+       * minutes at launch and buys a token that looks right everywhere it is
+       * indexed. */
+      mark("live", "on", "Arweave is still publishing it — this is worth the wait");
+      var liveOk = await waitForUri(meta.uri, function (secs) {
+        mark("live", "on", "Arweave is still publishing it — " + secs + "s");
+      });
+      mark("live", "done", liveOk ? "" : "still publishing — launching anyway");
 
       mark("pool", "on");
       var res = await window.Token.launchToken({
