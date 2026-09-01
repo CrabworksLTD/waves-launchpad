@@ -64,7 +64,10 @@ export default async function handler(req) {
     (to === "token" ? "Token" : "Collection");
   const dest = "/" + (to === "token" ? "token" : "mint") + "/" + id;
   const card = url.origin + "/api/og?id=" + id + "&to=" + to;
-  const title = esc(name) + " — WAVES";
+  /* No "— WAVES" suffix: og:site_name already puts WAVES on the line above,
+     so the suffix made every unfurl read "WAVES / $MOAR · moar cat — WAVES".
+     The title is the launch; the site name is the site. */
+  const title = esc(name);
   const desc = "Cross-chain token and NFT launchpad";
   const human = dest + "?hp=1";
 
