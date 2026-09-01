@@ -319,6 +319,18 @@
       "made and will be reused.");
   }
 
+  /* ⚠️ A pledged launch names the KEEPER as poolCreator at creation — see the
+   * two poolCreator lines below.
+   *
+   * It used to create the pool as the launcher and then send a SECOND
+   * transaction transferring that role. Snipers trade in the gap: on $MOAR they
+   * took nearly all of it, leaving 0.0047 SOL on the creator side against 0.742
+   * to the platform, so a "90% to holders" launch shared 90% of almost nothing.
+   *
+   * Naming the keeper up front closes the window entirely — there is no moment
+   * when the pool exists unpledged, no second transaction to land late, and one
+   * less signature. The promise is unchanged: the launcher cannot claim a
+   * stream they never held. */
   async function launchToken(opts) {
     var c = await client();
     var progress = opts.onProgress || function () {};
@@ -361,7 +373,8 @@
           name: opts.name,
           symbol: opts.symbol,
           uri: opts.uri,
-          poolCreator: c.owner
+          poolCreator: opts.feeShare === "holders"
+            ? new c.X.PublicKey(window.BRAND.feeKeeper) : c.owner
         }
       }, curve, opts.firstBuySol > 0 ? {
         firstBuyParam: {
@@ -385,7 +398,9 @@
         symbol: opts.symbol,
         uri: opts.uri,
         payer: c.owner,
-        poolCreator: c.owner
+        // the keeper when fees are pledged — see poolCreatorFor
+        poolCreator: opts.feeShare === "holders"
+          ? new c.X.PublicKey(window.BRAND.feeKeeper) : c.owner
       };
 
       var built;
@@ -420,20 +435,8 @@
       new c.X.PublicKey(qm2), baseMint.publicKey, configPk);
     progress({ step: "pool", state: "done", mint: String(baseMint.publicKey) });
 
-    /* "Share with holders": hand the pool's creator authority to the keeper.
-     * Only the current creator signs, so the launcher does this alone — and
-     * afterwards cannot claim the stream they pledged. The keeper
-     * (tools/fee-share-keeper.js) claims and distributes it. */
-    if (opts.feeShare === "holders") {
-      progress({ step: "pledge", state: "signing" });
-      var ttx = await c.cli.creator.transferPoolCreator({
-        pool: poolPk,
-        creator: c.owner,
-        newCreator: new c.X.PublicKey(window.BRAND.feeKeeper)
-      });
-      await send(c, ttx);
-      progress({ step: "pledge", state: "done" });
-    }
+    /* No transfer step any more. The pool was created with the keeper as its
+     * creator, so it has been pledged since the instant it existed. */
 
     // Record for the homepage token listing — fire-and-forget, same contract
     // as the collections listing: the pool exists regardless.

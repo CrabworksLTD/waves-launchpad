@@ -1629,9 +1629,10 @@
       ["live", "Waiting for the artwork to go live"],
       ["pool", "Creating the pool" + (flow.tbuy > 0 ? " + your first buy" : "")]
     ];
-    if (flow.feeShare === "holders") {
-      stages.push(["pledge", "Pledging your fee share to holders"]);
-    }
+    /* No "pledge" step: the pool is created with the keeper as its creator, so
+     * it is pledged from the instant it exists rather than a transaction later.
+     * See token.js — the gap that step left is what cost $MOAR's holders
+     * almost all of their fees. */
     var box = shell(H`
       <h2>Launching token</h2>
       <p class="sub">Leave this tab open.</p>
