@@ -262,9 +262,42 @@
   /* Launch a token. `firstBuySol` > 0 uses createPoolWithFirstBuy so the
    * creator's own buy lands in the same transaction as the pool — otherwise a
    * sniper can be first in line between the two. */
+  /* Rent is charged in SOL whatever the token trades against.
+   *
+   * A creator holding USDC reasonably believes they are funded — the launch
+   * window asked them to price in USDC and quoted the dev buy in USDC. But the
+   * mint, both vaults, the pool state and the metadata are all rent-exempt SOL
+   * accounts, and the failure when there is not enough is
+   * "custom program error: 0x1", which tells them nothing.
+   *
+   * Measured against a real launch: 0.0365 SOL total, of which 0.01 was the dev
+   * buy — so ~0.027 for rent and fees. 0.05 is that with room. */
+  var POOL_RENT_LAMPORTS = 50000000;   // 0.05 SOL
+
+  async function assertEnoughSol(c, opts) {
+    var need = POOL_RENT_LAMPORTS;
+    // a SOL-quoted dev buy comes out of the same balance
+    if ((opts.quote || "sol") === "sol" && opts.firstBuySol) {
+      need += Math.round(Number(opts.firstBuySol) * 1e9);
+    }
+    var have = await c.conn.getBalance(c.owner).catch(function () { return null; });
+    if (have == null || have >= need) return;
+    var short = (need - have) / 1e9;
+    throw new Error(
+      "Not enough SOL to create the pool. You have " + (have / 1e9).toFixed(4) +
+      " SOL and need about " + (need / 1e9).toFixed(2) + " — Solana charges " +
+      "account rent in SOL even when your token is priced in " +
+      String(opts.quote || "sol").toUpperCase() + ". Add roughly " +
+      short.toFixed(3) + " SOL and try again; your storage payment is already " +
+      "made and will be reused.");
+  }
+
   async function launchToken(opts) {
     var c = await client();
     var progress = opts.onProgress || function () {};
+
+    // fail here, with a number, rather than at simulation with "0x1"
+    await assertEnoughSol(c, opts);
 
     var baseMint = c.X.Keypair.generate();
     var configPk, sig;
@@ -757,6 +790,7 @@
     onchainIdentity: onchainIdentity,
     recentTrades: recentTrades,
     launchToken: launchToken,
+    assertEnoughSol: async function (opts) { return assertEnoughSol(await client(), opts); },
     readPool: readPool,
     claimCreatorFeesTo: claimCreatorFeesTo,
     claimPartnerFeesTo: claimPartnerFeesTo,

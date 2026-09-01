@@ -1609,6 +1609,14 @@
     var mark = stepList(box);
 
     try {
+      /* Check the SOL balance BEFORE charging for storage. Rent is paid in SOL
+       * whatever the token is priced in, and finding that out after taking the
+       * storage fee is how a creator ends up paying for an upload they cannot
+       * use. */
+      await window.Token.assertEnoughSol({
+        quote: flow.quote, firstBuySol: flow.tbuy
+      });
+
       mark("meta", "on");
       var tcard = await makeCard({
         name: flow.tname, symbol: flow.tsym,
