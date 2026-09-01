@@ -688,6 +688,7 @@
         },
         payer: async function (q) {
           waitingOn = "storage";
+          await assertFreshBuild();
           var held = paidCredit();
           if (held) {
             // paid already on a run that did not finish; the credit is unspent
@@ -1013,6 +1014,30 @@
    * ⚠️ That hour is the server's rule (api/upload-url rejects payments older
    * than 3600s), so a resume offer must state the time left rather than
    * pretend the credit keeps. */
+  /* The code this page loaded, learned once at startup.
+   *
+   * A tab left open across a deploy keeps running its original JavaScript, and
+   * nothing about the page says so. Three launches in a row failed on a bug
+   * that was already fixed and deployed, each paying a storage fee before
+   * reaching the broken step. Checking costs one request and only ever runs
+   * before money moves. */
+  var loadedBuild = null;
+  fetch("/api/build").then(function (r) { return r.json(); })
+    .then(function (j) { loadedBuild = j && j.build; })
+    .catch(function () {});
+
+  async function assertFreshBuild() {
+    if (!loadedBuild) return;                 // never learned it — do not block
+    var live = null;
+    try {
+      live = (await (await fetch("/api/build", { cache: "no-store" })).json()).build;
+    } catch (e) { return; }                   // offline is not a stale tab
+    if (live && live !== loadedBuild) {
+      throw new Error("This page was loaded before the site updated, and would " +
+        "run the old code. Reload and launch again — nothing has been charged.");
+    }
+  }
+
   var PAID_KEY = "waves.paidStorage";
   var PAID_TTL = 55 * 60 * 1000;        // just inside the server's hour
 
@@ -1765,9 +1790,10 @@
         banner: flow.banner || null,
         bannerExt: flow.bannerExt || "png",
         links: { website: flow.web, x: flow.x, telegram: flow.tg },
-        payer: function (q) {
+        payer: async function (q) {
+          await assertFreshBuild();
           var held = paidCredit();
-          return held ? Promise.resolve(held.sig) : payStorage(q);
+          return held ? held.sig : payStorage(q);
         }
       });
       forgetPaid();
