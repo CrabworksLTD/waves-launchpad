@@ -121,10 +121,12 @@ async function confirmed(conn, sig, raw, ms) {
   throw new Error("not confirmed within timeout");
 }
 
-async function signSend(conn, tx, keeper) {
+async function signSend(conn, tx, keeper, extra) {
   tx.feePayer = keeper.publicKey;
   tx.recentBlockhash = (await conn.getLatestBlockhash("confirmed")).blockhash;
-  tx.sign(keeper);
+  // the keeper always pays; `extra` is any additional required signer, which
+  // for a partner claim is the claim key — it authorises, it does not fund
+  tx.sign.apply(tx, extra ? [keeper, extra] : [keeper]);
   const raw = tx.serialize();
   const sig = await conn.sendRawTransaction(raw, { maxRetries: 5 });
   await confirmed(conn, sig, raw);
@@ -261,14 +263,20 @@ export default async function handler(req, res) {
             const m = await cli.state.getPoolFeeMetrics(p);
             const owed = BigInt(m.current.partnerQuoteFee.toString());
             if (owed === 0n) continue;
+            /* The keeper pays, the claimer authorises. Otherwise the claim key
+             * needs its own SOL float and someone has to remember to top it up
+             * — and the first sweep failed for exactly that, with "attempt to
+             * debit an account but found no record of a prior credit". Keeping
+             * the claim key balanceless is also the point: it can authorise a
+             * claim and nothing else. */
             const tx = await cli.partner.claimPartnerTradingFeeToReceiver({
               feeClaimer: claimer.publicKey,
-              payer: claimer.publicKey,
+              payer: keeper.publicKey,
               pool: p,
               receiver: new w3.PublicKey(process.env.FEE_TO),
               maxBaseAmount: new BN(U64MAX), maxQuoteAmount: new BN(U64MAX)
             });
-            await signSend(conn, tx, claimer);
+            await signSend(conn, tx, keeper, claimer);
             log.push("platform: claimed " + owed + " from " + (t.symbol || t.mint));
           } catch (e) {
             // a config that names the treasury refuses this signer — expected
