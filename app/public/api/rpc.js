@@ -43,6 +43,17 @@ const ALLOW = new Set([
   "getProgramAccounts"
 ]);
 
+/* Writes are named explicitly; reads are allowed as a class.
+ *
+ * An enumerated read list is the wrong shape here — the SDKs decide what they
+ * call, a method nobody thought of returns 403, and the failure lands in the
+ * middle of a launch that has already been paid for. Every `get*` on a Solana
+ * node is a read, so the blast radius of allowing them is someone using this as
+ * a read endpoint, which rate limiting answers and a dead launch does not. */
+function allowed(method) {
+  return ALLOW.has(method) || /^get[A-Z]/.test(method);
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -66,7 +77,7 @@ export default async function handler(req, res) {
   const calls = Array.isArray(body) ? body : [body];
   if (calls.length > 20) return res.status(413).json({ error: "batch too large" });
   for (const c of calls) {
-    if (!c || typeof c.method !== "string" || !ALLOW.has(c.method)) {
+    if (!c || typeof c.method !== "string" || !allowed(c.method)) {
       return res.status(403).json({ error: "method not allowed: " + (c && c.method) });
     }
   }
