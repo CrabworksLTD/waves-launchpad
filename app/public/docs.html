@@ -223,8 +223,20 @@ td b{color:var(--ink)}
       <tr><td>Trading a token</td><td><b>1%</b> of each swap</td></tr>
     </table>
     <p>The 1% trading fee splits <b>20% to the creator, 60% to the platform, 20% to
-    Meteora</b> — on the curve and, after graduation, from the locked LP forever.
-    The creator's share is the stream that funds holder rewards on a pair.</p>
+    Meteora</b> — on the curve and, after graduation, from the locked LP forever.</p>
+
+    <p>A creator can pledge any share of their 20% to the people holding the
+    token. That pledge is enforced on chain, not by us: the pool names our
+    keeper as its creator from the moment it exists, so the launcher cannot
+    claim a stream they gave away. Payouts run hourly, pro-rata by holdings,
+    with nothing for holders to claim.</p>
+
+    <p>Creators may also choose the asset holders are paid in — a tokenised
+    stock or commodity rather than the currency the token trades against. The
+    keeper buys it before distributing, and pays the trading currency instead
+    whenever that would not serve holders: nothing trades the asset yet, the
+    payout would be large enough to move its price, or the cost of creating
+    token accounts would eat more than a tenth of the payout.</p>
 
     <h2 id="safety">Wallets &amp; safety</h2>
     <ul>

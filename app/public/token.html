@@ -245,8 +245,12 @@ input:focus{outline:none;border-color:var(--accent)}
       <a class="pairlink" id="pairlink" hidden></a>
       <a class="pairlink" id="stakelink" hidden></a>
       <div class="rewards" id="rewards" hidden></div>
-      <p class="note">Trades run against the bonding curve — no order book, no LP.
-      1% trading fee: 20% creator / 60% platform / 20% Meteora.</p>
+      <!-- The fee split lives in the docs. Someone at a buy box needs to know
+           how trading works here, not how the fee is apportioned three ways —
+           and on a pledged token that breakdown was misleading anyway, since
+           most of the creator's share goes straight back to holders. -->
+      <p class="note">Trades run against the bonding curve — no order book, no
+      liquidity providers. <a href="/docs#fees">How fees work ↗</a></p>
     </div>
 
     <div class="panel chartp">
