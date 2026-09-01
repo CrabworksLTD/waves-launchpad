@@ -38,6 +38,10 @@ main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
   -webkit-background-clip:text;background-clip:text;color:transparent}
 .who .sym{-webkit-text-fill-color:var(--faint);color:var(--faint);
   font-size:16px;margin-left:10px;letter-spacing:0}
+/* what holders are paid in, worn next to the ticker — the reward asset is
+   part of what this token IS, not a footnote further down the page */
+.who .rsym{-webkit-text-fill-color:var(--accent);color:var(--accent);
+  font-size:16px;letter-spacing:0}
 .socials{display:flex;gap:8px;flex-wrap:wrap}
 .socials a{display:inline-flex;align-items:center;gap:6px;
   padding:7px 14px;border:1px solid rgba(255,255,255,.22);border-radius:99px;
@@ -209,7 +213,7 @@ input:focus{outline:none;border-color:var(--accent)}
   <div class="hero-in">
     <div class="who">
       <div class="logo" id="logo">?</div>
-      <h1 id="name">Loading…<span class="sym" id="sym"></span></h1>
+      <h1 id="name">Loading…<span class="sym" id="sym"></span><span class="rsym" id="rsym" hidden></span></h1>
       <button class="ca" id="ca-copy" title="Copy the contract address">
         <code id="ca">—</code>
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/>
@@ -635,18 +639,20 @@ input:focus{outline:none;border-color:var(--accent)}
     var box = $("rewards");
     var asset = rec.rewardMint || null;
 
+    /* One line. The mechanics — hourly, pro-rata, nothing to claim — are true
+     * but nobody reads a paragraph in a buy box; what matters is that holding
+     * this pays you, and in what. */
     function paint(sym, tradeable) {
-      box.innerHTML =
-        "<b>Holders earn " + pct + "% of trading fees</b>" +
-        "<span>Paid out automatically every hour, pro-rata by how much you " +
-        "hold. Nothing to claim." +
-        (sym
-          ? " Paid in <span class=\"asset\">" + esc(sym) + "</span>" +
-            (tradeable ? "." : " once it is tradeable \u2014 " + esc(QUOTE) +
-             " until then.")
-          : " Paid in " + esc(QUOTE) + ".") +
-        "</span>";
+      var asset = sym || QUOTE;
+      box.innerHTML = "<b>Holders earn rewards in " + esc(asset) + "</b>" +
+        (sym && !tradeable
+          ? "<span>Paid in " + esc(QUOTE) + " until " + esc(sym) +
+            " is tradeable.</span>"
+          : "");
       box.hidden = false;
+      // the ticker carries it too, so it is visible without scrolling
+      var slash = $("rsym");
+      if (slash) { slash.textContent = "/" + asset; slash.hidden = false; }
     }
 
     if (!asset) return paint(null, true);

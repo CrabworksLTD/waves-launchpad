@@ -155,17 +155,25 @@ function readSwap(tx, baseMint, sig, blockTime) {
   const base = ms.filter((m) => m.mint === baseMint);
   if (base.length < 2) return null;                 // not a swap of this token
 
-  // the pool authority is the address on both sides of the trade
-  const quoteByOwner = new Map();
-  for (const m of ms) {
-    if (m.mint === baseMint) continue;
-    if (!quoteByOwner.has(m.owner)) quoteByOwner.set(m.owner, m);
-  }
-  const poolSide = base.find((b) => quoteByOwner.has(b.owner));
-  if (!poolSide) return null;
-  const poolQuote = quoteByOwner.get(poolSide.owner);
-  const trader = base.find((b) => b.owner !== poolSide.owner);
-  if (!trader || poolQuote.delta === 0n || poolSide.delta === 0n) return null;
+  /* The trader is whoever SIGNED; the pool is the other side.
+   *
+   * This used to look for the address holding both the base and the quote,
+   * assuming only the pool does. A trader paying with a wrapped-SOL account
+   * holds both too, so the wrong side was sometimes picked — and since the
+   * holder list excludes "the pool", that mislabelled a real holder as the
+   * curve and let the curve's own 93% back into the list as the top holder.
+   * The signer is unambiguous. */
+  const keys = (tx.transaction.message.accountKeys || [])
+    .map((k) => (typeof k === "string" ? { pubkey: k } : k));
+  const signer = keys.find((k) => k.signer);
+  const signerAddr = signer ? String(signer.pubkey) : null;
+
+  const trader = base.find((b) => b.owner === signerAddr);
+  const poolSide = base.find((b) => b.owner !== signerAddr);
+  if (!trader || !poolSide) return null;
+
+  const poolQuote = ms.find((m) => m.mint !== baseMint && m.owner === poolSide.owner);
+  if (!poolQuote || poolQuote.delta === 0n || poolSide.delta === 0n) return null;
 
   /* Size comes from the TRADER's side, not the pool's. They are the same
    * number in an ordinary swap, but not in the launch transaction: createPool
