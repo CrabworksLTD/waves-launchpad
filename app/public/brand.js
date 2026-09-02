@@ -81,59 +81,39 @@
        * The replacement names the keeper's claim key, so fees sweep hourly.
        * Pools keep the config they launched against; this only affects new
        * launches. */
-      "mainnet-beta": { sol: "3HLkZDZzcJAvdQWsQNWLP98qA9pPL2jtaRbhiE8t6tko",
-                        // was 9xHSsPYmRuJJtGA3TYB7Q5P2oHWy4zpeugTf9EZ1S491,
-                        // which names the treasury as claimer — see sol above
-                        usdc: "CkggbyU3nA7DLxT5Cw6xZBysB9tQK1Bt4SstY7cdcNGe",
-                        /* Fee-ladder rungs. Each is its own immutable config,
-                         * signed once at /config-create?fee=<rung>. An empty
-                         * string means that rung is simply not offered — the
-                         * launch window hides it rather than trying to create
-                         * one mid-launch. */
-                        t2:  { sol: "", usdc: "", rwa: {} },
-                        t4:  { sol: "", usdc: "", rwa: {} },
-                        t5:  { sol: "", usdc: "", rwa: {} },
-                        t10: { sol: "", usdc: "", rwa: {} },
-                        /* The tax rung — 3%, signed 2026-09-01. Verified on
-                         * chain before wiring: 0.6% Meteora, 0.792% platform,
-                         * 1.608% to holders, and feeClaimer is the sweep key so
-                         * platform fees claim hourly rather than by hand.
-                         *
-                         * ⚠️ Replaces an earlier pair signed the same evening
-                         * (9wYcHGs7… sol, F22Pjfu2… usdc) which took 1.8% for
-                         * the platform and left 0.6% for holders — the wrong
-                         * way round for a rung whose whole point is the reward.
-                         * Those stay readable for anything already launched on
-                         * them; nothing new can reach them. */
-                        t3:  { sol: "GA2TweZTv5JMT6nu9gGMRJTsmbnNArvTNdQpFPUxNU7W",
-                               usdc: "QYECpZwhb3jCrQtH8Q2wUZmEVA3LijZAKz3c9yEXXgB",
-                               // gold, the only tokenised asset DBC will take
-                               // as a quote — the rest are Token-2022
-                               rwa: { "AymATz4TCL9sWNEEV9Kvyz45CHVhDZ6kUgjTJPzLpU9P":
-                                 { config: "9EMW8SWyyTsqXZBzK9664xrfneFhvV7eBYYxKnWg7hL8",
-                                   symbol: "XAUt0", decimals: 6, label: "Gold" } } },
-                        /* 5% config, signed 2026-09-01 and then superseded by
-                         * the 3% rung above. Kept because it is immutable and
-                         * paid for; not in LADDER, so nothing new launches on
-                         * it. */
+      /* All twelve signed 2026-09-02 and verified on chain before wiring:
+       * fee, split, quote mint, feeClaimer (the sweep key, so platform revenue
+       * claims hourly) and leftoverReceiver.
+       *
+       * Platform take by rung: 0.400 / 0.512 / 0.600 / 0.704 / 0.800 / 0.880 %
+       * of a trade. It approximates a tenth of a percent per rung rather than
+       * hitting it, because creatorTradingFeePercentage is an INTEGER on chain
+       * — see dbc-terms.js. */
+      "mainnet-beta": { sol: "4cD5hSa6zD8UWDoB7GTcgUDmPt94rPW5rUhWESN5Swhv",
+                        usdc: "GTLoW7zUSp8EYUGcUGVeeocT7UWnmi7KhAUpq6zGDFvC",
+                        t2:  { sol: "5FRLvvLecmZqDTp7vNYkJAXN4QqBywkKxUPboD5p3Pcv",
+                               usdc: "5HFsQE1keZLYv5Nv8quZkd7HQUhSaQdrmEXUJ7JDQs6N", rwa: {} },
+                        t3:  { sol: "4aiD1TBNnVQdtAWrmmBW53g3qQU68PtB834EF9rJRbXS",
+                               usdc: "G1bXNHGPBvnKi4tTtDCEpxQvsXVcrfWQ5m7Lrv8NF5K6", rwa: {} },
+                        t4:  { sol: "73bBu45ymdPRsdVJqyDZLe8ExTWasEN8ncTPTHS3gCck",
+                               usdc: "A63Yku5iVaREormEAECywYagueCxqEX9ZqoawD9pTVSs", rwa: {} },
+                        t5:  { sol: "9sRHWsZS9DHMfffPA1Hri1NSLE7T7BWxuvtWPDQ6rvxV",
+                               usdc: "5e8o73VYKhWhiWkgG34deBmXoa9XcEf5Nxb62pR6obd6", rwa: {} },
+                        t10: { sol: "B7VXTPqoAairkL11sVKonAX2mTYXXVeNBCfK8oo7RnSx",
+                               usdc: "HThFWGnh98j3aSR7Nhv44e25KVRZPq822wpsJB4kkD59", rwa: {} },
+
+                        /* ⚠️ Superseded, kept only so pools already launched
+                         * against them still read. None are in LADDER.
+                         *   3HLkZDZz… / CkggbyU3…  1% at 0.2 creator / 0.6 us
+                         *   GA2TweZT… / QYECpZwh…  3% at 1.608 / 0.792
+                         *   9wYcHGs7… / F22Pjfu2…  3% at 0.6 / 1.8, backwards
+                         *   39FwtFMZ…              5% abandoned
+                         *   9EMW8SWy…              gold, dropped as a quote
+                         *   41hCSSUm… / DUjdKhLg…  10% signed from a stale tab,
+                         *                          stored 88 not 89
+                         */
                         tax: { sol: "39FwtFMZJfp97WzKqFs3rcC6xE5YewCgPxw5LV6BEQdp",
-                               usdc: "", rwa: {} },
-                        /* ⚠️ Only classic-SPL mints can be a QUOTE — DBC
-                         * rejects Token-2022, and 49 of the 50 most liquid
-                         * tokenised assets are Token-2022. Gold is effectively
-                         * the only real-world quote available.
-                         *
-                         * This does not limit REWARDS: Jupiter routes SOL into
-                         * NVDAx, SPYx, TSLAx and AAPLx at ~0% impact despite
-                         * all four being Token-2022. Paying holders in stocks
-                         * needs the keeper's swap leg, not a different quote
-                         * mint — and not a different launchpad. */
-                        rwa: {
-                          // was AWar1Y1GALnT3TjL3d4K1qjH2ZLB5KiqrSw3gmaR9EGA
-                          "AymATz4TCL9sWNEEV9Kvyz45CHVhDZ6kUgjTJPzLpU9P":
-                            { config: "CoYJxuQZsTSfdGJfadZNfiVwr1pTtKN5tsGKH6K12WGc",
-                              symbol: "XAUt0", decimals: 6, label: "Gold" }
-                        } },
+                               usdc: "", rwa: {} } },
       devnet: { sol: "97FsuYAZrY1HxSokdSz1GnPVsLWNdpVgdczt3bLqXv8J", usdc: "",
                 tax: { sol: "", usdc: "", rwa: {} }, rwa: {} }
     },

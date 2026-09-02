@@ -1432,22 +1432,20 @@
       <p class="note" id="tk-taxtxt"></p>
 
       <div id="tk-sharewrap" ${(flow.tier || "standard") === "standard" ? raw("hidden") : ""}>
-      <div id="tk-splitwrap" ${flow.rewardMode === "keep" ? raw("hidden") : ""}>
+      <div id="tk-splitwrap">
       <label>Split — how the <span id="tk-poolpct"></span> is divided</label>
       <div class="ptabs" id="tk-splits">
         <button data-s="100">All to holders</button>
         <button data-s="75">75 / 25</button>
         <button data-s="50">50 / 50</button>
         <button data-s="25">25 / 75</button>
+        <button data-s="0">All to you</button>
       </div>
       <p class="note" id="tk-splittxt"></p>
       </div><!-- /tk-splitwrap -->
 
       <label>What the tax does</label>
       <div class="tiers" id="tk-modes">
-        <button data-m="keep" class="tier ${flow.rewardMode === "keep" ? "on" : ""}">
-          <b>Keep the fees</b><span>All of it goes to you, claimable whenever
-          you like.</span></button>
         <button data-m="dividend" class="tier ${(flow.rewardMode || "dividend") === "dividend" ? "on" : ""}">
           <b>Dividend</b><span>Paid out to holders automatically based on their
           holdings.</span></button>
@@ -1458,7 +1456,7 @@
 
       <!-- the reward picker answers "paid in what?", which is only a question
            when something is being paid out -->
-      <div id="tk-rewardwrap" ${flow.rewardMode === "burn" || flow.rewardMode === "keep"
+      <div id="tk-rewardwrap" ${flow.rewardMode === "burn" || flow.feeSharePct === 0
         ? raw("hidden") : ""}>
         <label>Holders are paid in</label>
         <button class="pick" id="lp-reward">
@@ -1678,6 +1676,8 @@
        * stop them claiming directly — so at zero the pool is created by, and
        * belongs to, the launcher. */
       flow.feeShare = flow.feeSharePct > 0 ? "holders" : "keep";
+      var rw2 = box.querySelector("#tk-rewardwrap");
+      if (rw2) rw2.hidden = flow.rewardMode === "burn" || flow.feeSharePct === 0;
       paintSplit();
     });
 
@@ -1698,20 +1698,10 @@
        * Keeping the fees also hands the pool back to the launcher: pledging it
        * to the keeper would route a creator's own money through us and stop
        * them claiming it directly. */
-      var keep = flow.rewardMode === "keep";
-      if (keep) {
-        flow.feeSharePct = 0;
-        flow.feeShare = "keep";
-      } else if (!flow.feeSharePct) {
-        flow.feeSharePct = 100;
-        flow.feeShare = "holders";
-      }
-      var sp = box.querySelector("#tk-splitwrap");
-      if (sp) sp.hidden = keep;
+      /* Nothing is paid to holders under a burn, so "paid in what?" is not a
+       * question — and neither is it when the whole share is kept. */
       var rw = box.querySelector("#tk-rewardwrap");
-      if (rw) rw.hidden = keep || flow.rewardMode === "burn";
-      var fw = box.querySelector("#tk-fwwrap");
-      if (fw) fw.hidden = !keep && (flow.feeSharePct || 0) >= 100;
+      if (rw) rw.hidden = flow.rewardMode === "burn" || flow.feeSharePct === 0;
 
       paintSplit();                     // "buys back and burns" vs "holders receive"
     });
