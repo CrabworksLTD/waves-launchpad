@@ -149,11 +149,15 @@ window.MOONPAD_CHAINS = [
     // records API, same as the Solana side.
     registry: null,
 
-    // ⚠️ WAVES needs its own EVM fee wallet before launches charge a platform
-    // mint fee here. null means feeFor() resolves to zero fee — launches are
-    // free until Kyle supplies a WAVES treasury address. Do NOT point this at
-    // another site's vault.
-    feeTo: null,
+    /* WAVES's own EVM treasury, set 2026-09-02. The same address that receives
+     * the Arweave storage fee (FEE_TO_EVM), so both sides of the business land
+     * in one wallet.
+     *
+     * Turning this from null switches the protocol mint fee on: the greater of
+     * 0.001 ETH or 2.5%, per token, paid by the buyer on top of the price. Both
+     * numbers are written into each collection at deploy and are immutable
+     * there, so this only reaches collections launched from now on. */
+    feeTo: "0xE52f574AC7006614EBe1c8a82913a5C07eC73CC7",
     // A $-token (coin) allowlist reads holder balances at the block the sale
     // opened on, for the whole wave. This RPC prunes that state after ~10 min
     // (measured live 2026-08-20), so a longer wave locks holders out — the gate
