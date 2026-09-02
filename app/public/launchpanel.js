@@ -1433,10 +1433,11 @@
       <label>What the 1.6% does</label>
       <div class="tiers" id="tk-modes">
         <button data-m="dividend" class="tier ${(flow.rewardMode || "dividend") === "dividend" ? "on" : ""}">
-          <b>Dividend</b><span>Paid out to holders, pro-rata by what they hold.</span></button>
+          <b>Dividend</b><span>Paid out to holders automatically based on their
+          holdings.</span></button>
         <button data-m="burn" class="tier ${flow.rewardMode === "burn" ? "on" : ""}">
-          <b>Buyback &amp; burn</b><span>Buys the token off the market and burns it.
-          Supply falls, every holder's slice grows.</span></button>
+          <b>Buyback &amp; burn</b><span>Buys the token off the market and burns it,
+          causing supply to fall.</span></button>
       </div>
 
       <!-- the reward picker answers "paid in what?", which is only a question
