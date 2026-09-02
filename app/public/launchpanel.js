@@ -387,7 +387,7 @@
       </div>
 
       <!-- Pairing and staking are one decision: a paired token exists so its
-           trading fees can reward holders, and staking is what delivers them.
+           trading fees reward holders, and staking is what delivers them.
            The reasoning lives in the docs; the launch window just says it is
            not open yet. -->
       <label class="tick"><input type="checkbox" id="f-pairOn" disabled>
@@ -1390,7 +1390,7 @@
     var box = shell(H`
       <h2>${nft ? "2 of 2 — the token" : "Launch token"}</h2>
       <p class="sub">${nft
-        ? "Paired with " + nft.cfg.name + ". Its trading fees can reward the collection's holders."
+        ? "Paired with " + nft.cfg.name + ". Its trading fees reward the collection's holders."
         : "A bonding-curve token. No liquidity to manage — the curve is the liquidity."}</p>
 
       <div class="two">
