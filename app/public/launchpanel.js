@@ -1980,7 +1980,24 @@
       /* Index the new token straight away. The record was written a moment
        * ago, so the sweep would not reach it for up to ten minutes — and its
        * page is being opened right now, by the person who just made it. */
-      fetch("/api/indexer?mint=" + encodeURIComponent(res.mint)).catch(function () {});
+      /* Index the launch before the creator can open its page.
+       *
+       * This was fire-and-forget, so anything transient — a slow node, an RPC
+       * having a bad afternoon — left the token page showing "—" for holders
+       * and an empty chart, on the one visit that matters most. It now retries,
+       * and keeps retrying while the run reports nothing indexed, because the
+       * first buy sometimes lands a moment after the record does. */
+      (function indexNow(attempt) {
+        fetch("/api/indexer?mint=" + encodeURIComponent(res.mint))
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            var got = j && (j.indexed || j.trades || j.holders);
+            if (!got && attempt < 5) setTimeout(function () { indexNow(attempt + 1); }, 3000);
+          })
+          .catch(function () {
+            if (attempt < 5) setTimeout(function () { indexNow(attempt + 1); }, 3000);
+          });
+      })(0);
 
       // Link the records both ways for a pair.
       if (flow.nft) recordCollection(flow.nft.cfg, flow.nft.res, res.mint, flow.nft.up);

@@ -420,6 +420,26 @@ input:focus{outline:none;border-color:var(--accent)}
     if (s < 86400) return Math.floor(s / 3600) + "h";
     return Math.floor(s / 86400) + "d";
   }
+  /* Index on demand when the page has nothing to show.
+   *
+   * A token opened minutes after launching had "—" holders and an empty chart
+   * until the ten-minute cron came round, which reads as broken on exactly the
+   * visit that matters. If the stats come back unindexed, ask for a run and
+   * reload once. Cheap, bounded to a single retry, and it means a brand-new
+   * token fills itself in rather than waiting on a schedule. */
+  var healed = false;
+  async function healIfEmpty(d) {
+    if (healed) return false;
+    var s = d && d.stats;
+    var empty = !d || d.indexed === false || !s || s.holders == null;
+    if (!empty) return false;
+    healed = true;
+    try {
+      await fetch("/api/indexer?mint=" + encodeURIComponent(MINT));
+      return true;
+    } catch (e) { return false; }
+  }
+
   /* The indexer (api/indexer.js, every 10 minutes) is the source for history:
    * price series, volume, market cap, holders, ATH. It reads each swap from the
    * pool's own vault movements, which the page cannot do cheaply — walking the
@@ -471,7 +491,12 @@ input:focus{outline:none;border-color:var(--accent)}
   function loadStats() {
     return fetch("/api/stats?mint=" + encodeURIComponent(MINT) + "&tf=" + tf)
       .then(function (r) { return r.json(); })
-      .then(function (d) {
+      .then(async function (d) {
+        // a token launched moments ago has nothing yet — ask for a run, once
+        if (await healIfEmpty(d)) {
+          d = await fetch("/api/stats?mint=" + encodeURIComponent(MINT) + "&tf=" + tf)
+            .then(function (r) { return r.json(); }).catch(function () { return d; });
+        }
         if (!d.indexed || !d.stats) return false;
         var s = d.stats;
         var sym = ($("sym").textContent || "").replace(/^\$/, "");
