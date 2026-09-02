@@ -301,7 +301,9 @@
       price: 0, maxPer: 0, dev: 0, roy: 5, royTo: "",
       site: "", x: "", tg: "", dc: "",
       openAt: "", splits: [], allowOn: false, phases: [""], wave: 30,
-      pairOn: false, tname: "", tsym: "", avatar: null, avatarName: "", banner: null, bannerName: ""
+      pairOn: false, tname: "", tsym: "", avatar: null, avatarName: "", banner: null, bannerName: "",
+      // Standard, keeping the fees — the least surprising thing a launch can do
+      tier: "standard", feeSharePct: 0, feeShare: "keep"
     };
 
     var box = shell(H`
@@ -1431,7 +1433,7 @@
       <div class="ptabs" id="tk-tiers">${raw(tierButtons(flow))}</div>
       <p class="note" id="tk-taxtxt"></p>
 
-      <div id="tk-sharewrap" ${(flow.tier || "standard") === "standard" ? raw("hidden") : ""}>
+      <div id="tk-sharewrap">
       <div id="tk-splitwrap">
       <label>Split — how the <span id="tk-poolpct"></span> is divided</label>
       <div class="ptabs" id="tk-splits">
@@ -1444,7 +1446,8 @@
       <p class="note" id="tk-splittxt"></p>
       </div><!-- /tk-splitwrap -->
 
-      <label>What the tax does</label>
+      <div id="tk-modewrap" ${(flow.feeSharePct || 0) > 0 ? "" : raw("hidden")}>
+      <label>What the holders' share does</label>
       <div class="tiers" id="tk-modes">
         <button data-m="dividend" class="tier ${(flow.rewardMode || "dividend") === "dividend" ? "on" : ""}">
           <b>Dividend</b><span>Paid out to holders automatically based on their
@@ -1453,6 +1456,8 @@
           <b>Buyback &amp; burn</b><span>Buys the token off the market and burns it,
           causing supply to fall.</span></button>
       </div>
+
+      </div><!-- /tk-modewrap -->
 
       <!-- the reward picker answers "paid in what?", which is only a question
            when something is being paid out -->
@@ -1601,21 +1606,8 @@
         x.classList.toggle("on", x === b);
       });
 
-      /* Standard keeps everything. A tax defaults to giving all of it away,
-       * and the split below can hand some back — but a tax the creator has not
-       * looked at yet should read as generous, not as a silent claim. */
-      var sw = box.querySelector("#tk-sharewrap");
-      var isStd = flow.tier === "standard";
-      if (sw) sw.hidden = isStd;
-      if (isStd) {
-        flow.feeSharePct = 0;
-      } else {
-        if (!flow.rewardMode) flow.rewardMode = "dividend";
-        if (flow.rewardMode === "keep") flow.feeSharePct = 0;
-        else if (flow.feeSharePct == null) flow.feeSharePct = 100;
-      }
-      flow.feeShare = (flow.feeSharePct || 0) > 0 ? "holders" : "keep";
-
+      /* The rung sets the size of the pot, not who gets it — the split below
+       * is the only thing that decides that, and it survives a rung change. */
       paintSplit();
       paintTax();
       paintEconomics();          // each rung has its own curve, not just its own fee
@@ -1644,6 +1636,16 @@
         meteora.toFixed(2).replace(/0$/, "") + "% Meteora.";
     }
 
+    function paintVisibility() {
+      var shared = (flow.feeSharePct || 0) > 0;
+      var mw = box.querySelector("#tk-modewrap");
+      if (mw) mw.hidden = !shared;
+      var rw = box.querySelector("#tk-rewardwrap");
+      if (rw) rw.hidden = !shared || flow.rewardMode === "burn";
+      var fw = box.querySelector("#tk-fwwrap");
+      if (fw) fw.hidden = (flow.feeSharePct || 0) >= 100;
+    }
+
     function paintSplit() {
       var total = pledgeable(flow);
       var pct = flow.feeSharePct == null ? 100 : flow.feeSharePct;
@@ -1666,6 +1668,7 @@
     }
     paintSplit();
     paintTax();
+    paintVisibility();
 
     box.querySelector("#tk-splits").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-s]");
@@ -1676,8 +1679,9 @@
        * stop them claiming directly — so at zero the pool is created by, and
        * belongs to, the launcher. */
       flow.feeShare = flow.feeSharePct > 0 ? "holders" : "keep";
-      var rw2 = box.querySelector("#tk-rewardwrap");
-      if (rw2) rw2.hidden = flow.rewardMode === "burn" || flow.feeSharePct === 0;
+      // a first pledge needs a destination; dividend is the gentler default
+      if (flow.feeSharePct > 0 && !flow.rewardMode) flow.rewardMode = "dividend";
+      paintVisibility();
       paintSplit();
     });
 
@@ -1698,10 +1702,7 @@
        * Keeping the fees also hands the pool back to the launcher: pledging it
        * to the keeper would route a creator's own money through us and stop
        * them claiming it directly. */
-      /* Nothing is paid to holders under a burn, so "paid in what?" is not a
-       * question — and neither is it when the whole share is kept. */
-      var rw = box.querySelector("#tk-rewardwrap");
-      if (rw) rw.hidden = flow.rewardMode === "burn" || flow.feeSharePct === 0;
+      paintVisibility();     // a burn has nothing "paid in" anything
 
       paintSplit();                     // "buys back and burns" vs "holders receive"
     });
