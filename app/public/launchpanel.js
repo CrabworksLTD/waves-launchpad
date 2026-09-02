@@ -1419,10 +1419,11 @@
 
       <label>Swap fee</label>
       <div class="tiers" id="tk-tiers">${raw(tierButtons(flow))}</div>
-      ${tierRungs(flow).length > 1 ? raw('<p class="note">A tax token is a bigger ' +
-        "swap fee with a bigger creator share — that stream funds burns or " +
-        "dividends via the rewards program. Per-transfer taxes arrive with " +
-        "holder staking.</p>") : ""}
+      ${tierRungs(flow).length > 1 ? raw('<p class="note">A tax token charges a ' +
+        "bigger swap fee and pledges the creator's entire share to holders, " +
+        "paid out automatically in the asset you pick below. You keep none of " +
+        "it — that is the difference between the two. Choose Standard if you " +
+        "want to keep your fees.</p>") : ""}
 
       <div id="tk-sharewrap" ${(flow.tier || "standard") === "standard" ? raw("hidden") : ""}>
       <label>Holder rewards</label>
