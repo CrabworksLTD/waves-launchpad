@@ -40,6 +40,13 @@ contract GraduationForkTest is Test {
     address platform = address(0xFEE);
 
     function setUp() public {
+        /* These need the real Uniswap, so they only mean anything on a fork.
+         * Run without one they failed rather than skipped, which turns a green
+         * suite into four red lines that say nothing about the code. */
+        if (FACTORY.code.length == 0) {
+            vm.skip(true);
+            return;
+        }
         curve = new WavesCurve(platform, GRAD, V_ETH, V_TOKENS, SUPPLY, FACTORY, WETH, FEE);
         vm.deal(alice, 100 ether);
         vm.deal(creator, 10 ether);
