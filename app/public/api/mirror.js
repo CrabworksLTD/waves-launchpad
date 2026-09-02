@@ -23,7 +23,13 @@
 export const config = { runtime: "nodejs" };
 
 const TTL = 60 * 60 * 48;                    // two days
-const MAX_BYTES = 900 * 1024;                // a launch icon runs ~400KB
+/* Big enough for the whole launch, not just the icon.
+ *
+ * At 900KB this covered icons (~400KB) and quietly refused banners and share
+ * cards, which run over 1MB — so the one image X and Telegram fetch when a
+ * creator shares their launch was the one image never kept. Same failure as the
+ * metadata: the file that mattered most was outside the limit. */
+const MAX_BYTES = 3 * 1024 * 1024;
 /* Both the addresses a launch's art can be published at: arweave.net directly
  * (collections) and our own /m/ path (tokens, since api/meta.js). Either way
  * the key is the transaction id and the file name, so a mirror written under
