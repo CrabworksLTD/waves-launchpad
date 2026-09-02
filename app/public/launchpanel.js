@@ -2198,14 +2198,22 @@
       if (other) return fail(box, other + " of those are neither PNG nor JSON.");
       if (!pngs.length) return fail(box, "No images in that selection.");
 
-      // Metadata pairing, as promised on the fork page: 4.png needs 4.json.
-      // If ANY json comes along, EVERY image must have its pair — a half-paired
-      // collection means half the traits silently vanish, which nobody notices
-      // until reveal. We check every pair; we never write their json.
+      /* Metadata pairing: 4.png needs 4.json, for every image.
+       *
+       * Bringing finished files means bringing their traits — we never write
+       * anyone's json, so an upload without it produces a collection with no
+       * attributes at all, and nobody notices until it is on chain and
+       * immutable. Requiring it up front is the only point where that is still
+       * fixable. */
       var stem = function (n) { return n.replace(/\.(png|json)$/i, ""); };
       var jmap = {};
       jsons.forEach(function (j) { jmap[stem(j.name)] = j; });
-      if (jsons.length) {
+      if (!jsons.length) {
+        return fail(box, "No .json files in that selection — every image needs " +
+          "its metadata, named to match (4.png needs 4.json). We never write " +
+          "your json, so without it the collection would have no traits.");
+      }
+      {
         var missing = pngs.filter(function (p) { return !jmap[stem(p.name)]; });
         if (missing.length) return fail(box, missing.length + " image(s) have no matching .json — first: " +
           missing[0].name + " needs " + stem(missing[0].name) + ".json");
