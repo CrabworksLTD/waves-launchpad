@@ -335,15 +335,21 @@
         }
         var bh = (await c.conn.getLatestBlockhash("confirmed")).blockhash;
         tx.recentBlockhash = bh;
-        // Extra keypairs the SDK needs to sign for (the new mint, usually) are
-        // returned alongside the transaction and have to be applied before the
-        // wallet signs, or the wallet's signature covers the wrong message.
-        if (txish.signers && txish.signers.length) tx.partialSign.apply(tx, txish.signers);
-        tx = await cosignIfNeeded(c, tx);
-        /* A wallet that never answers must not hang the launch. Phantom can
-         * fail to surface its window — especially behind its own "this dApp may
-         * be malicious" screen — and without a ceiling the step simply sits
-         * there looking identical to a slow confirmation. */
+
+        /* ⚠️ THE WALLET SIGNS FIRST. Do not move the other signatures above
+         * this line.
+         *
+         * We used to attach the new mint's signature and the keeper's before
+         * handing the transaction over, so Phantom received something already
+         * partly signed by keys it knew nothing about. Phantom support named
+         * that as the cause of the "this dApp could be malicious" block on
+         * 2026-09-02: for a multi-signer transaction it expects to sign a
+         * transaction with no existing non-null signatures.
+         *
+         * The message must not change afterwards — not its instructions,
+         * accounts, fee payer or blockhash — so everything that alters it
+         * (priority fee, storage fee, blockhash) happens above, and what
+         * follows only adds signatures to the exact bytes Phantom returned. */
         var signed = await Promise.race([
           c.wallet.signTransaction(tx),
           new Promise(function (_, rej) {
@@ -354,7 +360,21 @@
             }, 120000);
           })
         ]);
-        var raw = signed.serialize();
+
+        // rebuild from exactly what came back, then add the remaining signers
+        var full = c.X.Transaction.from(signed.serialize());
+        if (txish.signers && txish.signers.length) full.partialSign.apply(full, txish.signers);
+        full = await cosignIfNeeded(c, full);
+
+        /* Prove it before spending a blockhash on it. If adding a signature
+         * disturbed the message, the wallet's signature is now worthless and
+         * the node would reject it as "signature verification failed" — the
+         * failure that cost hours on 2026-09-01. Catch it here instead. */
+        if (!full.verifySignatures()) {
+          throw new Error("The transaction lost a signature while being assembled. " +
+            "Nothing was sent — please try again.");
+        }
+        var raw = full.serialize();
         var sig = await Promise.race([
           c.conn.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 5 }),
           new Promise(function (_, rej) {
