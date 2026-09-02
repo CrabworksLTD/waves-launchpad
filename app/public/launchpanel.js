@@ -1331,13 +1331,21 @@
       flow.tier = cur;
     }
     return rungs.map(function (r) {
+      /* Quote the share this rung actually pays, read from the rung itself.
+       *
+       * This said "20% of the fee" and "0.6% of volume to you" — both baked in
+       * when every rung had the same split and both wrong the moment the tax
+       * rung was rebalanced to 1.608%. It also said "to you" for a rung whose
+       * whole share goes to holders. Meteora takes 20% off the top, so the
+       * creator's cut is that percentage of the remaining 80%. */
       var pct = r.spec.pct;
+      var share = pct * 0.8 * (r.spec.creatorTradingFeePercentage || 0) / 100;
+      var num = share.toFixed(2).replace(/0$/, "");
       return '<button data-t="' + r.name + '" class="tier' + (r.name === cur ? " on" : "") + '">' +
         "<b>" + esc(r.spec.label) + " — " + pct + "%</b><span>" +
         (r.name === "standard"
-          ? "You keep 20% of the fee (" + (pct * 0.2).toFixed(1) + "% of volume)."
-          : "Same 20% share of a bigger fee — " + (pct * 0.2).toFixed(1) +
-            "% of volume to you.") +
+          ? "You keep " + num + "% of every trade."
+          : num + "% of every trade to your holders. You keep none.") +
         "</span></button>";
     }).join("");
   }
@@ -1419,17 +1427,8 @@
 
       <label>Swap fee</label>
       <div class="tiers" id="tk-tiers">${raw(tierButtons(flow))}</div>
-      ${tierRungs(flow).length > 1 ? raw('<p class="note">A tax token charges a ' +
-        "bigger swap fee and pledges the creator's entire share to holders, " +
-        "paid out automatically in the asset you pick below. You keep none of " +
-        "it — that is the difference between the two. Choose Standard if you " +
-        "want to keep your fees.</p>") : ""}
 
       <div id="tk-sharewrap" ${(flow.tier || "standard") === "standard" ? raw("hidden") : ""}>
-      <label>Holder rewards</label>
-      <div class="sharebox">
-        <div class="sharelbl"><span id="tk-sharetxt"></span></div>
-      </div>
       <!-- the reward picker belongs to sharing: it answers "paid in what?",
            which is only a question once something is being shared -->
       <div id="tk-rewardwrap">
@@ -1537,16 +1536,6 @@
      * keeps all of them; one who wants a reward token gives all of it. The
      * in-between was a dial nobody could interpret: "90% of your share" reads
      * as 90% of every trade, and the honest figure took three lines to explain. */
-    function paintShare() {
-      var el = box.querySelector("#tk-sharetxt");
-      if (!el) return;
-      var toHolders = tierPct(flow) * 0.8 * (window.DBC_TERMS && window.DBC_TERMS.TIERS[flow.tier || "standard"]
-        ? window.DBC_TERMS.TIERS[flow.tier || "standard"].creatorTradingFeePercentage / 100 : 0);
-      el.textContent = "Every holder earns " + toHolders.toFixed(2).replace(/0$/, "") +
-        "% of every trade, paid automatically in proportion to what they hold. " +
-        "You keep none of it — that is what makes it a tax token.";
-    }
-    paintShare();
     /* What the first buy actually gets you.
      *
      * "1 SOL" tells a launcher nothing about the position they are taking. The
@@ -1596,7 +1585,6 @@
       flow.feeShare = isStd ? "keep" : "holders";
       var fw = box.querySelector("#tk-fwwrap");
       if (fw) fw.hidden = !isStd;
-      paintShare();
       box.querySelector("#tk-fee").textContent = tierPct(flow) +
         "% — 20% you / 60% platform / 20% Meteora";
       paintEconomics();          // the rung has its own curve, not just its own fee
