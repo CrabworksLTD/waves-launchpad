@@ -12,6 +12,8 @@
 
 export const config = { runtime: "edge" };
 
+import { allow, tooManyResponse } from "./_guard.js";
+
 const B58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 async function evmName(c) {
@@ -53,6 +55,12 @@ function esc(s) {
 }
 
 export default async function handler(req) {
+  /* Edge, and cached for ten minutes, so honest traffic barely lands here — but
+   * a unique query string misses the cache every time, and each miss makes two
+   * outbound requests of its own. `tooManyResponse` rather than `tooMany`
+   * because an edge function returns a Response and has no `res` to write to. */
+  if (!(await allow(req, { bucket: "share", max: 60, windowSec: 60 }))) return tooManyResponse(60);
+
   const url = new URL(req.url);
   const id = url.searchParams.get("id") || "";
   const to = url.searchParams.get("to") === "token" ? "token" : "mint";

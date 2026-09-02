@@ -15,6 +15,8 @@
 
 export const config = { runtime: "nodejs" };
 
+import { allow, tooMany } from "./_guard.js";
+
 const WINDOWS = {
   "1h": 3600000,
   "6h": 21600000,
@@ -78,6 +80,10 @@ async function quoteUsd(sym) {
 }
 
 export default async function handler(req, res) {
+  /* Same reasoning as solstats: the cache handles honest traffic, this
+   * handles the traffic that deliberately misses it. */
+  if (!(await allow(req, { bucket: "stats", max: 120, windowSec: 60 }))) return tooMany(res, 60);
+
   // ?usd=sol — just the rate, for a page whose token is not indexed yet
   if (req.query && req.query.usd) {
     const usd = await quoteUsd(req.query.usd);

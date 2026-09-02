@@ -29,10 +29,16 @@
 
 export const config = { runtime: "nodejs" };
 
+import { allow, tooMany } from "./_guard.js";
+
 const DBC = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN";
 const MAX_TX_BYTES = 1600;
 
 export default async function handler(req, res) {
+  /* Holds the keeper key. The secret is the real gate; this bounds how fast
+   * anyone may guess at it, and how much signing work a caller can demand. */
+  if (!(await allow(req, { bucket: "cosign", max: 30, windowSec: 60 }))) return tooMany(res, 60);
+
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "POST" });

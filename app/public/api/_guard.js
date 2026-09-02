@@ -26,12 +26,20 @@ export function kv() {
  * caller can set to anything; the right-most is the one our own proxy appended.
  * Taking the left would let one attacker look like a thousand. */
 export function clientIp(req) {
-  const xff = req.headers["x-forwarded-for"];
+  /* Two request shapes live here: the Node functions get a plain headers
+   * object, the edge ones get a Headers instance whose values only come out
+   * through .get(). Reading the wrong one silently yields undefined, which
+   * buckets every caller together under "unknown" — a rate limiter that is
+   * really a global one, and a single user could then lock out the world. */
+  const h = (name) =>
+    (typeof req.headers?.get === "function" ? req.headers.get(name) : req.headers?.[name]) || "";
+
+  const xff = h("x-forwarded-for");
   if (typeof xff === "string" && xff.length) {
     const parts = xff.split(",").map((s) => s.trim()).filter(Boolean);
     if (parts.length) return parts[parts.length - 1];
   }
-  return req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  return h("x-real-ip") || req.socket?.remoteAddress || "unknown";
 }
 
 /**
@@ -49,9 +57,17 @@ export async function allow(req, { bucket, max, windowSec, cost = 1 }) {
     /* `cost` because a JSON-RPC batch is one HTTP request carrying up to twenty
      * calls, and it is the calls that get billed. Counting requests would price
      * a batch the same as a single read and leave a twentyfold hole. */
-    const n = await db.incrby(key, cost);
-    if (n === cost) await db.expire(key, windowSec);
-    return n <= max;
+    /* One round trip, and the expiry is NOT conditional.
+     *
+     * It used to be set only when the counter came back equal to the cost —
+     * i.e. on what looked like the first call of the window. Two things wrong
+     * with that: concurrent first calls can both miss the test, and an INCRBY
+     * that lands while the EXPIRE fails leaves a key with no TTL at all. The
+     * key carries its own window index so a stranded one is never read again,
+     * but it is also never collected, and a rate limiter that slowly fills the
+     * store is its own denial of service. */
+    const [n] = await db.pipeline().incrby(key, cost).expire(key, windowSec).exec();
+    return Number(n) <= max;
   } catch {
     return true;
   }
@@ -61,6 +77,14 @@ export async function allow(req, { bucket, max, windowSec, cost = 1 }) {
 export function tooMany(res, retryAfter) {
   res.setHeader("Retry-After", String(retryAfter || 60));
   return res.status(429).json({ error: "slow down" });
+}
+
+/** The same refusal, for the edge functions, which return a Response. */
+export function tooManyResponse(retryAfter) {
+  return new Response(JSON.stringify({ error: "slow down" }), {
+    status: 429,
+    headers: { "content-type": "application/json", "Retry-After": String(retryAfter || 60) }
+  });
 }
 
 async function rpc(method, params) {

@@ -9,8 +9,13 @@
 // otherwise. A redirect is something no builder can break.
 
 import { okArt, isOurPath } from "./_art.js";
+import { allow, tooMany } from "./_guard.js";
 
 export default async function handler(req, res) {
+  /* A share card is fetched by a crawler once and by a person rarely; a
+   * flood is a scraper. Cheap since it became a redirect, but not free. */
+  if (!(await allow(req, { bucket: "og", max: 30, windowSec: 60 }))) return tooMany(res, 60);
+
   const id = String(req.query.id || "");
   const to = req.query.to === "token" ? "token" : "mint";
   const isEvm = /^0x[0-9a-fA-F]{40}$/.test(id);

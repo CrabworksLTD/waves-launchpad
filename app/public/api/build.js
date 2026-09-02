@@ -4,6 +4,10 @@
 // deploy keeps running the JavaScript it loaded — which is how three launches
 // in a row hit a bug that had already been fixed, each one paying a storage fee
 // on the way. The page checks this before it spends anything.
+//
+// Deliberately NOT rate limited. It returns one string, makes no network or
+// store call, and every open launch page polls it — a Redis round trip to
+// guard it would cost strictly more than the thing being guarded.
 
 export const config = { runtime: "nodejs" };
 

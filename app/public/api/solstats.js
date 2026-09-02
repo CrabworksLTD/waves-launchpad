@@ -1,3 +1,4 @@
+import { allow, tooMany } from "./_guard.js";
 // GET /api/solstats?cm=<machine>   -> { minted, supply }
 // GET /api/solstats?mint=<mint>&pool=<pool>&config=<key> -> { raised, threshold, quote, migrated }
 //
@@ -15,6 +16,11 @@ const DBC_CONFIGS = [
 ];
 
 export default async function handler(req, res) {
+  /* Edge-cached, so only cache MISSES reach this — and a miss is what an
+   * attacker manufactures with a unique query string, which is exactly the
+   * traffic worth bounding. */
+  if (!(await allow(req, { bucket: "solstats", max: 120, windowSec: 60 }))) return tooMany(res, 60);
+
   res.setHeader("cache-control", "public, s-maxage=60, stale-while-revalidate=300");
   const cm = req.query.cm;
   const mint = req.query.mint;

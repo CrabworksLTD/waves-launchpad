@@ -21,6 +21,8 @@
 //    $MOAR/etc. are dividend mode, so this over-counts nothing today. If burn
 //    ships, stamp the mode into the keeperlog entry and exclude it here.
 
+import { allow, tooMany } from "./_guard.js";
+
 function kv() {
   if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
     return Promise.resolve(null);
@@ -34,6 +36,10 @@ function kv() {
 const B58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 export default async function handler(req, res) {
+  /* Reads five hundred log rows out of Redis on every call and has no
+   * cache header, so each request is real work no CDN absorbs. */
+  if (!(await allow(req, { bucket: "payouts", max: 120, windowSec: 60 }))) return tooMany(res, 60);
+
   if (req.method !== "GET") return res.status(405).json({ error: "GET only" });
   const only = req.query && req.query.mint;
   if (only && !B58.test(String(only))) {

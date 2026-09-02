@@ -34,6 +34,8 @@
 
 export const config = { runtime: "nodejs", maxDuration: 300 };
 
+import { allow, tooMany } from "./_guard.js";
+
 const RPC = process.env.SOLANA_RPC || "https://solana-rpc.publicnode.com";
 const DUST_MIN_LAMPORTS = 10000n;   // below this a transfer costs more than it delivers
 const BATCH = 12;                   // transfers per transaction
@@ -351,6 +353,10 @@ async function quoteInfo(conn, w3, cli, ps) {
   return { mint, decimals };
 }
 export default async function handler(req, res) {
+  /* Cron-gated; the limit is on guessing the secret, not on the cron itself,
+   * which comes from one address and stays well inside this. */
+  if (!(await allow(req, { bucket: "cron", max: 30, windowSec: 60 }))) return tooMany(res, 60);
+
   // Vercel signs scheduled invocations; a stranger hitting this URL must not
   // be able to start a payout run.
   const secret = process.env.CRON_SECRET;

@@ -22,6 +22,8 @@
 
 export const config = { runtime: "nodejs" };
 
+import { allow, tooMany } from "./_guard.js";
+
 const TTL = 60 * 60 * 48;                    // two days
 /* Big enough for the whole launch, not just the icon.
  *
@@ -54,6 +56,10 @@ function keyOf(url) {
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
+    /* Served from Redis, so a miss costs a read no matter how the cache is
+     * dodged. Generous: a gallery page legitimately asks for many at once. */
+    if (!(await allow(req, { bucket: "mirror-get", max: 300, windowSec: 60 }))) return tooMany(res, 60);
+
     const url = (req.query && req.query.u) || "";
     const key = keyOf(url);
     if (!key) return res.status(400).json({ error: "bad url" });
@@ -79,6 +85,13 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "POST") {
+    /* ⚠️ The note below is right that no single write is dangerous, and wrong
+     * about the total. Nothing bounded HOW MANY keys a stranger could create,
+     * and three megabytes apiece held for two days adds up to storage we pay
+     * for — the limit is per caller because there is no secret to check.
+     * A real launch stores four things: icon, banner, card, metadata. */
+    if (!(await allow(req, { bucket: "mirror-post", max: 20, windowSec: 600 }))) return tooMany(res, 600);
+
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const key = keyOf(body.url);
     if (!key) return res.status(400).json({ error: "bad url" });

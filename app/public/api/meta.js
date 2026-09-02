@@ -21,6 +21,8 @@
 
 export const config = { runtime: "nodejs" };
 
+import { allow, tooMany } from "./_guard.js";
+
 /* arweave.net first, so the canonical gateway is used the moment it works.
  * The rest are ar.io gateways that serve straight from the Turbo cache, which
  * is what makes a launch visible in the first minutes rather than the first
@@ -56,6 +58,11 @@ function kv() {
 }
 
 export default async function handler(req, res) {
+  /* Every miss fans out to Arweave gateways, so an attacker asking for
+   * random ids turns this into an amplifier pointed at somebody else.
+   * Generous, because one page legitimately pulls icon, banner and card. */
+  if (!(await allow(req, { bucket: "meta", max: 300, windowSec: 60 }))) return tooMany(res, 60);
+
   const id = String((req.query && req.query.id) || "");
   const file = String((req.query && req.query.file) || "");
   if (!ID.test(id) || !FILE.test(file) || file.includes("..")) {

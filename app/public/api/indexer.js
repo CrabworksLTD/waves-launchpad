@@ -33,6 +33,8 @@
 
 export const config = { runtime: "nodejs", maxDuration: 300 };
 
+import { allow, tooMany } from "./_guard.js";
+
 const RPC = process.env.SOLANA_RPC || "https://solana-rpc.publicnode.com";
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const MAX_TRADES = 600;          // ~70KB of JSON, plenty for a chart and a feed
@@ -206,6 +208,10 @@ function readSwap(tx, baseMint, sig, blockTime) {
 }
 
 export default async function handler(req, res) {
+  /* Cron-gated, so this only bounds how fast the secret can be guessed —
+   * cheap insurance on an endpoint that otherwise answers forever. */
+  if (!(await allow(req, { bucket: "cron", max: 30, windowSec: 60 }))) return tooMany(res, 60);
+
   /* Two ways in.
    *
    * The cron sweeps everything and needs the secret. But a launch and a trade

@@ -23,6 +23,8 @@
 
 export const config = { runtime: "nodejs" };
 
+import { allow, tooMany } from "./_guard.js";
+
 const B58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const SIG = /^[1-9A-HJ-NP-Za-km-z]{80,100}$/;
 const KEY = "tokens";
@@ -51,6 +53,10 @@ async function rpc(method, params) {
 }
 
 export default async function handler(req, res) {
+  /* Activation is a once-per-token event, and each attempt makes the server
+   * go and read the chain to check the claim. A flood is never genuine. */
+  if (!(await allow(req, { bucket: "rewards", max: 20, windowSec: 600 }))) return tooMany(res, 600);
+
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "POST" });

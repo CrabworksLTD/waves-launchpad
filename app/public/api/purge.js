@@ -31,6 +31,8 @@
 
 export const config = { runtime: "nodejs" };
 
+import { allow, tooMany } from "./_guard.js";
+
 function kv() {
   if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
     return Promise.resolve(null);
@@ -52,6 +54,10 @@ async function readList(db, key) {
 }
 
 export default async function handler(req, res) {
+  /* Cron-gated, and destructive if the secret ever leaked — so the rate at
+   * which it can be attempted is worth bounding on its own. */
+  if (!(await allow(req, { bucket: "cron", max: 30, windowSec: 60 }))) return tooMany(res, 60);
+
   const secret = process.env.CRON_SECRET;
   if (!secret) return res.status(500).json({ error: "CRON_SECRET is not set" });
   if ((req.headers.authorization || "") !== "Bearer " + secret) {

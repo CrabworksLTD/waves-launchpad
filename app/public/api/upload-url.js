@@ -23,6 +23,8 @@
 // arrived at the hard way — read the comments before relaxing one.
 
 // SHA-256 of the closed-testing password — the team's free path.
+import { allow, tooMany } from "./_guard.js";
+
 const TEST_HASH = process.env.TEST_HASH || "";
 
 // Collections whose holders launch free. Empty until a pass collection exists
@@ -332,6 +334,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "POST only" });
   }
 
+  /* An outer ceiling on the whole endpoint, above the per-holder allowance
+   * further down. That one bounds how much free STORAGE a proven holder can
+   * pull; this bounds how much WORK an anonymous caller can make us do getting
+   * there — signature verification, chain reads and rate lookups all happen
+   * before anything decides to say no. */
+  if (!(await allow(req, { bucket: "upload", max: 120, windowSec: 60 }))) return tooMany(res, 60);
+
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
   const { key, address, sig, ts, signerAddress, bytes, count, signature, quote } = body;
   // which chain is paying — Robinhood Chain pays in ETH, Solana in SOL
@@ -343,6 +352,12 @@ export default async function handler(req, res) {
 
   // Quote mode — a public price, grants nothing.
   if (quote) {
+    /* Grants nothing, but is not free: each quote calls Turbo for its live
+     * rates and Coinbase for a spot price. Unlimited, that makes this an
+     * amplifier aimed at two third parties who would rightly rate limit US.
+     * A launch window asks for a handful of quotes as the artwork changes. */
+    if (!(await allow(req, { bucket: "quote", max: 60, windowSec: 60 }))) return tooMany(res, 60);
+
     try {
       if (evm) {
         const feeWei = await quoteFeeWei(size, files);

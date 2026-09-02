@@ -40,20 +40,11 @@ const EVM = /^0x[0-9a-fA-F]{40}$/;
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
-    /* Prove it exists. A shape check cannot tell a collection from a string,
-     * and a string was enough to evict a real one. See api/_guard.js. */
-    {
-      const isAdmin = process.env.CRON_SECRET &&
-        req.headers.authorization === "Bearer " + process.env.CRON_SECRET;
-      if (!isAdmin) {
-        const real = isEvm ? await isRealEvmToken(address) : await isRealCollection(collection);
-        if (!real.ok) {
-          return res.status(real.reason === "unverifiable" ? 503 : 400)
-            .json({ ok: false, error: real.reason, retryable: real.reason === "unverifiable" });
-        }
-      }
-    }
-
+    /* GET lists every launch — there is no single record here to validate, so
+     * the per-record realness check belongs to POST, not here. It was pasted
+     * into this branch by mistake and referenced isEvm/address/collection,
+     * which only exist in the POST scope: every GET threw ReferenceError before
+     * the try below could catch it and 500'd the whole listing (2026-09-02). */
     try {
       const db = await kv();
       const raw = await db.lrange(KEY, 0, MAX - 1);
