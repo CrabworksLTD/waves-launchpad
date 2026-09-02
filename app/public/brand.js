@@ -104,7 +104,11 @@
                          * them; nothing new can reach them. */
                         t3:  { sol: "GA2TweZTv5JMT6nu9gGMRJTsmbnNArvTNdQpFPUxNU7W",
                                usdc: "QYECpZwhb3jCrQtH8Q2wUZmEVA3LijZAKz3c9yEXXgB",
-                               rwa: {} },
+                               // gold, the only tokenised asset DBC will take
+                               // as a quote — the rest are Token-2022
+                               rwa: { "AymATz4TCL9sWNEEV9Kvyz45CHVhDZ6kUgjTJPzLpU9P":
+                                 { config: "9EMW8SWyyTsqXZBzK9664xrfneFhvV7eBYYxKnWg7hL8",
+                                   symbol: "XAUt0", decimals: 6, label: "Gold" } } },
                         /* 5% config, signed 2026-09-01 and then superseded by
                          * the 3% rung above. Kept because it is immutable and
                          * paid for; not in LADDER, so nothing new launches on
