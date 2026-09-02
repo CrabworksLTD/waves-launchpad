@@ -91,6 +91,9 @@
                          * launch window hides it rather than trying to create
                          * one mid-launch. */
                         t2:  { sol: "", usdc: "", rwa: {} },
+                        t4:  { sol: "", usdc: "", rwa: {} },
+                        t5:  { sol: "", usdc: "", rwa: {} },
+                        t10: { sol: "", usdc: "", rwa: {} },
                         /* The tax rung — 3%, signed 2026-09-01. Verified on
                          * chain before wiring: 0.6% Meteora, 0.792% platform,
                          * 1.608% to holders, and feeClaimer is the sweep key so
