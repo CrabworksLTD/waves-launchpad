@@ -592,8 +592,7 @@
           name: opts.name,
           symbol: opts.symbol,
           uri: opts.uri,
-          poolCreator: opts.feeShare === "holders"
-            ? new c.X.PublicKey(window.BRAND.feeKeeper) : c.owner
+          poolCreator: c.owner   // see the note on the standard path
         }
       }, curve, opts.firstBuySol > 0 ? {
         firstBuyParam: {
@@ -618,9 +617,12 @@
         symbol: opts.symbol,
         uri: opts.uri,
         payer: c.owner,
-        // the keeper when fees are pledged — see poolCreatorFor
-        poolCreator: opts.feeShare === "holders"
-          ? new c.X.PublicKey(window.BRAND.feeKeeper) : c.owner
+        /* Always the launcher. Naming the keeper here made the launch
+         * transaction require a third signature from an address the user had
+         * never seen, which Phantom blocks as a possible drainer. Holder
+         * rewards are switched on afterwards by transferPoolCreator, which the
+         * creator alone signs — one instruction, 344 bytes. */
+        poolCreator: c.owner
       };
 
       var built;

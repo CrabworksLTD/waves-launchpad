@@ -54,6 +54,12 @@
        * rather than chase it, the row states the box explicitly: same height,
        * same radius, text centred. Back sets the row's top, so fixing the
        * height leaves the gap above unchanged. */
+      ".lp .tip{margin-top:16px;padding:14px 15px;border-radius:10px;",
+      "  border:1px solid var(--accent);background:rgba(var(--accent-rgb),.07)}",
+      ".lp .tip b{display:block;font:700 13.5px Archivo;margin-bottom:4px}",
+      ".lp .tip span{display:block;font-size:12.5px;color:var(--dim);line-height:1.5}",
+      ".lp .tip a{display:inline-block;margin-top:10px;font-size:12.5px;font-weight:600;",
+      "  color:var(--accent);text-decoration:none}",
       ".lp .acts{display:flex;gap:10px;margin-top:22px;align-items:center}",
       ".lp .acts button{height:46px;padding:0 16px;border-radius:8px;margin:0;",
       "  display:inline-flex;align-items:center;justify-content:center;line-height:1}",
@@ -139,10 +145,6 @@
       ".lp .artbtn.has{border-style:solid;border-color:rgba(var(--accent-rgb),.4);color:var(--accent)}",
       ".lp .tiers{display:grid;grid-template-columns:1fr 1fr;gap:10px}",
       // three modes, one row — a wrapped third option reads as an afterthought
-      ".lp #tk-modes{grid-template-columns:1fr 1fr 1fr;gap:8px}",
-      ".lp #tk-modes .tier{padding:10px 11px}",
-      ".lp #tk-modes .tier b{font-size:12.5px}",
-      ".lp #tk-modes .tier span{font-size:11px;line-height:1.4}",
       ".lp .tier{text-align:left;padding:12px 14px;border-radius:8px;",
       "  border:1px solid var(--line);background:var(--panel2);cursor:pointer}",
       ".lp .tier b{display:block;font:700 13px Archivo,sans-serif;margin-bottom:3px}",
@@ -1380,7 +1382,12 @@
      * and the state the panel opens in. Sharing is a decision the creator
      * makes, not one they have to notice and undo. */
     if (!flow.tier) flow.tier = "standard";
-    if (flow.feeSharePct == null) { flow.feeSharePct = 0; flow.feeShare = "keep"; }
+    /* Rewards are switched on after launch, from the claim page. A launch that
+     * named our keeper as the pool's creator put an unknown third signer into
+     * the transaction, which is what Phantom blocked as a possible drainer —
+     * isolated 2026-09-02 across four launches. */
+    flow.feeSharePct = 0;
+    flow.feeShare = "keep";
     var quotes = window.Token.quotes();
     var rwas = window.Token.rwaQuotes();
     var qLabel = flow.quote === "usdc" ? "USDC"
@@ -1446,52 +1453,6 @@
       <div class="ptabs" id="tk-tiers">${raw(tierButtons(flow))}</div>
       <p class="note" id="tk-taxtxt"></p>
 
-      <div id="tk-sharewrap">
-      <div id="tk-splitwrap">
-      <label>Split</label>
-      <div class="ptabs" id="tk-splits">
-        <button data-s="0">All to you</button>
-        <button data-s="25">75 / 25</button>
-        <button data-s="50">50 / 50</button>
-        <button data-s="75">25 / 75</button>
-        <button data-s="100">All to holders</button>
-      </div>
-      <p class="note" id="tk-splittxt"></p>
-      </div><!-- /tk-splitwrap -->
-
-      <div id="tk-modewrap" ${(flow.feeSharePct || 0) > 0 ? "" : raw("hidden")}>
-      <label>What the holders' share does</label>
-      <div class="tiers" id="tk-modes">
-        <button data-m="dividend" class="tier ${(flow.rewardMode || "dividend") === "dividend" ? "on" : ""}">
-          <b>Dividend</b><span>Paid out to holders automatically based on their
-          holdings.</span></button>
-        <button data-m="burn" class="tier ${flow.rewardMode === "burn" ? "on" : ""}">
-          <b>Buyback &amp; burn</b><span>Buys the token off the market and burns it,
-          causing supply to fall.</span></button>
-      </div>
-
-      </div><!-- /tk-modewrap -->
-
-      <!-- the reward picker answers "paid in what?", which is only a question
-           when something is being paid out -->
-      <div id="tk-rewardwrap" ${flow.rewardMode === "burn" || flow.feeSharePct === 0
-        ? raw("hidden") : ""}>
-        <label>Holders are paid in</label>
-        <button class="pick" id="lp-reward">
-          <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
-          <span class="pk-r"><span class="k2 mono">${
-            flow.reward.liquidity === undefined || flow.reward.liquidity >= 1000
-              ? "tradeable" : "not tradeable yet"}</span>
-          <span class="pk-dd">Change ▾</span></span>
-        </button>
-        <p class="note">Paid pro-rata by holdings, automatically — nobody claims
-        anything.${flow.reward.liquidity !== undefined && flow.reward.liquidity < 1000
-          ? raw(" <b>Nothing trades " + esc(flow.reward.symbol) + " yet</b>, so holders " +
-                "receive " + esc(qLabel) + " until it can be sold. It switches by itself " +
-                "once a market exists.")
-          : ""}</p>
-      </div>
-      </div><!-- /tk-sharewrap -->
 
       <div id="tk-fwwrap" ${(flow.feeSharePct || 0) >= 100 ? raw("hidden") : ""}>
         <label>Creator fee wallet</label>
@@ -1621,7 +1582,6 @@
 
       /* The rung sets the size of the pot, not who gets it — the split below
        * is the only thing that decides that, and it survives a rung change. */
-      paintSplit();
       paintTax();
       paintEconomics();          // each rung has its own curve, not just its own fee
     });
@@ -1632,72 +1592,12 @@
       if (el) el.textContent = "Traders pay " + tierPct(flow) + "% in total.";
     }
 
-    function paintVisibility() {
-      var shared = (flow.feeSharePct || 0) > 0;
-      var mw = box.querySelector("#tk-modewrap");
-      if (mw) mw.hidden = !shared;
-      var rw = box.querySelector("#tk-rewardwrap");
-      if (rw) rw.hidden = !shared || flow.rewardMode === "burn";
-      var fw = box.querySelector("#tk-fwwrap");
-      if (fw) fw.hidden = (flow.feeSharePct || 0) >= 100;
-    }
-
-    function paintSplit() {
-      var pct = flow.feeSharePct == null ? 0 : flow.feeSharePct;
-      box.querySelectorAll("#tk-splits button").forEach(function (b) {
-        b.classList.toggle("on", +b.dataset.s === pct);
-      });
-      /* The buttons stay short; the sentence says which side is which, so
-       * "25 / 75" never has to be guessed at. */
-      var el = box.querySelector("#tk-splittxt");
-      if (el) {
-        el.textContent = pct === 0 ? "All of it is yours."
-          : pct >= 100 ? "All of it goes to holders."
-          : (100 - pct) + "% to you, " + pct + "% to holders.";
-      }
-    }
 
 
-    paintSplit();
+
     paintTax();
-    paintVisibility();
 
-    box.querySelector("#tk-splits").addEventListener("click", function (e) {
-      var b = e.target.closest("button[data-s]");
-      if (!b) return;
-      flow.feeSharePct = +b.dataset.s;
-      /* Nothing pledged means nothing for the keeper to do. Handing it the pool
-       * anyway would route the creator's own fees through us for no reason and
-       * stop them claiming directly — so at zero the pool is created by, and
-       * belongs to, the launcher. */
-      flow.feeShare = flow.feeSharePct > 0 ? "holders" : "keep";
-      // a first pledge needs a destination; dividend is the gentler default
-      if (flow.feeSharePct > 0 && !flow.rewardMode) flow.rewardMode = "dividend";
-      paintVisibility();
-      paintSplit();
-    });
 
-    box.querySelector("#tk-modes").addEventListener("click", function (e) {
-      var b = e.target.closest("button[data-m]");
-      if (!b) return;
-      flow.rewardMode = b.dataset.m;
-      box.querySelectorAll("#tk-modes .tier").forEach(function (x) {
-        x.classList.toggle("on", x === b);
-      });
-
-      /* Each mode decides which controls below still mean anything.
-       *
-       * keep     — nothing is shared, so there is no split and no asset
-       * dividend — both apply
-       * burn     — split applies, but nothing is "paid in" anything
-       *
-       * Keeping the fees also hands the pool back to the launcher: pledging it
-       * to the keeper would route a creator's own money through us and stop
-       * them claiming it directly. */
-      paintVisibility();     // a burn has nothing "paid in" anything
-
-      paintSplit();                     // "buys back and burns" vs "holders receive"
-    });
 
     box.querySelector("#tk-quotes").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-q]");
@@ -2071,13 +1971,17 @@
     var box = shell(H`
       <h2>Live</h2>
       <p class="sub">$${flow.tsym} is trading on ${res.cluster}.</p>
-      <div class="row"><span class="k">Fee sharing</span><b>${(flow.feeSharePct || 0) > 0
-        ? flow.feeSharePct + "% to holders / " + (100 - flow.feeSharePct) + "% to you"
-        : "You keep everything"}</b></div>
-      ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Holders paid in</span><b>${
-        flow.reward.liquidity !== undefined && flow.reward.liquidity < 1000
-          ? qLabel + " — " + flow.reward.symbol + " has no market yet"
-          : (flow.reward.symbol || qLabel)}</b></div>` : ""}
+      <div class="row"><span class="k">Trading fees</span><b>yours to claim</b></div>
+
+      <!-- Rewards are a second, separate step now: one instruction the creator
+           signs alone. Doing it inside the launch put a third signer in the
+           transaction and Phantom blocked it. -->
+      <div class="tip">
+        <b>Want your holders to earn from every trade?</b>
+        <span>Turn on holder rewards from the fee page — one signature, and your
+        share starts paying out hourly. You can do it whenever you like.</span>
+        <a class="go" href="/fees">Open the fee page →</a>
+      </div>
       ${raw(caRow("Token CA", res.mint))}
       ${nft ? raw(caRow("Collection", nft.res.collection) + caRow("Candy machine", nft.res.candyMachine)) : ""}
       ${nft ? H`<label>Mint page</label>
