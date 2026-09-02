@@ -1342,26 +1342,15 @@
       cur = rungs[0].name;
       flow.tier = cur;
     }
+    /* The tax IS the trading fee, so the buttons are the fee itself — "None"
+     * being the 1.2% floor every launch pays. Naming them after the number a
+     * trader sees keeps the label honest: a 3% tax means traders pay 3%. */
     return rungs.map(function (r) {
-      /* Quote the share this rung actually pays, read from the rung itself.
-       *
-       * This said "20% of the fee" and "0.6% of volume to you" — both baked in
-       * when every rung had the same split and both wrong the moment the tax
-       * rung was rebalanced to 1.608%. It also said "to you" for a rung whose
-       * whole share goes to holders. Meteora takes 20% off the top, so the
-       * creator's cut is that percentage of the remaining 80%. */
-      var pct = r.spec.pct;
-      var share = pct * 0.8 * (r.spec.creatorTradingFeePercentage || 0) / 100;
-      // one decimal: 1.608 reads as 1.6, which is the number to say out loud
-      var num = share.toFixed(1);
-      return '<button data-t="' + r.name + '" class="tier' + (r.name === cur ? " on" : "") + '">' +
-        "<b>" + esc(r.spec.label) + " — " + pct + "%</b><span>" +
-        (r.name === "standard"
-          ? "You receive " + num + "% of trading volume."
-          : "Up to " + num + "% of trading volume to holders.") +
-        "</span></button>";
+      return '<button data-t="' + r.name + '"' + (r.name === cur ? ' class="on"' : "") + ">" +
+        (r.name === "standard" ? "Standard" : r.spec.pct + "%") + "</button>";
     }).join("");
   }
+
 
   function tokenDetails(flow) {
     flow = flow || {};
@@ -1438,8 +1427,9 @@
       <p class="note">Lands in the same transaction as the pool, so nobody can snipe
       the opening price ahead of you.</p>
 
-      <label>Swap fee</label>
-      <div class="tiers" id="tk-tiers">${raw(tierButtons(flow))}</div>
+      <label>Creator tax</label>
+      <div class="ptabs" id="tk-tiers">${raw(tierButtons(flow))}</div>
+      <p class="note" id="tk-taxtxt"></p>
 
       <div id="tk-sharewrap" ${(flow.tier || "standard") === "standard" ? raw("hidden") : ""}>
       <label>Split — how the <span id="tk-poolpct"></span> is divided</label>
@@ -1603,26 +1593,24 @@
       // toggle IN PLACE — a full re-render scrolls the window back to the
       // top, which reads as a jump
       flow.tier = b.dataset.t;
-      box.querySelectorAll("#tk-tiers .tier").forEach(function (x) {
+      // these are plain buttons now, not the old two-column cards
+      box.querySelectorAll("#tk-tiers button").forEach(function (x) {
         x.classList.toggle("on", x === b);
       });
-      /* Sharing is the point of a tax token, and noise on a standard one. Hide
-       * it AND zero it — a slider left at 90% behind a hidden panel would
-       * quietly pledge fees the creator can no longer see. */
+
+      /* Standard keeps everything. A tax defaults to giving all of it away,
+       * and the split below can hand some back — but a tax the creator has not
+       * looked at yet should read as generous, not as a silent claim. */
       var sw = box.querySelector("#tk-sharewrap");
       var isStd = flow.tier === "standard";
       if (sw) sw.hidden = isStd;
-      /* Standard keeps everything, tax gives everything. The rung IS the
-       * choice, so nothing else has to be set or explained. */
-      /* Standard keeps everything. A tax rung defaults to giving everything,
-       * and the split below can hand some back. */
       if (isStd) flow.feeSharePct = 0;
       else if (flow.feeSharePct == null) flow.feeSharePct = 100;
       flow.feeShare = (flow.feeSharePct || 0) > 0 ? "holders" : "keep";
+
       paintSplit();
-      box.querySelector("#tk-fee").textContent = tierPct(flow) +
-        "% — 20% you / 60% platform / 20% Meteora";
-      paintEconomics();          // the rung has its own curve, not just its own fee
+      paintTax();
+      paintEconomics();          // each rung has its own curve, not just its own fee
     });
     /* Both sides of the split, in percent of trading volume.
      *
@@ -1635,6 +1623,19 @@
       var spec = tierSpec(f);
       return spec.pct * 0.8 * (spec.creatorTradingFeePercentage || 0) / 100;
     }
+    function paintTax() {
+      var spec = tierSpec(flow);
+      var el = box.querySelector("#tk-taxtxt");
+      if (!el) return;
+      var meteora = spec.pct * 0.2;
+      var creatorSide = pledgeable(flow);
+      var platform = spec.pct - meteora - creatorSide;
+      el.textContent = "Traders pay " + spec.pct + "% in total — " +
+        creatorSide.toFixed(2).replace(/0$/, "") + "% split below, " +
+        platform.toFixed(2).replace(/0$/, "") + "% platform, " +
+        meteora.toFixed(2).replace(/0$/, "") + "% Meteora.";
+    }
+
     function paintSplit() {
       var total = pledgeable(flow);
       var pct = flow.feeSharePct == null ? 100 : flow.feeSharePct;
@@ -1656,6 +1657,7 @@
       if (fw) fw.hidden = (flow.tier || "standard") === "standard" || pct >= 100;
     }
     paintSplit();
+    paintTax();
 
     box.querySelector("#tk-splits").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-s]");
