@@ -1081,6 +1081,41 @@
     }
   }
 
+  /* Hand a pool's creator role to the keeper — how holder rewards start.
+   *
+   * One instruction, signed by the creator alone. Doing this inside the launch
+   * put a third signature from an address the user had never seen into the
+   * transaction, and Phantom blocked it as a possible drainer; as its own step
+   * it is about as plain as a Solana transaction gets.
+   *
+   * It is one-way by design. The pledge is only worth something if the creator
+   * cannot quietly take it back, which is the same reason the keeper — not the
+   * launcher — has to hold the role.
+   */
+  async function activateHolderRewards(poolAddr) {
+    var c = await client();
+    var keeper = window.BRAND && window.BRAND.feeKeeper;
+    if (!keeper) throw new Error("No keeper is configured on this deployment.");
+    var pool = new c.X.PublicKey(poolAddr);
+
+    var state = await c.cli.state.getPool(pool);
+    var st = state && (state.account || state);
+    var ps = st && (st.poolState || st);
+    if (!ps) throw new Error("Could not read that pool.");
+    if (String(ps.creator) === keeper) return { already: true };
+    if (String(ps.creator) !== String(c.owner)) {
+      throw new Error("This pool belongs to " + String(ps.creator).slice(0, 8) +
+        "… — only its creator can turn rewards on.");
+    }
+
+    var tx = await within(30000, "Building the activation",
+      c.cli.creator.transferPoolCreator({
+        pool: pool, creator: c.owner, newCreator: new c.X.PublicKey(keeper)
+      }));
+    var sig = await send(c, { transaction: tx });
+    return { sig: sig };
+  }
+
   window.Token = {
     readMarket: readMarket,
     getQuote: getQuote,
@@ -1090,6 +1125,7 @@
     recentTrades: recentTrades,
     launchToken: launchToken,
     rewardsActive: rewardsActive,
+    activateHolderRewards: activateHolderRewards,
     // throws when a rung has no config, which is how the launch
     // window decides what to offer
     configFor: configKey,

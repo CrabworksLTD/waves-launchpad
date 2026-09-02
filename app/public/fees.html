@@ -45,6 +45,21 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
   background-image:var(--grad);background-repeat:no-repeat;
   background-size:calc(100% + 2px) 100%;background-position:-1px 0}
 .frow button:disabled{opacity:.4;cursor:default}
+.frow button.act{background:none;border:1px solid var(--accent);color:var(--accent);
+  padding:9px 16px;font-size:12.5px}
+.frow button.act:hover{background:rgba(var(--accent-rgb),.1)}
+.actbox{margin-top:8px;padding:14px 16px;border-radius:12px;
+  border:1px solid var(--accent);background:rgba(var(--accent-rgb),.06)}
+.actbox b{display:block;font:700 13.5px Archivo;margin-bottom:3px}
+.actbox p{margin:0 0 10px;font-size:12.5px;color:var(--dim);line-height:1.5}
+.actbox .opts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.actbox .opts button{padding:7px 13px;border-radius:999px;font-size:12px;
+  border:1px solid var(--line2);background:var(--panel2);color:var(--ink);cursor:pointer}
+.actbox .opts button.on{border-color:var(--accent);color:var(--accent)}
+.actbox .go{padding:10px 20px;border-radius:999px;border:0;cursor:pointer;
+  background-image:var(--grad);color:var(--accent-ink);font-weight:700;font-size:13px}
+.actbox .cancel{background:none;border:0;color:var(--faint);cursor:pointer;
+  font-size:12.5px;margin-left:10px}
 .frow .shared{flex:none;font:600 10px "IBM Plex Mono",monospace;letter-spacing:.12em;
   color:#ffb84d;border:1px solid rgba(255,180,80,.45);border-radius:99px;padding:5px 11px}
 .gate,.none{border:1px dashed var(--line2);border-radius:10px;padding:38px 24px;
@@ -115,8 +130,86 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
         ? '<span class="shared" title="The keeper claims this pool and pays ' + pct +
           '% to holders automatically; your ' + (100 - pct) +
           '% arrives at your fee wallet in the same run.">' + pct + '% AUTO-SHARED</span>'
-        : '<button class="cl" disabled>Claim</button>') +
+        : '<button class="cl" disabled>Claim</button>' +
+          (kind === "creator"
+            ? '<button class="act">Activate holder rewards</button>' : "")) +
       "</div>";
+  }
+
+  /* Turning holder rewards on.
+   *
+   * Two parts, in this order: the chain first, then our record. The transfer is
+   * what actually binds the pledge — the keeper ignores any pool it does not
+   * own — so if the second half fails the creator has still given the role away
+   * and can retry the terms. Doing it the other way round would let us promise
+   * a split the chain knows nothing about. */
+  function openActivate(rowEl, t, btn) {
+    if (rowEl.nextElementSibling && rowEl.nextElementSibling.classList.contains("actbox")) {
+      rowEl.nextElementSibling.remove();
+      return;
+    }
+    var pct = 100;
+    var box = document.createElement("div");
+    box.className = "actbox";
+    box.innerHTML =
+      "<b>Pay your holders from every trade</b>" +
+      "<p>Hands this pool's creator role to the WAVES keeper, which claims the " +
+      "fees hourly and pays your holders pro-rata. One signature. " +
+      "<b>This cannot be undone</b> — that is what makes the pledge worth " +
+      "anything to a buyer.</p>" +
+      '<div class="opts">' +
+        [25, 50, 75, 100].map(function (p) {
+          return '<button data-p="' + p + '"' + (p === 100 ? ' class="on"' : "") + ">" +
+            (p === 100 ? "All to holders" : p + "% holders · " + (100 - p) + "% you") +
+            "</button>";
+        }).join("") +
+      "</div>" +
+      '<button class="go">Activate</button>' +
+      '<button class="cancel">Cancel</button>' +
+      '<div class="amsg" style="margin-top:10px;font-size:12.5px"></div>';
+    rowEl.insertAdjacentElement("afterend", box);
+
+    var msg = box.querySelector(".amsg");
+    box.querySelector(".opts").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-p]");
+      if (!b) return;
+      pct = +b.dataset.p;
+      box.querySelectorAll(".opts button").forEach(function (x) {
+        x.classList.toggle("on", x === b);
+      });
+    });
+    box.querySelector(".cancel").onclick = function () { box.remove(); };
+
+    box.querySelector(".go").onclick = async function () {
+      var go = box.querySelector(".go");
+      go.disabled = true;
+      msg.style.color = "var(--dim)";
+      msg.textContent = "Confirm in your wallet…";
+      try {
+        if (!t.pool) throw new Error("This launch has no pool recorded.");
+        var out = await window.Token.activateHolderRewards(t.pool);
+        msg.textContent = "Saving your terms…";
+        var r = await fetch("/api/rewards", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            mint: t.mint, sig: out.sig || "", feeSharePct: pct,
+            rewardMode: t.rewardMode === "burn" ? "burn" : "dividend",
+            rewardMint: t.rewardMint || null,
+            keeper: window.BRAND.feeKeeper
+          })
+        });
+        var j = await r.json().catch(function () { return {}; });
+        if (!r.ok) throw new Error(j.error || ("could not save the terms (" + r.status + ")"));
+        msg.style.color = "var(--accent)";
+        msg.textContent = "Rewards are on. The first payout runs within the hour.";
+        setTimeout(function () { location.reload(); }, 1800);
+      } catch (e) {
+        go.disabled = false;
+        msg.style.color = "#ff8080";
+        msg.textContent = String(e.message || e).slice(0, 200);
+      }
+    };
   }
 
   async function load() {
@@ -154,6 +247,8 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
           btn.disabled = false;
           btn.onclick = function () { doClaim(el, t, btn); };
         }
+        var act = el.querySelector(".act");
+        if (act) act.onclick = function () { openActivate(el, t, act); };
       }).catch(function () {
         el.querySelector(".amt").textContent = "—";
       });
