@@ -59,6 +59,12 @@ td b{color:var(--ink)}
   font-size:13.5px;color:var(--dim)}
 .chainbar img{width:16px;height:16px;flex:none}
 .chainbar b{color:var(--ink)}
+.fees{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+.fees th{text-align:left;font:600 11px "IBM Plex Mono",monospace;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--faint);padding:0 12px 8px 0}
+.fees td{padding:7px 12px 7px 0;border-top:1px solid var(--line);
+  font-family:"IBM Plex Mono",monospace}
+.tiny{font-size:12.5px;color:var(--faint);line-height:1.6}
 </style>
 </head>
 <body>
@@ -220,23 +226,52 @@ td b{color:var(--ink)}
       <span class="ch-sol">SOL</span><span class="ch-rh">ETH</span> before you sign</td></tr>
       <tr><td>Launching a token</td><td><b>Free</b> (tiny metadata storage + network fees)</td></tr>
       <tr><td>Minting</td><td>The creator's mint price + network fee</td></tr>
-      <tr><td>Trading a token</td><td><b>1%</b> of each swap</td></tr>
+      <tr><td>Trading a token</td><td><b>1% to 10%</b> — the creator's choice at launch</td></tr>
     </table>
-    <p>The 1% trading fee splits <b>20% to the creator, 60% to the platform, 20% to
-    Meteora</b> — on the curve and, after graduation, from the locked LP forever.</p>
+    <p>The creator picks the trading fee at launch, from <b>1%</b> to <b>10%</b>.
+    Meteora takes a fixed fifth of whatever it is, and the rest is divided
+    between the platform and the creator. Our share rises a tenth of a percent
+    per step and stops there, so a creator who sets a high fee is raising it for
+    their token, not for us:</p>
 
-    <p>A creator can pledge any share of their 20% to the people holding the
-    token. That pledge is enforced on chain, not by us: the pool names our
-    keeper as its creator from the moment it exists, so the launcher cannot
-    claim a stream they gave away. Payouts run hourly, pro-rata by holdings,
-    with nothing for holders to claim.</p>
+    <table class="fees">
+      <tr><th>Trading fee</th><th>Meteora</th><th>Platform</th><th>Creator</th></tr>
+      <tr><td>1%</td><td>0.20%</td><td>0.40%</td><td>0.40%</td></tr>
+      <tr><td>2%</td><td>0.40%</td><td>0.51%</td><td>1.09%</td></tr>
+      <tr><td>3%</td><td>0.60%</td><td>0.60%</td><td>1.80%</td></tr>
+      <tr><td>4%</td><td>0.80%</td><td>0.70%</td><td>2.50%</td></tr>
+      <tr><td>5%</td><td>1.00%</td><td>0.80%</td><td>3.20%</td></tr>
+      <tr><td>10%</td><td>2.00%</td><td>0.88%</td><td>7.12%</td></tr>
+    </table>
+    <p class="tiny">Figures are of trading volume, and apply on the curve and,
+    after graduation, from the locked LP forever. The exact split is stored in
+    an immutable config signed before the launch existed — it cannot be changed
+    for a token afterwards, by the creator or by us.</p>
 
-    <p>Creators may also choose the asset holders are paid in — a tokenised
-    stock or commodity rather than the currency the token trades against. The
-    keeper buys it before distributing, and pays the trading currency instead
-    whenever that would not serve holders: nothing trades the asset yet, the
-    payout would be large enough to move its price, or the cost of creating
-    token accounts would eat more than a tenth of the payout.</p>
+    <h3>Holder rewards</h3>
+    <p>A creator can pass any share of their side to the people holding the
+    token — a dividend paid pro-rata every hour, with nothing for holders to
+    claim, or a buyback that takes the token off the market and burns it.</p>
+
+    <p><b>This is switched on after the launch, not during it.</b> The creator
+    opens the fee page and activates it in one signature, which hands the pool's
+    creator role to our keeper. That is what makes the pledge real rather than a
+    promise on a website: from then on the launcher cannot claim a stream they
+    gave away, because the chain no longer lets them. It cannot be undone.</p>
+
+    <p>The reason it is a separate step is worth stating plainly. Naming the
+    keeper inside the launch transaction meant the transaction required a
+    signature from an address the creator had never seen, and wallets block that
+    on sight — correctly, since it is also what a drainer looks like. Splitting
+    it in two costs one extra signature and removes the ambiguity.</p>
+
+    <p>Creators also choose the asset holders are paid in — a tokenised stock or
+    commodity rather than the currency the token trades against. The keeper buys
+    it before distributing, and pays the trading currency instead whenever that
+    would not serve holders: nothing trades the asset yet, the payout would be
+    large enough to move its price, or the cost of creating token accounts would
+    eat more than a tenth of the payout. It switches to the chosen asset on its
+    own once those stop being true.</p>
 
     <h2 id="safety">Wallets &amp; safety</h2>
     <ul>

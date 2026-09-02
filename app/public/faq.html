@@ -171,6 +171,39 @@ details[open] summary::after{transform:rotate(45deg);color:var(--accent)}
     USDC, or any of <b>400+ tokenized stocks and commodities</b> — Tesla, gold, oil.</p></div>
   </details>
   <details>
+    <summary>How do I turn on holder rewards?</summary>
+    <div class="a"><p>After you launch, not during it. Open <a href="/fees">the fee
+    page</a>, find your token, and hit <b>Activate holder rewards</b> — pick how
+    much of your side goes to holders, sign once, done. Payouts start on the
+    next hourly run.</p>
+    <p>That signature hands your pool's creator role to the WAVES keeper, which
+    is what makes the pledge real: from then on you cannot claim a stream you
+    gave away, because the chain will not let you. <b>It cannot be undone</b>,
+    which is the point — a promise you could quietly reverse would be worth
+    nothing to the people who bought on the strength of it.</p>
+    <p>It is a separate step because doing it inside the launch made that
+    transaction require a signature from an address you had never seen, and
+    wallets block that on sight. They are right to: it is also what a drainer
+    looks like. Two smaller transactions are clearer than one ambiguous one.</p></div>
+  </details>
+  <details>
+    <summary>Can I change the split later, or turn rewards off?</summary>
+    <div class="a"><p>No. Activation is one-way and the share is fixed when you
+    set it. If you want to reward holders differently, that is a decision for
+    your next launch.</p></div>
+  </details>
+  <details>
+    <summary>What do holders actually receive?</summary>
+    <div class="a"><p>Whatever you chose — SOL, USDC, or any of the tokenised
+    stocks and commodities. The keeper buys the asset before paying it out,
+    pro-rata by holdings, with nothing for anyone to claim.</p>
+    <p>It pays the trading currency instead whenever buying the asset would not
+    serve holders: nothing trades it yet, the payout is big enough to move its
+    price, or the cost of creating token accounts would eat more than a tenth
+    of it. It switches to your chosen asset by itself once that stops being
+    true — you do not have to do anything.</p></div>
+  </details>
+  <details>
     <summary>Is holder staking live?</summary>
     <div class="a"><p><b>Not yet.</b> The burn-to-stake rewards system is in
     development and needs an audit before it touches real money. Until then the
