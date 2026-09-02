@@ -38,8 +38,16 @@
                 creatorTradingFeePercentage: 25 },   // 0.2% creator / 0.6% us / 0.2% Meteora
     t2:       { label: "Tax token", pct: 2, baseFeeBps: 200,
                 creatorTradingFeePercentage: 25 },
+    /* The tax rung's whole point is the holder reward, so the creator's share
+     * is the big one and it is not the creator's to keep — the launch window
+     * pledges all of it to holders and offers no slider.
+     *
+     * Meteora takes 20% of any swap fee before we or the creator see anything,
+     * so 3% is really 0.6% Meteora and 2.4% to divide. 67% of that 2.4% is
+     * 1.608% to holders and 0.792% to the platform — the 0.8/1.6 split, as
+     * close as an integer percentage reaches it. */
     t3:       { label: "Tax token", pct: 3, baseFeeBps: 300,
-                creatorTradingFeePercentage: 25 },
+                creatorTradingFeePercentage: 67 },
     tax:      { label: "Tax token", pct: 5, baseFeeBps: 500,
                 creatorTradingFeePercentage: 25 }    // same split as standard, bigger fee
   };

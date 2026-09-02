@@ -551,7 +551,7 @@
       <div class="row"><span class="k">Priced in</span><b>${String(flow.quote || "sol").toUpperCase()}${
         flow.tbuy ? " · first buy " + flow.tbuy : ""}</b></div>
       <div class="row"><span class="k">Fee sharing</span><b>${
-        (flow.feeSharePct || 0) > 0 ? flow.feeSharePct + "% to holders" : "you keep it all"}</b></div>
+        (flow.feeSharePct || 0) > 0 ? "all to holders" : "you keep it all"}</b></div>
       <p class="note">The collection deploys first, then the token pairs to it.
       Both are signed from here.</p>` : ""}
       <div class="row"><span class="k">Storage fee</span><b id="lp-fee">quoting…</b></div>
@@ -1425,15 +1425,8 @@
         "holder staking.</p>") : ""}
 
       <div id="tk-sharewrap" ${(flow.tier || "standard") === "standard" ? raw("hidden") : ""}>
-      <label>Fee sharing — how much of your share goes to holders</label>
+      <label>Holder rewards</label>
       <div class="sharebox">
-        <input id="tk-sharepct" type="range" min="0" max="6" step="1"
-          value="${[0,10,25,50,75,90,100].indexOf(flow.feeSharePct || 0) >= 0
-            ? [0,10,25,50,75,90,100].indexOf(flow.feeSharePct || 0) : 0}">
-        <div class="shareticks">
-          <span>0</span><span>10</span><span>25</span><span>50</span>
-          <span>75</span><span>90</span><span>100</span>
-        </div>
         <div class="sharelbl"><span id="tk-sharetxt"></span></div>
       </div>
       <!-- the reward picker belongs to sharing: it answers "paid in what?",
@@ -1536,34 +1529,23 @@
       });
     });
     var SHARE_STOPS = [0, 10, 25, 50, 75, 90, 100];
+    /* A tax token pledges the creator's entire share to holders — there is no
+     * slider, and flow.feeSharePct is not a choice.
+     *
+     * A creator who wants to keep their fees launches on the standard rung and
+     * keeps all of them; one who wants a reward token gives all of it. The
+     * in-between was a dial nobody could interpret: "90% of your share" reads
+     * as 90% of every trade, and the honest figure took three lines to explain. */
     function paintShare() {
-      var sl = box.querySelector("#tk-sharepct");
-      var pct = SHARE_STOPS[+sl.value] || 0;
-      // the track tells the truth: green exactly as far as the thumb travels,
-      // and the thumb runs the full rail — 0 is hard left, 100 hard right
-      var t = (+sl.value / 6) * 100;
-      sl.style.background = "linear-gradient(90deg, var(--accent) 0%, var(--accent) " +
-        t + "%, var(--raise) " + t + "%, var(--raise) 100%)";
-      flow.feeSharePct = pct;
-      flow.feeShare = pct > 0 ? "holders" : "keep";
-      /* Say what holders actually earn, not what fraction of a fraction they
-       * get. "90% to holders" reads as 90% of every trade; the real number is
-       * 90% of the creator's fifth of the swap fee. Quoting the percentage of
-       * volume is the figure a buyer can check against the chart, and the one
-       * safe to repeat publicly. */
-      var ofVolume = tierPct(flow) * 0.2;           // the creator's share of a trade
-      var toHolders = ofVolume * pct / 100;
-      var fmtPct = function (n) {
-        return (n < 0.01 && n > 0 ? n.toFixed(3) : n.toFixed(2)).replace(/0+$/, "").replace(/\.$/, "");
-      };
-      box.querySelector("#tk-sharetxt").textContent = pct === 0
-        ? "You keep everything — claim whenever you like."
-        : "Holders earn " + fmtPct(toHolders) + "% of every trade, paid " +
-          "automatically. You keep " + fmtPct(ofVolume - toHolders) + "%.";
-      box.querySelector("#tk-fwwrap").hidden = pct >= 100;
+      var el = box.querySelector("#tk-sharetxt");
+      if (!el) return;
+      var toHolders = tierPct(flow) * 0.8 * (window.DBC_TERMS && window.DBC_TERMS.TIERS[flow.tier || "standard"]
+        ? window.DBC_TERMS.TIERS[flow.tier || "standard"].creatorTradingFeePercentage / 100 : 0);
+      el.textContent = "Every holder earns " + toHolders.toFixed(2).replace(/0$/, "") +
+        "% of every trade, paid automatically in proportion to what they hold. " +
+        "You keep none of it — that is what makes it a tax token.";
     }
     paintShare();
-    box.querySelector("#tk-sharepct").addEventListener("input", paintShare);
     /* What the first buy actually gets you.
      *
      * "1 SOL" tells a launcher nothing about the position they are taking. The
@@ -1607,11 +1589,13 @@
       var sw = box.querySelector("#tk-sharewrap");
       var isStd = flow.tier === "standard";
       if (sw) sw.hidden = isStd;
-      if (isStd) {
-        flow.feeSharePct = 0;
-        var sl2 = box.querySelector("#tk-sharepct");
-        if (sl2) { sl2.value = 0; sl2.dispatchEvent(new Event("input")); }
-      }
+      /* Standard keeps everything, tax gives everything. The rung IS the
+       * choice, so nothing else has to be set or explained. */
+      flow.feeSharePct = isStd ? 0 : 100;
+      flow.feeShare = isStd ? "keep" : "holders";
+      var fw = box.querySelector("#tk-fwwrap");
+      if (fw) fw.hidden = !isStd;
+      paintShare();
       box.querySelector("#tk-fee").textContent = tierPct(flow) +
         "% — 20% you / 60% platform / 20% Meteora";
       paintEconomics();          // the rung has its own curve, not just its own fee
@@ -1786,7 +1770,7 @@
       ${nft ? H`<div class="row"><span class="k">Paired with</span><b>${nft.cfg.name}</b></div>` : ""}
       <div class="row"><span class="k">Priced in</span><b>${qLabel}</b></div>
       <div class="row"><span class="k">Fee sharing</span><b>${(flow.feeSharePct || 0) > 0
-        ? flow.feeSharePct + "% to holders / " + (100 - flow.feeSharePct) + "% to you"
+        ? "all of your share to holders"
         : "You keep everything"}</b></div>
       ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Holders paid in</span><b>${
         flow.reward.liquidity !== undefined && flow.reward.liquidity < 1000
