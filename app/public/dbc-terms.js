@@ -34,11 +34,12 @@
    * launches on 2026-09-01. The ladder is short on purpose; each rung is an
    * immutable on-chain account somebody has to sign for. */
   var TIERS = {
-    /* The floor every launch pays. The creator keeps their side of it, so the
-     * platform takes a larger slice here than on a tax — 0.46% against 0.50%
-     * to the creator, with Meteora's fixed 20% before either. */
-    standard: { label: "Standard", pct: 1.2, baseFeeBps: 120,
-                creatorTradingFeePercentage: 52.0833 },
+    /* The floor every launch pays: 1%, split 40 platform / 40 creator / 20
+     * Meteora. Meteora's 20% comes off the top, so an even split of the rest is
+     * exactly 50 — which is also why this reads as clean numbers rather than
+     * the 38.33336% / 41.66664% an uneven target produced. */
+    standard: { label: "Standard", pct: 1, baseFeeBps: 100,
+                creatorTradingFeePercentage: 50 },
 
     /* Tax rungs. Our share is proportional up to a ceiling of 0.8% of a trade
      * and flat above it, so a creator who sets a high tax to be generous does
