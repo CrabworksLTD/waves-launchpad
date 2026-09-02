@@ -1340,12 +1340,13 @@
        * creator's cut is that percentage of the remaining 80%. */
       var pct = r.spec.pct;
       var share = pct * 0.8 * (r.spec.creatorTradingFeePercentage || 0) / 100;
-      var num = share.toFixed(2).replace(/0$/, "");
+      // one decimal: 1.608 reads as 1.6, which is the number to say out loud
+      var num = share.toFixed(1);
       return '<button data-t="' + r.name + '" class="tier' + (r.name === cur ? " on" : "") + '">' +
         "<b>" + esc(r.spec.label) + " — " + pct + "%</b><span>" +
         (r.name === "standard"
-          ? "You keep " + num + "% of every trade."
-          : num + "% of every trade to your holders. You keep none.") +
+          ? "You receive " + num + "% of trading volume."
+          : "Holders receive " + num + "% of trading volume.") +
         "</span></button>";
     }).join("");
   }
