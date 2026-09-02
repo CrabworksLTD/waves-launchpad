@@ -261,7 +261,19 @@ async function rewardPlan(rewardMint, quoteMint, potLamports, quoteDecimals, hol
 
 /* Execute the swap Jupiter quoted, signing with the keeper. Returns how much of
  * the reward asset actually arrived — measured from the keeper's own balance,
- * not from the quote, because a quote is a promise and slippage is real. */
+ * not from the quote, because a quote is a promise and slippage is real.
+ *
+ * ⚠️ The DELTA, not the balance.
+ *
+ * This used to report the keeper's whole balance of the reward mint. With one
+ * token paying rewards in a given asset that is harmless, and it even papered
+ * over a crash by sweeping what an earlier run had left behind. With two, it is
+ * theft: the keeper holds one ATA per asset, not per token, so the first
+ * token's payout would hand its holders everything the second token had bought.
+ *
+ * Leftovers are no longer swept implicitly. They do not need to be — the plan
+ * is written the moment the swap lands, so an interrupted run resumes and pays
+ * exactly what it bought. */
 async function doSwap(conn, w3, keeper, quote, rewardMint, splToken) {
   const built = await fetch("https://lite-api.jup.ag/swap/v1/swap", {
     method: "POST",
@@ -275,6 +287,14 @@ async function doSwap(conn, w3, keeper, quote, rewardMint, splToken) {
   }).then((r) => r.json());
   if (!built || !built.swapTransaction) throw new Error("Jupiter returned no transaction");
 
+  /* Read the balance BEFORE sending, so the arrival can be measured rather than
+   * assumed. A missing account reads as zero, which is what it holds. */
+  const ataPre = splToken.getAssociatedTokenAddressSync(
+    new w3.PublicKey(rewardMint), keeper.publicKey, true,
+    await tokenProgramOf(conn, w3, rewardMint, splToken));
+  const preBal = await conn.getTokenAccountBalance(ataPre).catch(() => null);
+  const before = BigInt((preBal && preBal.value && preBal.value.amount) || "0");
+
   const raw = Buffer.from(built.swapTransaction, "base64");
   const tx = w3.VersionedTransaction.deserialize(raw);
   tx.sign([keeper]);
@@ -282,11 +302,19 @@ async function doSwap(conn, w3, keeper, quote, rewardMint, splToken) {
   const sig = await conn.sendRawTransaction(bytes, { maxRetries: 5 });
   await confirmed(conn, sig, bytes, 120000);
 
-  const ata = splToken.getAssociatedTokenAddressSync(
-    new w3.PublicKey(rewardMint), keeper.publicKey, true,
-    await tokenProgramOf(conn, w3, rewardMint, splToken));
-  const bal = await conn.getTokenAccountBalance(ata).catch(() => null);
-  return { sig, amount: BigInt((bal && bal.value && bal.value.amount) || "0"),
+  /* Reading a delta is racier than reading a balance: a confirmed transaction
+   * whose account state has not propagated to the node we happen to ask reads
+   * as "nothing arrived", and the caller would then treat a spent pot as a
+   * failed swap. Ask again a few times before believing a zero. */
+  let bal = null, after = before, gained = 0n;
+  for (let i = 0; i < 6; i++) {
+    bal = await conn.getTokenAccountBalance(ataPre).catch(() => null);
+    after = BigInt((bal && bal.value && bal.value.amount) || "0");
+    gained = after > before ? after - before : 0n;
+    if (gained > 0n) break;
+    await new Promise((r) => setTimeout(r, 700));
+  }
+  return { sig, amount: gained,
            decimals: (bal && bal.value && bal.value.decimals) || 0 };
 }
 
