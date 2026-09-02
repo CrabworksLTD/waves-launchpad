@@ -46,7 +46,17 @@
       "  padding:7px 0;border-bottom:1px solid var(--line)}",
       ".lp .row b{font-weight:600;text-align:right}",
       ".lp .k{color:var(--dim)}",
-      ".lp .acts{display:flex;gap:10px;margin-top:22px}",
+      /* Both buttons, one geometry.
+       *
+       * Back was rendering taller than Continue and the row was bottom-aligned,
+       * so they disagreed on height and only agreed on their bottom edge. The
+       * cause is a padding difference inherited from outside this panel, so
+       * rather than chase it, the row states the box explicitly: same height,
+       * same radius, text centred. Back sets the row's top, so fixing the
+       * height leaves the gap above unchanged. */
+      ".lp .acts{display:flex;gap:10px;margin-top:22px;align-items:stretch}",
+      ".lp .acts button{height:46px;padding:0 16px;border-radius:8px;",
+      "  display:inline-flex;align-items:center;justify-content:center;line-height:1}",
       ".lp button{flex:1;font:inherit;font-weight:600;font-size:13px;cursor:pointer;",
       "  border-radius:6px;padding:12px 16px;border:1px solid var(--line2);",
       "  background:var(--panel2);color:var(--ink)}",
