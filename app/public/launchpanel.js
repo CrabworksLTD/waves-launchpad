@@ -138,6 +138,11 @@
       ".lp .artbtn:hover{border-color:var(--accent);color:var(--ink)}",
       ".lp .artbtn.has{border-style:solid;border-color:rgba(var(--accent-rgb),.4);color:var(--accent)}",
       ".lp .tiers{display:grid;grid-template-columns:1fr 1fr;gap:10px}",
+      // three modes, one row — a wrapped third option reads as an afterthought
+      ".lp #tk-modes{grid-template-columns:1fr 1fr 1fr;gap:8px}",
+      ".lp #tk-modes .tier{padding:10px 11px}",
+      ".lp #tk-modes .tier b{font-size:12.5px}",
+      ".lp #tk-modes .tier span{font-size:11px;line-height:1.4}",
       ".lp .tier{text-align:left;padding:12px 14px;border-radius:8px;",
       "  border:1px solid var(--line);background:var(--panel2);cursor:pointer}",
       ".lp .tier b{display:block;font:700 13px Archivo,sans-serif;margin-bottom:3px}",
@@ -1401,16 +1406,11 @@
           ${quotes.indexOf("sol") < 0 ? raw("disabled") : ""}>SOL</button>
         <button data-q="usdc" ${flow.quote === "usdc" ? raw('class="on"') : ""}
           ${quotes.indexOf("usdc") < 0 ? raw("disabled") : ""}>USDC</button>
-        <button data-q="rwa" ${flow.quote !== "sol" && flow.quote !== "usdc" ? raw('class="on"') : ""}
-          ${rwas.length ? "" : raw('disabled title="A stock or commodity as the trading pair — no RWA curve config signed yet"')}
-          >${flow.quote !== "sol" && flow.quote !== "usdc" ? qLabel
-             : (rwas.length === 1 ? rwas[0].label : "RWA")}</button>
       </div>
 
       <div class="fold2" id="tk-econ">
         <div class="row"><span class="k">Total supply</span><b>1,000,000,000 · fixed</b></div>
-        <div class="row"><span class="k">Trading fee</span><b id="tk-fee">${tierPct(flow)
-          + "% — 20% you / 60% platform / 20% Meteora"}</b></div>
+        <div class="row"><span class="k">Trading fee</span><b id="tk-fee">${tierPct(flow) + "%"}</b></div>
         <div class="row"><span class="k">Graduates at</span><b id="tk-grad">reading the curve…</b></div>
         <div class="row" style="border-bottom:0"><span class="k">Migrates to</span><b>Meteora DAMM v2, LP locked</b></div>
         <p class="note" style="margin-top:6px">Locked in the launchpad's config — identical

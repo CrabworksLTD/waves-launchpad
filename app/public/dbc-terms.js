@@ -34,31 +34,34 @@
    * launches on 2026-09-01. The ladder is short on purpose; each rung is an
    * immutable on-chain account somebody has to sign for. */
   var TIERS = {
-    standard: { label: "Standard", pct: 1, baseFeeBps: 100,
-                creatorTradingFeePercentage: 25 },   // 0.2% creator / 0.6% us / 0.2% Meteora
+    /* The floor every launch pays. The creator keeps their side of it, so the
+     * platform takes a larger slice here than on a tax — 0.46% against 0.50%
+     * to the creator, with Meteora's fixed 20% before either. */
+    standard: { label: "Standard", pct: 1.2, baseFeeBps: 120,
+                creatorTradingFeePercentage: 52.0833 },
 
-    /* Tax rungs. Every one pledges the creator's whole share to holders, so
-     * they all share one split — holders 53.6% of the fee, platform 26.4%,
-     * Meteora's fixed 20% off the top. Proportional, so the numbers scale
-     * predictably: at 3% that is 1.608% to holders, at 10% it is 5.36%.
+    /* Tax rungs. Our share is proportional up to a ceiling of 0.8% of a trade
+     * and flat above it, so a creator who sets a high tax to be generous does
+     * not fund us for the privilege — at 10% they hand 7.2% to holders and we
+     * earn what we would at 4%.
      *
-     * Each rung is an immutable config per quote, signed once. That is the
-     * price of a creator choosing a rate without paying ~0.03 SOL of rent and
-     * a second signature per launch, which is what a per-launch config cost. */
+     *   2%   0.40 Meteora  0.53 platform  1.07 creator side
+     *   3%   0.60          0.79           1.61
+     *   4%   0.80          0.80           2.40
+     *   5%   1.00          0.80           3.20
+     *  10%   2.00          0.80           7.20
+     */
     t2:  { label: "Tax token", pct: 2,  baseFeeBps: 200,  creatorTradingFeePercentage: 67 },
     t3:  { label: "Tax token", pct: 3,  baseFeeBps: 300,  creatorTradingFeePercentage: 67 },
-    t4:  { label: "Tax token", pct: 4,  baseFeeBps: 400,  creatorTradingFeePercentage: 67 },
-    t5:  { label: "Tax token", pct: 5,  baseFeeBps: 500,  creatorTradingFeePercentage: 67 },
-    t10: { label: "Tax token", pct: 10, baseFeeBps: 1000, creatorTradingFeePercentage: 67 },
+    t4:  { label: "Tax token", pct: 4,  baseFeeBps: 400,  creatorTradingFeePercentage: 75 },
+    t5:  { label: "Tax token", pct: 5,  baseFeeBps: 500,  creatorTradingFeePercentage: 80 },
+    t10: { label: "Tax token", pct: 10, baseFeeBps: 1000, creatorTradingFeePercentage: 90 },
 
-    /* ⚠️ The original 5% rung, kept only so pools launched against it still
-     * read. Its split is the old one — 1% to holders, 3% to the platform. Not
-     * in LADDER, so nothing new can reach it. */
+    /* ⚠️ Superseded. Kept so pools launched against them still read; out of
+     * LADDER, so nothing new can reach them. */
     tax: { label: "Tax token", pct: 5, baseFeeBps: 500, creatorTradingFeePercentage: 25 }
   };
 
-  /* The rungs offered, in order. A rung with no config for the chosen quote is
-   * not shown — see tierRungs() in launchpanel.js. */
   var LADDER = ["standard", "t2", "t3", "t4", "t5", "t10"];
 
   var QUOTES = {
