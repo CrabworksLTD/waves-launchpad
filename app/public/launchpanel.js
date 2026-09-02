@@ -1436,6 +1436,7 @@
 
       <label>Creator tax</label>
       <div class="ptabs" id="tk-tiers">${raw(tierButtons(flow))}</div>
+      <p class="note" id="tk-taxtxt"></p>
 
       <div id="tk-sharewrap">
       <div id="tk-splitwrap">
@@ -1612,8 +1613,16 @@
       /* The rung sets the size of the pot, not who gets it — the split below
        * is the only thing that decides that, and it survives a rung change. */
       paintSplit();
+      paintTax();
       paintEconomics();          // each rung has its own curve, not just its own fee
     });
+    /* What a trader pays, and only that. Where it goes is documentation — the
+     * creator is choosing a headline number here, not auditing a split. */
+    function paintTax() {
+      var el = box.querySelector("#tk-taxtxt");
+      if (el) el.textContent = "Traders pay " + tierPct(flow) + "% in total.";
+    }
+
     function paintVisibility() {
       var shared = (flow.feeSharePct || 0) > 0;
       var mw = box.querySelector("#tk-modewrap");
@@ -1633,6 +1642,7 @@
 
 
     paintSplit();
+    paintTax();
     paintVisibility();
 
     box.querySelector("#tk-splits").addEventListener("click", function (e) {
