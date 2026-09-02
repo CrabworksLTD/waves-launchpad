@@ -1425,8 +1425,9 @@
       <label>Your first buy (${qLabel}) — optional</label>
       <input id="lp-tbuy" type="number" min="0" step="0.1" value="${flow.tbuy || 0}">
       <div class="ptabs" id="tk-chips">
-        <button data-v="0.1">0.1</button><button data-v="0.5">0.5</button>
-        <button data-v="1">1</button><button data-v="5">5</button>
+        <button data-v="0.1">0.1</button><button data-v="0.25">0.25</button>
+        <button data-v="0.5">0.5</button><button data-v="1">1</button>
+        <button data-v="5">5</button><button data-v="10">10</button>
       </div>
       <p class="note" id="tk-buyshare"></p>
       <p class="note">Lands in the same transaction as the pool, so nobody can snipe
