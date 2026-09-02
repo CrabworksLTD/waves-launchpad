@@ -677,11 +677,23 @@ input:focus{outline:none;border-color:var(--accent)}
      * to holders until they hand the pool's creator role to our keeper — a
      * separate signature, taken on the fee page. Until that lands the fees are
      * simply theirs, so saying "holders earn rewards" here would be a promise
-     * the chain is not keeping. The pool itself is the only honest source. */
-    var active = false;
-    try {
-      active = await window.Token.rewardsActive(rec.pool || null, rec.mint);
-    } catch (e) { active = false; }
+     * the chain is not keeping.
+     *
+     * `rewardsActivatedAt` IS that landing, recorded: api/rewards.js only writes
+     * it after reading the pool and confirming the creator role now belongs to
+     * the keeper. So the record is an on-chain-verified, one-way, permanent
+     * fact — trust it. Re-reading the pool with a fresh getPool on every page
+     * load made the badge flicker out whenever that RPC lost the cold-start
+     * race against the vendor bundles or hit a transient limit (2026-09-02:
+     * $MOAR's rewards were live, verified creator == keeper, yet the indicator
+     * showed only intermittently). Fall back to the live check only for older
+     * records saved before this flag existed. */
+    var active = !!rec.rewardsActivatedAt;
+    if (!active) {
+      try {
+        active = await window.Token.rewardsActive(rec.pool || null, rec.mint);
+      } catch (e) { active = false; }
+    }
     if (!active) return;
 
     var box = $("rewards");

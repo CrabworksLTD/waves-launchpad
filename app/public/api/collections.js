@@ -20,6 +20,7 @@
 // nothing.
 
 import { okArt } from "./_art.js";
+import { allow, tooMany, isRealCollection, isRealEvmToken, archiveOverflow } from "./_guard.js";
 
 const KEY = "collections";
 const MAX = 200;                 // the listing is a shop window, not an archive
@@ -39,6 +40,20 @@ const EVM = /^0x[0-9a-fA-F]{40}$/;
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
+    /* Prove it exists. A shape check cannot tell a collection from a string,
+     * and a string was enough to evict a real one. See api/_guard.js. */
+    {
+      const isAdmin = process.env.CRON_SECRET &&
+        req.headers.authorization === "Bearer " + process.env.CRON_SECRET;
+      if (!isAdmin) {
+        const real = isEvm ? await isRealEvmToken(address) : await isRealCollection(collection);
+        if (!real.ok) {
+          return res.status(real.reason === "unverifiable" ? 503 : 400)
+            .json({ ok: false, error: real.reason, retryable: real.reason === "unverifiable" });
+        }
+      }
+    }
+
     try {
       const db = await kv();
       const raw = await db.lrange(KEY, 0, MAX - 1);
@@ -55,6 +70,10 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "POST") {
+    /* Same reasoning as api/tokens.js: this list is capped and trimmed, so an
+     * unauthenticated write was also an unauthenticated delete. */
+    if (!(await allow(req, { bucket: "collections", max: 10, windowSec: 600 }))) return tooMany(res, 600);
+
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const { candyMachine, collection, name, cluster, tokenMint, creator, avatar,
             chain, address } = body;
@@ -128,6 +147,8 @@ export default async function handler(req, res) {
       }
 
       await db.lpush(KEY, JSON.stringify(rec));
+      // the cap is a shop window, not a delete — keep what falls off the end
+      await archiveOverflow(db, KEY, MAX);
       await db.ltrim(KEY, 0, MAX - 1);
       return res.status(200).json({ ok: true });
     } catch (e) {

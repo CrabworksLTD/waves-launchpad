@@ -13,6 +13,7 @@
 // showing nothing.
 
 import { okArt as okArtShared } from "./_art.js";
+import { allow, tooMany, isRealLaunch, isRealEvmToken, archiveOverflow } from "./_guard.js";
 
 const KEY = "tokens";
 const MAX = 200;
@@ -42,6 +43,9 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "POST") {
+    /* A launch is a rare event for any one person and a flood is never real. */
+    if (!(await allow(req, { bucket: "tokens", max: 10, windowSec: 600 }))) return tooMany(res, 600);
+
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const { mint, name, symbol, cluster, rewardMint, collection, creator, icon, banner, pool, config, feeShare, feeSharePct, feeWallet, chain } = body;
     const isEvm = chain === "robinhood";
@@ -58,6 +62,32 @@ export default async function handler(req, res) {
       if (collection && !B58.test(collection)) return res.status(400).json({ error: "bad collection" });
       // Mainnet only — a devnet token on the homepage is a bug dressed as a scam.
       if (cluster && cluster !== "mainnet-beta") return res.status(200).json({ ok: true, skipped: "not mainnet" });
+    }
+
+    /* Prove it exists before listing it.
+     *
+     * ⚠️ Everything above this line is a SHAPE check, and shape is not
+     * identity: "is this 32-44 base58 characters" is true of any such string.
+     * The list is capped and trimmed, so two hundred well-formed strings pushed
+     * every real launch off the homepage permanently, for the price of two
+     * hundred HTTP requests. A listing now has to name a mint that exists and a
+     * pool the bonding curve owns, which cannot be typed — it has to be
+     * launched.
+     *
+     * Admins skip this: the correction path exists precisely for records the
+     * chain disagrees with, and it already requires the deploy secret. */
+    const isAdmin = process.env.CRON_SECRET &&
+      req.headers.authorization === "Bearer " + process.env.CRON_SECRET;
+    if (!isAdmin) {
+      const real = isEvm ? await isRealEvmToken(mint) : await isRealLaunch(mint, pool);
+      if (!real.ok) {
+        /* Fail closed, including when the chain cannot be reached. Listing an
+         * unverified token to be helpful during an outage reopens the whole
+         * hole; the launch itself already succeeded, and the client can post
+         * again. */
+        return res.status(real.reason === "unverifiable" ? 503 : 400)
+          .json({ ok: false, error: real.reason, retryable: real.reason === "unverifiable" });
+      }
     }
 
     try {
@@ -147,6 +177,8 @@ export default async function handler(req, res) {
       }
 
       await db.lpush(KEY, JSON.stringify(rec));
+      // whatever falls off the end is kept, so the cap is a window and not a delete
+      await archiveOverflow(db, KEY, MAX);
       await db.ltrim(KEY, 0, MAX - 1);
       return res.status(200).json({ ok: true });
     } catch (e) {

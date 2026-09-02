@@ -998,19 +998,48 @@
     throw new Error("The storage payment is taking a while — check the explorer.");
   }
 
+  /**
+   * Record a listing, waiting out a chain that has not caught up yet.
+   *
+   * The listing endpoints now verify against the chain before accepting
+   * anything — a shape check could not tell a launch from a made-up string, and
+   * the list is capped, so strings could evict real collections. This runs
+   * seconds after the collection was created, so a lagging node legitimately
+   * answers "no such collection"; that comes back as a 503 marked retryable and
+   * is worth waiting out rather than believing.
+   *
+   * Still never throws, for the original reason: the collection is already on
+   * chain, and a launch must never look failed because a listing endpoint was.
+   */
+  function postListing(url, payload) {
+    var delays = [2000, 5000, 10000, 15000];
+    function attempt(i) {
+      return fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }).then(function (r) {
+        if (r.ok || r.status !== 503 || i >= delays.length) return;
+        return new Promise(function (go) { setTimeout(go, delays[i]); })
+          .then(function () { return attempt(i + 1); });
+      }).catch(function () {
+        if (i >= delays.length) return;
+        return new Promise(function (go) { setTimeout(go, delays[i]); })
+          .then(function () { return attempt(i + 1); });
+      });
+    }
+    return attempt(0);
+  }
+
   function recordEvmCollection(cfg, res, up) {
-    fetch("/api/collections", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    postListing("/api/collections", {
         chain: "robinhood",
         address: res.address,
         name: cfg.name,
         avatar: (up && up.avatarUri) || null,
         card: (up && up.cardUri) || null,
         creator: (window.MoonpadWallet || {}).account || null
-      })
-    }).catch(function () {});
+    });
   }
 
   function evmDone(cfg, res) {
@@ -1031,19 +1060,13 @@
   }
 
   function recordCollection(cfg, res, tokenMint, up) {
-    // Fire-and-forget: the collection is already on chain, and a launch must
-    // never look failed because a listing endpoint was down.
-    fetch("/api/collections", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    postListing("/api/collections", {
         candyMachine: res.candyMachine, collection: res.collection,
         name: cfg.name, cluster: res.cluster, tokenMint: tokenMint || null,
         avatar: (up && up.avatarUri) || null,
         card: (up && up.cardUri) || null,
         creator: (window.Wallet.current() || {}).publicKey || null
-      })
-    }).catch(function () {});
+    });
   }
 
   function nftDone(cfg, res, up) {

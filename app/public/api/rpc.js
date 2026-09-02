@@ -11,7 +11,12 @@
 // on the server; the browser only ever sees this path.
 //
 // Not an open proxy: only the methods this site actually calls are forwarded,
-// so a key that costs money cannot be turned into someone else's free RPC.
+// so a key that costs money cannot be turned into someone else's free RPC. And
+// rate limited per caller, per call — an allowlist bounds WHAT may be asked,
+// which is not the same as bounding how much, and the node behind this is
+// metered.
+
+import { allow, tooMany } from "./_guard.js";
 
 export const config = { runtime: "nodejs" };
 
@@ -42,6 +47,10 @@ const ALLOW = new Set([
   "getGenesisHash",
   "getProgramAccounts"
 ]);
+
+/* The calls that cost far more than an ordinary read: these scan or walk rather
+ * than fetch one account, and are what a bill-running attack would reach for. */
+const HEAVY = new Set(["getProgramAccounts", "getSignaturesForAddress", "getBlock", "getBlocks"]);
 
 /* Writes are named explicitly; reads are allowed as a class.
  *
@@ -90,6 +99,24 @@ export default async function handler(req, res) {
     if (!c || typeof c.method !== "string" || !allowed(c.method)) {
       return res.status(403).json({ error: "method not allowed: " + (c && c.method) });
     }
+  }
+
+  /* Rate limiting, which the comment at the top of this file promised and
+   * nothing actually did.
+   *
+   * The method allowlist stops this being used as someone's general-purpose
+   * RPC. It does nothing about volume, and volume is the whole cost: the node
+   * behind this is metered, so an open endpoint with no ceiling is a bill
+   * anyone can run up. Two buckets, because the calls are not priced alike —
+   * getProgramAccounts scans an entire program's accounts and is worth hundreds
+   * of an ordinary read, so it gets a ceiling of its own rather than hiding
+   * inside a generous one. Counted per call, not per request. */
+  const heavy = calls.filter((c) => HEAVY.has(c.method)).length;
+  if (heavy && !(await allow(req, { bucket: "rpc-heavy", max: 30, windowSec: 60, cost: heavy }))) {
+    return tooMany(res, 60);
+  }
+  if (!(await allow(req, { bucket: "rpc", max: 600, windowSec: 60, cost: calls.length }))) {
+    return tooMany(res, 60);
   }
 
   /* A node counts as having answered only if it returns 2xx AND valid JSON.

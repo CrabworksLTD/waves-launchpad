@@ -525,6 +525,45 @@
    * with no prompt, no error and nothing to do but reload. That is
    * indistinguishable from a wallet that never answered, which made it useless
    * as a signal while we were isolating a Phantom block. */
+  /**
+   * Record a launch in the site's listing, retrying while the chain catches up.
+   *
+   * The listing endpoints verify against the chain before accepting anything,
+   * because a shape check could not tell a launch from a made-up string and the
+   * list is capped — so two hundred strings used to be able to evict every real
+   * token. The cost of that check is a race: this is called seconds after the
+   * pool was created, and a node that has not seen it yet says "no such pool".
+   *
+   * So a refusal marked `retryable` is waited out rather than believed. Four
+   * tries over about half a minute, which comfortably covers a node lagging.
+   * Anything else — a rate limit, a rejection on the merits — is final.
+   *
+   * Never rejects. The token exists on chain either way, and a launch that
+   * worked must not report an error because a listing did not.
+   */
+  function postListing(url, payload) {
+    var delays = [2000, 5000, 10000, 15000];
+    function attempt(i) {
+      return fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }).then(function (r) {
+        if (r.ok) return;
+        if (r.status !== 503 || i >= delays.length) return;   // only wait out "too new"
+        return new Promise(function (go) { setTimeout(go, delays[i]); }).then(function () {
+          return attempt(i + 1);
+        });
+      }).catch(function () {
+        if (i >= delays.length) return;
+        return new Promise(function (go) { setTimeout(go, delays[i]); }).then(function () {
+          return attempt(i + 1);
+        });
+      });
+    }
+    return attempt(0);
+  }
+
   function within(ms, label, p) {
     return Promise.race([
       p,
@@ -662,12 +701,18 @@
     /* No transfer step any more. The pool was created with the keeper as its
      * creator, so it has been pledged since the instant it existed. */
 
-    // Record for the homepage token listing — fire-and-forget, same contract
-    // as the collections listing: the pool exists regardless.
-    fetch("/api/tokens", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    /* Record for the homepage token listing.
+     *
+     * No longer quite fire-and-forget. The server verifies against the chain
+     * before listing, and this runs seconds after the pool was created — so a
+     * node that has not caught up yet answers "no such pool" and the listing is
+     * refused for being too new. That is a 503 with retryable set, and it is
+     * worth waiting out: the launch succeeded, and a token missing from the
+     * homepage looks exactly like a launch that failed.
+     *
+     * Still never throws. A listing that cannot be recorded must not surface as
+     * an error on a launch that already worked. */
+    postListing("/api/tokens", {
         mint: String(baseMint.publicKey), name: opts.name, symbol: opts.symbol,
         rewardMint: opts.rewardMint || null,
         icon: opts.icon || null,
@@ -685,8 +730,7 @@
         // without it every launch appeared on both chains
         chain: (window.Shell && window.Shell.chain) ? window.Shell.chain() : "solana",
         cluster: window.Launch ? window.Launch.cluster() : "mainnet-beta"
-      })
-    }).catch(function () {});
+    });
 
     return {
       mint: String(baseMint.publicKey),
@@ -729,7 +773,11 @@
     return {
       creator: Number(m.current.creatorQuoteFee) / dec,
       partner: Number(m.current.partnerQuoteFee) / dec,
-      quote: c.quoteSym
+      quote: c.quoteSym,
+      // the raw→human divisor, so a caller with a lamport figure of its own
+      // (e.g. the fees page's "sent to holders" total) formats in the same
+      // units as the accrued number here rather than guessing the decimals
+      quoteDec: c.quoteDec
     };
   }
 

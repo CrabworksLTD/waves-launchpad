@@ -40,6 +40,9 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
 .frow .owed b{display:block;font:700 15px "IBM Plex Mono",monospace}
 .frow .owed span{display:block;font-size:10.5px;letter-spacing:.1em;
   text-transform:uppercase;color:var(--faint)}
+/* the running total already paid out reads as the good number — tinted to set
+   it apart from the neutral accrued figure sitting right beside it */
+.frow .owed.sent b{color:var(--accent)}
 .frow button{flex:none;padding:10px 22px;border-radius:999px;border:0;cursor:pointer;
   font:700 13px Archivo;color:var(--accent-ink);
   background-image:var(--grad);background-repeat:no-repeat;
@@ -126,6 +129,10 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
       "<span>" + esc(shortAddr(t.mint)) + "</span></span>" +
       '<span class="owed"><b class="amt">' + (amt == null ? "…" : amt) + "</b>" +
       "<span>accrued</span></span>" +
+      (shared
+        ? '<span class="owed sent"><b class="samt">…</b>' +
+          "<span>sent to holders</span></span>"
+        : "") +
       (shared
         ? '<span class="shared" title="The keeper claims this pool and pays ' + pct +
           '% to holders automatically; your ' + (100 - pct) +
@@ -221,6 +228,10 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
     var tokens = await fetch("/api/tokens").then(function (r) { return r.json(); })
       .then(function (j) { return j.tokens || []; }).catch(function () { return []; });
 
+    // lifetime paid-to-holders per mint, summed from the keeper's run log
+    var paid = await fetch("/api/payouts").then(function (r) { return r.json(); })
+      .then(function (j) { return j.payouts || {}; }).catch(function () { return {}; });
+
     var mine = tokens.filter(function (t) { return t.creator === w.publicKey; });
     var isPlatform = w.publicKey === (window.BRAND.feeOwner || "");
 
@@ -243,6 +254,14 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
       window.Token.feeMetrics(t.mint, t.pool || null).then(function (m) {
         var amt = el.dataset.kind === "creator" ? m.creator : m.partner;
         el.querySelector(".amt").textContent = UI.fmt(amt, 4) + " " + m.quote;
+        // "sent to holders": raw lamports from /api/payouts, formatted in the
+        // same quote units as the accrued figure just above it
+        var sEl = el.querySelector(".samt");
+        if (sEl) {
+          var rec = paid[t.mint];
+          var sent = rec ? Number(rec.sentRaw) / Math.pow(10, m.quoteDec) : 0;
+          sEl.textContent = UI.fmt(sent, 4) + " " + m.quote;
+        }
         var btn = el.querySelector(".cl");
         if (btn && amt > 0) {
           btn.disabled = false;
