@@ -49,8 +49,14 @@
      * their tax is overwhelmingly raising it for their holders: from 2% to
      * 10% their side grows 1.1% -> 7.1% while ours grows 0.5% -> 0.9%.
      *
-     * Every rung lands on an exact percentage, which is the point — the
-     * config stores this number forever, and 83.3333 renders as 16.66672%.
+     * ⚠️ This is an INTEGER on chain. The program truncates, so 68.75 is
+     * stored as 68 — verified the hard way, on a signed config. An earlier
+     * test appeared to show fractions working; it only showed the SDK
+     * accepting one before the chain rounded it away.
+     *
+     * So the platform's take approximates the 0.1%-per-rung ladder rather than
+     * hitting it: 0.400, 0.512, 0.600, 0.704, 0.800, 0.880. Each value is the
+     * closest integer, and t2 is 68 because that is what is already signed.
      *
      *   fee   Meteora  platform  creator side   config split
      *    2%     0.40      0.50       1.10        25   / 55
@@ -59,11 +65,11 @@
      *    5%     1.00      0.80       3.20        16   / 64
      *   10%     2.00      0.90       7.10         9   / 71
      */
-    t2:  { label: "Tax token", pct: 2,  baseFeeBps: 200,  creatorTradingFeePercentage: 68.75 },
+    t2:  { label: "Tax token", pct: 2,  baseFeeBps: 200,  creatorTradingFeePercentage: 68 },
     t3:  { label: "Tax token", pct: 3,  baseFeeBps: 300,  creatorTradingFeePercentage: 75 },
-    t4:  { label: "Tax token", pct: 4,  baseFeeBps: 400,  creatorTradingFeePercentage: 78.125 },
+    t4:  { label: "Tax token", pct: 4,  baseFeeBps: 400,  creatorTradingFeePercentage: 78 },
     t5:  { label: "Tax token", pct: 5,  baseFeeBps: 500,  creatorTradingFeePercentage: 80 },
-    t10: { label: "Tax token", pct: 10, baseFeeBps: 1000, creatorTradingFeePercentage: 88.75 },
+    t10: { label: "Tax token", pct: 10, baseFeeBps: 1000, creatorTradingFeePercentage: 89 },
 
     /* ⚠️ Superseded. Kept so pools launched against them still read; out of
      * LADDER, so nothing new can reach them. */
