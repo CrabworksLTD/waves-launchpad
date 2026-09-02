@@ -94,8 +94,6 @@
       /* reward picker */
       ".lp .ptabs{display:flex;gap:6px;margin:10px 0}",
       ".lp .ptabs button{flex:none;padding:7px 12px;font-size:12px;border-radius:99px}",
-      // the split labels name both sides, so they need room to wrap
-      ".lp #tk-splits{flex-wrap:wrap;gap:6px}",
       ".lp .ptabs button.on{background:rgba(var(--accent-rgb),.14);border-color:transparent;",
       "  box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.3)}",
       ".lp .plist{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px}",
@@ -1443,11 +1441,12 @@
       <label>Split</label>
       <div class="ptabs" id="tk-splits">
         <button data-s="0">All to you</button>
-        <button data-s="25">75 to you · 25 to holders</button>
-        <button data-s="50">50 to you · 50 to holders</button>
-        <button data-s="75">25 to you · 75 to holders</button>
+        <button data-s="25">75 / 25</button>
+        <button data-s="50">50 / 50</button>
+        <button data-s="75">25 / 75</button>
         <button data-s="100">All to holders</button>
       </div>
+      <p class="note" id="tk-splittxt"></p>
       </div><!-- /tk-splitwrap -->
 
       <div id="tk-modewrap" ${(flow.feeSharePct || 0) > 0 ? "" : raw("hidden")}>
@@ -1638,6 +1637,14 @@
       box.querySelectorAll("#tk-splits button").forEach(function (b) {
         b.classList.toggle("on", +b.dataset.s === pct);
       });
+      /* The buttons stay short; the sentence says which side is which, so
+       * "25 / 75" never has to be guessed at. */
+      var el = box.querySelector("#tk-splittxt");
+      if (el) {
+        el.textContent = pct === 0 ? "All of it is yours."
+          : pct >= 100 ? "All of it goes to holders."
+          : (100 - pct) + "% to you, " + pct + "% to holders.";
+      }
     }
 
 
