@@ -1448,6 +1448,7 @@
         <button data-s="75">75 / 25</button>
         <button data-s="50">50 / 50</button>
         <button data-s="25">25 / 75</button>
+        <button data-s="0">All to you</button>
       </div>
       <p class="note" id="tk-splittxt"></p>
 
@@ -1616,8 +1617,8 @@
       /* Standard keeps everything. A tax rung defaults to giving everything,
        * and the split below can hand some back. */
       if (isStd) flow.feeSharePct = 0;
-      else if (!flow.feeSharePct) flow.feeSharePct = 100;
-      flow.feeShare = isStd ? "keep" : "holders";
+      else if (flow.feeSharePct == null) flow.feeSharePct = 100;
+      flow.feeShare = (flow.feeSharePct || 0) > 0 ? "holders" : "keep";
       paintSplit();
       box.querySelector("#tk-fee").textContent = tierPct(flow) +
         "% — 20% you / 60% platform / 20% Meteora";
@@ -1660,6 +1661,11 @@
       var b = e.target.closest("button[data-s]");
       if (!b) return;
       flow.feeSharePct = +b.dataset.s;
+      /* Nothing pledged means nothing for the keeper to do. Handing it the pool
+       * anyway would route the creator's own fees through us for no reason and
+       * stop them claiming directly — so at zero the pool is created by, and
+       * belongs to, the launcher. */
+      flow.feeShare = flow.feeSharePct > 0 ? "holders" : "keep";
       paintSplit();
     });
 
