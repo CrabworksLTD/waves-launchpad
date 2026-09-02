@@ -76,6 +76,10 @@ export default async function handler(req, res) {
         // the reward asset the creator picked, and the collection this token
         // is paired with — consumed by the staking keeper later, displayed now
         rewardMint: rewardMint || null,
+        /* What the pledged share does: pay holders an asset, or buy the token
+         * back and burn it. Anything unrecognised reads as a dividend, which
+         * is the behaviour every launch had before this existed. */
+        rewardMode: body.rewardMode === "burn" ? "burn" : "dividend",
         // only arweave art, never an arbitrary URL someone POSTs at us
         card: okArt(body.card),
         icon: okArt(icon), banner: okArt(banner),

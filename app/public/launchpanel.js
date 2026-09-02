@@ -1430,9 +1430,18 @@
       <div class="tiers" id="tk-tiers">${raw(tierButtons(flow))}</div>
 
       <div id="tk-sharewrap" ${(flow.tier || "standard") === "standard" ? raw("hidden") : ""}>
-      <!-- the reward picker belongs to sharing: it answers "paid in what?",
-           which is only a question once something is being shared -->
-      <div id="tk-rewardwrap">
+      <label>What the 1.6% does</label>
+      <div class="tiers" id="tk-modes">
+        <button data-m="dividend" class="tier ${(flow.rewardMode || "dividend") === "dividend" ? "on" : ""}">
+          <b>Dividend</b><span>Paid out to holders, pro-rata by what they hold.</span></button>
+        <button data-m="burn" class="tier ${flow.rewardMode === "burn" ? "on" : ""}">
+          <b>Buyback &amp; burn</b><span>Buys the token off the market and burns it.
+          Supply falls, every holder's slice grows.</span></button>
+      </div>
+
+      <!-- the reward picker answers "paid in what?", which is only a question
+           when something is being paid out -->
+      <div id="tk-rewardwrap" ${flow.rewardMode === "burn" ? raw("hidden") : ""}>
         <label>Holders are paid in</label>
         <button class="pick" id="lp-reward">
           <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
@@ -1590,6 +1599,19 @@
         "% — 20% you / 60% platform / 20% Meteora";
       paintEconomics();          // the rung has its own curve, not just its own fee
     });
+    box.querySelector("#tk-modes").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-m]");
+      if (!b) return;
+      flow.rewardMode = b.dataset.m;
+      box.querySelectorAll("#tk-modes .tier").forEach(function (x) {
+        x.classList.toggle("on", x === b);
+      });
+      /* Nothing is paid to holders under a burn, so "paid in what?" is not a
+       * question. Hiding it beats leaving a control that does nothing. */
+      var rw = box.querySelector("#tk-rewardwrap");
+      if (rw) rw.hidden = flow.rewardMode === "burn";
+    });
+
     box.querySelector("#tk-quotes").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-q]");
       if (!b || b.disabled) return;
@@ -1762,7 +1784,10 @@
       <div class="row"><span class="k">Fee sharing</span><b>${(flow.feeSharePct || 0) > 0
         ? "all of your share to holders"
         : "You keep everything"}</b></div>
-      ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Holders paid in</span><b>${
+      ${(flow.feeSharePct || 0) > 0 && flow.rewardMode === "burn"
+        ? H`<div class="row"><span class="k">Holder share</span><b>buyback &amp; burn</b></div>`
+        : ""}
+      ${(flow.feeSharePct || 0) > 0 && flow.rewardMode !== "burn" ? H`<div class="row"><span class="k">Holders paid in</span><b>${
         flow.reward.liquidity !== undefined && flow.reward.liquidity < 1000
           ? qLabel + " — " + flow.reward.symbol + " has no market yet"
           : (flow.reward.symbol || qLabel)}</b></div>` : ""}
@@ -1901,7 +1926,9 @@
         feeShare: flow.feeShare || "keep",
         feeSharePct: flow.feeSharePct || 0,
         firstBuySol: flow.tbuy,
-        rewardMint: flow.reward.mint,
+        rewardMode: flow.rewardMode === "burn" ? "burn" : "dividend",
+        // a burn buys the token itself, so there is no reward asset to name
+        rewardMint: flow.rewardMode === "burn" ? null : flow.reward.mint,
         feeWallet: flow.feeWallet || null,
         icon: meta.iconUri || null,
         banner: meta.bannerUri || null,

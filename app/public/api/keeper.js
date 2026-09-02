@@ -410,7 +410,8 @@ export default async function handler(req, res) {
       } catch (e) {
         log.push("could not read the launch list: " + String((e && e.message) || e).slice(0, 80));
       }
-      jobs = all.filter((t) => (t.feeSharePct || 0) > 0 || t.feeShare === "holders");
+      jobs = all.filter((t) => (t.feeSharePct || 0) > 0 || t.feeShare === "holders" ||
+                               t.rewardMode === "burn");
     }
 
     /* The platform's own revenue, swept before anything else.
@@ -550,7 +551,10 @@ export default async function handler(req, res) {
           }
           const pct = BigInt(Math.max(0, Math.min(100,
             job.feeSharePct == null ? 100 : job.feeSharePct)));
-          if (pct > 0n && (!holders.length || held === 0n)) {
+          /* A burn needs no holders — it destroys supply rather than paying
+           * anyone, so a launch nobody holds yet still burns. Only a dividend
+           * needs somebody to receive it. */
+          if (pct > 0n && job.rewardMode !== "burn" && (!holders.length || held === 0n)) {
             log.push(job.mint + ": no holders to pay, left in the pool");
             continue;                                   // unclaimed, so it keeps accruing
           }
@@ -601,23 +605,37 @@ export default async function handler(req, res) {
            * the quote currency — they chose what their HOLDERS are paid in, not
            * what they are. Any reason not to swap pays the quote currency and
            * says why, which is a real payout rather than a failure. */
+          /* Buyback and burn is the same pipeline pointed at the token itself:
+           * swap the pot into the launch's own mint and destroy it, so supply
+           * falls and every remaining holder's slice grows. No holder is paid,
+           * so it needs no holders — a launch with one wallet still burns. */
+          const isBurn = job.rewardMode === "burn";
+          const rewardTarget = isBurn ? job.mint : job.rewardMint;
+
           let reward = null;
-          if (job.rewardMint && pot > 0n && pays.length) {
+          if (rewardTarget && pot > 0n && (isBurn || pays.length)) {
             const qi = await quoteInfo(conn, w3, cli, ps);
+            /* Zero holders in the rent check: a burn creates one account, the
+             * keeper's own, not one per holder. The per-holder rent rule would
+             * otherwise refuse burns that cost nothing per holder to make. */
             const decision = await rewardPlan(
-              job.rewardMint, qi.mint, pot, qi.decimals, pays.length);
+              rewardTarget, qi.mint, pot, qi.decimals, isBurn ? 0 : pays.length);
             if (decision && decision.skip) {
               log.push(job.mint + ": paying " + (job.quote || "the quote currency") +
                        " — " + decision.skip);
             } else if (decision && decision.quote) {
               try {
                 const got = await doSwap(conn, w3, keeper, decision.quote,
-                                         job.rewardMint, splToken);
+                                         rewardTarget, splToken);
                 if (got.amount > 0n) {
-                  reward = { mint: job.rewardMint, amount: got.amount.toString(),
-                             decimals: got.decimals, swapSig: got.sig };
-                  log.push(job.mint + ": swapped the pot into " +
-                           job.rewardMint.slice(0, 6) + "… (" + got.sig.slice(0, 12) + "…)");
+                  reward = { mint: rewardTarget, amount: got.amount.toString(),
+                             decimals: got.decimals, swapSig: got.sig,
+                             burn: isBurn };
+                  if (isBurn) pays = [];        // nobody is paid, it is destroyed
+                  log.push(job.mint + (isBurn
+                    ? ": bought back " + got.amount.toString() + " to burn ("
+                    : ": swapped the pot into " + rewardTarget.slice(0, 6) + "… (") +
+                    got.sig.slice(0, 12) + "…)");
                   /* Write it down NOW.
                    *
                    * The plan is normally persisted a few steps below, after the
@@ -633,7 +651,9 @@ export default async function handler(req, res) {
                       mint: job.mint, claimSig, claimed: claimed.toString(),
                       creatorCut: creatorCut.toString(),
                       creatorDest: job.feeWallet || job.creator || null,
-                      reward: got, pays: [], done: 0, at: Date.now(), partial: true
+                      reward: Object.assign({ mint: rewardTarget, burn: isBurn }, got,
+                                            { amount: got.amount.toString() }),
+                      pays: [], done: 0, at: Date.now(), partial: true
                     }), { ex: PLAN_TTL });
                   }
                 }
@@ -647,7 +667,7 @@ export default async function handler(req, res) {
 
           /* Re-cut the shares in the asset actually held. Percentages come from
            * the token balances already read, so this is the same split. */
-          if (reward) {
+          if (reward && !reward.burn) {
             const total = BigInt(reward.amount);
             let assigned = 0n;
             pays = holders
@@ -694,7 +714,23 @@ export default async function handler(req, res) {
          * for that mint, which the keeper creates and funds. Fewer per
          * transaction, because an account creation is far bigger than a
          * lamport transfer. */
-        const rewardPay = plan.reward || null;
+        /* Burn before anything else. The tokens are already bought and sitting
+         * in the keeper; until they are destroyed the buyback has not happened,
+         * and payOnce records the signature before broadcasting so a retry asks
+         * the chain rather than burning twice. */
+        if (plan.reward && plan.reward.burn && BigInt(plan.reward.amount) > 0n) {
+          const burnMint = new w3.PublicKey(plan.reward.mint);
+          const burnProgram = await tokenProgramOf(conn, w3, plan.reward.mint, splToken);
+          const burnFrom = splToken.getAssociatedTokenAddressSync(
+            burnMint, keeper.publicKey, true, burnProgram);
+          await payOnce(conn, keeper, plan, "burn", () =>
+            new w3.Transaction().add(splToken.createBurnInstruction(
+              burnFrom, burnMint, keeper.publicKey,
+              BigInt(plan.reward.amount), [], burnProgram)), save);
+          log.push(plan.mint + ": burned " + plan.reward.amount);
+        }
+
+        const rewardPay = (plan.reward && !plan.reward.burn) ? plan.reward : null;
         let tokenProgram = null, rewardPk = null;
         if (rewardPay) {
           rewardPk = new w3.PublicKey(rewardPay.mint);
