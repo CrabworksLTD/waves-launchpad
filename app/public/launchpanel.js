@@ -1454,6 +1454,28 @@
       <p class="note" id="tk-taxtxt"></p>
 
 
+      <!-- What holders would be paid in. A preference recorded with the
+           launch, not a routing instruction: nothing reaches holders until the
+           creator activates rewards on the fee page, which is a separate
+           signature. Keeping the choice here means they make it while thinking
+           about their token, not weeks later in a different screen. -->
+      <div id="tk-rewardwrap">
+        <label>Holders are paid in</label>
+        <button class="pick" id="lp-reward">
+          <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
+          <span class="pk-r"><span class="k2 mono">${
+            flow.reward.liquidity === undefined || flow.reward.liquidity >= 1000
+              ? "tradeable" : "not tradeable yet"}</span>
+          <span class="pk-dd">Change ▾</span></span>
+        </button>
+        <p class="note">Saved with your launch. Rewards start once you switch
+        them on from the fee page.${flow.reward.liquidity !== undefined && flow.reward.liquidity < 1000
+          ? raw(" <b>Nothing trades " + esc(flow.reward.symbol) + " yet</b>, so holders " +
+                "would receive " + esc(qLabel) + " until it can be sold — it switches " +
+                "by itself once a market exists.")
+          : ""}</p>
+      </div>
+
       <div id="tk-fwwrap" ${(flow.feeSharePct || 0) >= 100 ? raw("hidden") : ""}>
         <label>Creator fee wallet</label>
         <input id="tk-feewallet" value="${flow.feeWallet || ""}"
@@ -1628,8 +1650,7 @@
       if (nft) { recordCollection(nft.cfg, nft.res, null, nft.up); nftDone(nft.cfg, nft.res, nft.up); }
       else modeSelect();
     };
-    // the reward-asset picker is out until the keeper can swap; guarded rather
-    // than deleted so rewardPicker stays wired for when it comes back
+    // the choice is recorded with the launch; activation happens on the fee page
     var rewardBtn = box.querySelector("#lp-reward");
     if (rewardBtn) rewardBtn.onclick = function () { collect(); rewardPicker(flow); };
     box.querySelector("#lp-next").onclick = function () {
@@ -1921,7 +1942,7 @@
         firstBuySol: flow.tbuy,
         rewardMode: flow.rewardMode === "burn" ? "burn" : "dividend",
         // a burn buys the token itself, so there is no reward asset to name
-        rewardMint: flow.rewardMode === "burn" ? null : flow.reward.mint,
+        rewardMint: flow.reward ? flow.reward.mint : null,
         feeWallet: flow.feeWallet || null,
         icon: meta.iconUri || null,
         banner: meta.bannerUri || null,

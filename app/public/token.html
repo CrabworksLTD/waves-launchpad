@@ -642,9 +642,23 @@ input:focus{outline:none;border-color:var(--accent)}
    * asset is the creator's choice; when nothing trades it yet, holders are
    * paid the quote currency until it can be sold, and saying so here is the
    * same honesty the launch window owes the creator. */
-  function drawRewards(rec) {
+  async function drawRewards(rec) {
     var pct = rec && rec.feeSharePct;
     if (!pct || pct <= 0) return;
+
+    /* Intent is not the same as active.
+     *
+     * A creator picks a reward asset at launch, but nothing is actually routed
+     * to holders until they hand the pool's creator role to our keeper — a
+     * separate signature, taken on the fee page. Until that lands the fees are
+     * simply theirs, so saying "holders earn rewards" here would be a promise
+     * the chain is not keeping. The pool itself is the only honest source. */
+    var active = false;
+    try {
+      active = await window.Token.rewardsActive(rec.pool || null, rec.mint);
+    } catch (e) { active = false; }
+    if (!active) return;
+
     var box = $("rewards");
     var asset = rec.rewardMint || null;
 
@@ -653,7 +667,7 @@ input:focus{outline:none;border-color:var(--accent)}
      * this pays you, and in what. */
     function paint(sym, tradeable) {
       var asset = sym || QUOTE;
-      box.innerHTML = "<b>Holders earn rewards in " + esc(asset) + "</b>" +
+      box.innerHTML = "<b>" + esc(asset) + " rewards are active</b>" +
         (sym && !tradeable
           ? "<span>Paid in " + esc(QUOTE) + " until " + esc(sym) +
             " is tradeable.</span>"

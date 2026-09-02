@@ -1054,6 +1054,33 @@
     return out;
   }
 
+  /* Is this pool actually paying its holders?
+   *
+   * The launch record carries what the creator chose; the pool carries what is
+   * true. Rewards only run once the pool's creator role belongs to the keeper,
+   * which happens on the fee page after launch — so this reads the pool rather
+   * than trusting the record. Any doubt answers false: claiming a token pays
+   * holders when it does not is worse than saying nothing.
+   */
+  async function rewardsActive(poolHint, mint) {
+    var keeper = window.BRAND && window.BRAND.feeKeeper;
+    if (!keeper) return false;
+    try {
+      var M = await dbc(), X = await mx();
+      var cluster = window.Launch ? window.Launch.cluster() : "mainnet-beta";
+      var conn = new X.Connection(rpcUrl(cluster), "confirmed");
+      var cli = new M.DynamicBondingCurveClient(conn, "confirmed");
+      var pk = poolHint ? new X.PublicKey(poolHint) : null;
+      if (!pk) return false;
+      var pool = await cli.state.getPool(pk);
+      var st = pool && (pool.account || pool);
+      var ps = st && (st.poolState || st);
+      return !!ps && String(ps.creator) === keeper;
+    } catch (e) {
+      return false;
+    }
+  }
+
   window.Token = {
     readMarket: readMarket,
     getQuote: getQuote,
@@ -1062,6 +1089,7 @@
     onchainIdentity: onchainIdentity,
     recentTrades: recentTrades,
     launchToken: launchToken,
+    rewardsActive: rewardsActive,
     // throws when a rung has no config, which is how the launch
     // window decides what to offer
     configFor: configKey,
