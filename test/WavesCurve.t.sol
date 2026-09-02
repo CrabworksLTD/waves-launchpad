@@ -27,8 +27,15 @@ contract WavesCurveTest is Test {
     uint256 constant V_ETH    = 1.41 ether;
     uint256 constant GRAD     = 4 ether;
 
+    /* Robinhood Chain's real deployments. Uniswap V3 is NOT at its canonical
+     * address there — 0x1F98431c… holds something that answers nothing — so
+     * these are the verified ones, used by the fork test below. */
+    address constant RH_FACTORY = 0x1f7d7550B1b028f7571E69A784071F0205FD2EfA;
+    address constant RH_WETH    = 0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73;
+
     function setUp() public {
-        curve = new WavesCurve(platform, GRAD, V_ETH, V_TOKENS, SUPPLY);
+        curve = new WavesCurve(platform, GRAD, V_ETH, V_TOKENS, SUPPLY,
+                               RH_FACTORY, RH_WETH, 10000);
         vm.deal(alice, 1000 ether);
         vm.deal(bob, 1000 ether);
         vm.deal(creator, 1000 ether);

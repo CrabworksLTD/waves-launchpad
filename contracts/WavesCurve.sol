@@ -3,6 +3,24 @@ pragma solidity 0.8.28;
 
 import {WavesToken} from "./WavesToken.sol";
 
+interface IUniswapV3Factory {
+    function getPool(address a, address b, uint24 fee) external view returns (address);
+    function createPool(address a, address b, uint24 fee) external returns (address);
+}
+
+interface IUniswapV3Pool {
+    function initialize(uint160 sqrtPriceX96) external;
+    function mint(address recipient, int24 tickLower, int24 tickUpper, uint128 amount, bytes calldata data)
+        external returns (uint256 amount0, uint256 amount1);
+    function collect(address recipient, int24 tickLower, int24 tickUpper, uint128 a0, uint128 a1)
+        external returns (uint128, uint128);
+}
+
+interface IWETH {
+    function deposit() external payable;
+    function transfer(address to, uint256 value) external returns (bool);
+}
+
 /**
  * WavesCurve — the bonding curve every WAVES token on an EVM chain launches on.
  *
@@ -45,6 +63,22 @@ contract WavesCurve {
      * split after you launch on it is a launchpad you have to trust. */
     address public immutable platform;
     uint256 public immutable graduationEth;
+
+    /* Where a graduated token goes to trade. Uniswap V3 is on Robinhood Chain
+     * at a NON-canonical address, so this is a constructor argument rather than
+     * the usual constant — the deployment at 0x1F98431c… on that chain is
+     * something else entirely and answers nothing. */
+    IUniswapV3Factory public immutable factory;
+    address public immutable weth;
+    uint24  public immutable poolFee;
+
+    /* Full range, aligned to the 1% tier's spacing of 200. Full range because a
+     * locked position should never fall out of its band and stop being
+     * liquidity — a narrower one would earn more fees right up until the price
+     * left it, and then the token would look rugged. */
+    int24 internal constant MIN_TICK = -887200;
+    int24 internal constant MAX_TICK = 887200;
+    uint256 internal constant Q96 = 0x1000000000000000000000000;
 
     /* Virtual reserves, which together decide the opening market cap and the
      * shape of the climb.
@@ -137,8 +171,14 @@ contract WavesCurve {
         uint256 graduationEth_,
         uint256 virtualEth_,
         uint256 virtualTokens_,
-        uint256 curveSupply_
+        uint256 curveSupply_,
+        address factory_,
+        address weth_,
+        uint24  poolFee_
     ) {
+        factory = IUniswapV3Factory(factory_);
+        weth = weth_;
+        poolFee = poolFee_;
         platform = platform_;
         graduationEth = graduationEth_;
         virtualEth = virtualEth_;
@@ -351,6 +391,103 @@ contract WavesCurve {
     function ready(address token) public view returns (bool) {
         Curve storage c = curves[token];
         return !c.graduated && c.creator != address(0) && c.raised >= graduationEth;
+    }
+
+    // ────────────────────────────────────────────────────────────── graduation
+
+    mapping(address => address) public poolOf;   // token => its pool, once graduated
+
+    /**
+     * Close the curve and put everything into a pool nobody can withdraw from.
+     *
+     * Permissionless on purpose: the threshold is a fact about the chain, so
+     * anyone may push the button once it is true. Leaving it to us would mean a
+     * token that has met its terms sits waiting on our keeper being awake.
+     *
+     * The remaining tokens and the raised ETH become one full-range position
+     * owned by this contract. There is no function anywhere in here that calls
+     * burn() or decreaseLiquidity() on a pool — that is what makes the lock
+     * real. Not a timelock, not a promise: the code to remove liquidity does
+     * not exist, so it cannot be called.
+     */
+    function graduate(address token) external {
+        Curve storage c = curves[token];
+        if (c.creator == address(0)) revert UnknownToken();
+        if (c.graduated) revert AlreadyGraduated();
+        if (c.raised < graduationEth) revert NotGraduated();
+
+        uint256 ethIn = c.raised;
+        uint256 tokensIn = c.tokensLeft;
+        c.graduated = true;
+        c.raised = 0;
+        c.tokensLeft = 0;
+
+        address pool = factory.getPool(token, weth, poolFee);
+        if (pool == address(0)) pool = factory.createPool(token, weth, poolFee);
+        poolOf[token] = pool;
+
+        bool tokenIsZero = token < weth;
+        (uint256 amount0, uint256 amount1) = tokenIsZero ? (tokensIn, ethIn) : (ethIn, tokensIn);
+
+        /* The opening price is whatever the curve finished at — the ratio of
+         * what was raised to what is left. Continuity matters: a pool that
+         * opens anywhere else hands the difference to whoever arbitrages it,
+         * and that money came from the people who bought on the curve. */
+        uint160 sqrtPriceX96 = uint160(_sqrt((amount1 * (1 << 96) / amount0) * (1 << 96)));
+        IUniswapV3Pool(pool).initialize(sqrtPriceX96);
+
+        IWETH(weth).deposit{value: ethIn}();
+
+        /* Liquidity for a full-range position, taking whichever side binds.
+         * Deliberately a hair under: the callback must be payable from what we
+         * hold, and dust left behind is locked here forever, which is the safe
+         * direction to be wrong in. */
+        uint256 l0 = (amount0 * sqrtPriceX96) / Q96;
+        uint256 l1 = (amount1 * Q96) / sqrtPriceX96;
+        uint256 liquidity = ((l0 < l1 ? l0 : l1) * 999) / 1000;
+
+        _mintPayer = token;
+        IUniswapV3Pool(pool).mint(address(this), MIN_TICK, MAX_TICK, uint128(liquidity), "");
+        _mintPayer = address(0);
+
+        emit Graduated(token, ethIn, tokensIn);
+    }
+
+    address private _mintPayer;
+
+    /// Uniswap calls this to collect what the position costs. Only during a mint we started.
+    function uniswapV3MintCallback(uint256 owed0, uint256 owed1, bytes calldata) external {
+        address token = _mintPayer;
+        if (token == address(0)) revert NotGraduated();
+        if (msg.sender != poolOf[token]) revert UnknownToken();
+
+        bool tokenIsZero = token < weth;
+        (uint256 owedToken, uint256 owedWeth) = tokenIsZero ? (owed0, owed1) : (owed1, owed0);
+        if (owedToken > 0 && !WavesToken(token).transfer(msg.sender, owedToken)) revert TransferFailed();
+        if (owedWeth > 0 && !IWETH(weth).transfer(msg.sender, owedWeth)) revert TransferFailed();
+    }
+
+    /**
+     * Sweep the locked position's trading fees to whoever the creator pledged
+     * to — them, or the keeper paying their holders.
+     *
+     * This is the reason to hold the position rather than send it to a burn
+     * address: locked liquidity that also pays its holders forever, which is
+     * what the Solana side does from its locked LP.
+     */
+    function collectPoolFees(address token) external {
+        address pool = poolOf[token];
+        if (pool == address(0)) revert NotGraduated();
+        Curve storage c = curves[token];
+        address to = (c.rewardsBps > 0 && c.keeper != address(0)) ? c.keeper : c.creator;
+        IUniswapV3Pool(pool).collect(to, MIN_TICK, MAX_TICK, type(uint128).max, type(uint128).max);
+    }
+
+    function _sqrt(uint256 x) private pure returns (uint256 y) {
+        if (x == 0) return 0;
+        uint256 z = (x + 1) / 2;
+        y = x;
+        while (z < y) { y = z; z = (x / z + z) / 2; }
     }
 
     receive() external payable {}
