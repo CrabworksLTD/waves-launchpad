@@ -561,7 +561,9 @@
       <div class="row"><span class="k">Priced in</span><b>${String(flow.quote || "sol").toUpperCase()}${
         flow.tbuy ? " · first buy " + flow.tbuy : ""}</b></div>
       <div class="row"><span class="k">Fee sharing</span><b>${
-        (flow.feeSharePct || 0) > 0 ? "all to holders" : "you keep it all"}</b></div>
+        (flow.feeSharePct || 0) >= 100 ? "all to holders"
+          : (flow.feeSharePct || 0) > 0 ? flow.feeSharePct + "% to holders"
+          : "you keep it all"}</b></div>
       <p class="note">The collection deploys first, then the token pairs to it.
       Both are signed from here.</p>` : ""}
       <div class="row"><span class="k">Storage fee</span><b id="lp-fee">quoting…</b></div>
@@ -1356,7 +1358,7 @@
         "<b>" + esc(r.spec.label) + " — " + pct + "%</b><span>" +
         (r.name === "standard"
           ? "You receive " + num + "% of trading volume."
-          : "Holders receive " + num + "% of trading volume.") +
+          : "Up to " + num + "% of trading volume to holders.") +
         "</span></button>";
     }).join("");
   }
@@ -1440,7 +1442,16 @@
       <div class="tiers" id="tk-tiers">${raw(tierButtons(flow))}</div>
 
       <div id="tk-sharewrap" ${(flow.tier || "standard") === "standard" ? raw("hidden") : ""}>
-      <label>What the 1.6% does</label>
+      <label>Split — how the <span id="tk-poolpct"></span> is divided</label>
+      <div class="ptabs" id="tk-splits">
+        <button data-s="100">All to holders</button>
+        <button data-s="75">75 / 25</button>
+        <button data-s="50">50 / 50</button>
+        <button data-s="25">25 / 75</button>
+      </div>
+      <p class="note" id="tk-splittxt"></p>
+
+      <label>What the holders' share does</label>
       <div class="tiers" id="tk-modes">
         <button data-m="dividend" class="tier ${(flow.rewardMode || "dividend") === "dividend" ? "on" : ""}">
           <b>Dividend</b><span>Paid out to holders automatically based on their
@@ -1602,14 +1613,56 @@
       if (sw) sw.hidden = isStd;
       /* Standard keeps everything, tax gives everything. The rung IS the
        * choice, so nothing else has to be set or explained. */
-      flow.feeSharePct = isStd ? 0 : 100;
+      /* Standard keeps everything. A tax rung defaults to giving everything,
+       * and the split below can hand some back. */
+      if (isStd) flow.feeSharePct = 0;
+      else if (!flow.feeSharePct) flow.feeSharePct = 100;
       flow.feeShare = isStd ? "keep" : "holders";
-      var fw = box.querySelector("#tk-fwwrap");
-      if (fw) fw.hidden = !isStd;
+      paintSplit();
       box.querySelector("#tk-fee").textContent = tierPct(flow) +
         "% — 20% you / 60% platform / 20% Meteora";
       paintEconomics();          // the rung has its own curve, not just its own fee
     });
+    /* Both sides of the split, in percent of trading volume.
+     *
+     * The old control said "90% of your share to holders", which reads as 90%
+     * of every trade and is four times the real figure. Percent-of-volume is
+     * what a buyer can check against the chart, so it is what both numbers are
+     * quoted in — and the creator's side is stated even when it is zero,
+     * because "you receive 0%" is the fact that makes a tax token a tax token. */
+    function pledgeable(f) {
+      var spec = tierSpec(f);
+      return spec.pct * 0.8 * (spec.creatorTradingFeePercentage || 0) / 100;
+    }
+    function paintSplit() {
+      var total = pledgeable(flow);
+      var pct = flow.feeSharePct == null ? 100 : flow.feeSharePct;
+      var toHolders = total * pct / 100;
+      var toYou = total - toHolders;
+      var pp = box.querySelector("#tk-poolpct");
+      if (pp) pp.textContent = total.toFixed(2).replace(/0$/, "") + "%";
+      var el = box.querySelector("#tk-splittxt");
+      if (el) {
+        el.textContent = (flow.rewardMode === "burn"
+          ? toHolders.toFixed(2).replace(/0$/, "") + "% of every trade buys the token back and burns it"
+          : "Holders receive " + toHolders.toFixed(2).replace(/0$/, "") + "% of every trade") +
+          ", you receive " + toYou.toFixed(2).replace(/0$/, "") + "%.";
+      }
+      box.querySelectorAll("#tk-splits button").forEach(function (b) {
+        b.classList.toggle("on", +b.dataset.s === pct);
+      });
+      var fw = box.querySelector("#tk-fwwrap");
+      if (fw) fw.hidden = (flow.tier || "standard") === "standard" || pct >= 100;
+    }
+    paintSplit();
+
+    box.querySelector("#tk-splits").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-s]");
+      if (!b) return;
+      flow.feeSharePct = +b.dataset.s;
+      paintSplit();
+    });
+
     box.querySelector("#tk-modes").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-m]");
       if (!b) return;
@@ -1621,6 +1674,7 @@
        * question. Hiding it beats leaving a control that does nothing. */
       var rw = box.querySelector("#tk-rewardwrap");
       if (rw) rw.hidden = flow.rewardMode === "burn";
+      paintSplit();                     // "buys back and burns" vs "holders receive"
     });
 
     box.querySelector("#tk-quotes").addEventListener("click", function (e) {
@@ -1793,7 +1847,8 @@
       ${nft ? H`<div class="row"><span class="k">Paired with</span><b>${nft.cfg.name}</b></div>` : ""}
       <div class="row"><span class="k">Priced in</span><b>${qLabel}</b></div>
       <div class="row"><span class="k">Fee sharing</span><b>${(flow.feeSharePct || 0) > 0
-        ? "all of your share to holders"
+        ? (flow.feeSharePct >= 100 ? "all to holders"
+           : flow.feeSharePct + "% holders / " + (100 - flow.feeSharePct) + "% you")
         : "You keep everything"}</b></div>
       ${(flow.feeSharePct || 0) > 0 && flow.rewardMode === "burn"
         ? H`<div class="row"><span class="k">Holder share</span><b>buyback &amp; burn</b></div>`
