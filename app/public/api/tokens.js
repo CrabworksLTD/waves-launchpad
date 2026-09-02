@@ -12,6 +12,8 @@
 // "43% to graduation" on a token that graduated an hour ago is worse than
 // showing nothing.
 
+import { okArt as okArtShared } from "./_art.js";
+
 const KEY = "tokens";
 const MAX = 200;
 
@@ -60,33 +62,8 @@ export default async function handler(req, res) {
 
     try {
       const db = await kv();
-      /* Art must come from somewhere we control, never an arbitrary URL a
-       * stranger POSTs at us — these render on the explore pages.
-       *
-       * Two shapes qualify now: arweave.net directly, and our own /m/ path,
-       * which is where token art has lived since it stopped pointing at a
-       * gateway that 404s for the first hour. Only the host that received this
-       * request counts as "ours", so this cannot be pointed at another site,
-       * and the path is matched exactly — a 43-character id and a file name.
-       *
-       * Without the second shape every launch silently recorded icon: null and
-       * the token showed no picture on our own site while aggregators, reading
-       * the on-chain metadata instead, showed it fine. */
-      const selfHost = String(req.headers.host || "").toLowerCase();
-      const okArt = (u) => {
-        if (typeof u !== "string") return null;
-        if (/^https:\/\/arweave\.net\/[\w\-\/\.]+$/.test(u)) return u;
-        try {
-          const parsed = new URL(u);
-          if (parsed.protocol !== "https:") return null;
-          const host = parsed.hostname.toLowerCase();
-          const bare = (h) => h.replace(/^www\./, "");
-          if (bare(host) !== bare(selfHost.split(":")[0])) return null;
-          if (!/^\/m\/[\w-]{43}\/[\w.-]{1,40}$/.test(parsed.pathname)) return null;
-          if (parsed.search || parsed.hash) return null;
-          return u;
-        } catch (e) { return null; }
-      };
+      // one rule for every endpoint — see api/_art.js
+      const okArt = (u) => okArtShared(u, req.headers.host);
       const rec = {
         mint,
         name: String(name || "Untitled").slice(0, 40),

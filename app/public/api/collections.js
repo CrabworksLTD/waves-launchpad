@@ -19,6 +19,8 @@
 // "12/500 minted" on a sold-out collection, which is worse than showing
 // nothing.
 
+import { okArt } from "./_art.js";
+
 const KEY = "collections";
 const MAX = 200;                 // the listing is a shop window, not an archive
 
@@ -79,9 +81,9 @@ export default async function handler(req, res) {
         address: isEvm ? address : null,
         name: String(name || "Untitled").slice(0, 40),
         // only arweave art, never an arbitrary URL someone POSTs at us
-        avatar: (typeof avatar === "string" && /^https:\/\/arweave\.net\/[\w\-\/\.]+$/.test(avatar)) ? avatar : null,
+        avatar: okArt(avatar, req.headers.host),
         // the launch's own share card, pinned beside its art
-        card: (typeof body.card === "string" && /^https:\/\/arweave\.net\/[\w\-\/\.]+$/.test(body.card)) ? body.card : null,
+        card: okArt(body.card, req.headers.host),
         tokenMint: (tokenMint && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(tokenMint)) ? tokenMint : null,
         creator: (creator && (B58.test(creator) || EVM.test(creator))) ? creator : null,
         at: Date.now()

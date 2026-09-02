@@ -8,7 +8,7 @@
 // the launch's own card when one was recorded, the chain's brand card
 // otherwise. A redirect is something no builder can break.
 
-const ARWEAVE = /^https:\/\/arweave\.net\/[\w\-/.]+$/;
+import { okArt, isOurPath } from "./_art.js";
 
 export default async function handler(req, res) {
   const id = String(req.query.id || "");
@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     const rec = list.find((r) =>
       (to === "token" ? r.mint === id
         : (r.candyMachine === id || (r.address || "").toLowerCase() === id.toLowerCase())));
-    if (rec && typeof rec.card === "string" && ARWEAVE.test(rec.card)) card = rec.card;
+    if (rec) card = okArt(rec.card, req.headers.host);
   } catch (e) {}
 
   /* Through the mirror, not straight at Arweave.
@@ -35,7 +35,11 @@ export default async function handler(req, res) {
    * cache the unfurl they get. /api/mirror serves our short-lived copy when it
    * has one and redirects to Arweave when it does not, so the card is right
    * from the first share instead of after propagation. */
-  if (card) card = origin + "/api/mirror?u=" + encodeURIComponent(card);
+  /* Our own /m/ path already falls back across gateways, so wrapping it in the
+   * mirror would be a second hop to reach the same bytes. Only arweave.net
+   * URLs — collections, and launches from before /m/ existed — need proxying. */
+  if (card && isOurPath(card, req.headers.host)) { /* serve it directly */ }
+  else if (card) card = origin + "/api/mirror?u=" + encodeURIComponent(card);
   else card = origin + (isEvm ? "/art/og-rh.png" : "/art/og.png");
   res.setHeader("cache-control", "public, s-maxage=300, stale-while-revalidate=3600");
   res.redirect(302, card);
