@@ -301,9 +301,7 @@
       price: 0, maxPer: 0, dev: 0, roy: 5, royTo: "",
       site: "", x: "", tg: "", dc: "",
       openAt: "", splits: [], allowOn: false, phases: [""], wave: 30,
-      pairOn: false, tname: "", tsym: "", avatar: null, avatarName: "", banner: null, bannerName: "",
-      // Standard, keeping the fees — the least surprising thing a launch can do
-      tier: "standard", feeSharePct: 0, feeShare: "keep"
+      pairOn: false, tname: "", tsym: "", avatar: null, avatarName: "", banner: null, bannerName: ""
     };
 
     var box = shell(H`
@@ -1369,6 +1367,11 @@
       (defName ? defName.replace(/[^A-Za-z]/g, "").slice(0, 5).toUpperCase() : "");
     flow.reward = flow.reward || BUILTIN_REWARDS[0];
     flow.quote = flow.quote || "sol";
+    /* Standard, keeping the fees — the least surprising thing a launch can be,
+     * and the state the panel opens in. Sharing is a decision the creator
+     * makes, not one they have to notice and undo. */
+    if (!flow.tier) flow.tier = "standard";
+    if (flow.feeSharePct == null) { flow.feeSharePct = 0; flow.feeShare = "keep"; }
     var quotes = window.Token.quotes();
     var rwas = window.Token.rwaQuotes();
     var qLabel = flow.quote === "usdc" ? "USDC"
