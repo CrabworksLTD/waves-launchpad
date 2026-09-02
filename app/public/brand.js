@@ -91,12 +91,19 @@
                          * launch window hides it rather than trying to create
                          * one mid-launch. */
                         t2:  { sol: "", usdc: "", rwa: {} },
-                        /* The tax rung — 3%, signed 2026-09-01, both quotes.
-                         * Verified on chain before wiring: feeClaimer is the
-                         * sweep key, so platform fees claim hourly instead of
-                         * by hand at /fees. */
-                        t3:  { sol: "9wYcHGs7Jtyg4CYtpLgTE3vCUUmBorn5ncu3Gtmb4RyH",
-                               usdc: "F22Pjfu2FLafWVGDyoXLPVUBUaF9tFB7HhuURBn9yX1u",
+                        /* The tax rung — 3%, signed 2026-09-01. Verified on
+                         * chain before wiring: 0.6% Meteora, 0.792% platform,
+                         * 1.608% to holders, and feeClaimer is the sweep key so
+                         * platform fees claim hourly rather than by hand.
+                         *
+                         * ⚠️ Replaces an earlier pair signed the same evening
+                         * (9wYcHGs7… sol, F22Pjfu2… usdc) which took 1.8% for
+                         * the platform and left 0.6% for holders — the wrong
+                         * way round for a rung whose whole point is the reward.
+                         * Those stay readable for anything already launched on
+                         * them; nothing new can reach them. */
+                        t3:  { sol: "GA2TweZTv5JMT6nu9gGMRJTsmbnNArvTNdQpFPUxNU7W",
+                               usdc: "QYECpZwhb3jCrQtH8Q2wUZmEVA3LijZAKz3c9yEXXgB",
                                rwa: {} },
                         /* 5% config, signed 2026-09-01 and then superseded by
                          * the 3% rung above. Kept because it is immutable and
