@@ -350,6 +350,24 @@
          * accounts, fee payer or blockhash — so everything that alters it
          * (priority fee, storage fee, blockhash) happens above, and what
          * follows only adds signatures to the exact bytes Phantom returned. */
+        /* Print the exact bytes we hand the wallet.
+         *
+         * Phantom blocks this request before signing, so there is no signature
+         * to send anyone — the transaction never reaches the chain. The only
+         * artefact that exists is what we passed in, and that is what a wallet
+         * team needs to inspect. Base64 of the unsigned message, in the
+         * console, costs nothing and makes the block reportable. */
+        try {
+          var dbg = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+          var b = "";
+          for (var di = 0; di < dbg.length; di++) b += String.fromCharCode(dbg[di]);
+          console.log("[WAVES] unsigned transaction, base64:\n" + btoa(b));
+          console.log("[WAVES] signers required:",
+            tx.compileMessage().header.numRequiredSignatures,
+            "| instructions:", tx.instructions.length,
+            "| bytes:", dbg.length);
+        } catch (e) { console.log("[WAVES] could not serialise for debug:", e.message); }
+
         var signed = await Promise.race([
           c.wallet.signTransaction(tx),
           new Promise(function (_, rej) {
