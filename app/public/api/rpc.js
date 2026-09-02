@@ -60,10 +60,20 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "POST" });
   }
 
-  const upstream = process.env.SOLANA_RPC;
-  if (!upstream) {
-    /* Say so rather than failing obscurely — without this the site silently
-     * falls back to the endpoint that caused the problem. */
+  /* More than one node, in order of preference.
+   *
+   * On 2026-09-02 Helius served getSlot and getHealth happily while returning
+   * a plain-text "Internal server error" for every call that takes an address
+   * — getBalance, getAccountInfo, getMultipleAccounts. Every page that reads
+   * the chain broke, because routing everything here left the site with one
+   * node and no way past it.
+   *
+   * The public node is second, not first: it drops large sends, which is why
+   * this endpoint exists at all. But a node that fumbles a send still answers
+   * reads correctly, and a degraded site beats a dead one. */
+  const upstreams = [process.env.SOLANA_RPC, "https://solana-rpc.publicnode.com"]
+    .filter(Boolean);
+  if (!upstreams.length) {
     return res.status(503).json({ error: "no upstream rpc configured" });
   }
 
@@ -82,18 +92,30 @@ export default async function handler(req, res) {
     }
   }
 
-  try {
-    const r = await fetch(upstream, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30000)
-    });
-    const text = await r.text();
-    res.setHeader("Content-Type", "application/json");
-    res.setHeader("Cache-Control", "no-store");
-    return res.status(r.status).send(text);
-  } catch (e) {
-    return res.status(502).json({ error: "upstream: " + (e.message || String(e)) });
+  /* A node counts as having answered only if it returns 2xx AND valid JSON.
+   * Helius's failure mode was a 500 carrying the words "Internal server
+   * error", so status alone is not enough to trust — and forwarding that text
+   * to a caller expecting JSON-RPC is how one node's bad day became every
+   * page's bad day. */
+  let last = null;
+  for (const upstream of upstreams) {
+    try {
+      const r = await fetch(upstream, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20000)
+      });
+      const text = await r.text();
+      if (!r.ok) { last = "upstream " + r.status; continue; }
+      try { JSON.parse(text); } catch (e) { last = "upstream sent non-json"; continue; }
+
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).send(text);
+    } catch (e) {
+      last = e.message || String(e);
+    }
   }
+  return res.status(502).json({ error: "no rpc answered: " + last });
 }
