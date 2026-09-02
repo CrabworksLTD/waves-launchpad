@@ -165,6 +165,8 @@ contract WavesCurve {
     error TransferFailed();
     error NotCreator();
     error AlreadyPledged();
+    /// The curve has taken everything it is going to take; graduate it.
+    error CurveComplete();
 
     constructor(
         address platform_,
@@ -228,8 +230,36 @@ contract WavesCurve {
         if (c.creator == address(0)) revert UnknownToken();
         if (c.graduated) revert AlreadyGraduated();
 
-        uint256 fee = (value * c.feeBps) / 10_000;
-        uint256 inAfterFee = value - fee;
+        /* Never take more ETH than the curve has room for before it closes.
+         *
+         * ⚠️ Without this a single large buy empties the curve outright — the
+         * clamp below hands over every remaining token — and that state is
+         * poison twice over: graduation computes an opening price from a zero
+         * token amount and reverts forever, and the next buyer pays ETH for
+         * nothing, because there is nothing left to give them. Found by running
+         * the invariant handler against the real Uniswap, where graduation is
+         * in the sequence and the pool refused `initialize(0)`.
+         *
+         * Capping at the threshold is also just correct: money paid in past the
+         * point the curve was meant to close was going into the pool at a price
+         * the curve had already left behind. The excess is refunded instead. */
+        uint256 room = c.raised >= graduationEth ? 0 : graduationEth - c.raised;
+        if (room == 0) revert CurveComplete();
+
+        uint256 accepted = value;
+        uint256 fee = (accepted * c.feeBps) / 10_000;
+        uint256 inAfterFee = accepted - fee;
+        uint256 refund;
+        if (inAfterFee > room) {
+            /* Take exactly what fills the curve, and the fee that belongs to
+             * it. fee/accepted stays equal to feeBps, so the buyer is charged
+             * the same rate on the smaller amount rather than the fee on money
+             * that was handed back. */
+            inAfterFee = room;
+            fee = (room * c.feeBps) / (10_000 - c.feeBps);
+            accepted = room + fee;
+            refund = value - accepted;
+        }
 
         /* The curve, in the order that matters: reserves BEFORE this trade.
          * x grows by what the buyer pays, y shrinks by what they receive, and
@@ -256,10 +286,18 @@ contract WavesCurve {
          * inflated tokensLeft above the real balance, and the next buyer's
          * transfer reverted with InsufficientBalance. Found by fuzzing. */
         c.tokensLeft = uint96(c.tokensLeft - out);
-        _accrue(c, value, fee);
+        /* `accepted`, not `value` — the platform's cut is a share of volume, and
+         * refunded money was never volume. */
+        _accrue(c, accepted, fee);
 
         if (!WavesToken(token).transfer(msg.sender, out)) revert TransferFailed();
-        emit Bought(token, msg.sender, value, out, fee);
+        emit Bought(token, msg.sender, accepted, out, fee);
+
+        // last, with every bit of state already written
+        if (refund > 0) {
+            (bool ok, ) = msg.sender.call{value: refund}("");
+            if (!ok) revert TransferFailed();
+        }
     }
 
     function sell(address token, uint256 amount, uint256 minEthOut) external {
@@ -360,6 +398,9 @@ contract WavesCurve {
         Curve storage c = curves[token];
         if (c.creator == address(0) || c.graduated) return 0;
         uint256 inAfterFee = value - (value * c.feeBps) / 10_000;
+        // the same cap the buy applies, so a quote never promises more than it gives
+        uint256 room = c.raised >= graduationEth ? 0 : graduationEth - c.raised;
+        if (inAfterFee > room) inAfterFee = room;
         uint256 sold = curveSupply - c.tokensLeft;
         uint256 y = virtualTokens - sold;
         uint256 out = y - ((virtualEth * virtualTokens) / (virtualEth + c.raised + inAfterFee));
@@ -434,6 +475,11 @@ contract WavesCurve {
          * opens anywhere else hands the difference to whoever arbitrages it,
          * and that money came from the people who bought on the curve. */
         uint160 sqrtPriceX96 = uint160(_sqrt((amount1 * (1 << 96) / amount0) * (1 << 96)));
+        /* Belt and braces. The buy cap above means neither side can be zero, so
+         * this cannot trigger — but a price of zero is what a sold-out curve
+         * produced before that cap existed, and it surfaced as a bare "R" from
+         * inside the pool. If it ever comes back it should say so here. */
+        if (sqrtPriceX96 == 0) revert ZeroAmount();
         IUniswapV3Pool(pool).initialize(sqrtPriceX96);
 
         IWETH(weth).deposit{value: ethIn}();

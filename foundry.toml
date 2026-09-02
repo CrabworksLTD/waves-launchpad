@@ -13,3 +13,11 @@ evm_version = "paris"
 
 [fuzz]
 runs = 512
+
+# The invariant run is the one that looks for a drain: random actors, random
+# tokens, random ordering. depth is how long a single sequence gets — the bugs
+# that matter need a few calls to set up, so a shallow run finds nothing.
+[invariant]
+runs = 256
+depth = 64
+fail_on_revert = false

@@ -427,7 +427,21 @@ export default async function handler(req, res) {
 
         await db.set(tradesKey, JSON.stringify(trades));
         await db.set(statsKey, JSON.stringify(stats));
-        if (safeCursor && safeCursor !== cursor) await db.set(cursorKey, safeCursor);
+        /* Never strand a token behind a cursor with nothing to show. A run can
+         * capture zero trades and still have advanced the cursor — the launch
+         * tx parses to nothing, the fee-sharing transferPoolCreator tx is not a
+         * swap, and failed snipes advance it too (see line ~301). If that cursor
+         * sticks, every later run reads only "newer than the launch" and the
+         * real buys sitting behind it never appear — the token page shows an
+         * empty chart forever ($MOAR, 2026-09-02). While a token has no captured
+         * trades, force the next run to re-walk from scratch; it self-heals
+         * within one cron cycle and costs one extra page for a genuinely quiet
+         * token. Once real trades land, resume the cheap incremental cursor. */
+        if (trades.length === 0) {
+          await db.del(cursorKey).catch(() => {});
+        } else if (safeCursor && safeCursor !== cursor) {
+          await db.set(cursorKey, safeCursor);
+        }
         log.push(t.symbol + ": " + (quiet ? "no new trades" : "+" + found.length + " trades") +
                  " (" + trades.length + " kept), " +
                  (holders == null ? "holders n/a" : holders + " holders") +

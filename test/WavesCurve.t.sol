@@ -106,7 +106,9 @@ contract WavesCurveTest is Test {
         address token = _launch(300);
 
         vm.prank(alice); curve.buy{value: a}(token, 0);
-        vm.prank(bob);   curve.buy{value: b}(token, 0);
+        // the first buy may have filled the curve, which legitimately refuses the second
+        (, , , , uint96 mid, , ) = curve.curves(token);
+        if (mid < GRAD) { vm.prank(bob); curve.buy{value: b}(token, 0); }
 
         (, , , , uint96 raised, , ) = curve.curves(token);
         uint256 liabilities = uint256(raised) + curve.owed(platform) + curve.owed(creator);
@@ -155,16 +157,19 @@ contract WavesCurveTest is Test {
         }
     }
 
+    /* 1 ether, not 10: a buy past the graduation threshold is now capped and
+     * partly refunded, so 10 ether in is no longer 10 ether of volume. These
+     * two measure the split, so they use an amount the curve takes whole. */
     function test_platformIsPaidItsShareOfVolume() public {
         address token = _launch(300);            // 3% fee, platform 0.6% of volume
-        vm.prank(alice); curve.buy{value: 10 ether}(token, 0);
-        assertEq(curve.owed(platform), 10 ether * 60 / 10_000, "platform cut wrong");
+        vm.prank(alice); curve.buy{value: 1 ether}(token, 0);
+        assertEq(curve.owed(platform), 1 ether * 60 / 10_000, "platform cut wrong");
     }
 
     function test_creatorTakesTheRest() public {
         address token = _launch(300);
-        vm.prank(alice); curve.buy{value: 10 ether}(token, 0);
-        uint256 fee = 10 ether * 300 / 10_000;
+        vm.prank(alice); curve.buy{value: 1 ether}(token, 0);
+        uint256 fee = 1 ether * 300 / 10_000;
         assertEq(curve.owed(creator), fee - curve.owed(platform));
     }
 
@@ -231,9 +236,61 @@ contract WavesCurveTest is Test {
         assertEq(curve.progressBps(token), 0);
         assertFalse(curve.ready(token));
 
-        vm.prank(alice); curve.buy{value: 10 ether}(token, 0);
+        vm.prank(alice); curve.buy{value: 10 ether}(token, 0);   // capped at the threshold
         assertTrue(curve.ready(token), "should be ready past the threshold");
         assertEq(curve.progressBps(token), 10_000);
+    }
+
+    /**
+     * A buy larger than the curve can absorb is capped, and the rest handed
+     * back — rather than taken, at a price the curve had already left.
+     */
+    function test_anOversizedBuyIsCappedAndRefunded() public {
+        address token = _launch(300);
+        uint256 before = alice.balance;
+
+        vm.prank(alice);
+        curve.buy{value: 60 ether}(token, 0);
+
+        (, , , , uint96 raised, uint96 left, ) = curve.curves(token);
+        assertEq(raised, GRAD, "the curve should stop exactly at its threshold");
+        assertGt(left, 0, "the curve must not sell out");
+        assertLt(before - alice.balance, 60 ether, "nothing was refunded");
+        assertTrue(curve.ready(token), "and it should now be ready to graduate");
+    }
+
+    /// No sequence of buys can empty the curve, however it is split up.
+    function testFuzz_theCurveNeverSellsOut(uint96 a, uint96 b, uint96 c) public {
+        address token = _launch(300);
+        uint96[3] memory amounts = [uint96(bound(a, 1e12, 40 ether)),
+                                    uint96(bound(b, 1e12, 40 ether)),
+                                    uint96(bound(c, 1e12, 40 ether))];
+        for (uint256 i = 0; i < 3; i++) {
+            (, , , , uint96 raised, , ) = curve.curves(token);
+            if (raised >= GRAD) break;                 // full: further buys revert by design
+            vm.prank(alice);
+            curve.buy{value: amounts[i]}(token, 0);
+        }
+        (, , , , , uint96 left, ) = curve.curves(token);
+        assertGt(left, 0, "the curve sold out");
+    }
+
+    /// Once full, it must be graduated rather than take more money.
+    function test_aFullCurveRefusesFurtherBuys() public {
+        address token = _launch(300);
+        vm.prank(alice); curve.buy{value: 60 ether}(token, 0);
+
+        vm.prank(bob);
+        vm.expectRevert(WavesCurve.CurveComplete.selector);
+        curve.buy{value: 1 ether}(token, 0);
+    }
+
+    /// The quote must promise exactly what the buy delivers, cap included.
+    function test_quoteMatchesTheCappedBuy() public {
+        address token = _launch(300);
+        uint256 quoted = curve.quoteBuy(token, 60 ether);
+        vm.prank(alice); curve.buy{value: 60 ether}(token, 0);
+        assertEq(WavesToken(token).balanceOf(alice), quoted, "quote and fill disagree");
     }
 
     /// About a fifth of supply should survive the curve, to seed the pool.
