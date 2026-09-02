@@ -11,3 +11,6 @@ app/public/.vercel
 .vercel
 program/target/
 program/.anchor/
+forge-out/
+lib/forge-std/
+cache/

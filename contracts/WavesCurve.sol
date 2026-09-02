@@ -211,7 +211,11 @@ contract WavesCurve {
         if (out < minTokensOut) revert Slippage();
 
         c.raised += uint96(inAfterFee);
-        c.tokensLeft = uint96(y - out);
+        /* ⚠️ Off the REAL balance, not off `y`. y is the virtual reserve and is
+         * larger than what the contract actually holds; writing it back here
+         * inflated tokensLeft above the real balance, and the next buyer's
+         * transfer reverted with InsufficientBalance. Found by fuzzing. */
+        c.tokensLeft = uint96(c.tokensLeft - out);
         _accrue(c, value, fee);
 
         if (!WavesToken(token).transfer(msg.sender, out)) revert TransferFailed();
@@ -231,7 +235,12 @@ contract WavesCurve {
         uint256 sold = curveSupply - c.tokensLeft;
         uint256 x = virtualEth + c.raised;
         uint256 y = virtualTokens - sold;
-        uint256 gross = x - ((virtualEth * virtualTokens) / (y + amount));
+        /* Rounding can put the quotient a wei or two above x on a very small
+         * round trip, which underflows rather than returning ~0. Clamp instead:
+         * the seller gets nothing, which is the correct answer for a trade too
+         * small to move the curve, and the pool keeps the dust. */
+        uint256 back = (virtualEth * virtualTokens) / (y + amount);
+        uint256 gross = back >= x ? 0 : x - back;
         if (gross > c.raised) gross = c.raised;    // never pay out virtual ETH
 
         uint256 fee = (gross * c.feeBps) / 10_000;
@@ -239,7 +248,7 @@ contract WavesCurve {
         if (net < minEthOut) revert Slippage();
 
         c.raised -= uint96(gross);
-        c.tokensLeft = uint96(y + amount);
+        c.tokensLeft = uint96(c.tokensLeft + amount);   // real balance, as above
         _accrue(c, gross, fee);
 
         (bool ok, ) = msg.sender.call{value: net}("");
@@ -324,7 +333,8 @@ contract WavesCurve {
         uint256 sold = curveSupply - c.tokensLeft;
         uint256 x = virtualEth + c.raised;
         uint256 y = virtualTokens - sold;
-        uint256 gross = x - ((virtualEth * virtualTokens) / (y + amount));
+        uint256 back = (virtualEth * virtualTokens) / (y + amount);
+        uint256 gross = back >= x ? 0 : x - back;
         if (gross > c.raised) gross = c.raised;
         return gross - (gross * c.feeBps) / 10_000;
     }
