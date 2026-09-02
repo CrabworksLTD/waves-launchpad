@@ -59,9 +59,9 @@ export default async function handler(req, res) {
   if (typeof body === "string") {
     try { body = JSON.parse(body); } catch { return res.status(400).json({ error: "bad json" }); }
   }
-  const { mint, sig } = body || {};
+  const { mint } = body || {};
+  let sig = body && body.sig;
   if (!B58.test(mint || "")) return res.status(400).json({ error: "bad mint" });
-  if (!SIG.test(sig || "")) return res.status(400).json({ error: "bad signature" });
 
   const keeper = body.keeper || process.env.FEE_KEEPER || "";
   const pct = Math.max(0, Math.min(100, parseInt(body.feeSharePct, 10) || 0));
@@ -73,13 +73,40 @@ export default async function handler(req, res) {
     const db = await kv();
     if (!db) return res.status(503).json({ error: "no store" });
 
-    const raw = await db.get(KEY);
-    let list = typeof raw === "string" ? JSON.parse(raw) : (raw || []);
-    if (!Array.isArray(list)) list = [];
-    const i = list.findIndex((t) => t && t.mint === mint);
-    if (i < 0) return res.status(404).json({ error: "unknown token" });
-    const rec = list[i];
+    /* The listing is a Redis LIST, not a JSON blob under one key — read it the
+     * way api/tokens.js writes it, or Upstash answers WRONGTYPE. */
+    const raw = await db.lrange(KEY, 0, 199);
+    let i = -1, rec = null;
+    for (let n = 0; n < (raw || []).length; n++) {
+      const cur = typeof raw[n] === "string" ? JSON.parse(raw[n]) : raw[n];
+      if (cur && cur.mint === mint) { i = n; rec = cur; break; }
+    }
+    if (i < 0 || !rec) return res.status(404).json({ error: "unknown token" });
     if (!rec.pool) return res.status(400).json({ error: "that launch has no pool recorded" });
+
+    /* A retry has no fresh signature to offer.
+     *
+     * The transfer is irreversible, so a creator whose terms failed to save
+     * cannot produce it again — and it already happened. Find it instead: the
+     * pool's recent history, the most recent successful transaction signed by
+     * this token's creator. That is the same proof, just looked up rather than
+     * handed over. */
+    if (!SIG.test(sig || "")) {
+      const recent = await rpc("getSignaturesForAddress", [rec.pool, { limit: 25 }]);
+      for (const r of recent || []) {
+        if (r.err) continue;
+        const t = await rpc("getTransaction", [r.signature, { maxSupportedTransactionVersion: 0 }])
+          .catch(() => null);
+        const ks = t && t.transaction && t.transaction.message &&
+          (t.transaction.message.accountKeys || []).map((k) => (typeof k === "string" ? k : k.pubkey));
+        if (ks && ks[0] === rec.creator) { sig = r.signature; break; }
+      }
+      if (!SIG.test(sig || "")) {
+        return res.status(400).json({
+          error: "could not find your activation on chain — try activating again"
+        });
+      }
+    }
 
     // 1. the transaction exists, succeeded, and this wallet signed it
     const tx = await rpc("getTransaction", [sig, { maxSupportedTransactionVersion: 0 }]);
@@ -118,14 +145,14 @@ export default async function handler(req, res) {
       });
     }
 
-    list[i] = Object.assign({}, rec, {
+    const updated = Object.assign({}, rec, {
       feeShare: "holders",
       feeSharePct: pct,
       rewardMode: mode,
       rewardMint: mode === "burn" ? null : (rewardMint || rec.rewardMint || null),
       rewardsActivatedAt: Date.now()
     });
-    await db.set(KEY, JSON.stringify(list));
+    await db.lset(KEY, i, JSON.stringify(updated));
     return res.status(200).json({ ok: true, feeSharePct: pct, rewardMode: mode });
   } catch (e) {
     return res.status(500).json({ error: (e.message || String(e)).slice(0, 200) });

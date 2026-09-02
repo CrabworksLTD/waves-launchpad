@@ -188,7 +188,9 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
       try {
         if (!t.pool) throw new Error("This launch has no pool recorded.");
         var out = await window.Token.activateHolderRewards(t.pool);
-        msg.textContent = "Saving your terms…";
+        msg.textContent = out.already
+          ? "Already handed over — saving your terms…"
+          : "Saving your terms…";
         var r = await fetch("/api/rewards", {
           method: "POST",
           headers: { "content-type": "application/json" },
