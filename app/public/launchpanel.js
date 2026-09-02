@@ -1271,6 +1271,35 @@
    * nothing extra at launch. A rung with no config for the selected quote is
    * not offered — silently creating one mid-launch is what turned a launch into
    * two signatures and a failure point. */
+  /* A cap at the point of choosing, so nothing downstream has to cope.
+   *
+   * There was none, so a 20MB PNG was accepted and then met three limits that
+   * did not agree with each other: the free-upload allowance, the mirror's
+   * size cap, and Arweave pricing. The launch either cost more than expected
+   * or lost its mirror copy, and neither said so. Refusing here is one clear
+   * sentence before anything is paid for.
+   *
+   * 2MB is generous for a token logo or banner — the largest real launch art so
+   * far was 1.1MB — and leaves room under the mirror's 3MB ceiling. */
+  var MAX_ART_BYTES = 2 * 1024 * 1024;
+
+  function takeArt(file, box, onOk) {
+    if (!file) return;
+    if (file.size > MAX_ART_BYTES) {
+      var e = box.querySelector("#lp-err");
+      if (e) {
+        e.textContent = '"' + file.name + '" is ' +
+          (file.size / 1048576).toFixed(1) + "MB. Images must be under 2MB — " +
+          "resize it and try again.";
+        e.className = "err";
+      }
+      return;
+    }
+    var e2 = box.querySelector("#lp-err");
+    if (e2) { e2.textContent = ""; e2.className = ""; }
+    file.arrayBuffer().then(function (buf) { onOk(new Uint8Array(buf)); });
+  }
+
   function tierSpec(flow) {
     var T = window.DBC_TERMS;
     return (T && T.TIERS && T.TIERS[flow.tier || "standard"]) ||
@@ -1485,9 +1514,8 @@
     box.querySelector("#tk-logobtn").onclick = function () { box.querySelector("#tk-logo").click(); };
     box.querySelector("#tk-logo").addEventListener("change", function (e) {
       var f = e.target.files && e.target.files[0];
-      if (!f) return;
-      f.arrayBuffer().then(function (buf) {
-        flow.icon = new Uint8Array(buf);
+      takeArt(f, box, function (bytes) {
+        flow.icon = bytes;
         flow.iconName = f.name;
         flow.iconExt = /\.jpe?g$/i.test(f.name) ? "jpg" : "png";
         var lb = box.querySelector("#tk-logobtn");
@@ -1499,9 +1527,8 @@
     };
     box.querySelector("#tk-banner").addEventListener("change", function () {
       var f = box.querySelector("#tk-banner").files[0];
-      if (!f) return;
-      f.arrayBuffer().then(function (buf) {
-        flow.banner = new Uint8Array(buf);
+      takeArt(f, box, function (bytes) {
+        flow.banner = bytes;
         flow.bannerName = f.name;
         flow.bannerExt = /\.jpe?g$/i.test(f.name) ? "jpg" : "png";
         var bb = box.querySelector("#tk-bannerbtn");

@@ -280,7 +280,12 @@ const HOLDER_APPROVALS_PER_HOUR = 5;
  * therefore a few hundred kilobytes per allowance, capped per address per hour,
  * and only for people who abandon a launch after uploading.
  */
-const LAUNCH_FREE_BYTES = 3 * 1024 * 1024;
+/* Two 2MB images plus a generated share card plus the json, with room to
+ * spare. At 3MB this sat below what a real launch actually uploads — MOAR's
+ * was 2.68MB — so a slightly larger banner would have silently fallen out of
+ * the free allowance and demanded a storage payment instead. The launch window
+ * caps each image at 2MB, and this is the matching ceiling. */
+const LAUNCH_FREE_BYTES = 8 * 1024 * 1024;
 const LAUNCH_FREE_FILES = 5;
 const LAUNCH_UPLOADS_PER_HOUR = 6;
 
