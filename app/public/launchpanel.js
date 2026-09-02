@@ -54,8 +54,8 @@
        * rather than chase it, the row states the box explicitly: same height,
        * same radius, text centred. Back sets the row's top, so fixing the
        * height leaves the gap above unchanged. */
-      ".lp .acts{display:flex;gap:10px;margin-top:22px;align-items:stretch}",
-      ".lp .acts button{height:46px;padding:0 16px;border-radius:8px;",
+      ".lp .acts{display:flex;gap:10px;margin-top:22px;align-items:center}",
+      ".lp .acts button{height:46px;padding:0 16px;border-radius:8px;margin:0;",
       "  display:inline-flex;align-items:center;justify-content:center;line-height:1}",
       ".lp button{flex:1;font:inherit;font-weight:600;font-size:13px;cursor:pointer;",
       "  border-radius:6px;padding:12px 16px;border:1px solid var(--line2);",
