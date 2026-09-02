@@ -41,22 +41,29 @@
     standard: { label: "Standard", pct: 1, baseFeeBps: 100,
                 creatorTradingFeePercentage: 50 },
 
-    /* Tax rungs. Our share is proportional up to a ceiling of 0.8% of a trade
-     * and flat above it, so a creator who sets a high tax to be generous does
-     * not fund us for the privilege — at 10% they hand 7.2% to holders and we
-     * earn what we would at 4%.
+    /* Tax rungs.
      *
-     *   2%   0.40 Meteora  0.53 platform  1.07 creator side
-     *   3%   0.60          0.79           1.61
-     *   4%   0.80          0.80           2.40
-     *   5%   1.00          0.80           3.20
-     *  10%   2.00          0.80           7.20
+     * The platform's cut rises a tenth of a percent per rung — 0.4% at
+     * Standard, 0.5% at 2%, up to 0.9% at 10% — and everything else above
+     * Meteora's fixed fifth belongs to the creator's side. A creator raising
+     * their tax is overwhelmingly raising it for their holders: from 2% to
+     * 10% their side grows 1.1% -> 7.1% while ours grows 0.5% -> 0.9%.
+     *
+     * Every rung lands on an exact percentage, which is the point — the
+     * config stores this number forever, and 83.3333 renders as 16.66672%.
+     *
+     *   fee   Meteora  platform  creator side   config split
+     *    2%     0.40      0.50       1.10        25   / 55
+     *    3%     0.60      0.60       1.80        20   / 60
+     *    4%     0.80      0.70       2.50        17.5 / 62.5
+     *    5%     1.00      0.80       3.20        16   / 64
+     *   10%     2.00      0.90       7.10         9   / 71
      */
-    t2:  { label: "Tax token", pct: 2,  baseFeeBps: 200,  creatorTradingFeePercentage: 67 },
-    t3:  { label: "Tax token", pct: 3,  baseFeeBps: 300,  creatorTradingFeePercentage: 67 },
-    t4:  { label: "Tax token", pct: 4,  baseFeeBps: 400,  creatorTradingFeePercentage: 75 },
+    t2:  { label: "Tax token", pct: 2,  baseFeeBps: 200,  creatorTradingFeePercentage: 68.75 },
+    t3:  { label: "Tax token", pct: 3,  baseFeeBps: 300,  creatorTradingFeePercentage: 75 },
+    t4:  { label: "Tax token", pct: 4,  baseFeeBps: 400,  creatorTradingFeePercentage: 78.125 },
     t5:  { label: "Tax token", pct: 5,  baseFeeBps: 500,  creatorTradingFeePercentage: 80 },
-    t10: { label: "Tax token", pct: 10, baseFeeBps: 1000, creatorTradingFeePercentage: 90 },
+    t10: { label: "Tax token", pct: 10, baseFeeBps: 1000, creatorTradingFeePercentage: 88.75 },
 
     /* ⚠️ Superseded. Kept so pools launched against them still read; out of
      * LADDER, so nothing new can reach them. */
