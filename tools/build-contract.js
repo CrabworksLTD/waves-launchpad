@@ -23,9 +23,28 @@ function compile(name) {
   const file = name + ".sol";
   const source = fs.readFileSync(path.join(srcDir, file), "utf8");
 
+  /* Pull in every local import, so a contract can be written in more than one
+   * file. solc's import callback is not available through this binding, so the
+   * sources are gathered here instead — one level is enough for what we build,
+   * and a missing file fails loudly rather than compiling something partial. */
+  const sources = { [file]: { content: source } };
+  const seen = new Set([file]);
+  const queue = [source];
+  while (queue.length) {
+    const text = queue.pop();
+    for (const m of text.matchAll(/import\s*(?:\{[^}]*\}\s*from\s*)?"\.\/([^"]+)"/g)) {
+      const dep = m[1];
+      if (seen.has(dep)) continue;
+      seen.add(dep);
+      const body = fs.readFileSync(path.join(srcDir, dep), "utf8");
+      sources[dep] = { content: body };
+      queue.push(body);
+    }
+  }
+
   const input = {
     language: "Solidity",
-    sources: { [file]: { content: source } },
+    sources: sources,
     settings: {
       optimizer: { enabled: true, runs: 800 },
       evmVersion: "paris",
