@@ -93,6 +93,10 @@ h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:te
 .scard .sinfo{padding:12px 14px 14px}
 .scard .sinfo b{display:block;font:700 15px Archivo;letter-spacing:-.01em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scard .rw{display:inline-block;margin-top:7px;padding:3px 8px;border-radius:999px;
+  font:600 10px "IBM Plex Mono",monospace;letter-spacing:.08em;
+  color:var(--accent);border:1px solid var(--accent);
+  background:rgba(var(--accent-rgb),.09)}
 .scard .sym{display:block;margin-top:1px;font:400 12px "IBM Plex Mono",monospace;
   color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .scard .stat{margin-top:9px;font:600 15px "IBM Plex Mono",monospace;
@@ -493,6 +497,25 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
    * name, the ticker or supply, the single number that matters, and where it
    * came from. Tokens and collections share the shape deliberately — the
    * badge and the stat label say which is which. */
+  /* Reward assets by mint, so a card can name the stock rather than an address.
+   * Filled once in the background; until it lands the pill says REWARDS, which
+   * is still true and still worth showing. */
+  var RWA = null;
+  if (window.Token && window.Token.rwa) {
+    window.Token.rwa().then(function (list) {
+      RWA = {};
+      (list || []).forEach(function (t) { RWA[t.mint] = t.symbol; });
+      document.querySelectorAll(".scard .rw").forEach(function (el) {
+        var m = el.dataset.mint;
+        if (m && RWA[m]) el.textContent = RWA[m] + " REWARDS";
+      });
+    }).catch(function () {});
+  }
+  function rewardSym(mint) {
+    if (!mint) return "HOLDER";
+    return (RWA && RWA[mint]) || "";
+  }
+
   function spotCard(o) {
     return '<a class="scard" data-name="' + esc(o.name) + '" href="' + esc(o.href) + '">' +
       '<div class="art">' +
@@ -504,6 +527,8 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
       "</div>" +
       '<div class="sinfo"><b>' + esc(o.name) + "</b>" +
       '<span class="sym">' + esc(o.sym || "") + "</span>" +
+      (o.reward ? '<span class="rw"' + (o.rewardMint ? ' data-mint="' + esc(o.rewardMint) + '"' : "") +
+        ">" + esc(o.reward.replace(/^ +/, "") || "REWARDS") + "</span>" : "") +
       '<div class="stat" data-stat><b>—</b></div>' +
       '<div class="foot"><span>' + esc(o.addr ? shortAddr(o.addr) : "") + "</span>" +
       "<span>" + esc(ago(o.at)) + "</span></div></div></a>";
@@ -550,7 +575,16 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
         return spotCard({
           name: r.name || "Token", sym: "$" + String(r.symbol || "").toUpperCase(),
           href: "/token/" + r.mint, img: r.icon || null,
-          badge: "TOKEN", badgeKind: "live", addr: r.mint, at: r.at
+          badge: "TOKEN", badgeKind: "live", addr: r.mint, at: r.at,
+          /* Only once rewards are actually running. feeSharePct is zero at
+           * launch now — it is set when the creator activates, which is also
+           * when the pool's creator role moves to the keeper — so a non-zero
+           * value here means the chain is already paying holders. */
+          reward: (r.feeSharePct || 0) > 0
+            ? (r.rewardMode === "burn" ? "BUYBACK & BURN"
+               : (rewardSym(r.rewardMint) + " REWARDS").trim())
+            : null,
+          rewardMint: r.rewardMode === "burn" ? null : (r.rewardMint || null)
         });
       }
       if (it.kind === "col") {

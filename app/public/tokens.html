@@ -332,9 +332,13 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
         '<span class="body">' +
           "<b>" + esc(r.name || "Token") + "</b>" +
           '<span class="sym">$' + esc(sym) + "</span>" +
-          // a token that pays its holders is worth saying so on the card
+          /* A token that pays its holders is worth saying so on the card — but
+           * a buyback pays nobody, it destroys supply, and calling that "pays
+           * holders" would be wrong in the one place a buyer skims. */
           ((r.feeSharePct || 0) > 0
-            ? '<span class="pays">pays holders ' + r.feeSharePct + '%</span>' : "") +
+            ? '<span class="pays">' + (r.rewardMode === "burn"
+                ? "buys back &amp; burns " + r.feeSharePct + "%"
+                : "pays holders " + r.feeSharePct + "%") + "</span>" : "") +
           /* Market cap when the indexer knows it, because that is the number
            * people compare tokens by. Falls back to the curve's own raised /
            * threshold until a launch has been indexed. */
