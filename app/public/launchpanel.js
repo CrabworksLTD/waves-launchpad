@@ -1454,12 +1454,25 @@
       <p class="note" id="tk-taxtxt"></p>
 
 
+      <!-- Two ways the pledged share can work. Like the asset below, this is
+           recorded with the launch and takes effect when rewards are switched
+           on from the fee page — no routing happens here. -->
+      <label>Holder rewards</label>
+      <div class="tiers" id="tk-modes">
+        <button data-m="dividend" class="tier ${(flow.rewardMode || "dividend") === "dividend" ? "on" : ""}">
+          <b>Dividend</b><span>Paid out to holders automatically based on their
+          holdings.</span></button>
+        <button data-m="burn" class="tier ${flow.rewardMode === "burn" ? "on" : ""}">
+          <b>Buyback &amp; burn</b><span>Buys the token off the market and burns it,
+          causing supply to fall.</span></button>
+      </div>
+
       <!-- What holders would be paid in. A preference recorded with the
            launch, not a routing instruction: nothing reaches holders until the
            creator activates rewards on the fee page, which is a separate
            signature. Keeping the choice here means they make it while thinking
            about their token, not weeks later in a different screen. -->
-      <div id="tk-rewardwrap">
+      <div id="tk-rewardwrap" ${flow.rewardMode === "burn" ? raw("hidden") : ""}>
         <label>Holders are paid in</label>
         <button class="pick" id="lp-reward">
           <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
@@ -1650,6 +1663,19 @@
       if (nft) { recordCollection(nft.cfg, nft.res, null, nft.up); nftDone(nft.cfg, nft.res, nft.up); }
       else modeSelect();
     };
+    box.querySelector("#tk-modes").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-m]");
+      if (!b) return;
+      flow.rewardMode = b.dataset.m;
+      box.querySelectorAll("#tk-modes .tier").forEach(function (x) {
+        x.classList.toggle("on", x === b);
+      });
+      /* A burn pays nobody anything, so "paid in what?" stops being a question
+       * — a control that does nothing is worse than no control. */
+      var rw = box.querySelector("#tk-rewardwrap");
+      if (rw) rw.hidden = flow.rewardMode === "burn";
+    });
+
     // the choice is recorded with the launch; activation happens on the fee page
     var rewardBtn = box.querySelector("#lp-reward");
     if (rewardBtn) rewardBtn.onclick = function () { collect(); rewardPicker(flow); };
