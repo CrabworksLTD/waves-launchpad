@@ -517,6 +517,26 @@
     return tx;
   }
 
+  /* Nothing in a launch may wait forever.
+   *
+   * Building the pool transaction reads accounts through the SDK's own
+   * connection, and the balance check reads the chain — neither had a ceiling,
+   * so a slow or degraded node left the panel sitting on "Creating the pool"
+   * with no prompt, no error and nothing to do but reload. That is
+   * indistinguishable from a wallet that never answered, which made it useless
+   * as a signal while we were isolating a Phantom block. */
+  function within(ms, label, p) {
+    return Promise.race([
+      p,
+      new Promise(function (_, rej) {
+        setTimeout(function () {
+          rej(new Error(label + " did not finish in " + Math.round(ms / 1000) +
+            "s. Nothing has been sent — try again."));
+        }, ms);
+      })
+    ]);
+  }
+
   /* ⚠️ A pledged launch names the KEEPER as poolCreator at creation — see the
    * two poolCreator lines below.
    *
@@ -534,7 +554,7 @@
     var progress = opts.onProgress || function () {};
 
     // fail here, with a number, rather than at simulation with "0x1"
-    await assertEnoughSol(c, opts);
+    await within(30000, "The balance check", assertEnoughSol(c, opts));
 
     var baseMint = c.X.Keypair.generate();
     var configPk, sig;
@@ -560,7 +580,8 @@
         { baseFeeBps: opts.customFeeBps, creatorTradingFeePercentage: 25 }));
 
       progress({ step: "pool", state: "signing" });
-      var pair = await c.cli.partner.createConfigAndPoolWithFirstBuy(Object.assign({
+      var pair = await within(60000, "Building the launch transaction",
+        c.cli.partner.createConfigAndPoolWithFirstBuy(Object.assign({
         config: cfgKp.publicKey,
         feeClaimer: feeOwner,
         leftoverReceiver: feeOwner,
@@ -581,7 +602,7 @@
           minimumAmountOut: new c.M.BN(1),
           referralTokenAccount: null
         }
-      } : {}));
+      } : {})));
       await send(c, { transaction: pair.createConfigTx, signers: [cfgKp] });
       sig = await send(c, { transaction: pair.createPoolWithFirstBuyTx, signers: [baseMint],
         storageFee: opts.storageFee });
@@ -604,7 +625,8 @@
 
       var built;
       if (opts.firstBuySol > 0) {
-        built = await c.cli.creator.createPoolWithFirstBuy({
+        built = await within(60000, "Building the launch transaction",
+          c.cli.creator.createPoolWithFirstBuy({
           createPoolParam: args,
           firstBuyParam: {
             buyer: c.owner,
@@ -618,9 +640,10 @@
             minimumAmountOut: new c.M.BN(1),   // creator buying their own launch, slippage is theirs
             referralTokenAccount: null
           }
-        });
+        }));
       } else {
-        built = await c.cli.creator.createPool(args);
+        built = await within(60000, "Building the launch transaction",
+          c.cli.creator.createPool(args));
       }
       var tx = built.createPoolTx || built.transaction || built;
       sig = await send(c, { transaction: tx, signers: [baseMint], storageFee: opts.storageFee });
