@@ -1435,11 +1435,11 @@
       <div id="tk-splitwrap">
       <label>Split — how the <span id="tk-poolpct"></span> is divided</label>
       <div class="ptabs" id="tk-splits">
-        <button data-s="100">All to holders</button>
-        <button data-s="75">75 / 25</button>
-        <button data-s="50">50 / 50</button>
-        <button data-s="25">25 / 75</button>
         <button data-s="0">All to you</button>
+        <button data-s="25">25 / 75</button>
+        <button data-s="50">50 / 50</button>
+        <button data-s="75">75 / 25</button>
+        <button data-s="100">All to holders</button>
       </div>
       <p class="note" id="tk-splittxt"></p>
       </div><!-- /tk-splitwrap -->
