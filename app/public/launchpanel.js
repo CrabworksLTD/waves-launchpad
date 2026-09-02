@@ -1432,18 +1432,22 @@
       <p class="note" id="tk-taxtxt"></p>
 
       <div id="tk-sharewrap" ${(flow.tier || "standard") === "standard" ? raw("hidden") : ""}>
+      <div id="tk-splitwrap" ${flow.rewardMode === "keep" ? raw("hidden") : ""}>
       <label>Split — how the <span id="tk-poolpct"></span> is divided</label>
       <div class="ptabs" id="tk-splits">
         <button data-s="100">All to holders</button>
         <button data-s="75">75 / 25</button>
         <button data-s="50">50 / 50</button>
         <button data-s="25">25 / 75</button>
-        <button data-s="0">All to you</button>
       </div>
       <p class="note" id="tk-splittxt"></p>
+      </div><!-- /tk-splitwrap -->
 
-      <label>What the holders' share does</label>
+      <label>What the tax does</label>
       <div class="tiers" id="tk-modes">
+        <button data-m="keep" class="tier ${flow.rewardMode === "keep" ? "on" : ""}">
+          <b>Keep the fees</b><span>All of it goes to you, claimable whenever
+          you like.</span></button>
         <button data-m="dividend" class="tier ${(flow.rewardMode || "dividend") === "dividend" ? "on" : ""}">
           <b>Dividend</b><span>Paid out to holders automatically based on their
           holdings.</span></button>
@@ -1454,7 +1458,8 @@
 
       <!-- the reward picker answers "paid in what?", which is only a question
            when something is being paid out -->
-      <div id="tk-rewardwrap" ${flow.rewardMode === "burn" ? raw("hidden") : ""}>
+      <div id="tk-rewardwrap" ${flow.rewardMode === "burn" || flow.rewardMode === "keep"
+        ? raw("hidden") : ""}>
         <label>Holders are paid in</label>
         <button class="pick" id="lp-reward">
           <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
@@ -1604,8 +1609,13 @@
       var sw = box.querySelector("#tk-sharewrap");
       var isStd = flow.tier === "standard";
       if (sw) sw.hidden = isStd;
-      if (isStd) flow.feeSharePct = 0;
-      else if (flow.feeSharePct == null) flow.feeSharePct = 100;
+      if (isStd) {
+        flow.feeSharePct = 0;
+      } else {
+        if (!flow.rewardMode) flow.rewardMode = "dividend";
+        if (flow.rewardMode === "keep") flow.feeSharePct = 0;
+        else if (flow.feeSharePct == null) flow.feeSharePct = 100;
+      }
       flow.feeShare = (flow.feeSharePct || 0) > 0 ? "holders" : "keep";
 
       paintSplit();
@@ -1678,10 +1688,31 @@
       box.querySelectorAll("#tk-modes .tier").forEach(function (x) {
         x.classList.toggle("on", x === b);
       });
-      /* Nothing is paid to holders under a burn, so "paid in what?" is not a
-       * question. Hiding it beats leaving a control that does nothing. */
+
+      /* Each mode decides which controls below still mean anything.
+       *
+       * keep     — nothing is shared, so there is no split and no asset
+       * dividend — both apply
+       * burn     — split applies, but nothing is "paid in" anything
+       *
+       * Keeping the fees also hands the pool back to the launcher: pledging it
+       * to the keeper would route a creator's own money through us and stop
+       * them claiming it directly. */
+      var keep = flow.rewardMode === "keep";
+      if (keep) {
+        flow.feeSharePct = 0;
+        flow.feeShare = "keep";
+      } else if (!flow.feeSharePct) {
+        flow.feeSharePct = 100;
+        flow.feeShare = "holders";
+      }
+      var sp = box.querySelector("#tk-splitwrap");
+      if (sp) sp.hidden = keep;
       var rw = box.querySelector("#tk-rewardwrap");
-      if (rw) rw.hidden = flow.rewardMode === "burn";
+      if (rw) rw.hidden = keep || flow.rewardMode === "burn";
+      var fw = box.querySelector("#tk-fwwrap");
+      if (fw) fw.hidden = !keep && (flow.feeSharePct || 0) >= 100;
+
       paintSplit();                     // "buys back and burns" vs "holders receive"
     });
 
