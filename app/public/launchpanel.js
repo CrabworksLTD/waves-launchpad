@@ -94,6 +94,8 @@
       /* reward picker */
       ".lp .ptabs{display:flex;gap:6px;margin:10px 0}",
       ".lp .ptabs button{flex:none;padding:7px 12px;font-size:12px;border-radius:99px}",
+      // the split labels name both sides, so they need room to wrap
+      ".lp #tk-splits{flex-wrap:wrap;gap:6px}",
       ".lp .ptabs button.on{background:rgba(var(--accent-rgb),.14);border-color:transparent;",
       "  box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.3)}",
       ".lp .plist{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px}",
@@ -1352,7 +1354,7 @@
      * trader sees keeps the label honest: a 3% tax means traders pay 3%. */
     return rungs.map(function (r) {
       return '<button data-t="' + r.name + '"' + (r.name === cur ? ' class="on"' : "") + ">" +
-        (r.name === "standard" ? "Standard" : r.spec.pct + "%") + "</button>";
+        r.spec.pct + "%" + "</button>";
     }).join("");
   }
 
@@ -1434,19 +1436,17 @@
 
       <label>Creator tax</label>
       <div class="ptabs" id="tk-tiers">${raw(tierButtons(flow))}</div>
-      <p class="note" id="tk-taxtxt"></p>
 
       <div id="tk-sharewrap">
       <div id="tk-splitwrap">
-      <label>Split — how the <span id="tk-poolpct"></span> is divided</label>
+      <label>Split</label>
       <div class="ptabs" id="tk-splits">
         <button data-s="0">All to you</button>
-        <button data-s="25">25 / 75</button>
-        <button data-s="50">50 / 50</button>
-        <button data-s="75">75 / 25</button>
+        <button data-s="25">75 to you · 25 to holders</button>
+        <button data-s="50">50 to you · 50 to holders</button>
+        <button data-s="75">25 to you · 75 to holders</button>
         <button data-s="100">All to holders</button>
       </div>
-      <p class="note" id="tk-splittxt"></p>
       </div><!-- /tk-splitwrap -->
 
       <div id="tk-modewrap" ${(flow.feeSharePct || 0) > 0 ? "" : raw("hidden")}>
@@ -1612,33 +1612,8 @@
       /* The rung sets the size of the pot, not who gets it — the split below
        * is the only thing that decides that, and it survives a rung change. */
       paintSplit();
-      paintTax();
       paintEconomics();          // each rung has its own curve, not just its own fee
     });
-    /* Both sides of the split, in percent of trading volume.
-     *
-     * The old control said "90% of your share to holders", which reads as 90%
-     * of every trade and is four times the real figure. Percent-of-volume is
-     * what a buyer can check against the chart, so it is what both numbers are
-     * quoted in — and the creator's side is stated even when it is zero,
-     * because "you receive 0%" is the fact that makes a tax token a tax token. */
-    function pledgeable(f) {
-      var spec = tierSpec(f);
-      return spec.pct * 0.8 * (spec.creatorTradingFeePercentage || 0) / 100;
-    }
-    function paintTax() {
-      var spec = tierSpec(flow);
-      var el = box.querySelector("#tk-taxtxt");
-      if (!el) return;
-      var meteora = spec.pct * 0.2;
-      var creatorSide = pledgeable(flow);
-      var platform = spec.pct - meteora - creatorSide;
-      el.textContent = "Traders pay " + spec.pct + "% in total — " +
-        creatorSide.toFixed(2).replace(/0$/, "") + "% split below, " +
-        platform.toFixed(2).replace(/0$/, "") + "% platform, " +
-        meteora.toFixed(2).replace(/0$/, "") + "% Meteora.";
-    }
-
     function paintVisibility() {
       var shared = (flow.feeSharePct || 0) > 0;
       var mw = box.querySelector("#tk-modewrap");
@@ -1650,27 +1625,14 @@
     }
 
     function paintSplit() {
-      var total = pledgeable(flow);
-      var pct = flow.feeSharePct == null ? 100 : flow.feeSharePct;
-      var toHolders = total * pct / 100;
-      var toYou = total - toHolders;
-      var pp = box.querySelector("#tk-poolpct");
-      if (pp) pp.textContent = total.toFixed(2).replace(/0$/, "") + "%";
-      var el = box.querySelector("#tk-splittxt");
-      if (el) {
-        el.textContent = (flow.rewardMode === "burn"
-          ? toHolders.toFixed(2).replace(/0$/, "") + "% of every trade buys the token back and burns it"
-          : "Holders receive " + toHolders.toFixed(2).replace(/0$/, "") + "% of every trade") +
-          ", you receive " + toYou.toFixed(2).replace(/0$/, "") + "%.";
-      }
+      var pct = flow.feeSharePct == null ? 0 : flow.feeSharePct;
       box.querySelectorAll("#tk-splits button").forEach(function (b) {
         b.classList.toggle("on", +b.dataset.s === pct);
       });
-      var fw = box.querySelector("#tk-fwwrap");
-      if (fw) fw.hidden = (flow.tier || "standard") === "standard" || pct >= 100;
     }
+
+
     paintSplit();
-    paintTax();
     paintVisibility();
 
     box.querySelector("#tk-splits").addEventListener("click", function (e) {
