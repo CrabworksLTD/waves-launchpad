@@ -218,13 +218,22 @@
       el.addEventListener("click", function (e) { if (e.target === el) close(); });
       document.body.appendChild(el);
     }
-    // where the panel sits right now, before it is replaced
+    // where the panel sits, and where it is scrolled to, before it is replaced
     var prev = el.querySelector(".lp");
     var top = prev ? prev.getBoundingClientRect().top : null;
+    var scrolled = prev ? prev.scrollTop : 0;
 
     el.innerHTML = '<div class="lp">' + (node.s || node) + "</div>";
+    var card = el.querySelector(".lp");
     if (top !== null) pinTop(top);
-    return el.querySelector(".lp");
+    /* Keep the scroll where it was.
+     *
+     * Several controls re-render the whole panel — changing the quote currency
+     * rebuilds it — and a fresh innerHTML starts at the top, so clicking a
+     * button two thirds of the way down threw the creator back to the name
+     * field. The panel looks like it jumped; it was replaced. */
+    if (card && scrolled) card.scrollTop = scrolled;
+    return card;
   }
 
   /* A contract address the way people actually use one: the full string,
@@ -1703,8 +1712,13 @@
         }
         return rwaQuotePicker(flow, r);
       }
+      /* Re-render, deliberately. The currency changes labels captured at
+       * render time — "your first buy (SOL)", the graduation figure, the
+       * reward note — so repainting piecemeal leaves at least one of them
+       * lying. shell() preserves the scroll position, so this no longer
+       * throws the creator back to the top. */
       flow.quote = b.dataset.q;
-      tokenDetails(flow);                          // re-render with the new currency
+      tokenDetails(flow);
     });
     box.querySelector("#tk-chips").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-v]");
