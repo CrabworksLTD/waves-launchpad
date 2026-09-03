@@ -161,6 +161,7 @@
       ".lp .artbtn:hover{border-color:var(--accent);color:var(--ink)}",
       ".lp .artbtn.has{border-style:solid;border-color:rgba(var(--accent-rgb),.4);color:var(--accent)}",
       ".lp .tiers{display:grid;grid-template-columns:1fr 1fr;gap:10px}",
+      ".lp .tiers.three{grid-template-columns:1fr 1fr 1fr}",
       // three modes, one row — a wrapped third option reads as an afterthought
       ".lp .tier{text-align:left;padding:12px 14px;border-radius:8px;",
       "  border:1px solid var(--line);background:var(--panel2);cursor:pointer}",
@@ -1373,6 +1374,73 @@
     file.arrayBuffer().then(function (buf) { onOk(new Uint8Array(buf)); });
   }
 
+  /* Dev-buy presets, in the chain's own coin.
+   *
+   * The Solana ladder tops out at 10, which is about right for SOL and absurd
+   * for ETH — 10 ETH is a $25,000 "optional first buy" on a curve that
+   * graduates at four. Same idea, an order of magnitude down. */
+  function buyChips() {
+    var vals = isEvm() ? [0.025, 0.05, 0.1, 0.25, 0.5, 1]
+                       : [0.1, 0.25, 0.5, 1, 5, 10];
+    return vals.map(function (v) {
+      return '<button data-v="' + v + '">' + v + "</button>";
+    }).join("");
+  }
+
+  /* ETH spot and the live curve terms, each fetched once per panel session.
+   * The terms come from the DEPLOYED contract rather than constants — they are
+   * immutable there, so the contract is the only honest source. */
+  var ethUsdP = null;
+  function ethUsd() {
+    if (!ethUsdP) {
+      ethUsdP = fetch("https://api.coinbase.com/v2/prices/ETH-USD/spot")
+        .then(function (r) { return r.json(); })
+        .then(function (j) { return Number(j.data.amount) || null; })
+        .catch(function () { return null; });
+    }
+    return ethUsdP;
+  }
+
+  var evmTermsP = null;
+  function evmTerms() {
+    if (!evmTermsP) {
+      evmTermsP = (window.MoonpadToken ? Promise.resolve() : window.Shell.ensureEvmLaunch())
+        .then(function () { return window.MoonpadToken.terms(); })
+        .catch(function () { return null; });
+    }
+    return evmTermsP;
+  }
+
+  /* What a dev buy actually gets you, in tokens, share of supply and dollars.
+   *
+   * Priced with the curve's own arithmetic against its virtual reserves — the
+   * same formula the contract runs — and net of the rung's trading fee, which
+   * the creator pays on their own first buy like anybody else. There is no
+   * token yet to call quoteBuy against, so this is computed rather than read.
+   */
+  var evmBuySeq = 0;
+  function paintEvmBuyShare(el, amt, flow) {
+    var seq = ++evmBuySeq;
+    var bps = tierSpec(flow).baseFeeBps || 100;
+    el.textContent = "…";
+    Promise.all([evmTerms(), ethUsd()]).then(function (r) {
+      if (seq !== evmBuySeq) return;          // a newer keystroke won
+      var t = r[0], px = r[1];
+      if (!t) { el.textContent = ""; return; }
+      var ve = Number(t.virtualEth) / 1e18;
+      var vt = Number(t.virtualTokens) / 1e18;
+      var cs = Number(t.curveSupply) / 1e18;
+      var inAfterFee = amt * (1 - bps / 10000);
+      var out = vt - (ve * vt) / (ve + inAfterFee);
+      if (out > cs) out = cs;
+      var pct = (out / cs) * 100;
+      el.innerHTML =
+        (px ? "<b>$" + UI.fmt(amt * px, 2) + "</b> — that buys you about " : "That buys you about ") +
+        "<b>" + UI.fmt(out, 0) + " tokens</b>, " + pct.toFixed(2) + "% of supply" +
+        (pct >= 10 ? ". <b>Buyers will read that as a large insider position.</b>" : ".");
+    });
+  }
+
   function tierSpec(flow) {
     var T = window.DBC_TERMS;
     return (T && T.TIERS && T.TIERS[flow.tier || "standard"]) ||
@@ -1478,13 +1546,9 @@
       <div class="ptabs" id="tk-tiers">${raw(tierButtons(flow))}</div>
       <p class="note" id="tk-taxtxt"></p>
 
-      <label>Your first buy (SOL) — optional</label>
-      <input id="lp-tbuy" type="number" min="0" step="0.1" value="${flow.tbuy || 0}">
-      <div class="ptabs" id="tk-chips">
-        <button data-v="0.1">0.1</button><button data-v="0.25">0.25</button>
-        <button data-v="0.5">0.5</button><button data-v="1">1</button>
-        <button data-v="5">5</button><button data-v="10">10</button>
-      </div>
+      <label>Your first buy (${isEvm() ? "ETH" : "SOL"}) — optional</label>
+      <input id="lp-tbuy" type="number" min="0" step="${isEvm() ? "0.005" : "0.1"}" value="${flow.tbuy || 0}">
+      <div class="ptabs" id="tk-chips">${raw(buyChips())}</div>
       <p class="note" id="tk-buyshare"></p>
       <p class="note">Lands in the same transaction as the pool, so nobody can snipe
       the opening price ahead of you.</p>
@@ -1552,6 +1616,10 @@
       var el = box.querySelector("#tk-buyshare");
       if (!el) return;
       var amt = parseFloat(box.querySelector("#lp-tbuy").value) || 0;
+      if (isEvm()) {
+        if (!amt) { el.textContent = ""; return; }
+        return paintEvmBuyShare(el, amt, flow);
+      }
       var terms = window.DBC_TERMS;
       var q = terms && terms.QUOTES && terms.QUOTES[flow.quote];
       var cap = q && q.initialMarketCap;
@@ -1669,12 +1737,8 @@
       </div>
 
       <label>Your first buy (${qLabel}) — optional</label>
-      <input id="lp-tbuy" type="number" min="0" step="0.1" value="${flow.tbuy || 0}">
-      <div class="ptabs" id="tk-chips">
-        <button data-v="0.1">0.1</button><button data-v="0.25">0.25</button>
-        <button data-v="0.5">0.5</button><button data-v="1">1</button>
-        <button data-v="5">5</button><button data-v="10">10</button>
-      </div>
+      <input id="lp-tbuy" type="number" min="0" step="${isEvm() ? "0.005" : "0.1"}" value="${flow.tbuy || 0}">
+      <div class="ptabs" id="tk-chips">${raw(buyChips())}</div>
       <p class="note" id="tk-buyshare"></p>
       <p class="note">Lands in the same transaction as the pool, so nobody can snipe
       the opening price ahead of you.</p>
@@ -1688,8 +1752,11 @@
            recorded with the launch and takes effect when rewards are switched
            on from the fee page — no routing happens here. -->
       <label>Holder rewards</label>
-      <div class="tiers" id="tk-modes">
-        <button data-m="dividend" class="tier ${(flow.rewardMode || "dividend") === "dividend" ? "on" : ""}">
+      <div class="tiers three" id="tk-modes">
+        <button data-m="none" class="tier ${(flow.rewardMode || "none") === "none" ? "on" : ""}">
+          <b>Normal</b><span>You keep all of your trading fees. No holder
+          rewards.</span></button>
+        <button data-m="dividend" class="tier ${flow.rewardMode === "dividend" ? "on" : ""}">
           <b>Dividend</b><span>Paid out to holders automatically based on their
           holdings.</span></button>
         <button data-m="burn" class="tier ${flow.rewardMode === "burn" ? "on" : ""}">
@@ -1702,7 +1769,7 @@
            creator activates rewards on the fee page, which is a separate
            signature. Keeping the choice here means they make it while thinking
            about their token, not weeks later in a different screen. -->
-      <div id="tk-rewardwrap" ${flow.rewardMode === "burn" ? raw("hidden") : ""}>
+      <div id="tk-rewardwrap" ${(flow.rewardMode || "none") !== "dividend" ? raw("hidden") : ""}>
         <label>Holders are paid in</label>
         <button class="pick" id="lp-reward">
           <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
@@ -1848,6 +1915,10 @@
       var el = box.querySelector("#tk-buyshare");
       if (!el) return;
       var amt = parseFloat(box.querySelector("#lp-tbuy").value) || 0;
+      if (isEvm()) {
+        if (!amt) { el.textContent = ""; return; }
+        return paintEvmBuyShare(el, amt, flow);
+      }
       var terms = window.DBC_TERMS;
       var q = terms && terms.QUOTES && terms.QUOTES[flow.quote];
       var cap = q && q.initialMarketCap;
@@ -1933,13 +2004,32 @@
       var b = e.target.closest("button[data-m]");
       if (!b) return;
       flow.rewardMode = b.dataset.m;
+
+      /* The mode has to move the SHARE, not just the label.
+       *
+       * These were two tabs sitting over a feeSharePct that this window
+       * hardcodes to zero, so picking "Dividend" changed the wording and
+       * pledged nothing. Normal is a share of zero; the other two pledge the
+       * creator's whole side, which is what the fee page then activates. */
+      if (flow.rewardMode === "none") {
+        flow.feeShare = "keep";
+        flow.feeSharePct = 0;
+      } else {
+        flow.feeShare = "holders";
+        if (!(flow.feeSharePct > 0)) flow.feeSharePct = 100;
+      }
+      var fw = box.querySelector("#tk-fwwrap");
+      if (fw) fw.hidden = (flow.feeSharePct || 0) >= 100;
+
       box.querySelectorAll("#tk-modes .tier").forEach(function (x) {
         x.classList.toggle("on", x === b);
       });
       /* A burn pays nobody anything, so "paid in what?" stops being a question
        * — a control that does nothing is worse than no control. */
       var rw = box.querySelector("#tk-rewardwrap");
-      if (rw) rw.hidden = flow.rewardMode === "burn";
+      // the "paid in" asset only matters for a dividend — Normal keeps the fees,
+      // burn buys back the token itself
+      if (rw) rw.hidden = flow.rewardMode !== "dividend";
     });
 
     // the choice is recorded with the launch; activation happens on the fee page
