@@ -452,7 +452,17 @@
 
     // first fetch, not the first fetch after arweave.net indexes
 
-    var ORIGIN = window.location.origin;
+    /* ⚠️ The CANONICAL origin, never location.origin.
+     *
+     * These URLs go into permanent Arweave metadata and — on Robinhood — into
+     * an immutable field on the token contract itself. A launch run from the
+     * dev server wrote "http://localhost:4400/m/…/icon.png" on chain, where it
+     * will sit forever being fetchable by nobody. There is no setter and no
+     * second chance, so the address of the site must not depend on which
+     * machine happened to run the launch. */
+    var ORIGIN = /^(localhost|127\.|\[::1\])/.test(window.location.hostname)
+      ? "https://www.waveslaunchpad.xyz"
+      : window.location.origin;
 
     function buildJson(cid) {
       var j = {
