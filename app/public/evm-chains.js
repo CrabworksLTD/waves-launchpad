@@ -168,7 +168,7 @@ window.MOONPAD_CHAINS = [
      * arguments are the launchpad's whole economics and are immutable, so the
      * deployed address is the only truthful source for them — nothing here
      * should ever restate the curve's parameters. */
-    curve: null,
+    curve: "0x4b90e4712bc31a9a1c82d3809788e626eec3a051",
 
     /* Who receives a creator's pledged share, and pays it out to holders.
      *
