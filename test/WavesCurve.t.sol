@@ -218,6 +218,46 @@ contract WavesCurveTest is Test {
         curve.claim();
     }
 
+    /**
+     * Claiming to a nominated address — the EVM half of the Solana side's
+     * feeWallet, and the reason it had to exist before deploy.
+     */
+    function test_claimToSendsElsewhereButSpendsYourOwnBalance() public {
+        address token = _launch(300);
+        vm.prank(alice); curve.buy{value: 1 ether}(token, 0);
+
+        address vault = address(0xdeadbeef);
+        uint256 owedToCreator = curve.owed(creator);
+        assertGt(owedToCreator, 0);
+
+        vm.prank(creator);
+        curve.claimTo(vault);
+
+        assertEq(vault.balance, owedToCreator, "the vault did not receive it");
+        assertEq(curve.owed(creator), 0, "the creator's balance was not spent");
+    }
+
+    /// Nominating a destination must never let one address spend another's.
+    function test_claimToCannotTakeSomeoneElsesBalance() public {
+        address token = _launch(300);
+        vm.prank(alice); curve.buy{value: 1 ether}(token, 0);
+        assertGt(curve.owed(creator), 0);
+
+        // bob is owed nothing, and naming the creator as destination changes that not at all
+        vm.prank(bob);
+        vm.expectRevert(WavesCurve.NothingOwed.selector);
+        curve.claimTo(creator);
+        assertGt(curve.owed(creator), 0, "the creator's balance moved");
+    }
+
+    function test_claimToRefusesTheZeroAddress() public {
+        address token = _launch(300);
+        vm.prank(alice); curve.buy{value: 1 ether}(token, 0);
+        vm.prank(creator);
+        vm.expectRevert(WavesCurve.ZeroAddress.selector);
+        curve.claimTo(address(0));
+    }
+
     /// A creator whose wallet reverts must not be able to wedge their own token.
     function test_aRevertingCreatorCannotBlockTrading() public {
         Reverter bad = new Reverter();

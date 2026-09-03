@@ -69,8 +69,13 @@ const QUOTE_MINTS = {
  * indexed. A launch is minutes old before the indexer has seen it, but its
  * page still wants to show dollars rather than falling back to raw SOL — so
  * this answers from the same source the indexer uses, cached at the edge. */
+const B58MINT = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 async function quoteUsd(sym) {
-  const mint = QUOTE_MINTS[String(sym || "sol").toLowerCase()];
+  // a known quote symbol (sol/usdc), or a raw mint address — the token page
+  // uses the raw-mint form to price a reward asset (e.g. an xStock) so it can
+  // show accrued/distributed in that asset rather than the quote currency
+  const key = String(sym || "sol").toLowerCase();
+  const mint = QUOTE_MINTS[key] || (B58MINT.test(String(sym)) ? String(sym) : null);
   if (!mint) return null;
   try {
     const j = await fetch("https://lite-api.jup.ag/price/v3?ids=" + mint).then((r) => r.json());

@@ -1684,7 +1684,7 @@
       <p class="note" id="tk-taxtxt"></p>
 
 
-      ${isEvm() ? "" : H`<!-- Two ways the pledged share can work. Like the asset below, this is
+      <!-- Two ways the pledged share can work. Like the asset below, this is
            recorded with the launch and takes effect when rewards are switched
            on from the fee page — no routing happens here. -->
       <label>Holder rewards</label>
@@ -1697,7 +1697,7 @@
           causing supply to fall.</span></button>
       </div>
 
-      <!-- What holders would be paid in. A preference recorded with the
+      ${isEvm() ? "" : H`<!-- What holders would be paid in. A preference recorded with the
            launch, not a routing instruction: nothing reaches holders until the
            creator activates rewards on the fee page, which is a separate
            signature. Keeping the choice here means they make it while thinking
@@ -1721,9 +1721,9 @@
 
 `}
 
-      ${isEvm() ? H`<p class="note">Holder rewards are switched on after launch,
-      from the fee page. On Robinhood Chain a pledged share is paid in ETH —
-      choosing a different reward asset is not available here yet.</p>` : ""}
+      ${isEvm() ? H`<p class="note">Saved with your launch. Rewards start once you
+      switch them on from the fee page. A pledged share pays in ETH on Robinhood
+      Chain — picking a different reward asset is not available here yet.</p>` : ""}
 
       <div id="tk-fwwrap" ${(flow.feeSharePct || 0) >= 100 ? raw("hidden") : ""}>
         <label>Creator fee wallet</label>
@@ -1927,7 +1927,7 @@
       if (nft) { recordCollection(nft.cfg, nft.res, null, nft.up); nftDone(nft.cfg, nft.res, nft.up); }
       else modeSelect();
     };
-    // also absent on EVM — see the quote picker above
+    // present on both chains now; the reward ASSET picker is the Solana-only part
     var modeTabs = box.querySelector("#tk-modes");
     if (modeTabs) modeTabs.addEventListener("click", function (e) {
       var b = e.target.closest("button[data-m]");
@@ -2417,6 +2417,14 @@
         acct ? shortAddr(acct) : "not connected"}</b></div>
       <div class="row"><span class="k">Trading fee</span><b>${
         tierSpec(flow).label + " — " + (sp ? sp.total : tierPct(flow)) + "%"}</b></div>
+      <div class="row"><span class="k">Fee sharing</span><b>${(flow.feeSharePct || 0) > 0
+        ? (flow.feeSharePct >= 100 ? "all to holders"
+           : flow.feeSharePct + "% holders / " + (100 - flow.feeSharePct) + "% you")
+        : "You keep everything"}</b></div>
+      ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Holder share</span><b>${
+        flow.rewardMode === "burn" ? "buyback & burn" : "dividend, paid in ETH"}</b></div>` : ""}
+      ${flow.feeWallet ? H`<div class="row"><span class="k">Fees claim to</span><b>${
+        shortAddr(flow.feeWallet)}</b></div>` : ""}
       ${sp ? H`<p class="note">Of every ${sp.total}% traded, ${sp.creator}% is yours and
       ${sp.platform}% is ours. There is no third party on this chain, so you keep
       more here than the same rung pays on Solana.</p>` : ""}
@@ -2536,6 +2544,10 @@
   }
 
   function recordEvmToken(flow, res, meta) {
+    /* The same fields the Solana side records, and for the same reason: these
+     * are the creator's CHOICES, saved with the launch and applied when they
+     * switch rewards on from the fee page. Recording "keep / 0" regardless —
+     * which this used to do — quietly threw away what they picked. */
     postListing("/api/tokens", {
       chain: "robinhood",
       mint: res.token,
@@ -2545,8 +2557,11 @@
       icon: (meta && meta.iconUri) || null,
       banner: (meta && meta.bannerUri) || null,
       card: (meta && meta.cardUri) || null,
-      feeShare: "keep",
-      feeSharePct: 0
+      feeShare: flow.feeShare || "keep",
+      feeSharePct: flow.feeSharePct || 0,
+      rewardMode: flow.rewardMode === "burn" ? "burn" : "dividend",
+      // where the creator's KEPT portion claims to — claimTo() on the curve
+      feeWallet: flow.feeWallet || null
     });
   }
 

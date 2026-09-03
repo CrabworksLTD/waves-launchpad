@@ -167,6 +167,8 @@ contract WavesCurve {
     error AlreadyPledged();
     /// The curve has taken everything it is going to take; graduate it.
     error CurveComplete();
+    /// Claiming to nowhere would burn the money silently.
+    error ZeroAddress();
 
     constructor(
         address platform_,
@@ -380,15 +382,36 @@ contract WavesCurve {
         emit Pledged(token, keeper_, bps);
     }
 
-    /* Pull, not push. A creator whose wallet reverts on receive must not be
-     * able to brick every trade on their own token. */
-    function claim() external {
+    /**
+     * Take what you are owed, and send it wherever you like.
+     *
+     * The destination is an argument because the Solana side has the same
+     * choice — a creator there nominates the address their kept fees claim to,
+     * which is how a reward vault or a cold wallet receives them without ever
+     * passing through the launch wallet. Without it here the two chains would
+     * be different products, and it cannot be added afterwards: this contract
+     * has no owner and no upgrade path.
+     *
+     * The BALANCE is still msg.sender's. Nominating a destination moves where
+     * the money lands, never whose money it is, so there is nothing here for
+     * one address to take from another.
+     *
+     * Pull, not push, as before: a creator whose wallet reverts on receive must
+     * not be able to brick every trade on their own token.
+     */
+    function claimTo(address to) public {
+        if (to == address(0)) revert ZeroAddress();
         uint256 amount = owed[msg.sender];
         if (amount == 0) revert NothingOwed();
         owed[msg.sender] = 0;
-        (bool ok, ) = msg.sender.call{value: amount}("");
+        (bool ok, ) = to.call{value: amount}("");
         if (!ok) revert TransferFailed();
         emit Claimed(msg.sender, amount);
+    }
+
+    /// The common case, kept so nothing that already calls it has to change.
+    function claim() external {
+        claimTo(msg.sender);
     }
 
     // ─────────────────────────────────────────────────────────────────── view

@@ -136,13 +136,11 @@
       g.fillStyle = "rgba(255,255,255,.9)";
       g.fillText(handle, W - 56, 100);
     }
-    /* Two passes. First a soft DARK edge, so both stay legible on a light/white
-     * banner (a pure green glow gives no contrast on white). Then a GREEN glow
-     * in the WAVES accent layered on top — invisible on dark, a subtle bloom on
-     * light, and matches the wordmark either way. */
-    g.shadowColor = "rgba(0,0,0,.5)"; g.shadowBlur = 7; g.shadowOffsetY = 1;
-    drawBranding();
-    g.shadowColor = pal.accent; g.shadowBlur = 16; g.shadowOffsetY = 0;
+    /* A soft dark shadow so WAVES + the handle stay legible over a light/white
+     * banner (green-on-white and white-on-white would otherwise vanish). On a
+     * dark banner the dark shadow is invisible, so the look is unchanged.
+     * (A green glow was tried and dropped — Kyle preferred the plain shadow.) */
+    g.shadowColor = "rgba(0,0,0,.62)"; g.shadowBlur = 11; g.shadowOffsetY = 1;
     drawBranding();
     g.restore();
 

@@ -331,6 +331,8 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
    * token's fees, once, irreversibly. So the rows below are about that, not
    * about claiming.
    */
+  var evmFeeWallet = null;   // where this creator asked their fees to claim to
+
   async function loadEvm() {
     var acct = (window.MoonpadWallet || {}).account;
     if (!acct) return;
@@ -367,6 +369,18 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
       $("evm-owed").textContent = "—";
     }
 
+    /* Any of this creator's launches may nominate where fees claim to. They
+     * all share one balance on this chain, so the first nomination found is the
+     * destination — the launch window offers it per token, which on Solana is
+     * per pool and here cannot be. */
+    var nom = mine.find(function (t) { return t.feeWallet; });
+    evmFeeWallet = nom ? nom.feeWallet : null;
+    if (evmFeeWallet) {
+      $("evm-claim").querySelector(".k2").textContent =
+        "One balance for every token you have launched here. Claims to " +
+        shortAddr(evmFeeWallet) + ".";
+    }
+
     if (!mine.length) {
       $("evm-tokens").innerHTML = '<div class="none">No launches from this wallet yet.</div>';
       return;
@@ -382,6 +396,7 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
 
     [].slice.call($("evm-tokens").querySelectorAll(".frow")).forEach(function (el) {
       var mint = el.dataset.mint;
+      var rec = mine.find(function (x) { return x.mint === mint; }) || {};
       TK.curveOf(mint).then(function (c) {
         var amt = el.querySelector(".rw");
         var act = el.querySelector(".act");
@@ -394,7 +409,7 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
         }
         amt.textContent = "you keep everything";
         act.disabled = false;
-        act.onclick = function () { openEvmActivate(el, mint, act); };
+        act.onclick = function () { openEvmActivate(el, mint, act, rec); };
       }).catch(function () { el.querySelector(".rw").textContent = "—"; });
     });
   }
@@ -403,7 +418,10 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
     btn.disabled = true; btn.textContent = "Confirm…";
     say("", "");
     try {
-      var hash = await window.MoonpadToken.claim();
+      /* Send it where the creator asked. Recorded at launch, same as the Solana
+       * side — where forgetting to honour it meant the keeper quietly paid the
+       * deploy wallet while the launch window promised otherwise. */
+      var hash = await window.MoonpadToken.claim(null, evmFeeWallet);
       await window.MoonpadToken.waitForTx(hash);
       say("ok", 'Claimed. <a href="' + esc(window.MoonpadToken.adapter().txUrl(hash)) +
         '" target="_blank" rel="noopener">View tx ↗</a>');
@@ -419,21 +437,33 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
 
   /* A pledge cannot be undone, so it is confirmed rather than fired off a
    * single click — the same care the Solana side takes over the equivalent. */
-  function openEvmActivate(rowEl, mint, btn) {
+  function openEvmActivate(rowEl, mint, btn, rec) {
     if (rowEl.querySelector(".actbox")) return;
     var box = document.createElement("div");
     box.className = "actbox";
+    /* Default to the share they chose in the launch window. That choice was
+     * recorded with the launch precisely so it did not have to be remembered
+     * and re-entered weeks later in a different screen. */
+    var chosen = Math.round((Number((rec || {}).feeSharePct) || 100) * 100);
+    var opts = [2500, 5000, 7500, 10000];
+    if (opts.indexOf(chosen) === -1) chosen = 10000;
+
     box.innerHTML =
       "<p>Give holders of this token a share of every trading fee it earns, " +
-      "paid in ETH. Choose the share once — it cannot be changed or undone.</p>" +
+      ((rec || {}).rewardMode === "burn"
+        ? "used to buy the token back and burn it. "
+        : "paid out to them in ETH. ") +
+      "Choose the share once — it cannot be changed or undone.</p>" +
       '<div class="ptabs evm-share">' +
-      '<button data-b="2500">25%</button><button data-b="5000">50%</button>' +
-      '<button data-b="7500">75%</button><button data-b="10000" class="on">100%</button></div>' +
+      opts.map(function (b) {
+        return '<button data-b="' + b + '"' + (b === chosen ? ' class="on"' : "") + ">" +
+          (b / 100) + "%</button>";
+      }).join("") + "</div>" +
       '<div class="acts"><button class="go2">Activate</button>' +
       '<button class="no2">Cancel</button></div>';
     rowEl.appendChild(box);
 
-    var bps = 10000;
+    var bps = chosen;
     box.querySelector(".evm-share").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-b]");
       if (!b) return;

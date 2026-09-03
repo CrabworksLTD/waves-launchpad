@@ -782,26 +782,57 @@ input:focus{outline:none;border-color:var(--accent)}
    * on the pool right now (feeMetrics.creator); this matches the claim page.
    * Distributed = the holder pot actually paid out (sentRaw). Returns formatted
    * strings, or null when the pool's quote/decimals can't be read. */
-  function fetchRewardFees(rec) {
-    return Promise.all([
+  async function fetchRewardFees(rec) {
+    var res = await Promise.all([
       fetch("/api/payouts?mint=" + encodeURIComponent(rec.mint))
         .then(function (r) { return r.json(); })
         .then(function (j) { return (j.payouts && j.payouts[rec.mint]) || null; })
         .catch(function () { return null; }),
       IS_EVM ? Promise.resolve(null)
              : window.Token.feeMetrics(rec.mint, rec.pool || null).catch(function () { return null; })
-    ]).then(function (res) {
-      var pay = res[0], m = res[1];
-      if (!m) return null;
-      var q = m.quote || "SOL", dec = Math.pow(10, m.quoteDec);
-      var distributed = pay ? Number(pay.sentRaw) / dec : 0;
-      var claimed = pay ? Number(pay.claimedRaw) / dec : 0;
-      var accrued = claimed + (m.creator || 0);            // total since deploy
-      return {
-        accrued: UI.fmt(accrued, 4) + " " + q,
-        distributed: UI.fmt(distributed, 4) + " " + q
-      };
-    });
+    ]);
+    var pay = res[0], m = res[1];
+    if (!m) return null;
+    var q = m.quote || "SOL", dec = Math.pow(10, m.quoteDec);
+    var distQuote = pay ? Number(pay.sentRaw) / dec : 0;
+    var accruedQuote = (pay ? Number(pay.claimedRaw) / dec : 0) + (m.creator || 0);
+    function inQuote() {
+      return { accrued: UI.fmt(accruedQuote, 4) + " " + q,
+               distributed: UI.fmt(distQuote, 4) + " " + q };
+    }
+    /* Holders are actually paid in the chosen REWARD asset — the keeper swaps
+     * the quote into it — so show the figures in that asset. Fall back to the
+     * quote when the reward IS the quote, it is a burn (no asset paid), or the
+     * asset is not tradeable yet (the keeper pays the quote until it is). */
+    var SOL = "So11111111111111111111111111111111111111112";
+    var USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    var quoteMint = q === "USDC" ? USDC : SOL;
+    var rm = rec.rewardMint;
+    if (!rm || rm === quoteMint || rec.rewardMode === "burn") return inQuote();
+    var rsym = rm === USDC ? "USDC" : (rm === SOL ? "SOL" : null);
+    var tradeable = true;
+    if (!rsym) {
+      try {
+        var list = await window.Token.rwa();
+        var hit = (list || []).find(function (t) { return t.mint === rm; });
+        rsym = hit && hit.symbol;
+        tradeable = !!hit && (hit.liquidity || 0) >= 1000;
+      } catch (e) {}
+    }
+    if (!rsym || !tradeable) return inQuote();
+    // convert the quote-denominated pot into the reward asset via each side's
+    // dollar price (server-priced, so no third-party call from the page)
+    var prices = await Promise.all([
+      fetch("/api/stats?usd=" + encodeURIComponent(q.toLowerCase()))
+        .then(function (r) { return r.json(); }).then(function (j) { return j.usd; }).catch(function () { return null; }),
+      fetch("/api/stats?usd=" + encodeURIComponent(rm))
+        .then(function (r) { return r.json(); }).then(function (j) { return j.usd; }).catch(function () { return null; })
+    ]);
+    var qUsd = prices[0], rUsd = prices[1];
+    if (!qUsd || !rUsd) return inQuote();               // no price → stay honest in the quote
+    var f = qUsd / rUsd;                                // reward units per 1 quote unit
+    return { accrued: "≈ " + UI.fmt(accruedQuote * f, 4) + " " + rsym,
+             distributed: "≈ " + UI.fmt(distQuote * f, 4) + " " + rsym };
   }
 
   /* A paired launch links both ways. Someone who arrived at the token should

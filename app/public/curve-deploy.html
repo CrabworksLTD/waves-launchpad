@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WAVES — deploy the curve</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+/* Internal tool, deliberately unlinked from the nav — the same shape as
+ * config-create.html, and for the same reason: the thing being created here is
+ * permanent, so the wallet that signs it should be a browser or Ledger wallet
+ * rather than a keyfile on disk.
+ *
+ * What this deploys is contracts/WavesCurve.sol: ONE contract that will hold
+ * every token launch on this chain. Its constructor arguments are the
+ * launchpad's whole economics, there is no owner and no setter, so this page is
+ * the only moment they can be chosen. */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--void);color:var(--ink);font:400 15px/1.6 Inter,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono",monospace}
+main{max-width:660px;margin:0 auto;padding:48px 24px 90px}
+h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}
+h2{font-family:Archivo;font-size:15px;font-weight:800;margin:26px 0 10px}
+.sub{color:var(--dim);margin:0 0 26px;font-size:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:20px 22px;margin-bottom:18px}
+.row{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;
+  padding:8px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row b{font-weight:600;text-align:right;font-family:"IBM Plex Mono",monospace}
+.k{color:var(--dim)}
+.warn{border:1px solid rgba(255,180,80,.35);background:rgba(255,180,80,.07);
+  border-radius:8px;padding:13px 15px;font-size:13px;color:#ffd9a0;margin-bottom:18px}
+.warn b{display:block;margin-bottom:4px}
+.ok{border:1px solid rgba(140,220,140,.35);background:rgba(140,220,140,.07);
+  border-radius:8px;padding:13px 15px;font-size:13px;color:#b8e6b8;margin-bottom:18px}
+.err{border:1px solid rgba(255,110,110,.4);background:rgba(255,110,110,.08);
+  border-radius:8px;padding:13px 15px;font-size:13px;color:#ff9d9d;margin-bottom:18px}
+button{width:100%;padding:13px;border:0;border-radius:9px;font:700 14px Inter,sans-serif;
+  cursor:pointer;background:var(--accent);color:#0b0d10}
+button:disabled{opacity:.45;cursor:default}
+button.ghost{background:transparent;color:var(--dim);border:1px solid var(--line);margin-top:9px}
+pre{background:var(--void);border:1px solid var(--line);border-radius:7px;padding:12px 14px;
+  overflow-x:auto;font:500 12.5px/1.6 "IBM Plex Mono",monospace;color:var(--ink);margin:10px 0 0}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Deploy the bonding curve</h1>
+  <p class="sub">One contract, holding every token launch on Robinhood Chain.
+  Done once.</p>
+
+  <div class="warn">
+    <b>Everything below is immutable.</b>
+    There is no owner on this contract, no setter and no upgrade path. The
+    numbers you deploy with are the numbers every token that ever launches here
+    will use. Getting them wrong means deploying a second curve and abandoning
+    the first.
+  </div>
+
+  <div class="panel" id="params">
+    <div class="row"><span class="k">Chain</span><b id="p-chain">…</b></div>
+    <div class="row"><span class="k">Platform fee recipient</span><b class="mono" id="p-plat">…</b></div>
+    <div class="row"><span class="k">virtualEth</span><b>1.41 ETH</b></div>
+    <div class="row"><span class="k">virtualTokens</span><b>1,073,000,000</b></div>
+    <div class="row"><span class="k">curveSupply</span><b>1,000,000,000</b></div>
+    <div class="row"><span class="k">graduationEth</span><b>4 ETH</b></div>
+    <div class="row"><span class="k">Uniswap V3 factory</span><b class="mono" id="p-fac">…</b></div>
+    <div class="row"><span class="k">WETH</span><b class="mono" id="p-weth">…</b></div>
+    <div class="row"><span class="k">Pool fee tier</span><b>1% (10000)</b></div>
+  </div>
+
+  <h2>What those numbers mean</h2>
+  <div class="panel">
+    <div class="row"><span class="k">Opens at</span><b id="d-open">…</b></div>
+    <div class="row"><span class="k">Graduates at</span><b id="d-grad">…</b></div>
+    <div class="row"><span class="k">Raised to graduate</span><b id="d-raise">…</b></div>
+    <div class="row"><span class="k">Sold on the curve</span><b>79.3% of supply</b></div>
+    <div class="row"><span class="k">Seeds the pool with</span><b>20.7% + the raise</b></div>
+    <p class="sub" style="margin:10px 0 0;font-size:12.5px" id="d-note">…</p>
+  </div>
+
+  <div id="msg"></div>
+
+  <button id="go" disabled>Connect wallet</button>
+  <button class="ghost" id="sim">Simulate first (free, changes nothing)</button>
+
+  <div id="after" hidden>
+    <h2>Deployed</h2>
+    <div class="panel">
+      <div class="row"><span class="k">Curve address</span><b class="mono" id="r-addr">…</b></div>
+      <div class="row"><span class="k">Read back from chain</span><b id="r-verify">…</b></div>
+    </div>
+    <p class="sub" style="font-size:13px">Put this on the Robinhood entry in
+    <span class="mono">app/public/evm-chains.js</span>, then redeploy the site:</p>
+    <pre id="r-snippet"></pre>
+  </div>
+</main>
+
+<script src="/brand.js"></script>
+<script src="/ui.js"></script>
+<script src="/evm-chains.js"></script>
+<script src="/evm-wallet.js"></script>
+<script src="/evm-contract.js"></script>
+<script src="/evm-launch.js"></script>
+<script src="/evm-wavescurve.js"></script>
+<script src="/evm-token.js"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  function say(k, h) { $("msg").innerHTML = h ? '<div class="' + k + '">' + h + "</div>" : ""; }
+
+  var ETHER = 1000000000000000000n;
+  var ARGS = {
+    platform: null,                       // filled from the chain's feeTo below
+    graduationEth: 4n * ETHER,
+    virtualEth: 1410000000000000000n,     // 1.41
+    virtualTokens: 1073000000n * ETHER,
+    curveSupply: 1000000000n * ETHER,
+    factory: "0x1f7d7550B1b028f7571E69A784071F0205FD2EfA",
+    weth: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+    poolFee: 10000
+  };
+
+  var chain = window.MoonpadToken.chain();
+  ARGS.platform = chain.feeTo;
+  $("p-chain").textContent = chain.name + " (" + chain.id + ")";
+  $("p-plat").textContent = ARGS.platform || "NOT SET";
+  $("p-fac").textContent = ARGS.factory;
+  $("p-weth").textContent = ARGS.weth;
+
+  /* What the parameters mean in money, at today's price.
+   *
+   * The curve is denominated in ETH, so the dollar figures move with ETH and
+   * these are "right at deploy", not right forever — worth seeing before
+   * committing to them, and worth not pretending they are fixed. */
+  fetch("https://api.coinbase.com/v2/prices/ETH-USD/spot")
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      var px = Number(j.data.amount);
+      var vt = 1073000000, cs = 1000000000, ve = 1.41, grad = 4;
+      var open = (ve / vt) * px * cs;
+      var sold = vt - (ve * vt) / (ve + grad);
+      var gradMc = ((ve + grad) / (vt - sold)) * px * cs;
+      var m = function (n) { return "$" + Math.round(n).toLocaleString(); };
+      $("d-open").textContent = m(open) + " market cap";
+      $("d-grad").textContent = m(gradMc) + " market cap";
+      $("d-raise").textContent = "4 ETH (" + m(grad * px) + ")";
+      $("d-note").textContent =
+        "At ETH $" + px.toLocaleString() + ". These figures move with ETH — the " +
+        "parameters are fixed, the dollar values are not. They were chosen " +
+        "against roughly $3,800.";
+    })
+    .catch(function () { $("d-note").textContent = "Could not read the ETH price."; });
+
+  function snippet(addr) {
+    return "    curve: \"" + addr + "\",";
+  }
+
+  async function connected() {
+    var a = (window.MoonpadWallet || {}).account;
+    if (a) return a;
+    return window.MoonpadLaunch.connect();
+  }
+
+  /* Simulate before spending. eth_call against a constructor runs the whole
+   * deployment on the real chain and returns the runtime code without mining
+   * anything — so a constructor that would revert says so for free. */
+  $("sim").onclick = async function () {
+    say("", "");
+    $("sim").disabled = true;
+    try {
+      var from = await connected();
+      var art = window.WAVES_WAVESCURVE;
+      var data = art.bytecode + encodeArgs();
+      var out = await window.MoonpadRPC.send(chain.rpc, "eth_call",
+        [{ from: from, data: data }, "latest"]);
+      if (!out || out === "0x") throw new Error("The constructor returned no code.");
+      say("ok", "Simulated on " + chain.name + ": the constructor runs and returns " +
+        ((out.length - 2) / 2).toLocaleString() + " bytes of runtime code. " +
+        "Nothing was deployed and nothing was spent.");
+    } catch (e) {
+      say("err", "Simulation failed: " + String(e.message || e).slice(0, 300));
+    }
+    $("sim").disabled = false;
+  };
+
+  function encodeArgs() {
+    var h = function (v) {
+      var s = BigInt(v).toString(16);
+      return "0".repeat(64 - s.length) + s;
+    };
+    var a = function (x) {
+      return "0".repeat(24) + String(x).toLowerCase().replace(/^0x/, "");
+    };
+    return a(ARGS.platform) + h(ARGS.graduationEth) + h(ARGS.virtualEth) +
+      h(ARGS.virtualTokens) + h(ARGS.curveSupply) + a(ARGS.factory) +
+      a(ARGS.weth) + h(ARGS.poolFee);
+  }
+
+  async function paintButton() {
+    var a = (window.MoonpadWallet || {}).account;
+    $("go").disabled = false;
+    $("go").textContent = a ? "Deploy the curve" : "Connect wallet";
+  }
+  paintButton();
+  window.addEventListener("moonpad-wallet", paintButton);
+
+  $("go").onclick = async function () {
+    var a = (window.MoonpadWallet || {}).account;
+    if (!a) { await window.MoonpadLaunch.connect(); return paintButton(); }
+    if (!ARGS.platform) return say("err", "This chain has no feeTo set — the platform's fee share would go nowhere.");
+
+    $("go").disabled = true; $("go").textContent = "Confirm in your wallet…";
+    say("", "");
+    try {
+      var hash = await window.MoonpadToken.deployCurve(ARGS, a);
+      $("go").textContent = "Waiting for the block…";
+      var rc = await window.MoonpadToken.waitForTx(hash);
+      var addr = rc.contractAddress;
+      $("after").hidden = false;
+      $("r-addr").textContent = addr;
+      $("r-snippet").textContent = snippet(addr);
+
+      /* Read the parameters back OUT of the deployed contract and check them
+       * against what we meant to send. A deploy that succeeded with the wrong
+       * arguments is the failure worth catching here, and it is silent. */
+      chain.curve = addr;                 // so the reader below targets it
+      var t = await window.MoonpadToken.terms();
+      var same = t.graduationEth === ARGS.graduationEth &&
+                 t.virtualEth === ARGS.virtualEth &&
+                 t.virtualTokens === ARGS.virtualTokens &&
+                 t.curveSupply === ARGS.curveSupply;
+      $("r-verify").textContent = same ? "matches what was sent" : "DOES NOT MATCH";
+      say(same ? "ok" : "err", same
+        ? "Deployed and verified. Paste the line below into evm-chains.js."
+        : "Deployed, but the contract reads back different parameters. Do not use it.");
+      $("go").textContent = "Deployed";
+    } catch (e) {
+      var m = String(e.message || e);
+      if (/reject|denied/i.test(m)) m = "You cancelled the transaction.";
+      say("err", m.slice(0, 300));
+      $("go").disabled = false; $("go").textContent = "Deploy the curve";
+    }
+  };
+})();
+</script>
+</body>
+</html>

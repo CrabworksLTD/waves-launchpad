@@ -345,10 +345,19 @@
     });
   }
 
-  async function claim(from) {
+  /**
+   * Take what you are owed. `to` is the Solana side's feeWallet: a creator can
+   * send their kept fees somewhere other than the wallet that launched — a
+   * reward vault, a cold wallet — without the money passing through the hot one.
+   * The balance spent is always the caller's own.
+   */
+  async function claim(from, to) {
     from = from || await window.MoonpadLaunch.connect();
     await window.MoonpadLaunch.switchChain(chain().id);
-    return send(from, { to: curveAddress(), data: sel("claim()"), value: "0x0" });
+    var data = to && String(to).toLowerCase() !== String(from).toLowerCase()
+      ? sel("claimTo(address)") + addr32(to)
+      : sel("claim()");
+    return send(from, { to: curveAddress(), data: data, value: "0x0" });
   }
 
   /**

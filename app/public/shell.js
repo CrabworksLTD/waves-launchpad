@@ -409,8 +409,8 @@
           <div class="menu">
             <a href="#" data-net="solana"><img src="/art/solana.svg" width="13" height="13" alt="">
               Solana</a>
-            <a href="#" data-net="robinhood" class="soon"><img src="/art/robinhood.svg" width="13" height="13" alt="">
-              Robinhood Chain <i>SOON</i></a>
+            <a href="#" data-net="robinhood"><img src="/art/robinhood.svg" width="13" height="13" alt="">
+              Robinhood Chain</a>
           </div>
         </div>
         <div class="shl-dd r" id="shl-wmenu">
@@ -500,16 +500,13 @@
           var net = a.dataset.net;
           if (net === currentChain()) return;          // already there
 
-          /* Robinhood is not selectable yet. Its launch flow has never been
-           * run, and there is nothing recorded on that side to browse — so
-           * switching to it lands a visitor on an empty site that cannot do
-           * the thing the site is for. The row stays visible with its SOON
-           * tag, because it is a real part of the plan; it just does not go
-           * anywhere until launching works there. */
-          if (net === "robinhood") {
-            alertBar("Robinhood Chain is coming — launches run on Solana for now.");
-            return;
-          }
+          /* Robinhood used to be refused here, because its launch flow had
+           * never been run and there was nothing on that side to browse — a
+           * switch landed a visitor on an empty site that could not do the
+           * thing the site is for. That is no longer true: the flow is built
+           * and the side is behind a password, so the only people who arrive
+           * are the ones we handed the password to. The gate does the job the
+           * SOON tag was doing, and does it without lying about the state. */
 
           /* Switching chains goes home, rather than re-skinning the page you
            * are standing on.
@@ -549,8 +546,8 @@
         if (!told) {
           try { sessionStorage.setItem("shl-rh-note", "1"); } catch (e) {}
           setTimeout(function () {
-            alertBar("Robinhood Chain is being wired in — you can browse and mint here, " +
-              "but launching still runs on Solana for now.");
+            alertBar("Robinhood Chain is in closed testing. Launching runs on our " +
+              "own bonding curve here, which is not audited — treat it as a test.");
           }, 900);
         }
       }
