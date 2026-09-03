@@ -576,18 +576,20 @@
     ]);
   }
 
-  /* ⚠️ A pledged launch names the KEEPER as poolCreator at creation — see the
-   * two poolCreator lines below.
+  /* The pool launches with the LAUNCHER as its poolCreator — see the two
+   * poolCreator lines below. Holder rewards are a separate, later step: the
+   * creator activates them from the claim page, which sends transferPoolCreator
+   * handing the pool's creator role to the keeper.
    *
-   * It used to create the pool as the launcher and then send a SECOND
-   * transaction transferring that role. Snipers trade in the gap: on $MOAR they
-   * took nearly all of it, leaving 0.0047 SOL on the creator side against 0.742
-   * to the platform, so a "90% to holders" launch shared 90% of almost nothing.
-   *
-   * Naming the keeper up front closes the window entirely — there is no moment
-   * when the pool exists unpledged, no second transaction to land late, and one
-   * less signature. The promise is unchanged: the launcher cannot claim a
-   * stream they never held. */
+   * We tried the other way — naming the keeper as poolCreator inside the
+   * pool-creation tx, to close the sniping gap (on $MOAR, trades in the window
+   * before a second pledge tx landed took nearly all of the creator side:
+   * 0.0047 SOL against 0.742 to the platform). But that put a signer the user
+   * had never seen into the first transaction after connect, and Phantom
+   * blocked the whole domain as a possible drainer. Launching clean and
+   * pledging afterward is what cleared that block (2026-09-03). The sniping gap
+   * is the accepted cost; the promise is unchanged — a launcher cannot claim a
+   * stream they never pledged. */
   async function launchToken(opts) {
     var c = await client();
     var progress = opts.onProgress || function () {};
@@ -698,8 +700,10 @@
       new c.X.PublicKey(qm2), baseMint.publicKey, configPk);
     progress({ step: "pool", state: "done", mint: String(baseMint.publicKey) });
 
-    /* No transfer step any more. The pool was created with the keeper as its
-     * creator, so it has been pledged since the instant it existed. */
+    /* The pool is created UNPLEDGED — the launcher owns it. Holder rewards, if
+     * the creator wants them, are switched on later from the claim page
+     * (transferPoolCreator → keeper), a separate tx the creator alone signs.
+     * Keeping that out of the launch is what keeps Phantom from flagging it. */
 
     /* Record for the homepage token listing.
      *

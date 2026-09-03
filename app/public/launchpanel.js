@@ -18,6 +18,15 @@
   var H = window.UI.html, raw = window.UI.raw, esc = window.UI.esc,
       shortAddr = window.UI.shortAddr;
 
+  /* NFT+token pairing. The launch mechanics are all live (collection launch,
+   * token launch, fee routing), but a pair's fees feed the collection's reward
+   * VAULT, and NFT holders CLAIM from it via the staking program — which is
+   * devnet-only and unaudited as of 2026-09-02. Until it is deployed to mainnet
+   * and audited, launching a pair would strand fees in a vault nobody can claim.
+   * So the panel is built and wired behind this flag; flip it the day the
+   * program lands. Local testing: set true in the console or here. */
+  var PAIRING_LIVE = false;
+
   var run = null;        // { files, count } from the generator
   var el = null;
   var busy = false;
@@ -388,13 +397,16 @@
         </div>
       </div>
 
-      <!-- Pairing and staking are one decision: a paired token exists so its
-           trading fees reward holders, and staking is what delivers them.
-           The reasoning lives in the docs; the launch window just says it is
-           not open yet. -->
-      <label class="tick"><input type="checkbox" id="f-pairOn" disabled>
-        <span><b>Pair a token that rewards holders</b>
-        <span>Still in closed testing.</span></span></label>
+      <!-- A paired token exists to feed this collection's reward vault; the
+           collection's NFT holders claim from it on the staking page. The
+           launch is independent of the staking program (it only routes fees to
+           the vault) — but claiming needs that program live, so the tick is
+           held until it ships. See PAIRING_LIVE. -->
+      <label class="tick"><input type="checkbox" id="f-pairOn" ${PAIRING_LIVE ? "" : raw("disabled")}>
+        <span><b>Pair a token that rewards NFT holders</b>
+        <span>${PAIRING_LIVE
+          ? "Its trading fees feed a vault your holders claim from staking."
+          : "Still in closed testing."}</span></span></label>
 
       <div id="lp-err"></div>
       <div class="acts"><button id="lp-x">Cancel</button>
@@ -490,8 +502,9 @@
       d.openAt = box.querySelector("#f-open").value;
       d.wave = parseInt(box.querySelector("#f-wave").value, 10) || 30;
       d.allowOn = box.querySelector("#f-allowOn").checked;
-      // pairing is coupled to staking and neither is live — see the note above
-      d.pairOn = false;
+      // gated on PAIRING_LIVE: the checkbox is disabled until the staking
+      // program (the claim side) ships, so this reads false until then
+      d.pairOn = PAIRING_LIVE && box.querySelector("#f-pairOn").checked;
       if (!box.querySelector("#f-splitOn").checked) d.splits = [];
 
       // validate
@@ -546,7 +559,8 @@
       if (d.pairOn) {
         flow.cfg = cfg;
         flow.preconfig = true;
-        return tokenDetails(flow);
+        // pairs use their own minimal token form, not the full token window
+        return pairTokenDetails(flow);
       }
       nftConfirm(cfg, flow);
     };
@@ -1391,6 +1405,185 @@
   }
 
 
+  /* The paired token's OWN launch form — not the full token window.
+   *
+   * A pair exists for one reason: to feed its collection's reward vault, which
+   * the collection's NFT holders claim from on the staking page. So the creator
+   * decides only what a pair needs — logo, banner, name, ticker, the trading
+   * fee, and their own first buy. There is no quote picker (a pair prices in
+   * SOL), no split slider and no reward-asset picker: 100% of the creator fee
+   * routes to the vault, full stop. Everything the standard token window asks
+   * that a pair does not need is simply absent, by design.
+   *
+   * Reached only from the pair tick, which is gated on PAIRING_LIVE, and always
+   * in the preconfig order: this form is filled first, then the collection
+   * launches, then the token pairs to it. */
+  function pairTokenDetails(flow) {
+    flow = flow || {};
+    var nft = flow.nft;
+    var defName = flow.preTname || (nft ? nft.cfg.name : "");
+    var defSym = flow.preTsym ||
+      (defName ? defName.replace(/[^A-Za-z]/g, "").slice(0, 5).toUpperCase() : "");
+
+    flow.quote = "sol";                    // pairs price in SOL
+    if (!flow.tier) flow.tier = "standard";
+    /* The whole creator share feeds the collection's vault; NFT holders claim
+     * it from the staking program. This is a RECORDED PREFERENCE, not launch-
+     * time routing: the pool launches clean with the launcher as poolCreator,
+     * and the creator role is handed to the staking pool PDA AFTER deploy, from
+     * a claim-page step — the same post-launch activation the standard token now
+     * uses. Doing it inside the launch tx puts an unknown signer (the vault/PDA)
+     * into the pool creation, which is exactly the drainer shape Phantom blocked
+     * — moving reward routing to after deploy is what CLEARED that block
+     * (2026-09-03). Piece 3 (token.js) must follow the same post-deploy model. */
+    flow.feeShare = "vault";
+    flow.feeSharePct = 100;
+    flow.rewardMode = "dividend";
+    // what the NFT holders are paid in — SOL by default, changed via the picker
+    flow.reward = flow.reward || BUILTIN_REWARDS[0];
+
+    var box = shell(H`
+      <h2>2 of 2 — the token</h2>
+      <p class="sub">Paired with ${nft ? nft.cfg.name : "your collection"}. Its trading fees
+      feed the collection's reward vault, which its NFT holders claim from staking.</p>
+
+      <div class="two">
+        <div><label>Logo · 1:1</label>
+        <button class="artbtn ${flow.icon ? "has" : ""}" id="tk-logobtn" type="button">${
+          flow.icon ? "✓ " + (flow.iconName || "chosen") : "Choose…"}</button></div>
+        <div><label>Banner · 3:1</label>
+        <button class="artbtn ${flow.banner ? "has" : ""}" id="tk-bannerbtn" type="button">${
+          flow.banner ? "✓ " + (flow.bannerName || "chosen") : "Choose…"}</button></div>
+      </div>
+      <input type="file" id="tk-logo" accept="image/png,image/jpeg" hidden>
+      <input type="file" id="tk-banner" accept="image/png,image/jpeg" hidden>
+
+      <div class="two">
+        <div><label>Name</label>
+        <input id="lp-tname" value="${flow.tname || defName}" maxlength="30" placeholder="My Token"></div>
+        <div><label>Ticker</label>
+        <input id="lp-tsym" value="${flow.tsym || defSym}" maxlength="8" placeholder="TKN"
+          style="text-transform:uppercase"></div>
+      </div>
+
+      <label>Trading fee</label>
+      <div class="ptabs" id="tk-tiers">${raw(tierButtons(flow))}</div>
+      <p class="note" id="tk-taxtxt"></p>
+
+      <label>Your first buy (SOL) — optional</label>
+      <input id="lp-tbuy" type="number" min="0" step="0.1" value="${flow.tbuy || 0}">
+      <div class="ptabs" id="tk-chips">
+        <button data-v="0.1">0.1</button><button data-v="0.25">0.25</button>
+        <button data-v="0.5">0.5</button><button data-v="1">1</button>
+        <button data-v="5">5</button><button data-v="10">10</button>
+      </div>
+      <p class="note" id="tk-buyshare"></p>
+      <p class="note">Lands in the same transaction as the pool, so nobody can snipe
+      the opening price ahead of you.</p>
+
+      <label>Rewards paid in</label>
+      <button class="pick" id="lp-reward">
+        <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
+        <span class="pk-r"><span class="k2 mono">${
+          flow.reward.liquidity === undefined || flow.reward.liquidity >= 1000
+            ? "tradeable" : "not tradeable yet"}</span>
+        <span class="pk-dd">Change ▾</span></span>
+      </button>
+      <p class="note">What your NFT holders claim — SOL, USDC, or a tokenized stock or
+      commodity.${flow.reward.liquidity !== undefined && flow.reward.liquidity < 1000
+        ? raw(" <b>Nothing trades " + esc(flow.reward.symbol) + " yet</b>, so holders " +
+              "receive SOL until it can be sold — it switches by itself once a market exists.")
+        : ""}</p>
+
+      <div id="lp-err"></div>
+      <div class="acts"><button id="lp-x">Back</button>
+      <button class="go" id="lp-next">Continue</button></div>
+    `);
+
+    function collect() {
+      flow.tname = box.querySelector("#lp-tname").value;
+      flow.tsym = box.querySelector("#lp-tsym").value;
+      flow.tbuy = box.querySelector("#lp-tbuy").value;
+    }
+
+    box.querySelector("#tk-logobtn").onclick = function () { box.querySelector("#tk-logo").click(); };
+    box.querySelector("#tk-logo").addEventListener("change", function (e) {
+      var f = e.target.files && e.target.files[0];
+      takeArt(f, box, function (bytes) {
+        flow.icon = bytes; flow.iconName = f.name;
+        flow.iconExt = /\.jpe?g$/i.test(f.name) ? "jpg" : "png";
+        var lb = box.querySelector("#tk-logobtn");
+        lb.textContent = "✓ " + f.name; lb.classList.add("has");
+      });
+    });
+    box.querySelector("#tk-bannerbtn").onclick = function () { box.querySelector("#tk-banner").click(); };
+    box.querySelector("#tk-banner").addEventListener("change", function () {
+      var f = box.querySelector("#tk-banner").files[0];
+      takeArt(f, box, function (bytes) {
+        flow.banner = bytes; flow.bannerName = f.name;
+        flow.bannerExt = /\.jpe?g$/i.test(f.name) ? "jpg" : "png";
+        var bb = box.querySelector("#tk-bannerbtn");
+        bb.textContent = "✓ " + f.name; bb.classList.add("has");
+      });
+    });
+
+    function paintTax() {
+      var el = box.querySelector("#tk-taxtxt");
+      if (el) el.textContent = "Traders pay " + tierPct(flow) + "% in total.";
+    }
+    paintTax();
+    box.querySelector("#tk-tiers").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-t]");
+      if (!b || b.disabled) return;
+      flow.tier = b.dataset.t;
+      box.querySelectorAll("#tk-tiers button").forEach(function (x) { x.classList.toggle("on", x === b); });
+      paintTax();
+    });
+
+    function paintBuyShare() {
+      var el = box.querySelector("#tk-buyshare");
+      if (!el) return;
+      var amt = parseFloat(box.querySelector("#lp-tbuy").value) || 0;
+      var terms = window.DBC_TERMS;
+      var q = terms && terms.QUOTES && terms.QUOTES[flow.quote];
+      var cap = q && q.initialMarketCap;
+      if (!amt || !cap) { el.textContent = ""; return; }
+      var supply = (terms.TERMS && terms.TERMS.totalTokenSupply) || 1e9;
+      var pct = Math.min(100, (amt / cap) * 100);
+      el.innerHTML = "That buys you roughly <b>" + pct.toFixed(2) + "% of supply</b> — about " +
+        UI.fmt(supply * pct / 100, 0) + " tokens" +
+        (pct >= 10 ? " <b>— buyers will read that as a large insider position.</b>" : ".");
+    }
+    paintBuyShare();
+    box.querySelector("#lp-tbuy").addEventListener("input", paintBuyShare);
+    box.querySelector("#tk-chips").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-v]");
+      if (b) box.querySelector("#lp-tbuy").value = b.dataset.v;
+      setTimeout(paintBuyShare, 0);        // after the chip writes the value
+    });
+
+    // the reward choice is recorded with the launch; it reopens this same form
+    var rewardBtn = box.querySelector("#lp-reward");
+    if (rewardBtn) rewardBtn.onclick = function () { collect(); rewardPicker(flow); };
+
+    box.querySelector("#lp-x").onclick = function () {
+      // back to the collection form; flow.d still holds what they entered there
+      collect();
+      nftDetails(flow);
+    };
+    box.querySelector("#lp-next").onclick = function () {
+      collect();
+      var name = (flow.tname || "").trim();
+      var sym = (flow.tsym || "").trim().toUpperCase();
+      if (!name) return fail(box, "The token needs a name.");
+      if (!/^[A-Z0-9]{2,8}$/.test(sym)) return fail(box, "Ticker: 2-8 letters or digits.");
+      flow.tname = name; flow.tsym = sym;
+      flow.tbuy = parseFloat(flow.tbuy) || 0;
+      // preconfig: the collection launches first, then the token pairs to it
+      return nftConfirm(flow.cfg, flow);
+    };
+  }
+
   function tokenDetails(flow) {
     flow = flow || {};
     var nft = flow.nft;
@@ -1737,7 +1930,9 @@
       <p class="note" id="lp-hidden"></p>
       <div class="acts"><button id="lp-x">Back</button></div>
     `);
-    box.querySelector("#lp-x").onclick = function () { tokenDetails(flow); };
+    // return to whichever form opened the picker — the pair panel or the full
+    // token window
+    box.querySelector("#lp-x").onclick = function () { (flow.pair ? pairTokenDetails : tokenDetails)(flow); };
 
     var all = null, tab = "all", q = "", hidden = 0;
 
@@ -1777,7 +1972,7 @@
       list.querySelectorAll(".prow").forEach(function (b) {
         b.onclick = function () {
           flow.reward = all.find(function (t) { return t.mint === b.dataset.mint; });
-          tokenDetails(flow);
+          (flow.pair ? pairTokenDetails : tokenDetails)(flow);
         };
       });
     }

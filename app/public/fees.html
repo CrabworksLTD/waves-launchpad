@@ -252,14 +252,19 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
     rows.forEach(function (el) {
       var t = tokens.find(function (x) { return x.mint === el.dataset.mint; });
       window.Token.feeMetrics(t.mint, t.pool || null).then(function (m) {
+        // live accrued on the pool — what a Claim button would take right now
         var amt = el.dataset.kind === "creator" ? m.creator : m.partner;
-        el.querySelector(".amt").textContent = UI.fmt(amt, 4) + " " + m.quote;
-        // "sent to holders": raw lamports from /api/payouts, formatted in the
-        // same quote units as the accrued figure just above it
-        var sEl = el.querySelector(".samt");
+        var dec = Math.pow(10, m.quoteDec);
+        var pd = paid[t.mint];
+        var sEl = el.querySelector(".samt");   // present only on auto-shared rows
+        /* A holder-reward (auto-shared) row shows TOTAL accrued SINCE DEPLOY —
+         * everything the keeper has claimed plus what's still on the pool —
+         * matching the token page. A claimable row keeps the live figure, since
+         * that is exactly what its Claim button acts on. */
+        var accrued = (sEl && pd) ? (Number(pd.claimedRaw) / dec + amt) : amt;
+        el.querySelector(".amt").textContent = UI.fmt(accrued, 4) + " " + m.quote;
         if (sEl) {
-          var rec = paid[t.mint];
-          var sent = rec ? Number(rec.sentRaw) / Math.pow(10, m.quoteDec) : 0;
+          var sent = pd ? Number(pd.sentRaw) / dec : 0;
           sEl.textContent = UI.fmt(sent, 4) + " " + m.quote;
         }
         var btn = el.querySelector(".cl");

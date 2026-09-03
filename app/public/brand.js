@@ -28,7 +28,7 @@
      * It is client-side: anyone reading source can walk past it. That is fine
      * for a curtain and not fine as security — do not put anything behind it
      * that would matter if it were read. Password is with Kyle. */
-    gate: "53d3ecce08c0327fbcce4ee44ffcb3e8f0f02e2c486f840dc561427377c6bc5e",
+    gate: "",
 
     // The wallet that owns the platform's fee share. Creator-chosen-fee
     // launches create their own config naming this as feeClaimer — the

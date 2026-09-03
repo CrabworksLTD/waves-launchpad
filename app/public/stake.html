@@ -86,6 +86,30 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
 .none{border:1px dashed var(--line2);border-radius:10px;padding:34px 22px;text-align:center;
   color:var(--faint);font-size:13px;margin-top:8px}
 .none a{color:var(--accent)}
+
+/* per-NFT list — thumbnail · name/state · weight · action */
+.slist{padding:4px 22px}
+.srow{display:grid;grid-template-columns:52px 1fr 120px 148px;align-items:center;gap:14px;
+  padding:14px 0;border-top:1px solid var(--line)}
+.srow:first-child{border-top:0}
+.sthumb{width:52px;height:52px;border-radius:8px;overflow:hidden;border:1px solid var(--line);
+  display:grid;place-items:center;font:800 13px Archivo;color:var(--faint);
+  background:linear-gradient(135deg,var(--panel2),var(--void))}
+.sname{min-width:0}
+.sname b{display:block;font:700 14px Archivo}
+.sstate{display:block;font:600 10.5px "IBM Plex Mono",monospace;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--faint);margin-top:2px}
+.sstate.on{color:var(--accent)}
+.sweight{text-align:right;font:600 14px "IBM Plex Mono",monospace;color:var(--dim)}
+.sbtn{padding:11px 16px;border-radius:8px;border:1px solid var(--line2);width:100%;
+  background:var(--panel2);color:var(--ink);font:700 12.5px Archivo;cursor:default;text-align:center}
+.sbtn:disabled{opacity:.4}
+/* stake-all footer */
+.sfoot{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.sfoot .earn-lab{margin:0}
+.sfoot .go{padding:13px 26px}
+@media(max-width:640px){.srow{grid-template-columns:44px 1fr;gap:10px}
+  .sweight,.srow .sbtn{display:none}}
 </style>
 </head>
 <body>
@@ -122,9 +146,21 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
       </div>
       <div class="statrow">
         <div><span>Your staked</span><b>—</b></div>
-        <div><span>Total weight</span><b>—</b></div>
-        <div><span>Token burned</span><b>—</b></div>
+        <div><span>Your weight</span><b>—</b></div>
+        <div><span>Your burned</span><b>—</b></div>
       </div>
+    </div>
+
+    <!-- one row per NFT the connected wallet holds in a paired collection; it
+         fills from chain when the program ships (see stake.js). Empty until
+         then. -->
+    <div class="card slist">
+      <div class="none">Your NFTs from paired collections appear here.</div>
+    </div>
+
+    <div class="card sfoot">
+      <span class="earn-lab">Stake all at once</span>
+      <button class="go" disabled>Stake all</button>
     </div>
   </div>
 
@@ -140,6 +176,11 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
 <script src="/ui.js"></script>
 <script src="/wallet.js"></script>
 <script src="/shell.js"></script>
+<!-- The staking client, loaded but dormant: this page stays a preview and does
+     not call its action methods. window.WavesStake is available for read-only
+     testing (WavesStake.live(), .summary(pair, owner)) once the program is on a
+     reachable cluster. It wakes the page up when it ships — see stake.js. -->
+<script src="/stake.js"></script>
 <script>
 (function () {
   "use strict";

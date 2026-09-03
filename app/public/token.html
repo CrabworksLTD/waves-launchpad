@@ -123,6 +123,13 @@ main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
 .rewards span{display:block;margin-top:3px;font-size:11.5px;color:var(--dim)}
 .rewards .asset{display:inline-flex;align-items:center;gap:5px;
   font:600 11.5px "IBM Plex Mono",monospace;color:var(--ink)}
+/* fees since deploy, sat under the "rewards are active" line inside the badge */
+.rewards .rfees{display:flex;gap:22px;margin-top:11px;padding-top:11px;
+  border-top:1px solid rgba(var(--accent-rgb),.2)}
+.rewards .rfees span{display:block;margin-top:0;font:500 9.5px "IBM Plex Mono",monospace;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--faint)}
+.rewards .rfees b{display:block;margin-top:4px;font:700 14px "IBM Plex Mono",monospace;color:var(--ink)}
+.rewards .rfees .rf-dist{color:var(--accent)}
 
 /* the collection this token was paired with, and where its holders stake */
 .pairlink{display:flex;align-items:center;gap:10px;margin-top:12px;padding:11px 13px;
@@ -699,20 +706,39 @@ input:focus{outline:none;border-color:var(--accent)}
     var box = $("rewards");
     var asset = rec.rewardMint || null;
 
-    /* One line. The mechanics — hourly, pro-rata, nothing to claim — are true
-     * but nobody reads a paragraph in a buy box; what matters is that holding
-     * this pays you, and in what. */
+    /* The fees for this reward token, filled into the badge below. Fetched once;
+     * rendered whenever BOTH the badge DOM (paint) and the numbers are ready —
+     * either can win the race, so both paths call renderFees(). */
+    var feeData = null;
+    fetchRewardFees(rec).then(function (f) { feeData = f; renderFees(); });
+    function renderFees() {
+      if (!feeData) return;
+      var el = box.querySelector(".rfees");
+      if (!el) return;
+      el.querySelector(".rf-accrued").textContent = feeData.accrued;
+      el.querySelector(".rf-dist").textContent = feeData.distributed;
+      el.hidden = false;
+    }
+
+    /* One line, then the fees since deploy. The mechanics — hourly, pro-rata,
+     * nothing to claim — are true but nobody reads a paragraph in a buy box;
+     * what matters is that holding this pays you, in what, and how much it has
+     * paid so far. */
     function paint(sym, tradeable) {
-      var asset = sym || QUOTE;
-      box.innerHTML = "<b>" + esc(asset) + " rewards are active</b>" +
+      var a = sym || QUOTE;
+      box.innerHTML = "<b>" + esc(a) + " rewards are active</b>" +
         (sym && !tradeable
-          ? "<span>Paid in " + esc(QUOTE) + " until " + esc(sym) +
-            " is tradeable.</span>"
-          : "");
+          ? "<span>Paid in " + esc(QUOTE) + " until " + esc(sym) + " is tradeable.</span>"
+          : "") +
+        '<div class="rfees" hidden>' +
+          '<div><span>Fees accrued</span><b class="rf-accrued">—</b></div>' +
+          '<div><span>Distributed</span><b class="rf-dist">—</b></div>' +
+        "</div>";
       box.hidden = false;
       // the ticker carries it too, so it is visible without scrolling
       var slash = $("rsym");
-      if (slash) { slash.textContent = "/" + asset; slash.hidden = false; }
+      if (slash) { slash.textContent = "/" + a; slash.hidden = false; }
+      renderFees();          // the numbers may have resolved before this paint
     }
 
     if (!asset) return paint(null, true);
@@ -722,6 +748,33 @@ input:focus{outline:none;border-color:var(--accent)}
       if (!hit) return paint(null, true);
       paint(hit.symbol, (hit.liquidity || 0) >= 1000);
     }).catch(function () { paint(null, true); });
+  }
+
+  /* Fees for a holder-reward token — total accrued to the reward stream SINCE
+   * DEPLOY, and how much has reached holders. Accrued = every creator-side fee
+   * the keeper has claimed (/api/payouts claimedRaw) PLUS whatever is unclaimed
+   * on the pool right now (feeMetrics.creator); this matches the claim page.
+   * Distributed = the holder pot actually paid out (sentRaw). Returns formatted
+   * strings, or null when the pool's quote/decimals can't be read. */
+  function fetchRewardFees(rec) {
+    return Promise.all([
+      fetch("/api/payouts?mint=" + encodeURIComponent(rec.mint))
+        .then(function (r) { return r.json(); })
+        .then(function (j) { return (j.payouts && j.payouts[rec.mint]) || null; })
+        .catch(function () { return null; }),
+      window.Token.feeMetrics(rec.mint, rec.pool || null).catch(function () { return null; })
+    ]).then(function (res) {
+      var pay = res[0], m = res[1];
+      if (!m) return null;
+      var q = m.quote || "SOL", dec = Math.pow(10, m.quoteDec);
+      var distributed = pay ? Number(pay.sentRaw) / dec : 0;
+      var claimed = pay ? Number(pay.claimedRaw) / dec : 0;
+      var accrued = claimed + (m.creator || 0);            // total since deploy
+      return {
+        accrued: UI.fmt(accrued, 4) + " " + q,
+        distributed: UI.fmt(distributed, 4) + " " + q
+      };
+    });
   }
 
   /* A paired launch links both ways. Someone who arrived at the token should

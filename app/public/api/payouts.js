@@ -69,9 +69,10 @@ export default async function handler(req, res) {
       const pot = claimed > creatorCut ? claimed - creatorCut : 0n;
 
       const p = payouts[e.mint] || (payouts[e.mint] = {
-        sent: 0n, runs: 0, holders: 0, lastAt: 0
+        sent: 0n, claimed: 0n, runs: 0, holders: 0, lastAt: 0
       });
       p.sent += pot;
+      p.claimed += claimed;          // total creator-side fees claimed since deploy
       p.runs += 1;
       // keeperlog is newest-first (lpush), so the first entry we see for a mint
       // is its most recent run — take holders/lastAt from that one
@@ -85,7 +86,8 @@ export default async function handler(req, res) {
     const out = {};
     for (const m of Object.keys(payouts)) {
       const p = payouts[m];
-      out[m] = { sentRaw: p.sent.toString(), runs: p.runs, holders: p.holders, lastAt: p.lastAt };
+      out[m] = { sentRaw: p.sent.toString(), claimedRaw: p.claimed.toString(),
+                 runs: p.runs, holders: p.holders, lastAt: p.lastAt };
     }
     res.setHeader("cache-control", "public, max-age=30");
     return res.status(200).json({ payouts: out });
