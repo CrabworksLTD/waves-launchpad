@@ -567,7 +567,8 @@ input:focus{outline:none;border-color:var(--accent)}
         if (d.trades && d.trades.length) {
           $("hist-note").textContent = "";
           $("hist").innerHTML = d.trades.map(function (t) {
-            return '<a class="trow" href="https://explorer.solana.com/tx/' + esc(t.sig) +
+            var url = IS_EVM ? tk.txUrl(t.sig) : "https://explorer.solana.com/tx/" + t.sig;
+        return '<a class="trow" href="' + esc(url) +
               '" target="_blank" rel="noopener">' +
               '<span class="dir ' + t.side + '">' + (t.side === "buy" ? "↗" : "↙") + "</span>" +
               '<span class="amt"><b>' + UI.fmt(t.tokens, 2) + " " + esc(sym) + "</b>" +
@@ -646,8 +647,9 @@ input:focus{outline:none;border-color:var(--accent)}
 
   function loadTrades() {
     if (!poolHint) { $("hist-note").textContent = "no pool recorded"; return; }
-    if (IS_EVM) return;      // no EVM trade feed yet — see the note in evm-token.js
-    window.Token.recentTrades(MINT, poolHint, 15).then(function (list) {
+    (IS_EVM
+      ? tkReady.then(function () { return tk.recentTrades(MINT, 15); })
+      : window.Token.recentTrades(MINT, poolHint, 15)).then(function (list) {
       if (!list.length) {
         $("hist-note").textContent = "";
         $("hist").innerHTML = '<div class="empty">No trades yet — the first one shows up here.</div>';
@@ -677,7 +679,7 @@ input:focus{outline:none;border-color:var(--accent)}
           '<span class="amt"><b>' + UI.fmt(t.tokens, 2) + " " +
             esc(($("sym").textContent || "").replace(/^\$/, "")) + "</b>" +
             "<span>" + esc(shortWho(t.who)) + "</span></span>" +
-          '<span class="val"><b>' + UI.fmt(t.sol, 4) + " SOL</b>" +
+          '<span class="val"><b>' + UI.fmt(t.sol, 4) + (IS_EVM ? " ETH" : " SOL") + "</b>" +
             "<span>" + agoShort(t.at) + " ago</span></span></a>";
       }).join("");
     }).catch(function () {

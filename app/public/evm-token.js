@@ -51,6 +51,11 @@
    * the event signature changes, which would also change the ABI below. */
   var LAUNCHED_TOPIC =
     "0xcf74280e4eafa3845516f297991e114213dc6a4c132199d8338fe6ba26b216e4";
+  // Bought(address,address,uint256,uint256,uint256) / Sold(...) — the trade feed
+  var BOUGHT_TOPIC =
+    "0x7ce543d1780f3bdc3dac42da06c95da802653cd1b212b8d74ec3e3c33ad7095c";
+  var SOLD_TOPIC =
+    "0x9be8a5ca22b7e6e81f04b5879f0248227bb770114291bd47dfaee4c3a82ad60e";
 
   // ------------------------------------------------------------ abi encoding
   function hex32(v) {
@@ -576,6 +581,75 @@
           feeBps: c.feeBps,
           rewardsBps: c.rewardsBps
         };
+      },
+
+      /**
+       * Recent trades, read off the curve's own events.
+       *
+       * ⚠️ RECENT, not complete, and the page says so. Robinhood Chain makes a
+       * full history impossible from a browser: blocks come every 0.104s, so a
+       * week is 5.8 million of them; an open-ended getLogs is answered with
+       * "log query timed out", and a wide one with "logs matched by query
+       * exceeds limit of 10000". Measured, not assumed. Real history belongs in
+       * /api/indexer, which already does exactly this job on the Solana side
+       * with a stored cursor.
+       *
+       * So this walks backwards in bounded chunks and stops once it has enough
+       * or has looked far enough back — a handful of requests, never a scan.
+       */
+      recentTrades: async function (token, limit) {
+        limit = limit || 15;
+        var c = chain();
+        var CHUNK = 50000n;          // ~1.4 hours, comfortably inside both limits
+        var MAX_CHUNKS = 6;          // ~8 hours of history for a quiet token
+
+        var latest = BigInt(await window.MoonpadRPC.send(c.rpc, "eth_blockNumber", []));
+        var head = await window.MoonpadRPC.send(c.rpc, "eth_getBlockByNumber",
+          ["0x" + latest.toString(16), false]);
+        var headTs = Number(BigInt(head.timestamp)) * 1000;
+
+        /* Timestamps are INTERPOLATED from the head block, never fetched per
+         * log. One block read per trade is what made the Solana chart hammer
+         * its node into rate limiting; the arithmetic is the same either way
+         * and a few hundred milliseconds of drift is invisible in "3m ago". */
+        var MS_PER_BLOCK = 104;
+        var tokenTopic = "0x" + addr32(token);
+        var out = [];
+
+        for (var i = 0; i < MAX_CHUNKS && out.length < limit; i++) {
+          var to = latest - CHUNK * BigInt(i);
+          if (to <= 0n) break;
+          var from = to > CHUNK ? to - CHUNK + 1n : 0n;
+          var logs;
+          try {
+            logs = await window.MoonpadRPC.send(c.rpc, "eth_getLogs", [{
+              address: curveAddress(),
+              fromBlock: "0x" + from.toString(16),
+              toBlock: "0x" + to.toString(16),
+              topics: [[BOUGHT_TOPIC, SOLD_TOPIC], tokenTopic]
+            }]);
+          } catch (e) {
+            break;                   // a refused window is not a failed page
+          }
+          for (var j = logs.length - 1; j >= 0 && out.length < limit; j--) {
+            var lg = logs[j];
+            var isBuy = String(lg.topics[0]).toLowerCase() === BOUGHT_TOPIC;
+            var d = String(lg.data || "").replace(/^0x/, "");
+            var w = function (n) { return BigInt("0x" + (d.slice(n * 64, n * 64 + 64) || "0")); };
+            /* Bought(token, buyer, ethIn, tokensOut, fee)
+             * Sold  (token, seller, tokensIn, ethOut, fee)
+             * — so the first two data words swap meaning by side. */
+            out.push({
+              sig: lg.transactionHash,
+              side: isBuy ? "buy" : "sell",
+              who: "0x" + String(lg.topics[2]).replace(/^0x/, "").slice(24),
+              sol: fromWei(isBuy ? w(0) : w(1)),      // ETH here; the field name is the page's
+              tokens: fromWei(isBuy ? w(1) : w(0)),
+              at: headTs - Number(latest - BigInt(lg.blockNumber)) * MS_PER_BLOCK
+            });
+          }
+        }
+        return out;
       },
 
       // true once a creator has pledged part of their fees to holders

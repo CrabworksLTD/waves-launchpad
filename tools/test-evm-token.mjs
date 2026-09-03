@@ -201,6 +201,32 @@ FROM = BUYER;
 await mined(await T.pledgeToHolders(tok2, 5000, "0x000000000000000000000000000000000000dEaD", BUYER));
 check("rewardsActive is true once pledged", (await ad.rewardsActive(tok2)) === true);
 
+// ── the trade feed, read off the curve's own events ──────────────────────────
+const tok3 = (await T.waitForLaunch(
+  (await T.launch({ name: "Feed", symbol: "FEED", feeBps: 300, devBuyWei: 0n })).hash)).token;
+
+FROM = BUYER;
+await mined(await T.buy(tok3, ETH / 2n, 0, BUYER));
+const bought = await T.balanceOf(tok3, BUYER);
+await mined(await T.approve(tok3, bought / 4n, BUYER));
+await mined(await T.sell(tok3, bought / 4n, 0, BUYER));
+FROM = DEPLOYER;
+await mined(await T.buy(tok3, ETH / 4n, 0, DEPLOYER));
+
+const feed = await ad.recentTrades(tok3, 15);
+check("the feed finds every trade on this token", feed.length === 3, `${feed.length} trades`);
+check("newest first", feed[0].side === "buy" && feed[0].who.toLowerCase() === DEPLOYER.toLowerCase());
+check("a buy reads ETH in and tokens out",
+  feed[0].sol > 0.2 && feed[0].sol < 0.3 && feed[0].tokens > 0,
+  `${feed[0].sol} ETH -> ${feed[0].tokens.toFixed(0)} tokens`);
+const sold = feed.find((f) => f.side === "sell");
+check("a sell reads tokens in and ETH out", sold && sold.tokens > 0 && sold.sol > 0,
+  sold ? `${sold.tokens.toFixed(0)} tokens -> ${sold.sol.toFixed(4)} ETH` : "none");
+check("every row carries a tx hash and a timestamp",
+  feed.every((f) => /^0x[0-9a-f]{64}$/i.test(f.sig) && f.at > 0));
+check("the feed is scoped to ITS token, not the whole curve",
+  (await ad.recentTrades(tok2, 15)).every((f) => f.sig !== feed[0].sig));
+
 anvil.kill();
 console.log(bad ? `\n${bad} failed` : "\nevm-token.js drives the real contract correctly");
 process.exit(bad ? 1 : 0);
