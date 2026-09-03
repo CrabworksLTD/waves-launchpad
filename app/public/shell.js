@@ -739,14 +739,19 @@
   }
 
   /* The deploy half of the EVM stack: the drop contract's ABI + bytecode
-   * (45KB) and the launch primitives. Loaded only when someone actually
-   * launches, not for browsing. */
+   * (45KB), the launch primitives, and the bonding curve a token launches on.
+   * Loaded only when someone actually launches, not for browsing.
+   *
+   * evm-token.js must come after evm-wavescurve.js — it reads its selectors out
+   * of that artifact rather than pasting four-byte constants, so a signature
+   * change cannot leave a stale selector quietly calling the wrong function. */
   var evmLaunchP = null;
   function ensureEvmLaunch() {
-    if (window.MoonpadLaunch) return Promise.resolve();
+    if (window.MoonpadLaunch && window.MoonpadToken) return Promise.resolve();
     if (evmLaunchP) return evmLaunchP;
     evmLaunchP = ensureEvmStack().then(function () {
-      return ["/evm-contract.js", "/evm-launch.js"].reduce(function (p, src) {
+      return ["/evm-contract.js", "/evm-launch.js",
+              "/evm-wavescurve.js", "/evm-token.js"].reduce(function (p, src) {
         return p.then(function () {
           return new Promise(function (res, rej) {
             var el = document.createElement("script");

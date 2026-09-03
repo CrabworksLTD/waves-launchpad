@@ -8,16 +8,18 @@
  * with the same name. Choosing a reward asset by symbol would pay a
  * collection's holders in a fake, and it would look correct in review.
  *
- * Covers three issuers, because the first version only knew about one and
- * silently excluded the other two:
+ * Keeps the issuers whose tokens are FREELY TRANSFERABLE, since the keeper has
+ * to pay them to arbitrary holders:
  *
  *   Backed xStocks   `x` suffix, `Xs` vanity mint prefix   AAPLx, GLDx, SLVx
- *   Ondo Global      `on` suffix, no common prefix          USOon, BNOon, SLVon
  *   standalone       tokenised commodities                  PAXG, XAUt0
  *
- * Requiring the `xstocks` tag AND an Xs prefix — the original filter — dropped
- * Ondo's entire catalogue and every commodity token that is not an ETF wrapper.
- * That is how crude oil went missing.
+ * Ondo Global Markets (`on` suffix) is discovered but DROPPED — its tokens gate
+ * every transfer behind Token-2022 hooks (non-US, KYC'd recipients only), so a
+ * reward payout to a normal holder would be blocked. See the `issuer === "ondo"`
+ * skip below (verified against Ondo's eligibility terms 2026-09-03). Backed's
+ * xStocks are the permissionless catalogue — 500+ names now, incl. international
+ * listings — and are the whole reason reward payouts work at all.
  *
  * Filters, both required:
  *   1. Jupiter `verified` tag, plus at least one asset-class tag
@@ -72,7 +74,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function search(q) {
   try {
-    const r = await fetch(SEARCH + encodeURIComponent(q));
+    // limit=100 (the max) instead of the default 20 — xStocks is 500+ now, so
+    // one query per letter at 20 missed the mid-liquidity tail
+    const r = await fetch(SEARCH + encodeURIComponent(q) + "&limit=100");
     if (!r.ok) return [];
     const d = await r.json();
     return Array.isArray(d) ? d : (d.tokens || []);
@@ -144,6 +148,14 @@ async function verifyBatch(addresses) {
       const issuer = id.startsWith("Xs") ? "backed"
                    : /on$/.test(sym) ? "ondo"
                    : "other";
+      /* Drop Ondo Global Markets. Its tokens enforce eligibility on every
+       * transfer via Solana Token-2022 transfer hooks (non-US, KYC'd, allow-
+       * listed recipients only), so the keeper cannot distribute them to
+       * arbitrary holders — the transfer would be blocked or non-compliant.
+       * Verified against Ondo's eligibility terms 2026-09-03. Backed's xStocks
+       * are permissionless (freely transferable), which is what makes reward
+       * payouts possible; they are the only issuer we keep. */
+      if (issuer === "ondo") continue;
       // Curated: a "commodity" is exposure to the STUFF (physical tokens,
       // commodity ETFs/funds), never a company that digs it up — First
       // Majestic Silver and Royal Gold are equities about commodities.

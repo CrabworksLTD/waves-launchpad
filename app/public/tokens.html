@@ -95,6 +95,8 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tk .sym{display:block;margin-top:1px;font:400 12px "IBM Plex Mono",monospace;
   color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* the reward stock a holder-reward token pays in, worn on the ticker */
+.tk .sym .rwsym{color:var(--accent)}
 .tk .pays{display:block;margin-top:5px;font:600 10px "IBM Plex Mono",monospace;
   letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
 .tk .big{display:block;margin-top:9px;font:600 16px "IBM Plex Mono",monospace;
@@ -215,6 +217,25 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
    * what every record written before the field existed actually is. */
   var EVM = !!(window.Shell && window.Shell.chain && window.Shell.chain() === "robinhood");
 
+  /* Reward-asset ticker per mint, so a card can show what stock a holder-reward
+   * token pays in — "$MOAR /GMEx". Loaded once; a redraw fills them in when the
+   * list lands. SOL/USDC are always-there defaults. */
+  var REWARD_SYM = {
+    "So11111111111111111111111111111111111111112": "SOL",
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": "USDC"
+  };
+  if (window.Token && window.Token.rwa) {
+    window.Token.rwa().then(function (list) {
+      (list || []).forEach(function (t) { REWARD_SYM[t.mint] = t.symbol; });
+      if (state.length) draw();
+    }).catch(function () {});
+  }
+  function rewardTicker(rec) {
+    // only an ACTIVATED, non-burn reward token pays in a nameable asset
+    if (!rec || !(rec.feeSharePct > 0) || rec.rewardMode === "burn" || !rec.rewardMint) return "";
+    return REWARD_SYM[rec.rewardMint] || "";
+  }
+
   fetch("/api/tokens").then(function (r) { return r.json(); })
     .then(function (j) {
       return (j.tokens || []).filter(function (t) {
@@ -331,7 +352,9 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
         "</span>" +
         '<span class="body">' +
           "<b>" + esc(r.name || "Token") + "</b>" +
-          '<span class="sym">$' + esc(sym) + "</span>" +
+          '<span class="sym">$' + esc(sym) +
+            (rewardTicker(r) ? '<span class="rwsym">/' + esc(rewardTicker(r)) + "</span>" : "") +
+          "</span>" +
           /* A token that pays its holders is worth saying so on the card — but
            * a buyback pays nobody, it destroys supply, and calling that "pays
            * holders" would be wrong in the one place a buyer skims. */

@@ -112,6 +112,14 @@
       ".lp .ptabs button.on{background:rgba(var(--accent-rgb),.14);border-color:transparent;",
       "  box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.3)}",
       ".lp .plist{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px}",
+      // section header, stays pinned while its group scrolls under it
+      ".lp .phead{position:sticky;top:0;z-index:1;background:var(--panel);padding:8px 12px;",
+      "  font:600 10px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;",
+      "  color:var(--faint);border-bottom:1px solid var(--line)}",
+      ".lp .phead.tradeable{color:var(--accent)}",
+      ".lp .phead.nohead{cursor:pointer;display:flex;justify-content:space-between;align-items:center}",
+      ".lp .phead.nohead:hover{color:var(--ink)}",
+      ".lp .phead .tw{color:var(--accent);font-size:9px;letter-spacing:.1em}",
       ".lp .prow{display:flex;gap:10px;align-items:baseline;width:100%;text-align:left;",
       "  padding:9px 12px;border:0;border-bottom:1px solid var(--line);border-radius:0;",
       "  background:transparent}",
@@ -1593,7 +1601,9 @@
     var defSym = flow.preTsym ||
       (defName ? defName.replace(/[^A-Za-z]/g, "").slice(0, 5).toUpperCase() : "");
     flow.reward = flow.reward || BUILTIN_REWARDS[0];
-    flow.quote = flow.quote || "sol";
+    /* Robinhood Chain prices in ETH and nothing else — the curve takes the
+     * chain's native coin, there is no USDC config and no RWA quote. */
+    flow.quote = isEvm() ? "eth" : (flow.quote || "sol");
     /* Standard, keeping the fees — the least surprising thing a launch can be,
      * and the state the panel opens in. Sharing is a decision the creator
      * makes, not one they have to notice and undo. */
@@ -1606,7 +1616,8 @@
     flow.feeShare = "keep";
     var quotes = window.Token.quotes();
     var rwas = window.Token.rwaQuotes();
-    var qLabel = flow.quote === "usdc" ? "USDC"
+    var qLabel = isEvm() ? "ETH"
+      : flow.quote === "usdc" ? "USDC"
       : flow.quote === "sol" ? "SOL"
       : (flow.quoteSym || "RWA");
 
@@ -1635,23 +1646,26 @@
           style="text-transform:uppercase"></div>
       </div>
       <label>Description</label>
-      <textarea id="tk-desc" rows="2" placeholder="Shown on Jupiter and explorers">${flow.tdesc || ""}</textarea>
+      <textarea id="tk-desc" rows="2" placeholder="${isEvm()
+        ? "Shown on your token page and explorers" : "Shown on Jupiter and explorers"}">${flow.tdesc || ""}</textarea>
 
-      <label>Priced in</label>
+      ${isEvm() ? "" : H`<label>Priced in</label>
       <div class="ptabs" id="tk-quotes">
         <button data-q="sol" ${flow.quote === "sol" ? raw('class="on"') : ""}
           ${quotes.indexOf("sol") < 0 ? raw("disabled") : ""}>SOL</button>
         <button data-q="usdc" ${flow.quote === "usdc" ? raw('class="on"') : ""}
           ${quotes.indexOf("usdc") < 0 ? raw("disabled") : ""}>USDC</button>
-      </div>
+      </div>`}
 
       <div class="fold2" id="tk-econ">
         <div class="row"><span class="k">Total supply</span><b>1,000,000,000 · fixed</b></div>
         <div class="row"><span class="k">Trading fee</span><b id="tk-fee">${tierPct(flow) + "%"}</b></div>
         <div class="row"><span class="k">Graduates at</span><b id="tk-grad">reading the curve…</b></div>
-        <div class="row" style="border-bottom:0"><span class="k">Migrates to</span><b>Meteora DAMM v2, LP locked</b></div>
-        <p class="note" style="margin-top:6px">Locked in the launchpad's config — identical
-        for every launch, so nobody negotiates a better curve than you.</p>
+        <div class="row" style="border-bottom:0"><span class="k">Migrates to</span><b>${
+          isEvm() ? "Uniswap V3, liquidity locked" : "Meteora DAMM v2, LP locked"}</b></div>
+        <p class="note" style="margin-top:6px">${isEvm()
+          ? "Set when the curve contract was deployed and immutable since — identical for every launch, so nobody negotiates a better curve than you."
+          : "Locked in the launchpad's config — identical for every launch, so nobody negotiates a better curve than you."}</p>
       </div>
 
       <label>Your first buy (${qLabel}) — optional</label>
@@ -1670,7 +1684,7 @@
       <p class="note" id="tk-taxtxt"></p>
 
 
-      <!-- Two ways the pledged share can work. Like the asset below, this is
+      ${isEvm() ? "" : H`<!-- Two ways the pledged share can work. Like the asset below, this is
            recorded with the launch and takes effect when rewards are switched
            on from the fee page — no routing happens here. -->
       <label>Holder rewards</label>
@@ -1705,6 +1719,12 @@
           : ""}</p>
       </div>
 
+`}
+
+      ${isEvm() ? H`<p class="note">Holder rewards are switched on after launch,
+      from the fee page. On Robinhood Chain a pledged share is paid in ETH —
+      choosing a different reward asset is not available here yet.</p>` : ""}
+
       <div id="tk-fwwrap" ${(flow.feeSharePct || 0) >= 100 ? raw("hidden") : ""}>
         <label>Creator fee wallet</label>
         <input id="tk-feewallet" value="${flow.feeWallet || ""}"
@@ -1735,6 +1755,7 @@
      * hardcoded copy, and not the standard rung's numbers shown against a rung
      * the creator picked instead. Re-read when the rung changes. */
     function paintEconomics() {
+      if (isEvm()) return paintEvmEconomics();
       window.Token.describeConfig(flow.quote, flow.tier || "standard").then(function (d) {
         var el = box.querySelector("#tk-grad");
         if (!el) return;
@@ -1745,6 +1766,29 @@
           Math.round(80 * (100 - d.creatorShare) / 100) + "% platform / 20% Meteora";
       });
     }
+    /* Read from the contract, not from constants.
+     *
+     * The curve's parameters are constructor arguments and immutable, so the
+     * only truthful source for "graduates at" is the deployment itself — a page
+     * quoting last month's numbers at a curve deployed with different ones is
+     * worse than a page that says it does not know. */
+    function paintEvmEconomics() {
+      var grad = box.querySelector("#tk-grad");
+      var feeEl = box.querySelector("#tk-fee");
+      var sp = evmSplit(flow);
+      if (feeEl && sp) {
+        feeEl.textContent = sp.total + "% — " + sp.creator + "% you / " + sp.platform + "% platform";
+      }
+      if (!grad) return;
+      if (!window.MoonpadToken || !window.MoonpadToken.curveAddress()) {
+        grad.textContent = "not open on this chain yet";
+        return;
+      }
+      window.MoonpadToken.terms().then(function (t) {
+        grad.textContent = UI.fmt(Number(t.graduationEth) / 1e18) + " ETH raised";
+      }).catch(function () { grad.textContent = "shown at launch"; });
+    }
+
     paintEconomics();
 
     function collect() {
@@ -1850,7 +1894,11 @@
 
 
 
-    box.querySelector("#tk-quotes").addEventListener("click", function (e) {
+    /* Absent on Robinhood Chain — there is one quote currency, so the picker is
+     * not rendered. Binding to it unconditionally threw a TypeError and took
+     * the whole details screen down with it. */
+    var quoteTabs = box.querySelector("#tk-quotes");
+    if (quoteTabs) quoteTabs.addEventListener("click", function (e) {
       var b = e.target.closest("button[data-q]");
       if (!b || b.disabled) return;
       collect();
@@ -1879,7 +1927,9 @@
       if (nft) { recordCollection(nft.cfg, nft.res, null, nft.up); nftDone(nft.cfg, nft.res, nft.up); }
       else modeSelect();
     };
-    box.querySelector("#tk-modes").addEventListener("click", function (e) {
+    // also absent on EVM — see the quote picker above
+    var modeTabs = box.querySelector("#tk-modes");
+    if (modeTabs) modeTabs.addEventListener("click", function (e) {
       var b = e.target.closest("button[data-m]");
       if (!b) return;
       flow.rewardMode = b.dataset.m;
@@ -1901,12 +1951,16 @@
       var sym = flow.tsym.trim().toUpperCase();
       if (!name) return fail(box, "The token needs a name.");
       if (!/^[A-Z0-9]{2,8}$/.test(sym)) return fail(box, "Symbol: 2-8 letters or digits.");
-      if (flow.feeWallet && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(flow.feeWallet)) {
+      /* An address on Robinhood Chain is 0x-hex, not base58 — validating
+       * everything as base58 rejected every EVM fee wallet as malformed. */
+      var addrOk = isEvm() ? /^0x[0-9a-fA-F]{40}$/ : /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+      if (flow.feeWallet && !addrOk.test(flow.feeWallet)) {
         return fail(box, "The fee wallet is not a valid address.");
       }
       flow.tname = name; flow.tsym = sym;
       flow.tbuy = parseFloat(flow.tbuy) || 0;
       if (flow.preconfig) return nftConfirm(flow.cfg, flow);
+      if (isEvm()) return evmTokenConfirm(flow);
       tokenConfirm(flow);
     };
   }
@@ -1919,9 +1973,11 @@
     var box = shell(H`
       <h2>Reward asset</h2>
       <p class="sub">Trading fees are converted into this before distribution.</p>
-      <input id="lp-q" type="search" placeholder="Search tradeable assets" autocomplete="off">
+      <input id="lp-q" type="search" placeholder="Search assets…" autocomplete="off">
       <div class="ptabs" id="lp-tabs">
         <button data-t="all" class="on">All</button>
+        <button data-t="tradeable">Tradeable</button>
+        <button data-t="untradeable">Not tradeable yet</button>
         <button data-t="native">SOL &amp; USDC</button>
         <button data-t="equity">Stocks</button>
         <button data-t="commodity">Commodities</button>
@@ -1934,7 +1990,7 @@
     // token window
     box.querySelector("#lp-x").onclick = function () { (flow.pair ? pairTokenDetails : tokenDetails)(flow); };
 
-    var all = null, tab = "all", q = "", hidden = 0;
+    var all = null, tab = "all", q = "", hidden = 0, showNo = false;
 
     /* What the row tells you. A creator picking what their holders get paid in
      * needs to know two things: can it be sold, and how deep is it. */
@@ -1947,28 +2003,68 @@
       return "$" + Math.round(n / 1e3) + "k deep";
     }
 
+    // SOL/USDC carry no liquidity number and are always tradeable
+    function tradeable(t) { return t.liquidity === undefined || (t.liquidity || 0) >= MIN_LIQUIDITY; }
     function draw() {
       if (!all) return;
-      var rows = all.filter(function (t) {
-        if (tab !== "all" && t.kind !== tab) return false;
+      /* Two tab kinds share one row: ASSET-TYPE tabs (native/equity/commodity)
+       * filter by t.kind; TRADEABILITY tabs (tradeable/untradeable) filter by
+       * liquidity. "all" filters by neither. Search narrows whatever is showing;
+       * the 2000 cap is a safety bound well above the ~750 catalogue. */
+      var KIND = { native: 1, equity: 1, commodity: 1 };
+      var matched = all.filter(function (t) {
+        if (KIND[tab] && t.kind !== tab) return false;
+        if (tab === "tradeable" && !tradeable(t)) return false;
+        if (tab === "untradeable" && tradeable(t)) return false;
         if (!q) return true;
         return (t.symbol + " " + t.name).toLowerCase().indexOf(q) >= 0;
-      }).slice(0, 200);
-      var list = box.querySelector("#lp-list");
-      list.innerHTML = rows.map(function (t) {
+      }).slice(0, 2000);
+      function rowHtml(t) {
         return '<button class="prow" data-mint="' + esc(t.mint) + '">' +
           "<b>" + esc(t.symbol) + "</b><span>" + esc(t.name) + "</span>" +
-          '<i class="' + ((t.liquidity !== undefined && t.liquidity < MIN_LIQUIDITY)
-            ? "dim" : "") + '">' + esc(depth(t) || shortAddr(t.mint)) + "</i></button>";
-      }).join("") || '<p class="note" style="padding:12px">Nothing matches.</p>';
+          '<i class="' + (tradeable(t) ? "" : "dim") + '">' + esc(depth(t) || shortAddr(t.mint)) +
+          "</i></button>";
+      }
+      function head(label, cls, n) {
+        return '<div class="phead ' + cls + '">' + label + " · " + n + "</div>";
+      }
+
+      var html, hasNo;
+      if (tab === "tradeable") {
+        html = matched.length ? head("Tradeable now", "tradeable", matched.length) +
+          matched.map(rowHtml).join("") : "";
+        hasNo = false;
+      } else if (tab === "untradeable") {
+        html = matched.length ? head("Not tradeable yet", "", matched.length) +
+          matched.map(rowHtml).join("") : "";
+        hasNo = matched.length > 0;
+      } else {
+        // "all" or an asset-type tab: tradeable listed, the rest collapsed under
+        // their own header so it is never buried by hundreds of rows
+        var yes = matched.filter(tradeable);
+        var no = matched.filter(function (t) { return !tradeable(t); });
+        var openNo = showNo || !!q;
+        html = (yes.length ? head("Tradeable now", "tradeable", yes.length) +
+          yes.map(rowHtml).join("") : "");
+        if (no.length) {
+          html += '<div class="phead nohead">Not tradeable yet · ' + no.length +
+            ' <span class="tw">' + (openNo ? "hide ▾" : "show ▸") + "</span></div>" +
+            (openNo ? no.map(rowHtml).join("") : "");
+        }
+        hasNo = no.length > 0;
+      }
+
+      var list = box.querySelector("#lp-list");
+      list.innerHTML = html || '<p class="note" style="padding:12px">Nothing matches.</p>';
       var note = box.querySelector("#lp-hidden");
       if (note) {
-        note.textContent = hidden
-          ? hidden + " of these have no market yet. Pick one anyway — holders " +
-            "are paid the quote currency until it can be sold, then it switches " +
-            "by itself."
+        note.textContent = hasNo
+          ? "A not-tradeable pick pays holders the quote currency until the asset " +
+            "can be sold, then switches to it by itself."
           : "";
       }
+      var nh = list.querySelector(".nohead");
+      if (nh) nh.onclick = function () { showNo = !showNo; draw(); };
       list.querySelectorAll(".prow").forEach(function (b) {
         b.onclick = function () {
           flow.reward = all.find(function (t) { return t.mint === b.dataset.mint; });
@@ -1985,6 +2081,10 @@
       });
       hidden = list.filter(function (t) { return (t.liquidity || 0) < MIN_LIQUIDITY; }).length;
       all = BUILTIN_REWARDS.concat(list);
+      // show the exact catalogue size in the search box — "+" because it grows
+      // every time tools/fetch-rwa.js is re-run
+      var qi = box.querySelector("#lp-q");
+      if (qi && list.length) qi.placeholder = "Search " + list.length + "+ assets";
       draw();
     });
     box.querySelector("#lp-q").addEventListener("input", function (e) {
@@ -2281,6 +2381,199 @@
     var open = box.querySelector("#lp-open");
     if (open) open.onclick = function () { location.href = nft.res.mintUrl; };
     box.querySelector("#lp-token").onclick = function () { location.href = page; };
+  }
+
+  /* ---------- Robinhood Chain token launches ---------- */
+
+  /* The platform's cut, in basis points OF VOLUME, by rung.
+   *
+   * Mirrors platformVolumeBps() in contracts/WavesCurve.sol. Duplicated rather
+   * than read from the chain because this is a display string on a screen shown
+   * before a wallet is necessarily connected — but the contract is the
+   * authority, and it will refuse a rung that is not on this ladder, so the two
+   * cannot silently disagree about what is allowed. */
+  var EVM_PLATFORM_BPS = { 100: 40, 200: 50, 300: 60, 400: 70, 500: 80, 1000: 90 };
+
+  function evmSplit(flow) {
+    var bps = tierSpec(flow).baseFeeBps || 100;
+    var plat = EVM_PLATFORM_BPS[bps];
+    if (plat === undefined) return null;
+    return { total: bps / 100, platform: plat / 100, creator: (bps - plat) / 100, bps: bps };
+  }
+
+  async function evmTokenConfirm(flow) {
+    var acct = (window.MoonpadWallet || {}).account;
+    var sp = evmSplit(flow);
+    var box = shell(H`
+      <h2>Confirm token</h2>
+      <p class="sub">One small metadata upload, then the curve. The curve is the liquidity.</p>
+      <div class="row"><span class="k">Token</span><b>${flow.tname} · $${flow.tsym}</b></div>
+      <div class="row"><span class="k">Chain</span><b>Robinhood</b></div>
+      <div class="row"><span class="k">Priced in</span><b>ETH</b></div>
+      <div class="row"><span class="k">First buy</span><b>${
+        flow.tbuy > 0 ? flow.tbuy + " ETH" : "none"}</b></div>
+      <div class="row"><span class="k">Metadata storage</span><b id="lp-fee">quoting…</b></div>
+      <div class="row"><span class="k">Wallet</span><b>${
+        acct ? shortAddr(acct) : "not connected"}</b></div>
+      <div class="row"><span class="k">Trading fee</span><b>${
+        tierSpec(flow).label + " — " + (sp ? sp.total : tierPct(flow)) + "%"}</b></div>
+      ${sp ? H`<p class="note">Of every ${sp.total}% traded, ${sp.creator}% is yours and
+      ${sp.platform}% is ours. There is no third party on this chain, so you keep
+      more here than the same rung pays on Solana.</p>` : ""}
+      <p class="note">Holder rewards are switched on afterwards, from the fee page —
+      one transaction you sign alone.</p>
+      <div id="lp-err"></div>
+      <div class="acts"><button id="lp-back">Back</button>
+      <button class="go" id="lp-go" disabled>${acct ? "Launch token" : "Connect a wallet"}</button></div>
+    `);
+    box.querySelector("#lp-back").onclick = function () { tokenDetails(flow); };
+
+    /* Refuse early if there is no curve to launch into. Better here, on a screen
+     * that has taken nothing, than after the storage fee has been paid. */
+    if (!window.MoonpadToken || !window.MoonpadToken.curveAddress()) {
+      box.querySelector("#lp-fee").textContent = "—";
+      return fail(box, "Token launches are not open on Robinhood Chain yet — " +
+        "the bonding curve has not been deployed.");
+    }
+
+    try {
+      var upBytes = 300 + (flow.icon ? flow.icon.length : 0) +
+        (flow.banner ? flow.banner.length : 0);
+      var upCount = 2 + (flow.icon ? 1 : 0) + (flow.banner ? 1 : 0);
+      var q = await window.Storage.quoteUpload(upBytes, upCount);
+      box.querySelector("#lp-fee").textContent = Number(q.feeEth).toFixed(6) + " ETH";
+    } catch (e) {
+      box.querySelector("#lp-fee").textContent = "unavailable";
+      return fail(box, "Could not price storage: " + e.message);
+    }
+
+    var go = box.querySelector("#lp-go");
+    go.disabled = false;
+    go.onclick = acct
+      ? function () { doEvmTokenLaunch(flow); }
+      : async function () {
+          var w = await (window.Shell ? Shell.connect() : Promise.resolve(null));
+          if (w) evmTokenConfirm(flow);
+        };
+  }
+
+  async function doEvmTokenLaunch(flow) {
+    busy = true;
+    /* Two steps, not three.
+     *
+     * A Solana launch has to wait for arweave.net to serve the metadata before
+     * the pool goes on chain, because the pool embeds the URI and every
+     * aggregator reads it once and caches whatever it gets. Nothing on this
+     * chain points at the metadata — WavesToken has a name and a symbol and no
+     * URI — so there is nothing to wait for, and the launch is faster for it. */
+    var stages = [
+      ["meta", "Storing token metadata"],
+      ["curve", "Opening the curve" + (flow.tbuy > 0 ? " + your first buy" : "")]
+    ];
+    var box = shell(H`
+      <h2>Launching token</h2>
+      <p class="sub">Leave this tab open.</p>
+      <ul class="steps">${raw(stages.map(function (s) {
+        return '<li data-k="' + s[0] + '"><i>·</i><span>' + esc(s[1]) + "</span></li>";
+      }).join(""))}</ul>
+      <div id="lp-err"></div>
+    `);
+    var mark = stepList(box);
+
+    try {
+      mark("meta", "on");
+      var tcard = await makeCard({
+        name: flow.tname, symbol: flow.tsym,
+        avatar: flow.icon || null, banner: flow.banner || null
+      }, "token", [
+        ["priced in", "ETH"],
+        ["swap fee", (evmSplit(flow) || {}).total + "%"],
+        ["chain", "Robinhood"]
+      ]);
+      await assertFreshBuild();
+      var meta = await window.Storage.uploadTokenMeta({
+        name: flow.tname,
+        symbol: flow.tsym,
+        description: flow.tdesc || "",
+        card: tcard,
+        icon: flow.icon || null,
+        iconExt: flow.iconExt || "png",
+        banner: flow.banner || null,
+        bannerExt: flow.bannerExt || "png",
+        links: { website: flow.web, x: flow.x, telegram: flow.tg },
+        payer: payStorageEvm
+      });
+      mark("meta", "done");
+
+      mark("curve", "on");
+      var ETHER = 1000000000000000000n;
+      var devWei = flow.tbuy > 0
+        ? BigInt(Math.round(flow.tbuy * 1e9)) * (ETHER / 1000000000n)
+        : 0n;
+      var sent = await window.MoonpadToken.launch({
+        name: flow.tname,
+        symbol: flow.tsym,
+        feeBps: tierSpec(flow).baseFeeBps || 100,
+        devBuyWei: devWei,
+        /* Deliberately no slippage floor on the creator's own first buy: they
+         * are the first trade on a curve nobody else can have touched yet, so
+         * there is nothing to be front-run by. */
+        minTokensOut: 0
+      });
+      var res = await window.MoonpadToken.waitForLaunch(sent.hash);
+      mark("curve", "done");
+
+      recordEvmToken(flow, res, meta);
+      busy = false;
+      evmTokenDone(flow, res);
+    } catch (e) {
+      busy = false;
+      fail(box, describe(e));
+      box.insertAdjacentHTML("beforeend",
+        '<div class="acts"><button id="lp-close3">Close</button></div>');
+      box.querySelector("#lp-close3").onclick = close;
+    }
+  }
+
+  function recordEvmToken(flow, res, meta) {
+    postListing("/api/tokens", {
+      chain: "robinhood",
+      mint: res.token,
+      name: flow.tname,
+      symbol: flow.tsym,
+      creator: (window.MoonpadWallet || {}).account || null,
+      icon: (meta && meta.iconUri) || null,
+      banner: (meta && meta.bannerUri) || null,
+      card: (meta && meta.cardUri) || null,
+      feeShare: "keep",
+      feeSharePct: 0
+    });
+  }
+
+  function evmTokenDone(flow, res) {
+    var page = location.origin + "/token/" + res.token;
+    var box = shell(H`
+      <h2>Live</h2>
+      <p class="sub">$${flow.tsym} is trading on Robinhood Chain.</p>
+      <div class="row"><span class="k">Trading fees</span><b>yours to claim</b></div>
+      <div class="tip">
+        <b>Want your holders to earn from every trade?</b>
+        <span>Turn on holder rewards from the fee page — one transaction, and your
+        share starts paying out. You can do it whenever you like.</span>
+        <a class="go" href="/fees">Open the fee page →</a>
+      </div>
+      ${raw(caRow("Token CA", res.token))}
+      <label>Token page</label>
+      <input readonly value="${page}" onclick="this.select()">
+      <p class="note">Share this — it is where people buy. The token moves to a
+      Uniswap pool automatically once the curve fills, and the liquidity is locked
+      there permanently.</p>
+      <div class="acts"><button id="lp-done3">Close</button>
+      <button class="go" id="lp-token3">Open token page</button></div>
+    `);
+    bindCopy(box);
+    box.querySelector("#lp-done3").onclick = close;
+    box.querySelector("#lp-token3").onclick = function () { location.href = page; };
   }
 
   /* ---------- public surface ---------- */
