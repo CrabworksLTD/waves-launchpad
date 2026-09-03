@@ -2534,16 +2534,14 @@
         "the bonding curve has not been deployed.");
     }
 
-    try {
-      var upBytes = 300 + (flow.icon ? flow.icon.length : 0) +
-        (flow.banner ? flow.banner.length : 0);
-      var upCount = 2 + (flow.icon ? 1 : 0) + (flow.banner ? 1 : 0);
-      var q = await window.Storage.quoteUpload(upBytes, upCount);
-      box.querySelector("#lp-fee").textContent = Number(q.feeEth).toFixed(6) + " ETH";
-    } catch (e) {
-      box.querySelector("#lp-fee").textContent = "unavailable";
-      return fail(box, "Could not price storage: " + e.message);
-    }
+    /* Launch-sized uploads are on us — see doEvmTokenLaunch. Quoting a fee the
+     * creator will not be charged, and then not charging it, is a worse
+     * surprise than either being honest or actually charging. */
+    var upBytes = 300 + (flow.icon ? flow.icon.length : 0) +
+      (flow.banner ? flow.banner.length : 0);
+    box.querySelector("#lp-fee").textContent =
+      upBytes > 8 * 1024 * 1024 ? "charged at cost — your art is over the free size"
+                                : "included";
 
     var go = box.querySelector("#lp-go");
     go.disabled = false;
@@ -2599,7 +2597,24 @@
         banner: flow.banner || null,
         bannerExt: flow.bannerExt || "png",
         links: { website: flow.web, x: flow.x, telegram: flow.tg },
-        payer: payStorageEvm
+        /* No payment step, and therefore ONE signature for the whole launch.
+         *
+         * The server already grants launch-sized uploads (≤8MB, ≤5 files) for
+         * free, rate limited per address — a token launch is a card, an icon, a
+         * banner and a json, nowhere near it. Charging anyway meant a second
+         * transaction, and on this chain that transaction's gas costs about
+         * twice the fee it collects. Collecting nine tenths of a cent for
+         * seventeen tenths of a cent of gas, at the price of an extra wallet
+         * prompt, is worse for everyone.
+         *
+         * A collection is a different question — thousands of images is real
+         * money — so evm collections still pay, via payStorageEvm.
+         *
+         * The payer stays wired for the case the free tier refuses: art large
+         * enough to fall outside it still has a way through. */
+        payer: (300 + (flow.icon ? flow.icon.length : 0) +
+                (flow.banner ? flow.banner.length : 0) > 8 * 1024 * 1024)
+          ? payStorageEvm : null
       });
       mark("meta", "done");
 
