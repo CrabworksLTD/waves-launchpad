@@ -43,7 +43,7 @@ contract WavesCurveTest is Test {
 
     function _launch(uint16 feeBps) internal returns (address token) {
         vm.prank(creator);
-        token = curve.launch("Fart", "FART", feeBps, 0);
+        token = curve.launch("Fart", "FART", feeBps, 0, "", "", "");
     }
 
     // ─────────────────────────────────────────────────────────────── the basics
@@ -59,20 +59,57 @@ contract WavesCurveTest is Test {
         uint16[6] memory ok = [uint16(100), 200, 300, 400, 500, 1000];
         for (uint256 i = 0; i < ok.length; i++) {
             vm.prank(creator);
-            curve.launch("A", "A", ok[i], 0);
+            curve.launch("A", "A", ok[i], 0, "", "", "");
         }
         uint16[4] memory bad = [uint16(0), 150, 999, 1100];
         for (uint256 i = 0; i < bad.length; i++) {
             vm.prank(creator);
             vm.expectRevert(WavesCurve.BadFee.selector);
-            curve.launch("A", "A", bad[i], 0);
+            curve.launch("A", "A", bad[i], 0, "", "", "");
         }
     }
 
     function test_devBuyLandsInTheLaunchTransaction() public {
         vm.prank(creator);
-        address token = curve.launch{value: 1 ether}("Fart", "FART", 300, 0);
+        address token = curve.launch{value: 1 ether}("Fart", "FART", 300, 0, "", "", "");
         assertGt(WavesToken(token).balanceOf(creator), 0, "the dev buy must arrive");
+    }
+
+    /**
+     * The picture has to be ON the token, because there is nowhere else to put
+     * it. An ERC20 has no metadata account, so an indexer that cannot read this
+     * shows a grey letter placeholder forever.
+     */
+    function test_theTokenCarriesItsOwnIdentity() public {
+        vm.prank(creator);
+        address token = curve.launch(
+            "Fart", "FART", 300, 0,
+            "https://arweave.net/abc/icon.png",
+            "the smelliest coin on Robinhood",
+            "https://x.com/fartcoin"
+        );
+
+        WavesToken t = WavesToken(token);
+        assertEq(t.logo(), "https://arweave.net/abc/icon.png");
+        assertEq(t.description(), "the smelliest coin on Robinhood");
+        assertEq(t.socials(), "https://x.com/fartcoin");
+
+        /* The CREATOR, not the curve. The curve is what runs `new`, so a naive
+         * msg.sender here would record the launchpad as every token's deployer. */
+        assertEq(t.deployer(), creator, "deployer must be the launcher");
+
+        (address dep, string memory logo, string memory desc, string memory soc) = t.getTokenInfo();
+        assertEq(dep, creator);
+        assertEq(logo, "https://arweave.net/abc/icon.png");
+        assertEq(desc, "the smelliest coin on Robinhood");
+        assertEq(soc, "https://x.com/fartcoin");
+    }
+
+    /// A launch with no art must still work — the strings are optional.
+    function test_identityMayBeEmpty() public {
+        address token = _launch(300);
+        assertEq(WavesToken(token).logo(), "");
+        assertEq(WavesToken(token).deployer(), creator);
     }
 
     // ───────────────────────────────────────────────────────── the invariants
@@ -262,7 +299,7 @@ contract WavesCurveTest is Test {
     function test_aRevertingCreatorCannotBlockTrading() public {
         Reverter bad = new Reverter();
         vm.prank(address(bad));
-        address token = curve.launch("A", "A", 300, 0);
+        address token = curve.launch("A", "A", 300, 0, "", "", "");
 
         vm.prank(alice);
         curve.buy{value: 1 ether}(token, 0);       // must not revert

@@ -54,7 +54,7 @@ contract GraduationForkTest is Test {
 
     function test_graduatesIntoARealPool() public {
         vm.prank(creator);
-        address token = curve.launch("Fart", "FART", 300, 0);
+        address token = curve.launch("Fart", "FART", 300, 0, "", "", "");
 
         // fill the curve past its threshold
         vm.prank(alice);
@@ -92,7 +92,7 @@ contract GraduationForkTest is Test {
 
     function test_cannotTradeOnTheCurveAfterGraduation() public {
         vm.prank(creator);
-        address token = curve.launch("Fart", "FART", 300, 0);
+        address token = curve.launch("Fart", "FART", 300, 0, "", "", "");
         vm.prank(alice); curve.buy{value: 6 ether}(token, 0);
         curve.graduate(token);
 
@@ -103,7 +103,7 @@ contract GraduationForkTest is Test {
 
     function test_cannotGraduateTwice() public {
         vm.prank(creator);
-        address token = curve.launch("Fart", "FART", 300, 0);
+        address token = curve.launch("Fart", "FART", 300, 0, "", "", "");
         vm.prank(alice); curve.buy{value: 6 ether}(token, 0);
         curve.graduate(token);
 
@@ -113,7 +113,7 @@ contract GraduationForkTest is Test {
 
     function test_cannotGraduateEarly() public {
         vm.prank(creator);
-        address token = curve.launch("Fart", "FART", 300, 0);
+        address token = curve.launch("Fart", "FART", 300, 0, "", "", "");
         vm.prank(alice); curve.buy{value: 1 ether}(token, 0);
 
         vm.expectRevert(WavesCurve.NotGraduated.selector);
@@ -123,7 +123,7 @@ contract GraduationForkTest is Test {
     /// The whole point of the lock: no path exists to take the liquidity back.
     function test_thereIsNoWayToWithdrawTheLiquidity() public {
         vm.prank(creator);
-        address token = curve.launch("Fart", "FART", 300, 0);
+        address token = curve.launch("Fart", "FART", 300, 0, "", "", "");
         vm.prank(alice); curve.buy{value: 6 ether}(token, 0);
         curve.graduate(token);
 

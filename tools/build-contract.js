@@ -47,6 +47,9 @@ function compile(name) {
     sources: sources,
     settings: {
       optimizer: { enabled: true, runs: 800 },
+      // see foundry.toml — the launch path needs it, and the browser
+      // encodes this ABI by hand so the arguments stay flat
+      viaIR: true,
       evmVersion: "paris",
       outputSelection: { "*": { "*": ["abi", "evm.bytecode.object", "evm.methodIdentifiers"] } }
     }

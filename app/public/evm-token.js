@@ -90,15 +90,22 @@
    * not from the start of the call — getting that wrong is the classic way to
    * send a transaction that decodes into nonsense and reverts after paying gas.
    */
-  function encodeLaunch(name, symbol, feeBps, minTokensOut) {
-    var nameTail = strTail(name);
-    var symTail = strTail(symbol);
-    var head = 4 * 32;                                   // four arguments
-    var offName = head;
-    var offSym = head + words(nameTail) * 32;
-    return sel("launch(string,string,uint16,uint256)") +
-      hex32(offName) + hex32(offSym) + hex32(feeBps) + hex32(minTokensOut) +
-      nameTail + symTail;
+  function encodeLaunch(name, symbol, feeBps, minTokensOut, logo, description, socials) {
+    var tails = [strTail(name), strTail(symbol),
+                 strTail(logo), strTail(description), strTail(socials)];
+    var head = 7 * 32;                                   // seven arguments
+
+    /* Offsets are cumulative from the start of the ARGUMENTS, and each dynamic
+     * argument's offset is the head plus every preceding tail. Five strings
+     * makes this worth computing rather than writing out — the version with two
+     * had the arithmetic inline and would not have survived the third. */
+    var off = [], at = head;
+    for (var i = 0; i < tails.length; i++) { off.push(at); at += words(tails[i]) * 32; }
+
+    return sel("launch(string,string,uint16,uint256,string,string,string)") +
+      hex32(off[0]) + hex32(off[1]) + hex32(feeBps) + hex32(minTokensOut) +
+      hex32(off[2]) + hex32(off[3]) + hex32(off[4]) +
+      tails.join("");
   }
 
   // ------------------------------------------------------------ abi decoding
@@ -255,7 +262,8 @@
     await window.MoonpadLaunch.switchChain(chain().id);
 
     var value = BigInt(opts.devBuyWei || 0);
-    var data = encodeLaunch(opts.name, opts.symbol, opts.feeBps, opts.minTokensOut || 0);
+    var data = encodeLaunch(opts.name, opts.symbol, opts.feeBps, opts.minTokensOut || 0,
+      opts.logo || "", opts.description || "", opts.socials || "");
 
     var hash = await send(from, {
       to: curveAddress(),

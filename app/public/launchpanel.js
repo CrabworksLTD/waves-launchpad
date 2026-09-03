@@ -2628,6 +2628,22 @@
         symbol: flow.tsym,
         feeBps: tierSpec(flow).baseFeeBps || 100,
         devBuyWei: devWei,
+
+        /* ON CHAIN, and only obtainable here.
+         *
+         * An ERC20 has no metadata account, so an indexer reads the picture off
+         * the token itself or shows a grey letter forever — there is no later
+         * step. The icon is the square one; the share card is the fallback so a
+         * launch with no logo is still not blank.
+         *
+         * Served through our /m/ path, not arweave.net, for the reason
+         * storage.js already gives about token.json: an aggregator fetches once
+         * and caches whatever it gets, and arweave.net cannot serve a fresh
+         * upload for minutes. $MOAR is a permanent letter placeholder on GMGN
+         * because of exactly that window. The bytes are still on Arweave. */
+        logo: (meta && (meta.iconUri || meta.cardUri)) || "",
+        description: (flow.tdesc || "").slice(0, 200),
+        socials: flow.x || flow.web || "",
         /* Deliberately no slippage floor on the creator's own first buy: they
          * are the first trade on a curve nobody else can have touched yet, so
          * there is nothing to be front-run by. */

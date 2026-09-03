@@ -76,7 +76,7 @@ contract CurveHandler is Test {
         if (devBuy > who.balance) devBuy = who.balance;
 
         vm.prank(who);
-        address t = curve.launch{value: devBuy}("Fart", "FART", RUNGS[rungSeed % 6], 0);
+        address t = curve.launch{value: devBuy}("Fart", "FART", RUNGS[rungSeed % 6], 0, "", "", "");
         tokens.push(t);
         launches++;
     }

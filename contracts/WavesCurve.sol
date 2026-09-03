@@ -201,20 +201,35 @@ contract WavesCurve {
         string calldata name,
         string calldata symbol,
         uint16 feeBps,
-        uint256 minTokensOut
+        uint256 minTokensOut,
+        string calldata logo,
+        string calldata description,
+        string calldata socials
     ) external payable returns (address token) {
         platformVolumeBps(feeBps);            // reverts unless it is a real rung
 
-        token = address(new WavesToken(name, symbol, curveSupply, address(this)));
-        curves[token] = Curve({
-            creator: msg.sender,
-            feeBps: feeBps,
-            rewardsBps: 0,                    // pledged later, never at launch
-            keeper: address(0),
-            raised: 0,
-            tokensLeft: uint96(curveSupply),
-            graduated: false
-        });
+        /* The picture goes ON CHAIN, at launch, or not at all.
+         *
+         * An ERC20 has no metadata account for an aggregator to read, so a
+         * token that ships with only a name and a symbol is a grey letter
+         * placeholder on every indexer for as long as it exists — there is no
+         * later step that fixes it. Carrying three strings through the launch
+         * is the whole price of a token that looks like something.
+         *
+         * msg.sender, not this contract, is recorded as the deployer: the curve
+         * is what constructs the token, but the creator is who called us. */
+        token = address(new WavesToken(
+            name, symbol, curveSupply, address(this), msg.sender, logo, description, socials
+        ));
+        /* Written field by field rather than as a struct literal. The literal
+         * builds the whole Curve on the stack before storing it, and with the
+         * metadata strings also live that is "stack too deep". The zero fields
+         * — rewardsBps, keeper, raised, graduated — are already zero in fresh
+         * storage; pledging happens later and never at launch. */
+        Curve storage c = curves[token];
+        c.creator = msg.sender;
+        c.feeBps = feeBps;
+        c.tokensLeft = uint96(curveSupply);
         emit Launched(token, msg.sender, feeBps, name, symbol);
 
         if (msg.value > 0) _buy(token, msg.value, minTokensOut);

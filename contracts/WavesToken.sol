@@ -27,6 +27,42 @@ contract WavesToken {
     uint8 public constant decimals = 18;
     uint256 public immutable totalSupply;
 
+    /* ── On-chain identity ───────────────────────────────────────────────────
+     *
+     * A picture, a description and a link, readable from the chain.
+     *
+     * ⚠️ This is not decoration. On Solana a mint points at a metadata account
+     * and every aggregator reads the image from there. An ERC20 has no such
+     * thing, so a token with only a name and a symbol shows up on GMGN as a
+     * grey letter placeholder — forever, because nothing off-chain can be
+     * attached to it later.
+     *
+     * The names and shapes here copy what tokens launched by Pons expose on
+     * this chain (`logo()`, `description()`, `socials()`, `getTokenInfo()`),
+     * because those are the ones the indexers on Robinhood are already reading.
+     * `logo()` is the one that matters and the one we are most confident about;
+     * the rest cost a few words of storage and might as well be right.
+     *
+     * Set once in the constructor and never written again. There is no setter:
+     * a token whose picture can be changed after people have bought it is a
+     * token whose picture means nothing. */
+    string public logo;
+    string public description;
+    string public socials;
+
+    /// Who launched it. The curve passes this through; it is not msg.sender,
+    /// which at construction time is the curve itself.
+    address public immutable deployer;
+
+    /// Everything an indexer wants, in one call.
+    function getTokenInfo()
+        external
+        view
+        returns (address, string memory, string memory, string memory)
+    {
+        return (deployer, logo, description, socials);
+    }
+
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
 
@@ -42,12 +78,29 @@ contract WavesToken {
      * @param symbol_   ticker, immutable
      * @param supply_   the entire supply, in wei-equivalent units (18 dp)
      * @param mintTo_   who receives it — the launcher, which then seeds the pool
+     * @param deployer_ who launched it (the curve's caller, not the curve)
+     * @param logo_     an image URI an indexer can fetch — see the note above
+     * @param desc_     one-line description
+     * @param socials_  a link, usually x.com
      */
-    constructor(string memory name_, string memory symbol_, uint256 supply_, address mintTo_) {
+    constructor(
+        string memory name_,
+        string memory symbol_,
+        uint256 supply_,
+        address mintTo_,
+        address deployer_,
+        string memory logo_,
+        string memory desc_,
+        string memory socials_
+    ) {
         if (mintTo_ == address(0)) revert ZeroAddress();
         name = name_;
         symbol = symbol_;
         totalSupply = supply_;
+        deployer = deployer_;
+        logo = logo_;
+        description = desc_;
+        socials = socials_;
         balanceOf[mintTo_] = supply_;
         // a mint is a transfer from nowhere; indexers expect to see it
         emit Transfer(address(0), mintTo_, supply_);

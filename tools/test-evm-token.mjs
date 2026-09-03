@@ -92,12 +92,27 @@ check("terms() reads back the deployed parameters",
   `grad=${terms.graduationEth / ETH} ETH`);
 
 // ── launch ───────────────────────────────────────────────────────────────────
-const lh = await T.launch({ name: "Fart", symbol: "FART", feeBps: 300, devBuyWei: ETH });
+const lh = await T.launch({ name: "Fart", symbol: "FART", feeBps: 300, devBuyWei: ETH,
+  logo: "https://waves.test/m/abc/icon.png", description: "a test", socials: "https://x.com/t" });
 const launched = await T.waitForLaunch(lh.hash);
 check("the token address comes back out of the Launched event",
   /^0x[0-9a-f]{40}$/i.test(launched.token), launched.token);
 check("the creator in the event is the sender",
   launched.creator.toLowerCase() === DEPLOYER.toLowerCase());
+
+/* The picture, read back off the token the client just launched. This is the
+ * whole reason the curve was redeployed: an ERC20 has no metadata account, so
+ * whatever is not here is a grey letter placeholder on every indexer forever. */
+const tokRead = (sig, at) => rpc("eth_call", [{ to: at, data: sig }, "latest"])
+  .then((hex) => {
+    const d = hex.slice(2);
+    const len = parseInt(d.slice(64, 128), 16);
+    return Buffer.from(d.slice(128, 128 + len * 2), "hex").toString("utf8");
+  });
+check("the token carries its logo on chain",
+  (await tokRead("0xfb7f21eb", launched.token)) === "https://waves.test/m/abc/icon.png");
+check("and its description", (await tokRead("0x7284e416", launched.token)) === "a test");
+check("and its socials", (await tokRead("0x53cd512a", launched.token)) === "https://x.com/t");
 
 const tok = launched.token;
 const c0 = await T.curveOf(tok);
