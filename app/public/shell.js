@@ -45,7 +45,36 @@
   var shellPaintWallet = null;   // set by mount(); repainted on chain switch
   /* Chains are applied by loading the page, not by re-skinning it in place —
      see the network selector below for why. Boot reads the persisted choice. */
+  /* Which password, if any, stands in front of a chain — and whether this
+   * visitor has already answered it. Shared by the boot redirect below and the
+   * gate itself, because the two disagreeing is what locks people out. */
+  function gateHashFor(ch) {
+    var B = window.BRAND || {};
+    return B.gate || (B.gateChain || {})[ch] || "";
+  }
+  function gatePassed(gh) {
+    if (!gh) return true;
+    if (/^(localhost|127\.)/.test(location.hostname)) return true;
+    try { return sessionStorage.getItem("shl.gate") === gh; } catch (e) { return false; }
+  }
+
   if (currentChain() !== "solana") {
+    var bootChain = currentChain();
+    var bootLocked = !gatePassed(gateHashFor(bootChain));
+    var bootRoot = location.pathname === "/" || location.pathname === "/index.html";
+
+    /* ⚠️ Asking for the Solana front door must GIVE you the Solana front door.
+     *
+     * The chain choice is remembered, so a visitor who once looked at Robinhood
+     * had "/" rewritten to "/rh" on every later visit. Once Robinhood went
+     * behind a password that stopped being a redirect and became a trap: they
+     * landed on a gate they had no password for, and could not use the network
+     * selector to leave because the gate covers the page. The Solana side —
+     * which is public — became permanently unreachable for anyone who had
+     * clicked Robinhood once. */
+    if (bootLocked && bootRoot) {
+      try { localStorage.setItem("shl-chain", "solana"); } catch (e) {}
+    } else {
     document.documentElement.dataset.chain = currentChain();
     // keep the address bar honest on every page of the Robinhood side —
     // the homepage becomes /rh (a real page, crawler-safe), inner pages
@@ -60,6 +89,7 @@
         history.replaceState(null, "", bu.pathname + bu.search + bu.hash);
       }
     } catch (e) {}
+    }
     // load the EVM stack up front so connect and reads have no lag
     document.addEventListener("DOMContentLoaded", function () {
       window.Shell.ensureEvmStack().catch(function () {});
@@ -213,6 +243,9 @@
     "  font:500 15px 'IBM Plex Mono',monospace}",
     "#shl-gate input:focus{outline:none;border-color:var(--accent)}",
     "#shl-gate input.no{border-color:#ff6b6b}",
+    "#shl-gate .gout{display:block;margin-top:12px;color:var(--dim);font-size:12px;",
+    "text-decoration:none}",
+    "#shl-gate .gout:hover{color:var(--ink)}",
     "#shl-gate button{width:100%;margin-top:10px;padding:12px;border:0;border-radius:9px;",
     "  cursor:pointer;font:700 14px Archivo,sans-serif;color:var(--accent-ink);",
     "  background-image:var(--grad);background-repeat:no-repeat;",
@@ -265,12 +298,11 @@
      * client-side by design, so it keeps out visitors, not attackers. The
      * hash lives in brand.js; localhost stays open for development. */
     (function () {
-      var B = window.BRAND || {};
       /* Whole site first, then this chain's own gate. Robinhood is behind the
        * password while its launchpad runs on a curve that has never been
        * deployed or audited; Solana is public. Switching chains navigates, so
        * a page load runs this again and the curtain appears on arrival. */
-      var gh = B.gate || (B.gateChain || {})[currentChain()] || "";
+      var gh = gateHashFor(currentChain());
       if (!gh || /^(localhost|127\.)/.test(location.hostname)) return;
       /* Every page, not just the front doors. Kyle asked for the whole site
        * locked; the previous version let anyone with a /mint/<address> or
@@ -289,10 +321,25 @@
         '</linearGradient></defs>' +
         '<path fill="url(#shl-gg)" d="M0 16h8v8H0ZM8 8h8v8H8Zm8-8h8v8h-8Z"/></svg>' +
         "<b>" + NM + " is almost here</b>" +
-        "<p>The launchpad is in closed testing. Have the password?</p>" +
+        "<p>" + (window.BRAND && window.BRAND.gate
+          ? "The launchpad is in closed testing. Have the password?"
+          : "The " + (CHAINS[currentChain()] ? CHAINS[currentChain()].label : "this") +
+            " side is in closed testing. Have the password?") + "</p>" +
         '<input id="shl-gate-in" type="password" placeholder="password" autocomplete="off">' +
-        '<button id="shl-gate-go">Enter</button></div>';
+        '<button id="shl-gate-go">Enter</button>' +
+        /* A way out. Without this the gate is a dead end: it covers the page, so
+         * the network selector underneath cannot be reached, and someone who
+         * followed a link to the locked side has no route to the open one. */
+        (!(window.BRAND && window.BRAND.gate)
+          ? '<a class="gout" id="shl-gate-out" href="/">Back to the Solana side</a>'
+          : "") +
+        "</div>";
       document.body.appendChild(ov);
+      var out = ov.querySelector("#shl-gate-out");
+      if (out) out.addEventListener("click", function () {
+        // leave as Solana, or "/" would bounce straight back here
+        try { localStorage.setItem("shl-chain", "solana"); } catch (e) {}
+      });
       var inp = ov.querySelector("#shl-gate-in");
       async function tryPass() {
         var buf = new TextEncoder().encode(inp.value.trim());

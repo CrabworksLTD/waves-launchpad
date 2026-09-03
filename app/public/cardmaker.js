@@ -77,6 +77,7 @@
     // a fallback face — the launch page has them, but ask anyway
     try {
       await document.fonts.load("800 72px Archivo");
+      await document.fonts.load("700 20px Archivo");
       await document.fonts.load("600 34px 'IBM Plex Mono'");
       await document.fonts.ready;
     } catch (e) {}
@@ -129,7 +130,9 @@
       g.font = '800 30px Archivo, sans-serif';
       g.fillStyle = pal.accent;
       g.fillText("WAVES", W - 56, 74);
-      g.font = '500 20px "IBM Plex Mono", monospace';
+      // Archivo (proportional), not the mono face — the monospace one spaced the
+      // letters evenly so "@waveslaunchpad" read as two words with a gap
+      g.font = '700 20px Archivo, sans-serif';
       g.fillStyle = "rgba(255,255,255,.9)";
       g.fillText(handle, W - 56, 100);
     }
