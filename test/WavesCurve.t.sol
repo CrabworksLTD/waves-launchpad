@@ -4,6 +4,8 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {WavesCurve} from "../contracts/WavesCurve.sol";
 import {WavesToken} from "../contracts/WavesToken.sol";
+import {MockV4PoolManager} from "./MockV4.sol";
+import {PoolKey, Currency} from "../contracts/WavesCurve.sol";
 
 /**
  * Tests for the bonding curve.
@@ -15,6 +17,7 @@ import {WavesToken} from "../contracts/WavesToken.sol";
  */
 contract WavesCurveTest is Test {
     WavesCurve curve;
+    MockV4PoolManager pm;
 
     address platform = address(0xFEE);
     address creator  = address(0xC0FFEE);
@@ -27,15 +30,13 @@ contract WavesCurveTest is Test {
     uint256 constant V_ETH    = 1.41 ether;
     uint256 constant GRAD     = 4 ether;
 
-    /* Robinhood Chain's real deployments. Uniswap V3 is NOT at its canonical
-     * address there — 0x1F98431c… holds something that answers nothing — so
-     * these are the verified ones, used by the fork test below. */
-    address constant RH_FACTORY = 0x1f7d7550B1b028f7571E69A784071F0205FD2EfA;
-    address constant RH_WETH    = 0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73;
+    /* Robinhood trades on Uniswap V4, not V3 — 23 of its 25 indexed pairs are
+     * v4. The real singleton is 0x8366a39cc670b4001a1121b8f6a443a643e40951;
+     * these tests use a local stand-in, see MockV4.sol. */
 
     function setUp() public {
-        curve = new WavesCurve(platform, GRAD, V_ETH, V_TOKENS, SUPPLY,
-                               RH_FACTORY, RH_WETH, 10000);
+        pm = new MockV4PoolManager();
+        curve = new WavesCurve(platform, GRAD, V_ETH, V_TOKENS, SUPPLY, address(pm), 10000);
         vm.deal(alice, 1000 ether);
         vm.deal(bob, 1000 ether);
         vm.deal(creator, 1000 ether);
@@ -368,6 +369,92 @@ contract WavesCurveTest is Test {
         uint256 quoted = curve.quoteBuy(token, 60 ether);
         vm.prank(alice); curve.buy{value: 60 ether}(token, 0);
         assertEq(WavesToken(token).balanceOf(alice), quoted, "quote and fill disagree");
+    }
+
+    // ────────────────────────────────────────────────────────── graduation (V4)
+
+    function _fill(address token) internal {
+        vm.prank(alice); curve.buy{value: 60 ether}(token, 0);   // capped at the threshold
+    }
+
+    function test_graduatesIntoAV4Pool() public {
+        address token = _launch(300);
+        _fill(token);
+        assertTrue(curve.ready(token));
+
+        curve.graduate(token);
+
+        assertTrue(curve.poolIdOf(token) != bytes32(0), "no pool id recorded");
+        assertGt(address(pm).balance, 3.9 ether, "the ETH did not reach the pool");
+        assertGt(WavesToken(token).balanceOf(address(pm)), 0, "the tokens did not reach the pool");
+
+        (, , , , uint96 raised, uint96 left, bool grad) = curve.curves(token);
+        assertTrue(grad);
+        assertEq(raised, 0);
+        assertEq(left, 0);
+    }
+
+    function test_cannotGraduateTwiceOrTradeAfter() public {
+        address token = _launch(300);
+        _fill(token);
+        curve.graduate(token);
+
+        vm.expectRevert(WavesCurve.AlreadyGraduated.selector);
+        curve.graduate(token);
+
+        vm.prank(alice);
+        vm.expectRevert(WavesCurve.AlreadyGraduated.selector);
+        curve.buy{value: 1 ether}(token, 0);
+    }
+
+    function test_cannotGraduateEarly() public {
+        address token = _launch(300);
+        vm.prank(alice); curve.buy{value: 1 ether}(token, 0);
+        vm.expectRevert(WavesCurve.NotGraduated.selector);
+        curve.graduate(token);
+    }
+
+    /**
+     * The lock. Fees can be swept; the liquidity itself cannot be reduced —
+     * not by us, not by the creator, not by anyone. Enforced by the mock, which
+     * refuses any negative liquidityDelta outright.
+     */
+    function test_feesCanBeSweptButLiquidityCannotBeRemoved() public {
+        address token = _launch(300);
+        _fill(token);
+        curve.graduate(token);
+
+        uint256 before = pm.liquidityOf(_id(token));
+        assertGt(before, 0);
+
+        // hand the position some fees, then sweep them to the creator
+        vm.deal(address(pm), address(pm).balance + 1 ether);
+        pm.creditFees(_key(token), 1 ether, 0);
+        uint256 creatorBefore = creator.balance;
+
+        curve.collectPoolFees(token);
+
+        assertEq(creator.balance, creatorBefore + 1 ether, "fees did not reach the creator");
+        assertEq(pm.liquidityOf(_id(token)), before, "liquidity moved");
+    }
+
+    /// Only the PoolManager may drive the callback that spends this contract.
+    function test_theUnlockCallbackIsNotOpenToAnyone() public {
+        vm.expectRevert(WavesCurve.UnknownToken.selector);
+        curve.unlockCallback("");
+    }
+
+    function _key(address token) internal view returns (PoolKey memory) {
+        return PoolKey({
+            currency0: Currency.wrap(address(0)),
+            currency1: Currency.wrap(token),
+            fee: 10000,
+            tickSpacing: 200,
+            hooks: address(0)
+        });
+    }
+    function _id(address token) internal view returns (bytes32) {
+        return keccak256(abi.encode(_key(token)));
     }
 
     /// About a fifth of supply should survive the curve, to seed the pool.

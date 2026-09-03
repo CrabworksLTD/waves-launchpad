@@ -43,6 +43,10 @@ async function mined(hash) {
   throw new Error("never mined");
 }
 
+/* The curve now needs a Uniswap V4 PoolManager at construction. Deploy the same
+ * mock the contract tests use, so this exercises the real constructor. */
+let PM;
+
 // ── boot anvil ───────────────────────────────────────────────────────────────
 const anvil = spawn(process.env.HOME + "/.foundry/bin/anvil", ["--silent"], { stdio: "ignore" });
 process.on("exit", () => anvil.kill());
@@ -71,14 +75,18 @@ const check = (label, ok, detail) => {
 
 // ── deploy the curve through the module's own encoder ────────────────────────
 const ETH = 10n ** 18n;
+PM = (await mined(await rpc("eth_sendTransaction", [{
+  from: DEPLOYER,
+  data: JSON.parse(fs.readFileSync(path.join(root, "forge-out/MockV4.sol/MockV4PoolManager.json"), "utf8")).bytecode.object
+}]))).contractAddress;
+
 const hash = await T.deployCurve({
   platform: "0x000000000000000000000000000000000000fee5",
   graduationEth: 4n * ETH,
   virtualEth: 1410000000000000000n,
   virtualTokens: 1073000000n * ETH,
   curveSupply: 1000000000n * ETH,
-  factory: "0x1f7d7550B1b028f7571E69A784071F0205FD2EfA",
-  weth: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+  poolManager: PM,
   poolFee: 10000
 });
 const curve = (await mined(hash)).contractAddress;

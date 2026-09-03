@@ -168,7 +168,12 @@ window.MOONPAD_CHAINS = [
      * arguments are the launchpad's whole economics and are immutable, so the
      * deployed address is the only truthful source for them — nothing here
      * should ever restate the curve's parameters. */
-    curve: "0x4b90e4712bc31a9a1c82d3809788e626eec3a051",
+    /* ⚠️ Null again. 0x4b90e4712bc31a9a1c82d3809788e626eec3a051 was deployed
+     * 2026-09-03 and is abandoned: it graduates into Uniswap V3, and this chain
+     * trades on V4. It can still launch and trade, which is precisely why it
+     * must not be wired up — a token launched on it could never reach a pool
+     * anyone uses. Redeploy from /curve-deploy and put the new address here. */
+    curve: null,
 
     /* Who receives a creator's pledged share, and pays it out to holders.
      *

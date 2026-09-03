@@ -4,8 +4,8 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {WavesCurve} from "../contracts/WavesCurve.sol";
 import {WavesToken} from "../contracts/WavesToken.sol";
+import {MockV4PoolManager} from "./MockV4.sol";
 import {CurveHandler} from "./CurveHandler.sol";
-import {MockV3Factory, MockWETH} from "./MockUniswap.sol";
 
 /**
  * Invariants — the properties that must hold after EVERY call, in EVERY order.
@@ -35,17 +35,14 @@ contract WavesCurveInvariantTest is Test {
      * Robinhood rate-limits a fork far below what an invariant run needs, and
      * the ordering bugs this suite hunts are ours, not Uniswap's. The real
      * factory is covered by Graduation.fork.t.sol. */
-    MockV3Factory factory;
-    MockWETH mockWeth;
+    MockV4PoolManager pm;
 
     uint256 constant FUNDING = 10_000 ether;
     uint256 totalFunded;
 
     function setUp() public {
-        factory = new MockV3Factory();
-        mockWeth = new MockWETH();
-        curve = new WavesCurve(platform, GRAD, V_ETH, V_TOKENS, SUPPLY,
-                               address(factory), address(mockWeth), 10000);
+        pm = new MockV4PoolManager();
+        curve = new WavesCurve(platform, GRAD, V_ETH, V_TOKENS, SUPPLY, address(pm), 10000);
 
         for (uint256 i = 1; i <= 6; i++) {
             address a = address(uint160(0xA000 + i));
@@ -103,7 +100,28 @@ contract WavesCurveInvariantTest is Test {
      * that belongs to someone, which is a bug even though nobody can steal it.
      */
     function invariant_ethIsFullyAccountedFor() public view {
-        assertEq(address(curve).balance, _liabilities(), "ETH is unaccounted for");
+        uint256 bal = address(curve).balance;
+        uint256 owed = _liabilities();
+        assertGe(bal, owed, "ETH is unaccounted for");
+
+        /* Exact, except for what graduation deliberately leaves behind.
+         *
+         * A graduating pool is seeded with liquidity sized a hair under what
+         * the curve holds, because the amount owed must be payable from what we
+         * have and being short is not recoverable. The 0.1% remainder belongs
+         * to nobody and stays here forever, which is the safe direction to be
+         * wrong in.
+         *
+         * ⚠️ It only became visible when this moved to Uniswap V4. Under V3 the
+         * whole raise was wrapped to WETH first, so the leftover sat as WETH and
+         * the ETH balance went exactly to zero; V4 takes native ETH, so the dust
+         * stays as ETH and shows up here. The money did not change — only which
+         * asset the rounding lands in.
+         *
+         * So: still exact while nothing has graduated, and bounded by the dust
+         * afterwards. A leak larger than that is a real one. */
+        uint256 slack = handler.graduations() * (GRAD / 500);   // 0.2% each, generous
+        assertLe(bal - owed, slack, "more ETH is unaccounted for than graduation dust");
     }
 
     /**
@@ -163,8 +181,10 @@ contract WavesCurveInvariantTest is Test {
         for (uint256 i = 0; i < actors.length; i++) held += actors[i].balance;
         for (uint256 i = 0; i < keepers.length; i++) held += keepers[i].balance;
         held += platform.balance;
-        // graduated ETH is wrapped, not spent — it is still in the system
-        held += address(mockWeth).balance;
+        /* Graduated ETH is in the pool, not spent — still in the system. On V4
+         * that means it sits in the PoolManager as native ETH; there is no WETH
+         * wrapper any more. */
+        held += address(pm).balance;
         assertLe(held, totalFunded, "ETH was created out of nothing");
     }
 

@@ -3,22 +3,49 @@ pragma solidity 0.8.28;
 
 import {WavesToken} from "./WavesToken.sol";
 
-interface IUniswapV3Factory {
-    function getPool(address a, address b, uint24 fee) external view returns (address);
-    function createPool(address a, address b, uint24 fee) external returns (address);
+/* ── Uniswap V4 ──────────────────────────────────────────────────────────────
+ *
+ * Robinhood Chain trades on V4, not V3: 23 of its 25 indexed pairs are v4, and
+ * their identifiers are 32-byte PoolKey hashes rather than addresses. A V3
+ * factory does exist here and is busy in absolute terms, but it is not where
+ * this chain's launchpads go — graduating into it would put every token in a
+ * two-pair backwater.
+ *
+ * V4 is not a variation on V3. There is one singleton PoolManager and no
+ * per-pool contract; pools are identified by their key; and liquidity is added
+ * under "flash accounting" — you take a lock, do the work, and settle whatever
+ * you owe before the lock closes.
+ *
+ * The upside is that native ETH is a first-class currency (address zero), so
+ * the WETH wrapping this used to need is gone.
+ */
+type Currency is address;
+
+struct PoolKey {
+    Currency currency0;      // the lower address; native ETH is zero, so always first
+    Currency currency1;
+    uint24 fee;
+    int24 tickSpacing;
+    address hooks;
 }
 
-interface IUniswapV3Pool {
-    function initialize(uint160 sqrtPriceX96) external;
-    function mint(address recipient, int24 tickLower, int24 tickUpper, uint128 amount, bytes calldata data)
-        external returns (uint256 amount0, uint256 amount1);
-    function collect(address recipient, int24 tickLower, int24 tickUpper, uint128 a0, uint128 a1)
-        external returns (uint128, uint128);
+struct ModifyLiquidityParams {
+    int24 tickLower;
+    int24 tickUpper;
+    int256 liquidityDelta;
+    bytes32 salt;
 }
 
-interface IWETH {
-    function deposit() external payable;
-    function transfer(address to, uint256 value) external returns (bool);
+interface IPoolManager {
+    function initialize(PoolKey memory key, uint160 sqrtPriceX96) external returns (int24 tick);
+    function unlock(bytes calldata data) external returns (bytes memory);
+    /* Returns BalanceDelta — two int128s packed into one int256, amount0 in the
+     * high half. Negative means the caller owes the pool. */
+    function modifyLiquidity(PoolKey memory key, ModifyLiquidityParams memory params, bytes calldata hookData)
+        external returns (int256 callerDelta, int256 feesAccrued);
+    function settle() external payable returns (uint256);
+    function sync(Currency currency) external;
+    function take(Currency currency, address to, uint256 amount) external;
 }
 
 /**
@@ -68,16 +95,19 @@ contract WavesCurve {
      * at a NON-canonical address, so this is a constructor argument rather than
      * the usual constant — the deployment at 0x1F98431c… on that chain is
      * something else entirely and answers nothing. */
-    IUniswapV3Factory public immutable factory;
-    address public immutable weth;
-    uint24  public immutable poolFee;
+    /* The singleton every pool on this chain lives inside. Non-canonical here,
+     * like everything else, so it is a constructor argument. */
+    IPoolManager public immutable poolManager;
+    uint24 public immutable poolFee;
+    int24  public immutable tickSpacing;
 
-    /* Full range, aligned to the 1% tier's spacing of 200. Full range because a
-     * locked position should never fall out of its band and stop being
-     * liquidity — a narrower one would earn more fees right up until the price
-     * left it, and then the token would look rugged. */
-    int24 internal constant MIN_TICK = -887200;
-    int24 internal constant MAX_TICK = 887200;
+    /* Full range. A locked position should never fall out of its band and stop
+     * being liquidity — a narrower one earns more fees right up until the price
+     * leaves it, and then the token looks rugged.
+     *
+     * The bounds must be multiples of the pool's tick spacing, so they are
+     * computed from it rather than fixed. ±887272 is V4's limit. */
+    int24 internal constant MAX_TICK_LIMIT = 887272;
     uint256 internal constant Q96 = 0x1000000000000000000000000;
 
     /* Virtual reserves, which together decide the opening market cap and the
@@ -176,13 +206,14 @@ contract WavesCurve {
         uint256 virtualEth_,
         uint256 virtualTokens_,
         uint256 curveSupply_,
-        address factory_,
-        address weth_,
+        address poolManager_,
         uint24  poolFee_
     ) {
-        factory = IUniswapV3Factory(factory_);
-        weth = weth_;
+        poolManager = IPoolManager(poolManager_);
         poolFee = poolFee_;
+        /* 200 is what a 1% pool uses on V3 and a sane default here: wide enough
+         * that a full-range position is cheap, fine enough to price a memecoin. */
+        tickSpacing = 200;
         platform = platform_;
         graduationEth = graduationEth_;
         virtualEth = virtualEth_;
@@ -474,7 +505,9 @@ contract WavesCurve {
 
     // ────────────────────────────────────────────────────────────── graduation
 
-    mapping(address => address) public poolOf;   // token => its pool, once graduated
+    /* token => its V4 pool id, once graduated. A key hash, not an address:
+     * V4 has no per-pool contract to point at. */
+    mapping(address => bytes32) public poolIdOf;
 
     /**
      * Close the curve and put everything into a pool nobody can withdraw from.
@@ -501,54 +534,119 @@ contract WavesCurve {
         c.raised = 0;
         c.tokensLeft = 0;
 
-        address pool = factory.getPool(token, weth, poolFee);
-        if (pool == address(0)) pool = factory.createPool(token, weth, poolFee);
-        poolOf[token] = pool;
-
-        bool tokenIsZero = token < weth;
-        (uint256 amount0, uint256 amount1) = tokenIsZero ? (tokensIn, ethIn) : (ethIn, tokensIn);
+        /* Native ETH is currency zero — its address IS zero, so it sorts first
+         * against every token. That also means amount0 is the ETH side and
+         * amount1 the token side, with no ordering branch to get wrong. */
+        PoolKey memory key = _keyFor(token);
 
         /* The opening price is whatever the curve finished at — the ratio of
          * what was raised to what is left. Continuity matters: a pool that
          * opens anywhere else hands the difference to whoever arbitrages it,
          * and that money came from the people who bought on the curve. */
-        uint160 sqrtPriceX96 = uint160(_sqrt((amount1 * (1 << 96) / amount0) * (1 << 96)));
-        /* Belt and braces. The buy cap above means neither side can be zero, so
-         * this cannot trigger — but a price of zero is what a sold-out curve
-         * produced before that cap existed, and it surfaced as a bare "R" from
-         * inside the pool. If it ever comes back it should say so here. */
+        uint160 sqrtPriceX96 = uint160(_sqrt((tokensIn * (1 << 96) / ethIn) * (1 << 96)));
         if (sqrtPriceX96 == 0) revert ZeroAmount();
-        IUniswapV3Pool(pool).initialize(sqrtPriceX96);
+        poolManager.initialize(key, sqrtPriceX96);
 
-        IWETH(weth).deposit{value: ethIn}();
+        /* Everything below happens inside a lock. V4 will not move a token
+         * until the caller has settled, so the amounts owed come back as a
+         * delta and are paid in the callback. */
+        _pending = Pending(token, uint128(ethIn), uint128(tokensIn), sqrtPriceX96);
+        poolManager.unlock("");
+        delete _pending;
 
-        /* Liquidity for a full-range position, taking whichever side binds.
-         * Deliberately a hair under: the callback must be payable from what we
-         * hold, and dust left behind is locked here forever, which is the safe
-         * direction to be wrong in. */
-        uint256 l0 = (amount0 * sqrtPriceX96) / Q96;
-        uint256 l1 = (amount1 * Q96) / sqrtPriceX96;
-        uint256 liquidity = ((l0 < l1 ? l0 : l1) * 999) / 1000;
-
-        _mintPayer = token;
-        IUniswapV3Pool(pool).mint(address(this), MIN_TICK, MAX_TICK, uint128(liquidity), "");
-        _mintPayer = address(0);
-
+        poolIdOf[token] = keccak256(abi.encode(key));
         emit Graduated(token, ethIn, tokensIn);
     }
 
-    address private _mintPayer;
+    /* What the callback needs, parked here because unlock() hands back only
+     * what the PoolManager chooses to pass, and re-reading a curve that was
+     * just zeroed would read zeros. */
+    struct Pending {
+        address token;
+        uint128 ethIn;
+        uint128 tokensIn;
+        uint160 sqrtPriceX96;
+    }
+    Pending private _pending;
 
-    /// Uniswap calls this to collect what the position costs. Only during a mint we started.
-    function uniswapV3MintCallback(uint256 owed0, uint256 owed1, bytes calldata) external {
-        address token = _mintPayer;
-        if (token == address(0)) revert NotGraduated();
-        if (msg.sender != poolOf[token]) revert UnknownToken();
+    function _keyFor(address token) internal view returns (PoolKey memory) {
+        return PoolKey({
+            currency0: Currency.wrap(address(0)),        // native ETH
+            currency1: Currency.wrap(token),
+            fee: poolFee,
+            tickSpacing: tickSpacing,
+            hooks: address(0)                            // no hooks; nothing to trust
+        });
+    }
 
-        bool tokenIsZero = token < weth;
-        (uint256 owedToken, uint256 owedWeth) = tokenIsZero ? (owed0, owed1) : (owed1, owed0);
-        if (owedToken > 0 && !WavesToken(token).transfer(msg.sender, owedToken)) revert TransferFailed();
-        if (owedWeth > 0 && !IWETH(weth).transfer(msg.sender, owedWeth)) revert TransferFailed();
+    /// Full range, snapped inward to the spacing the pool was created with.
+    function _range() internal view returns (int24 lower, int24 upper) {
+        int24 spacing = tickSpacing;
+        upper = (MAX_TICK_LIMIT / spacing) * spacing;
+        lower = -upper;
+    }
+
+    /**
+     * Uniswap calls this once the lock is open. Add the liquidity, then pay
+     * what the pool says we owe.
+     *
+     * ⚠️ Only reachable during a graduate() we started: the PoolManager must be
+     * the caller AND there must be a pending graduation. Without the second
+     * check the manager could be made to open a lock on someone else's behalf
+     * and reach a callback that spends this contract's balance.
+     */
+    function unlockCallback(bytes calldata) external returns (bytes memory) {
+        if (msg.sender != address(poolManager)) revert UnknownToken();
+
+        // two things take a lock; the one in flight says which
+        if (_feesFor != address(0)) {
+            _collect(_feesFor);
+            return "";
+        }
+
+        Pending memory p = _pending;
+        if (p.token == address(0)) revert NotGraduated();
+
+        (int24 lower, int24 upper) = _range();
+
+        /* Liquidity for a full-range position, taking whichever side binds.
+         * Deliberately a hair under: what we owe must be payable from what we
+         * hold, and dust left behind is locked here forever, which is the safe
+         * direction to be wrong in. */
+        uint256 l0 = (uint256(p.ethIn) * p.sqrtPriceX96) / Q96;
+        uint256 l1 = (uint256(p.tokensIn) * Q96) / p.sqrtPriceX96;
+        uint256 liquidity = ((l0 < l1 ? l0 : l1) * 999) / 1000;
+
+        (int256 delta, ) = poolManager.modifyLiquidity(
+            _keyFor(p.token),
+            ModifyLiquidityParams({
+                tickLower: lower,
+                tickUpper: upper,
+                liquidityDelta: int256(liquidity),
+                salt: bytes32(0)
+            }),
+            ""
+        );
+
+        /* BalanceDelta is two int128s in one word, amount0 high. Negative is
+         * what we owe the pool. */
+        int128 owed0 = int128(delta >> 128);
+        int128 owed1 = int128(delta);
+
+        if (owed0 < 0) {
+            // native: hand it over with the call, no sync needed
+            poolManager.settle{value: uint256(uint128(-owed0))}();
+        }
+        if (owed1 < 0) {
+            /* ERC20: the manager measures what arrived, so it has to be told to
+             * take a reading BEFORE the transfer, not after. */
+            poolManager.sync(Currency.wrap(p.token));
+            if (!WavesToken(p.token).transfer(address(poolManager), uint256(uint128(-owed1)))) {
+                revert TransferFailed();
+            }
+            poolManager.settle();
+        }
+        return "";
     }
 
     /**
@@ -556,15 +654,47 @@ contract WavesCurve {
      * to — them, or the keeper paying their holders.
      *
      * This is the reason to hold the position rather than send it to a burn
-     * address: locked liquidity that also pays its holders forever, which is
-     * what the Solana side does from its locked LP.
+     * address: locked liquidity that also pays its holders forever.
+     *
+     * ⚠️ Note what is NOT here. There is no path that passes a negative
+     * liquidityDelta, so the position cannot be reduced — by us, by the
+     * creator, by anyone. Not a timelock and not a promise: the code to remove
+     * liquidity does not exist, so it cannot be called.
      */
     function collectPoolFees(address token) external {
-        address pool = poolOf[token];
-        if (pool == address(0)) revert NotGraduated();
+        if (poolIdOf[token] == bytes32(0)) revert NotGraduated();
+        _feesFor = token;
+        poolManager.unlock("");
+        _feesFor = address(0);
+    }
+
+    address private _feesFor;
+
+    /**
+     * Inside the lock: ask for zero liquidity change, which settles up the fees
+     * the position has earned, then take them.
+     *
+     * ⚠️ liquidityDelta is ZERO, and there is no code path anywhere in this
+     * contract that passes a negative one. That is what makes the lock real.
+     */
+    function _collect(address token) private {
         Curve storage c = curves[token];
         address to = (c.rewardsBps > 0 && c.keeper != address(0)) ? c.keeper : c.creator;
-        IUniswapV3Pool(pool).collect(to, MIN_TICK, MAX_TICK, type(uint128).max, type(uint128).max);
+        (int24 lower, int24 upper) = _range();
+
+        (int256 delta, ) = poolManager.modifyLiquidity(
+            _keyFor(token),
+            ModifyLiquidityParams({
+                tickLower: lower, tickUpper: upper, liquidityDelta: 0, salt: bytes32(0)
+            }),
+            ""
+        );
+
+        // positive means the pool owes US — the fees this position earned
+        int128 got0 = int128(delta >> 128);
+        int128 got1 = int128(delta);
+        if (got0 > 0) poolManager.take(Currency.wrap(address(0)), to, uint256(uint128(got0)));
+        if (got1 > 0) poolManager.take(Currency.wrap(token), to, uint256(uint128(got1)));
     }
 
     function _sqrt(uint256 x) private pure returns (uint256 y) {

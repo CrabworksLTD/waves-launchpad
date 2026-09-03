@@ -69,9 +69,9 @@ a{color:var(--accent)}
     <div class="row"><span class="k">virtualTokens</span><b>1,073,000,000</b></div>
     <div class="row"><span class="k">curveSupply</span><b>1,000,000,000</b></div>
     <div class="row"><span class="k">graduationEth</span><b>4 ETH</b></div>
-    <div class="row"><span class="k">Uniswap V3 factory</span><b class="mono" id="p-fac">…</b></div>
-    <div class="row"><span class="k">WETH</span><b class="mono" id="p-weth">…</b></div>
-    <div class="row"><span class="k">Pool fee tier</span><b>1% (10000)</b></div>
+    <div class="row"><span class="k">Uniswap V4 PoolManager</span><b class="mono" id="p-fac">…</b></div>
+    <div class="row"><span class="k">Pool fee tier</span><b>1% (10000), spacing 200</b></div>
+    <div class="row"><span class="k">Hooks</span><b>none</b></div>
   </div>
 
   <h2>What those numbers mean</h2>
@@ -122,8 +122,11 @@ a{color:var(--accent)}
     virtualEth: 1410000000000000000n,     // 1.41
     virtualTokens: 1073000000n * ETHER,
     curveSupply: 1000000000n * ETHER,
-    factory: "0x1f7d7550B1b028f7571E69A784071F0205FD2EfA",
-    weth: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+    /* Uniswap V4's singleton on Robinhood Chain, found by sweeping logs for the
+     * V4 Initialize topic. This chain trades on v4 — 23 of its 25 indexed pairs
+     * — and a curve that graduated into v3 would put every token in a two-pair
+     * backwater, permanently, since this is a constructor argument. */
+    poolManager: "0x8366a39cc670b4001a1121b8f6a443a643e40951",
     poolFee: 10000
   };
 
@@ -131,8 +134,7 @@ a{color:var(--accent)}
   ARGS.platform = chain.feeTo;
   $("p-chain").textContent = chain.name + " (" + chain.id + ")";
   $("p-plat").textContent = ARGS.platform || "NOT SET";
-  $("p-fac").textContent = ARGS.factory;
-  $("p-weth").textContent = ARGS.weth;
+  $("p-fac").textContent = ARGS.poolManager;
 
   /* What the parameters mean in money, at today's price.
    *
@@ -199,8 +201,8 @@ a{color:var(--accent)}
       return "0".repeat(24) + String(x).toLowerCase().replace(/^0x/, "");
     };
     return a(ARGS.platform) + h(ARGS.graduationEth) + h(ARGS.virtualEth) +
-      h(ARGS.virtualTokens) + h(ARGS.curveSupply) + a(ARGS.factory) +
-      a(ARGS.weth) + h(ARGS.poolFee);
+      h(ARGS.virtualTokens) + h(ARGS.curveSupply) + a(ARGS.poolManager) +
+      h(ARGS.poolFee);
   }
 
   async function paintButton() {

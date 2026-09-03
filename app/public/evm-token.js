@@ -421,9 +421,12 @@
     return uintAt(await read(sel("owed(address)") + addr32(who)), 0);
   }
 
-  async function poolOf(token) {
-    var a = addrAt(await read(sel("poolOf(address)") + addr32(token)), 0);
-    return /^0x0{40}$/.test(a) ? null : a;
+  /* V4 pools have an id, not an address — there is no per-pool contract to
+   * point at. Zero means it has not graduated. */
+  async function poolIdOf(token) {
+    var out = await read(sel("poolIdOf(address)") + addr32(token));
+    var id = "0x" + wordAt(out, 0);
+    return /^0x0{64}$/.test(id) ? null : id;
   }
 
   async function balanceOf(token, who) {
@@ -457,14 +460,15 @@
     from = from || await window.MoonpadLaunch.connect();
     await window.MoonpadLaunch.switchChain(chain().id);
 
+    /* A PoolManager, not a factory, and no WETH — Uniswap V4 takes native ETH
+     * as currency zero, so there is nothing to wrap. */
     var args =
       addr32(opts.platform) +
       hex32(opts.graduationEth) +
       hex32(opts.virtualEth) +
       hex32(opts.virtualTokens) +
       hex32(opts.curveSupply) +
-      addr32(opts.factory) +
-      addr32(opts.weth) +
+      addr32(opts.poolManager) +
       hex32(opts.poolFee);
 
     return send(from, { data: art.bytecode + args, value: "0x0" });
@@ -571,7 +575,7 @@
 
         var t = await terms();
         var supply = fromWei(t.curveSupply);
-        var pool = await poolOf(token);
+        var pool = await poolIdOf(token);
 
         /* x / y against the VIRTUAL reserves, which is what the curve prices
          * against — using the real balance would read a price the contract
@@ -702,7 +706,7 @@
     progressBps: progressBps,
     ready: ready,
     owed: owed,
-    poolOf: poolOf,
+    poolIdOf: poolIdOf,
     balanceOf: balanceOf,
     terms: terms,
     // setup

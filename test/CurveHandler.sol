@@ -139,15 +139,14 @@ contract CurveHandler is Test {
     }
 
     /**
-     * Graduation needs the real Uniswap, so locally this is a no-op and the run
-     * only exercises the curve. On a fork it closes curves mid-sequence, which
-     * is where the interesting orderings are — a sell arriving on a token that
-     * graduated three calls ago, a claim after the ETH left for the pool.
+     * Graduation runs against the mock PoolManager, so it happens for real
+     * mid-sequence — which is where the interesting orderings are: a sell
+     * arriving on a token that graduated three calls ago, a claim after the ETH
+     * has left for the pool.
      */
     function graduate(uint256 tokenSeed) external {
         address t = _token(tokenSeed);
         if (t == address(0)) return;
-        if (address(curve.factory()).code.length == 0) return;
         if (!curve.ready(t)) return;
         curve.graduate(t);
         graduations++;
