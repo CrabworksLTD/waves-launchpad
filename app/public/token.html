@@ -960,7 +960,11 @@ input:focus{outline:none;border-color:var(--accent)}
     // the rate, so a token the indexer has not seen still shows dollars
     if (USD == null) {
       try {
-        var ur = await fetch("/api/stats?usd=" + encodeURIComponent(QUOTE.toLowerCase()))
+        /* On Robinhood the quote is ETH, which the stats endpoint prices from
+         * Coinbase rather than Jupiter — Jupiter knows Solana mints and nothing
+         * about another chain's native coin. Without this the page fell back to
+         * raw ETH everywhere and never showed a dollar figure. */
+        var ur = await fetch("/api/stats?usd=" + encodeURIComponent(IS_EVM ? "eth" : QUOTE.toLowerCase()))
           .then(function (r) { return r.json(); });
         if (ur && ur.usd) USD = ur.usd;
       } catch (e) {}

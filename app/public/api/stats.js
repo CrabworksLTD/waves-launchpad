@@ -71,6 +71,17 @@ const QUOTE_MINTS = {
  * this answers from the same source the indexer uses, cached at the edge. */
 const B58MINT = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 async function quoteUsd(sym) {
+  /* ETH, for the Robinhood side. Jupiter prices Solana mints and knows nothing
+   * about another chain's native coin, so this asks Coinbase — the same source
+   * the launch window uses for its dollar figures, so the two agree. */
+  if (String(sym || "").toLowerCase() === "eth") {
+    try {
+      const j = await fetch("https://api.coinbase.com/v2/prices/ETH-USD/spot").then((r) => r.json());
+      const v = Number(j && j.data && j.data.amount);
+      return v > 0 ? v : null;
+    } catch (e) { return null; }
+  }
+
   // a known quote symbol (sol/usdc), or a raw mint address — the token page
   // uses the raw-mint form to price a reward asset (e.g. an xStock) so it can
   // show accrued/distributed in that asset rather than the quote currency

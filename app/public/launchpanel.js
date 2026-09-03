@@ -1455,8 +1455,18 @@
     for (var i = 0; i < T.LADDER.length; i++) {
       var name = T.LADDER[i], spec = T.TIERS[name];
       if (!spec) continue;
+      /* On Solana a rung only exists if we signed a DBC config for it, so the
+       * list is what has actually been created. On Robinhood the contract
+       * enforces the ladder itself — platformVolumeBps accepts exactly these
+       * six rungs and reverts on anything else — so there is nothing to look
+       * up, and asking Solana whether "eth" has a config threw for every rung
+       * and left the launch window with NO tax picker at all. */
       var ready = true;
-      try { window.Token.configFor(flow.quote, name); } catch (e) { ready = false; }
+      if (isEvm()) {
+        ready = EVM_PLATFORM_BPS[spec.baseFeeBps] !== undefined;
+      } else {
+        try { window.Token.configFor(flow.quote, name); } catch (e) { ready = false; }
+      }
       if (ready) out.push({ name: name, spec: spec });
     }
     return out;
