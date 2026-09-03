@@ -162,6 +162,45 @@ let full = false;
 try { await T.buy(tok, ETH, 0, BUYER); } catch (e) { full = /full/i.test(e.message); }
 check("a full curve refuses more money with a readable reason", full);
 
+// ── the adapter the token page's trade box talks to ──────────────────────────
+FROM = BUYER;
+window.MoonpadWallet = { account: BUYER };
+const ad = T.adapter();
+
+const lh2 = await T.launch({ name: "Ad", symbol: "AD", feeBps: 300, devBuyWei: ETH });
+const tok2 = (await T.waitForLaunch(lh2.hash)).token;
+
+const mk = await ad.readMarket(tok2);
+check("readMarket reports a live curve",
+  mk.migrated === false && mk.price > 0 && mk.supply === 1e9 && mk.quote === "ETH",
+  `price=${mk.price.toExponential(3)} mcap=${Math.round(mk.mcap)} ETH`);
+check("progress tracks the threshold",
+  mk.progress > 0 && mk.progress < 1 && mk.threshold === 4,
+  `${(mk.progress * 100).toFixed(1)}%`);
+
+const q = await ad.getQuote(tok2, 0.5, "buy");
+check("a quote carries a slippage floor below the expected fill",
+  q.minOut < BigInt(Math.floor(q.out * 1e18)) && q.minOut > 0n);
+
+await mined(await ad.swap(tok2, "buy", q.amountIn, q.minOut));
+const held = await ad.balanceOf(tok2);
+check("adapter buy fills at or above the floor", held >= q.out * 0.99,
+  `held=${held.toFixed(0)}`);
+
+/* The one that matters: a sell has to approve FIRST and wait for it to mine.
+ * An approval still in the mempool is not an allowance. */
+const sq = await ad.getQuote(tok2, held / 2, "sell");
+const ethBefore = BigInt(await rpc("eth_getBalance", [BUYER, "latest"]));
+await mined(await ad.swap(tok2, "sell", sq.amountIn, sq.minOut));
+check("adapter sell approves, waits, then sells in one call",
+  BigInt(await rpc("eth_getBalance", [BUYER, "latest"])) > ethBefore - ETH / 20n);
+check("and the tokens left the wallet", (await ad.balanceOf(tok2)) < held * 0.6);
+
+check("rewardsActive is false before any pledge", (await ad.rewardsActive(tok2)) === false);
+FROM = BUYER;
+await mined(await T.pledgeToHolders(tok2, 5000, "0x000000000000000000000000000000000000dEaD", BUYER));
+check("rewardsActive is true once pledged", (await ad.rewardsActive(tok2)) === true);
+
 anvil.kill();
 console.log(bad ? `\n${bad} failed` : "\nevm-token.js drives the real contract correctly");
 process.exit(bad ? 1 : 0);

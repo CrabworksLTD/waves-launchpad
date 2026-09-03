@@ -444,7 +444,151 @@
     return send(from, { data: art.bytecode + args, value: "0x0" });
   }
 
+  // ----------------------------------------------------------------- adapter
+  /* Whole units in, wei out. A launch amount arrives from an <input> as a
+   * float, and 0.1 * 1e18 in double precision is not 1e17 — it is
+   * 100000000000000000.00000001, which BigInt refuses. Going via 1e9 twice
+   * keeps every intermediate inside the range a double represents exactly. */
+  function toWei(amount) {
+    var n = Number(amount) || 0;
+    if (n <= 0) return 0n;
+    return BigInt(Math.round(n * 1e9)) * 1000000000n;
+  }
+
+  function fromWei(v) { return Number(v) / 1e18; }
+
+  /* How far the fill may drift from the quote before the trade reverts.
+   *
+   * The curve moves with every trade, so a quote is only true for the state it
+   * was read against — someone else's buy landing first moves the price under
+   * you. Two percent is wide enough to survive ordinary traffic and tight
+   * enough that a sandwich is not free. The contract enforces it; this only
+   * chooses the number. */
+  var SLIPPAGE_BPS = 200;
+
+  function withSlippage(v) {
+    return (BigInt(v) * BigInt(10000 - SLIPPAGE_BPS)) / 10000n;
+  }
+
+  async function waitForTx(hash) {
+    var c = chain();
+    for (var i = 0; i < 120; i++) {
+      var r = await window.MoonpadRPC.send(c.rpc, "eth_getTransactionReceipt", [hash])
+        .catch(function () { return null; });
+      if (r) {
+        if (r.status === "0x0") throw new Error("The transaction reverted");
+        return r;
+      }
+      await new Promise(function (s) { setTimeout(s, 2000); });
+    }
+    throw new Error("Not confirmed after four minutes — check the explorer");
+  }
+
+  /**
+   * The same surface window.Token presents on Solana, backed by our curve.
+   *
+   * The token page's trade box is chain-agnostic already — it asks for a
+   * balance, a quote and a swap. Giving it an object shaped like the one it
+   * knows means the buy/sell UI, the chips, the debounced requoting and the
+   * error handling are shared rather than written twice and drifting apart.
+   */
+  function adapter() {
+    return {
+      evm: true,
+
+      balanceOf: async function (token) {
+        var who = (window.MoonpadWallet || {}).account;
+        if (!who) return 0;
+        return fromWei(await balanceOf(token, who));
+      },
+
+      getQuote: async function (token, amount, side) {
+        var inWei = toWei(amount);
+        if (inWei <= 0n) throw new Error("Enter an amount.");
+        if (side === "buy") {
+          var out = await quoteBuy(token, inWei);
+          if (out <= 0n) throw new Error("The curve cannot fill that — it may be full.");
+          return { out: fromWei(out), amountIn: inWei, minOut: withSlippage(out) };
+        }
+        var back = await quoteSell(token, inWei);
+        if (back <= 0n) throw new Error("That is too small to move the curve.");
+        return { out: fromWei(back), amountIn: inWei, minOut: withSlippage(back) };
+      },
+
+      swap: async function (token, side, amountIn, minOut) {
+        var from = await window.MoonpadLaunch.connect();
+        if (side === "buy") return buy(token, amountIn, minOut, from);
+
+        /* Selling needs an allowance, and the approval has to be MINED before
+         * the sell is sent — an approval still in the mempool is not an
+         * allowance, and the sell reverts on a transfer the curve is not yet
+         * permitted to make. There is no equivalent step on Solana, which is
+         * why the shared trade box cannot simply call swap and be done. */
+        var have = await allowance(token, from);
+        if (have < BigInt(amountIn)) {
+          await waitForTx(await approve(token, amountIn, from));
+        }
+        return sell(token, amountIn, minOut, from);
+      },
+
+      /**
+       * The same market summary readMarket returns on Solana.
+       *
+       * Price comes from the curve's own arithmetic rather than a probe swap:
+       * the spot price on a constant-product curve is just the ratio of the
+       * reserves, and both are already in the struct we read to draw progress.
+       * One call, no quote round trip.
+       */
+      readMarket: async function (token) {
+        var c = await curveOf(token);
+        if (!c || /^0x0{40}$/.test(c.creator)) throw new Error("That token was not launched here.");
+
+        var t = await terms();
+        var supply = fromWei(t.curveSupply);
+        var pool = await poolOf(token);
+
+        /* x / y against the VIRTUAL reserves, which is what the curve prices
+         * against — using the real balance would read a price the contract
+         * would not honour. */
+        var x = t.virtualEth + c.raised;
+        var sold = t.curveSupply - c.tokensLeft;
+        var y = t.virtualTokens - sold;
+        var price = y > 0n ? fromWei(x) / fromWei(y) : null;
+
+        var raised = fromWei(c.raised);
+        var threshold = fromWei(t.graduationEth);
+        return {
+          pool: pool,
+          migrated: c.graduated,
+          raised: raised,
+          threshold: threshold,
+          progress: threshold > 0 ? Math.min(1, raised / threshold) : 0,
+          price: price,
+          supply: supply,
+          mcap: price != null ? price * supply : null,
+          quote: "ETH",
+          creator: c.creator,
+          // extras the EVM page can show and the Solana one has no equivalent for
+          feeBps: c.feeBps,
+          rewardsBps: c.rewardsBps
+        };
+      },
+
+      // true once a creator has pledged part of their fees to holders
+      rewardsActive: async function (token) {
+        var c = await curveOf(token);
+        return !!(c && c.rewardsBps > 0);
+      },
+
+      // the page links a finished trade to the right explorer
+      txUrl: function (hash) { return chain().explorer + "/tx/" + hash; }
+    };
+  }
+
   window.MoonpadToken = {
+    // the token page's trade box, chain-swapped
+    adapter: adapter,
+    waitForTx: waitForTx,
     // launch
     launch: launch,
     waitForLaunch: waitForLaunch,

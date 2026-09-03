@@ -323,8 +323,27 @@ input:focus{outline:none;border-color:var(--accent)}
 
   var qs = new URLSearchParams(location.search);
   if (qs.get("cluster")) window.Launch.cluster(qs.get("cluster"));
-  var MINT = (location.pathname.match(/\/token\/([1-9A-HJ-NP-Za-km-z]{32,44})/) || [])[1]
+  /* A Robinhood token is a 0x contract address, not a base58 mint. Matching only
+   * base58 meant an EVM token page never found its own address and rendered
+   * empty. */
+  var MINT = (location.pathname.match(/\/token\/(0x[0-9a-fA-F]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})/) || [])[1]
           || qs.get("mint") || "";
+  var IS_EVM = /^0x[0-9a-fA-F]{40}$/.test(MINT);
+
+  /* The trade box speaks to one object: balance, quote, swap. On Solana that is
+   * window.Token; on Robinhood it is an adapter over our own curve with the
+   * same three methods. Choosing here rather than branching inside every
+   * handler keeps the buy/sell UI, the chips, the debounced requoting and the
+   * error handling shared instead of written twice and drifting. */
+  var tk = IS_EVM ? null : window.Token;
+  var tkReady = IS_EVM
+    ? Shell.ensureEvmLaunch().then(function () { tk = window.MoonpadToken.adapter(); })
+    : Promise.resolve();
+
+  function currentWallet() {
+    return IS_EVM ? ((window.MoonpadWallet || {}).account || null)
+                  : (window.Wallet && window.Wallet.current());
+  }
   var $ = function (id) { return document.getElementById(id); };
 
   /* Read art through the mirror.
@@ -627,6 +646,7 @@ input:focus{outline:none;border-color:var(--accent)}
 
   function loadTrades() {
     if (!poolHint) { $("hist-note").textContent = "no pool recorded"; return; }
+    if (IS_EVM) return;      // no EVM trade feed yet — see the note in evm-token.js
     window.Token.recentTrades(MINT, poolHint, 15).then(function (list) {
       if (!list.length) {
         $("hist-note").textContent = "";
@@ -698,7 +718,9 @@ input:focus{outline:none;border-color:var(--accent)}
     var active = !!rec.rewardsActivatedAt;
     if (!active) {
       try {
-        active = await window.Token.rewardsActive(rec.pool || null, rec.mint);
+        active = IS_EVM
+          ? await tk.rewardsActive(rec.mint)
+          : await window.Token.rewardsActive(rec.pool || null, rec.mint);
       } catch (e) { active = false; }
     }
     if (!active) return;
@@ -743,6 +765,8 @@ input:focus{outline:none;border-color:var(--accent)}
 
     if (!asset) return paint(null, true);
     // the picker's list carries both the ticker and whether anything trades it
+    // RWA reward assets are a Solana-side feature; paint the plain state
+    if (IS_EVM) return paint(null, true);
     window.Token.rwa().then(function (list) {
       var hit = (list || []).find(function (t) { return t.mint === asset; });
       if (!hit) return paint(null, true);
@@ -762,7 +786,8 @@ input:focus{outline:none;border-color:var(--accent)}
         .then(function (r) { return r.json(); })
         .then(function (j) { return (j.payouts && j.payouts[rec.mint]) || null; })
         .catch(function () { return null; }),
-      window.Token.feeMetrics(rec.mint, rec.pool || null).catch(function () { return null; })
+      IS_EVM ? Promise.resolve(null)
+             : window.Token.feeMetrics(rec.mint, rec.pool || null).catch(function () { return null; })
     ]).then(function (res) {
       var pay = res[0], m = res[1];
       if (!m) return null;
@@ -833,16 +858,25 @@ input:focus{outline:none;border-color:var(--accent)}
         /* Our index is a convenience, not the truth. The name and ticker a
          * token actually launched with live on its metadata account, so ask
          * the chain and let it win — a listing can be wrong, the mint cannot. */
-        window.Token.onchainIdentity(MINT).then(function (id) {
-          if (!id) return;
-          if (id.name) $("name").firstChild.textContent = id.name;
-          if (id.symbol) $("sym").textContent = "$" + id.symbol;
-          if (!id.uri) return null;
-          return fetch(id.uri).then(function (r) { return r.ok ? r.json() : null; });
-        }).then(function (meta) {
-          renderLinks(meta);
-          if (meta && meta.description) $("desc").textContent = meta.description;
-        }).catch(function () { renderLinks(null); });
+        /* ⚠️ Not an early return. Everything below in load() — the art, the
+         * market read, the chart, the trade box — runs after this, so bailing
+         * out here on EVM would render a blank page. WavesToken carries only a
+         * name and a symbol, both already in the record, so there is simply
+         * nothing to ask the chain for. */
+        if (IS_EVM) {
+          renderLinks(null);
+        } else {
+          window.Token.onchainIdentity(MINT).then(function (id) {
+            if (!id) return;
+            if (id.name) $("name").firstChild.textContent = id.name;
+            if (id.symbol) $("sym").textContent = "$" + id.symbol;
+            if (!id.uri) return null;
+            return fetch(id.uri).then(function (r) { return r.ok ? r.json() : null; });
+          }).then(function (meta) {
+            renderLinks(meta);
+            if (meta && meta.description) $("desc").textContent = meta.description;
+          }).catch(function () { renderLinks(null); });
+        }
         /* Art is pinned to Arweave at launch, and the gateway can take a
          * while to serve a fresh upload — Turbo returns the id immediately but
          * the bundle is posted and seeded after. So a token is at its most
@@ -873,7 +907,8 @@ input:focus{outline:none;border-color:var(--accent)}
     }).catch(function () {});
 
     try {
-      market = await window.Token.readMarket(MINT, poolHint);
+      await tkReady;
+      market = await tk.readMarket(MINT, poolHint);
     } catch (e) {
       $("name").firstChild.textContent = "Not found";
       say("err", esc(String(e.message)));
@@ -1114,8 +1149,8 @@ input:focus{outline:none;border-color:var(--accent)}
       if (!b) return;
       if (b.dataset.v) { $("amt").value = b.dataset.v; requote(); return; }
       // sell chips are a percentage of what the wallet actually holds
-      if (!window.Wallet.current()) { say("err", "Connect a wallet to size a sell."); return; }
-      window.Token.balanceOf(MINT).then(function (bal) {
+      if (!currentWallet()) { say("err", "Connect a wallet to size a sell."); return; }
+      tkReady.then(function () { return tk.balanceOf(MINT); }).then(function (bal) {
         if (!bal) { say("err", "This wallet holds none of this token."); return; }
         var amt = Math.floor(bal * (+b.dataset.p / 100) * 1e6) / 1e6;
         $("amt").value = amt; say("", ""); requote();
@@ -1131,7 +1166,8 @@ input:focus{outline:none;border-color:var(--accent)}
     side = s;
     $("t-buy").className = s === "buy" ? "on buy" : "buy";
     $("t-sell").className = s === "sell" ? "on sell" : "sell";
-    $("amt-label").textContent = s === "buy" ? "Amount (SOL)" : "Amount (tokens)";
+    $("amt-label").textContent = s === "buy"
+      ? (IS_EVM ? "Amount (ETH)" : "Amount (SOL)") : "Amount (tokens)";
     $("chips").innerHTML = s === "buy"
       ? '<button data-v="0.1">0.1</button><button data-v="0.5">0.5</button><button data-v="1">1</button><button data-v="5">5</button>'
       : '<button data-p="10">10%</button><button data-p="25">25%</button><button data-p="50">50%</button><button data-p="100">100%</button>';
@@ -1146,11 +1182,12 @@ input:focus{outline:none;border-color:var(--accent)}
       if (!(amt > 0)) { $("est").textContent = "—"; lastQuote = null; paintGo(); return; }
       var seq = ++quoteSeq;
       try {
-        var q = await window.Token.getQuote(MINT, amt, side, poolHint);
+        await tkReady;
+        var q = await tk.getQuote(MINT, amt, side, poolHint);
         if (seq !== quoteSeq) return;              // a newer quote superseded this one
         lastQuote = q;
         $("est").textContent = UI.fmt(q.out, side === "buy" ? 0 : 4) +
-          (side === "buy" ? " tokens" : " SOL");
+          (side === "buy" ? " tokens" : (IS_EVM ? " ETH" : " SOL"));
       } catch (e) {
         if (seq !== quoteSeq) return;
         lastQuote = null; $("est").textContent = "—";
@@ -1161,7 +1198,7 @@ input:focus{outline:none;border-color:var(--accent)}
   }
 
   function paintGo() {
-    var w = window.Wallet.current();
+    var w = currentWallet();
     var go = $("go");
     go.disabled = false;
     if (!w) { go.textContent = "Connect wallet"; go.onclick = connect; return; }
@@ -1178,7 +1215,10 @@ input:focus{outline:none;border-color:var(--accent)}
   /* Same as the mint page: the shell restores an existing session on load and
    * that lands after this page has drawn, so the trade box has to redraw when
    * the wallet turns up rather than only when someone clicks Connect. */
-  if (window.Wallet) {
+  if (IS_EVM) {
+    // evm-wallet.js dispatches this when an account connects or changes
+    window.addEventListener("moonpad-wallet", function () { armTradeBox(); });
+  } else if (window.Wallet) {
     window.Wallet.on("change", function () { armTradeBox(); });
   }
 
@@ -1187,9 +1227,11 @@ input:focus{outline:none;border-color:var(--accent)}
     go.disabled = true; go.textContent = "Confirm in your wallet…";
     say("", "");
     try {
-      var sig = await window.Token.swap(MINT, side, lastQuote.amountIn, lastQuote.minOut, poolHint);
+      await tkReady;
+      var sig = await tk.swap(MINT, side, lastQuote.amountIn, lastQuote.minOut, poolHint);
+      var txUrl = IS_EVM ? tk.txUrl(sig) : "https://explorer.solana.com/tx/" + sig;
       say("ok", (side === "buy" ? "Bought." : "Sold.") +
-        ' <a href="https://explorer.solana.com/tx/' + esc(sig) + '" target="_blank" rel="noopener">View tx ↗</a>');
+        ' <a href="' + esc(txUrl) + '" target="_blank" rel="noopener">View tx ↗</a>');
       // Clear the amount once it has actually traded. Leaving the old number
       // sitting there invites a second trade nobody meant to make, and the
       // quote beside it is stale the moment the curve moves.
