@@ -265,7 +265,12 @@
      * client-side by design, so it keeps out visitors, not attackers. The
      * hash lives in brand.js; localhost stays open for development. */
     (function () {
-      var gh = window.BRAND && window.BRAND.gate;
+      var B = window.BRAND || {};
+      /* Whole site first, then this chain's own gate. Robinhood is behind the
+       * password while its launchpad runs on a curve that has never been
+       * deployed or audited; Solana is public. Switching chains navigates, so
+       * a page load runs this again and the curtain appears on arrival. */
+      var gh = B.gate || (B.gateChain || {})[currentChain()] || "";
       if (!gh || /^(localhost|127\.)/.test(location.hostname)) return;
       /* Every page, not just the front doors. Kyle asked for the whole site
        * locked; the previous version let anyone with a /mint/<address> or

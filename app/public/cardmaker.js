@@ -115,12 +115,33 @@
     g.fillStyle = sc;
     g.fillRect(0, 0, W, H);
 
-    // wordmark
-    g.font = '800 30px Archivo, sans-serif';
+    // wordmark + handle, top-right. A drop shadow keeps them legible over a
+    // LIGHT/white banner — green-on-white and white-on-white would otherwise
+    // vanish. On a dark banner the dark shadow is invisible, so the look is
+    // unchanged. save/restore so the shadow does not bleed into other draws.
+    g.save();
     g.textAlign = "right";
     g.textBaseline = "alphabetic";
-    g.fillStyle = pal.accent;
-    g.fillText("WAVES", W - 56, 74);
+    var handle = (window.BRAND && window.BRAND.x) || "@waveslaunchpad";
+    // the handle under the wordmark — every shared token card is exposure back
+    // to us, so a viewer can find and follow the launchpad's socials
+    function drawBranding() {
+      g.font = '800 30px Archivo, sans-serif';
+      g.fillStyle = pal.accent;
+      g.fillText("WAVES", W - 56, 74);
+      g.font = '500 20px "IBM Plex Mono", monospace';
+      g.fillStyle = "rgba(255,255,255,.9)";
+      g.fillText(handle, W - 56, 100);
+    }
+    /* Two passes. First a soft DARK edge, so both stay legible on a light/white
+     * banner (a pure green glow gives no contrast on white). Then a GREEN glow
+     * in the WAVES accent layered on top — invisible on dark, a subtle bloom on
+     * light, and matches the wordmark either way. */
+    g.shadowColor = "rgba(0,0,0,.5)"; g.shadowBlur = 7; g.shadowOffsetY = 1;
+    drawBranding();
+    g.shadowColor = pal.accent; g.shadowBlur = 16; g.shadowOffsetY = 0;
+    drawBranding();
+    g.restore();
 
     // avatar tile with the accent border
     var ax = 56, ay = H - 52 - 176 - 34 - 60, AS = 176;

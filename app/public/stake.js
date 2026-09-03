@@ -30,10 +30,12 @@
   // 8-byte anchor discriminators, from the IDL. Hardcoded rather than hashed so
   // there is no sha256 dependency and no chance of a "global:" prefix drift.
   var IX = {
-    stake: [206, 176, 202, 18, 200, 209, 179, 108],   // arg: amount u64
+    init_pool: [116, 233, 199, 204, 115, 159, 171, 36],
+    stake: [206, 176, 202, 18, 200, 209, 179, 108],    // arg: amount u64
     sync:  [4, 219, 40, 164, 21, 157, 189, 88],
     claim: [62, 198, 214, 193, 213, 159, 108, 210]
   };
+  var TOKEN22_PROGRAM = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"; // xStocks are T22
 
   var mxMod;
   function mx() { if (!mxMod) mxMod = import("/vendor/metaplex.esm.js"); return mxMod; }
@@ -144,6 +146,24 @@
     var b = new Uint8Array(8);
     new DataView(b.buffer).setBigUint64(0, BigInt(n), true);
     return b;
+  }
+  /* init_pool — create the RewardPool for one collection+token, once, before any
+   * fees route to it. From program src: the `vault` is NOT init'd here — it is a
+   * token account owned by the pool PDA (token::authority = pool) that the CALLER
+   * creates first (an ATA of the pool PDA for reward_mint). And token_program must
+   * match the reward mint's program: classic SPL for SOL/USDC, Token-2022 for the
+   * xStocks — so a.tokenProgram is resolved from the reward mint's owner, not
+   * hardcoded. ⚠️ UNTESTED against a live program. */
+  function ixInitPool(X, a) {  // a: {pool, tokenMint, collection, rewardMint, vault, payer, tokenProgram}
+    return {
+      programId: pk(X, PROGRAM_ID),
+      keys: [
+        key(X, a.pool, 0, 1), key(X, a.tokenMint, 0, 0), key(X, a.collection, 0, 0),
+        key(X, a.rewardMint, 0, 0), key(X, a.vault, 0, 0), key(X, a.payer, 1, 1),
+        key(X, a.tokenProgram || TOKEN_PROGRAM, 0, 0), key(X, SYS_PROGRAM, 0, 0)
+      ],
+      data: data(IX.init_pool)
+    };
   }
   function ixStake(X, a) {   // a: {pool, position, asset, tokenMint, stakerTokens, owner, amount}
     return {
@@ -259,9 +279,29 @@
     // instruction builders — assemble into a Transaction and sign via the wallet
     // adapter the same way token.js does. UNTESTED: do not wire to buttons until
     // the program is live and the flow is rehearsed.
+    buildInitPool: async function (a) { return ixInitPool(await mx(), a); },
     buildStake: async function (a) { return ixStake(await mx(), a); },
     buildSync:  async function (a) { return ixSync(await mx(), a); },
     buildClaim: async function (a) { return ixClaim(await mx(), a); },
-    ownerAta:   async function (mint, owner) { return ownerAta(await mx(), mint, owner).toBase58(); }
+    ownerAta:   async function (mint, owner) { return ownerAta(await mx(), mint, owner).toBase58(); },
+    // the reward mint's owner program, needed to build the vault ATA and pass the
+    // right token_program — classic SPL for SOL/USDC, Token-2022 for xStocks
+    tokenProgramOf: async function (mint) {
+      var X = await mx(), c = conn(X);
+      var info = await c.getAccountInfo(pk(X, mint), "confirmed");
+      var owner = info && info.owner && info.owner.toBase58 ? info.owner.toBase58() : String(info && info.owner);
+      return owner === TOKEN22_PROGRAM ? TOKEN22_PROGRAM : TOKEN_PROGRAM;
+    },
+    // the vault a pair's fees flow into: the pool PDA's ATA for the reward mint,
+    // derived with that mint's token program. The caller must CREATE it (an
+    // idempotent ATA create) before init_pool — the program does not.
+    vaultFor: async function (pair, tokenProgram) {
+      var X = await mx();
+      var pool = poolPda(X, pair.tokenMint, pair.collection);
+      var tp = pk(X, tokenProgram || TOKEN_PROGRAM);
+      var vault = X.PublicKey.findProgramAddressSync(
+        [pool.toBuffer(), tp.toBuffer(), pk(X, pair.rewardMint).toBuffer()], pk(X, ATA_PROGRAM))[0];
+      return { pool: pool.toBase58(), vault: vault.toBase58() };
+    }
   };
 })();

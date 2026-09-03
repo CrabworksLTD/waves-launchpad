@@ -18,6 +18,9 @@
     description: "Design, assemble, and deploy your own NFT collection on Solana.",
     chain: "Solana",
     domain: "",                       // set once a domain is registered
+    // WAVES's own X handle — worn on every share card so a token launched here
+    // is free exposure back to us (@ included, ready to render or link)
+    x: "@waveslaunchpad",
 
     /* Launch gate: sha256 of the password, empty = open.
      *
@@ -29,6 +32,19 @@
      * for a curtain and not fine as security — do not put anything behind it
      * that would matter if it were read. Password is with Kyle. */
     gate: "",
+
+    /* Per-chain gate, applied when the whole-site `gate` above is open.
+     *
+     * Robinhood Chain is behind the same password the whole site used to be —
+     * the token launchpad there runs on our own bonding curve, which works and
+     * is tested but has never been deployed or audited, so it is not something
+     * to leave open to strangers. The Solana side stays public.
+     *
+     * Same caveat as `gate`: this is a curtain, not security. Anyone reading
+     * source walks past it. It keeps out visitors, not attackers. */
+    gateChain: {
+      robinhood: "53d3ecce08c0327fbcce4ee44ffcb3e8f0f02e2c486f840dc561427377c6bc5e"
+    },
 
     // The wallet that owns the platform's fee share. Creator-chosen-fee
     // launches create their own config naming this as feeClaimer — the

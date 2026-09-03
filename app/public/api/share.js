@@ -91,6 +91,8 @@ export default async function handler(req) {
     '<meta property="og:image:width" content="1200">' +
     '<meta property="og:image:height" content="630">' +
     '<meta name="twitter:card" content="summary_large_image">' +
+    // attributes the unfurl to the launchpad's X account — exposure back to us
+    '<meta name="twitter:site" content="@waveslaunchpad">' +
     '<meta name="twitter:title" content="' + title + '">' +
     '<meta name="twitter:description" content="' + desc + '">' +
     '<meta name="twitter:image" content="' + card + '">' +
