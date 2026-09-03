@@ -138,13 +138,17 @@
    * it is deployed and recorded — which is deliberate: a launch UI that silently
    * points at address zero would take a creator's gas and give back nothing. */
   function curveAddress() {
+    /* On the chain entry beside feeTo, not on BRAND — it is a per-chain
+     * deployment, and splitting the chain's addresses across two files is how
+     * one of them ends up stale. */
+    var c = chain();
     var b = window.BRAND || {};
-    var a = (b.evmCurves || {})[chain().id] || b.evmCurve || null;
+    var a = c.curve || (b.evmCurves || {})[c.id] || b.evmCurve || null;
     if (!a) {
       throw new Error(
-        "No bonding curve is deployed on " + chain().name + " yet. " +
-        "Deploy contracts/WavesCurve.sol and put its address in brand.js as evmCurves[" +
-        chain().id + "].");
+        "No bonding curve is deployed on " + c.name + " yet. Deploy " +
+        "contracts/WavesCurve.sol and set `curve` on this chain's entry in " +
+        "evm-chains.js.");
     }
     return a;
   }

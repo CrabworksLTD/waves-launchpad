@@ -158,6 +158,25 @@ window.MOONPAD_CHAINS = [
      * numbers are written into each collection at deploy and are immutable
      * there, so this only reaches collections launched from now on. */
     feeTo: "0xE52f574AC7006614EBe1c8a82913a5C07eC73CC7",
+
+    /* The bonding curve every token on this chain launches through —
+     * contracts/WavesCurve.sol, one deployment holding every launch.
+     *
+     * ⚠️ Null until it is deployed, and the launch UI checks: a confirm screen
+     * refuses with "the bonding curve has not been deployed" rather than
+     * pointing a launch at address zero and taking the gas. Its constructor
+     * arguments are the launchpad's whole economics and are immutable, so the
+     * deployed address is the only truthful source for them — nothing here
+     * should ever restate the curve's parameters. */
+    curve: null,
+
+    /* Who receives a creator's pledged share, and pays it out to holders.
+     *
+     * Null until a keeper wallet exists for this chain. pledgeToHolders() is
+     * irreversible and names this address on chain, so a wrong value here is
+     * permanent for every token that pledges to it — the fee page refuses to
+     * offer the button while this is unset rather than guessing. */
+    rewardsKeeper: null,
     // A $-token (coin) allowlist reads holder balances at the block the sale
     // opened on, for the whole wave. This RPC prunes that state after ~10 min
     // (measured live 2026-08-20), so a longer wave locks holders out — the gate

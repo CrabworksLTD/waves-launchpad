@@ -80,7 +80,7 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
 <body>
 <main>
   <h1 class="disp">Claim fees</h1>
-  <p class="lede">Every trade of your token pays your share into its pool, where it
+  <p class="lede" id="lede">Every trade of your token pays your share into its pool, where it
   accrues until you claim it. Numbers below are read from the pools, live.</p>
 
   <div class="gate" id="gate">
@@ -96,6 +96,23 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
   <section id="plat-wrap" hidden>
     <h2 class="disp">Platform share</h2>
     <div id="plat"></div>
+  </section>
+
+  <!-- Robinhood Chain. Deliberately its own section rather than rows mixed in
+       with the Solana ones, because the money works differently: the curve
+       keeps ONE balance per address across every token that address launched,
+       not a balance per pool. So there is one claim here, not one per row. -->
+  <section id="evm-wrap" hidden>
+    <h2 class="disp">Robinhood Chain</h2>
+    <div class="frow" id="evm-claim">
+      <div class="fmeta">
+        <b>Claimable across all your launches</b>
+        <span class="k2">One balance for every token you have launched here.</span>
+      </div>
+      <div class="famt"><span class="amt" id="evm-owed">reading…</span></div>
+      <button class="cl" id="evm-claim-btn" disabled>Claim</button>
+    </div>
+    <div id="evm-tokens"></div>
   </section>
 
   <div class="msg" id="msg"></div>
@@ -300,15 +317,181 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
     }
   }
 
+  /* ---------- Robinhood Chain ----------
+   *
+   * ⚠️ The money is shaped differently here and the UI has to say so.
+   *
+   * On Solana each pool holds its own creator fees, so the page can show a
+   * figure per token and claim them one at a time. WavesCurve keeps a single
+   * `owed` balance per ADDRESS, accumulated across every token that address
+   * launched, and claim() takes the whole thing. Presenting per-token claim
+   * buttons here would be a lie — there is one balance and one claim.
+   *
+   * What IS per token is the pledge: a creator gives holders a share of one
+   * token's fees, once, irreversibly. So the rows below are about that, not
+   * about claiming.
+   */
+  async function loadEvm() {
+    var acct = (window.MoonpadWallet || {}).account;
+    if (!acct) return;
+    $("gate").hidden = true;
+    $("evm-wrap").hidden = false;
+
+    await Shell.ensureEvmLaunch();
+    var TK = window.MoonpadToken;
+    if (!TK.curveAddress()) {
+      $("evm-owed").textContent = "—";
+      $("evm-tokens").innerHTML =
+        '<div class="none">Token launches are not open on Robinhood Chain yet.</div>';
+      return;
+    }
+
+    var tokens = await fetch("/api/tokens").then(function (r) { return r.json(); })
+      .then(function (j) { return j.tokens || []; }).catch(function () { return []; });
+    // addresses are case-insensitive on EVM; comparing raw drops every row
+    var mine = tokens.filter(function (t) {
+      return t.chain === "robinhood" && t.creator &&
+        String(t.creator).toLowerCase() === acct.toLowerCase();
+    });
+
+    try {
+      var owed = await TK.owed(acct);
+      var eth = Number(owed) / 1e18;
+      $("evm-owed").textContent = UI.fmt(eth, 6) + " ETH";
+      var btn = $("evm-claim-btn");
+      if (eth > 0) {
+        btn.disabled = false;
+        btn.onclick = function () { doEvmClaim(btn); };
+      }
+    } catch (e) {
+      $("evm-owed").textContent = "—";
+    }
+
+    if (!mine.length) {
+      $("evm-tokens").innerHTML = '<div class="none">No launches from this wallet yet.</div>';
+      return;
+    }
+
+    $("evm-tokens").innerHTML = mine.map(function (t) {
+      return '<div class="frow" data-mint="' + esc(t.mint) + '">' +
+        '<div class="fmeta"><b>' + esc(t.name) + ' · $' + esc(t.symbol) + '</b>' +
+        '<span class="k2 mono">' + esc(shortAddr(t.mint)) + '</span></div>' +
+        '<div class="famt"><span class="amt rw">reading…</span></div>' +
+        '<button class="act" disabled>Activate holder rewards</button></div>';
+    }).join("");
+
+    [].slice.call($("evm-tokens").querySelectorAll(".frow")).forEach(function (el) {
+      var mint = el.dataset.mint;
+      TK.curveOf(mint).then(function (c) {
+        var amt = el.querySelector(".rw");
+        var act = el.querySelector(".act");
+        if (!c) { amt.textContent = "—"; return; }
+        if (c.rewardsBps > 0) {
+          amt.textContent = (c.rewardsBps / 100) + "% to holders";
+          act.textContent = "Rewards active";
+          act.disabled = true;
+          return;
+        }
+        amt.textContent = "you keep everything";
+        act.disabled = false;
+        act.onclick = function () { openEvmActivate(el, mint, act); };
+      }).catch(function () { el.querySelector(".rw").textContent = "—"; });
+    });
+  }
+
+  async function doEvmClaim(btn) {
+    btn.disabled = true; btn.textContent = "Confirm…";
+    say("", "");
+    try {
+      var hash = await window.MoonpadToken.claim();
+      await window.MoonpadToken.waitForTx(hash);
+      say("ok", 'Claimed. <a href="' + esc(window.MoonpadToken.adapter().txUrl(hash)) +
+        '" target="_blank" rel="noopener">View tx ↗</a>');
+      $("evm-owed").textContent = "0 ETH";
+      btn.textContent = "Claimed";
+    } catch (e) {
+      var m = String(e.message || e);
+      if (/reject|denied/i.test(m)) m = "You cancelled the transaction.";
+      say("err", esc(m.slice(0, 200)));
+      btn.disabled = false; btn.textContent = "Claim";
+    }
+  }
+
+  /* A pledge cannot be undone, so it is confirmed rather than fired off a
+   * single click — the same care the Solana side takes over the equivalent. */
+  function openEvmActivate(rowEl, mint, btn) {
+    if (rowEl.querySelector(".actbox")) return;
+    var box = document.createElement("div");
+    box.className = "actbox";
+    box.innerHTML =
+      "<p>Give holders of this token a share of every trading fee it earns, " +
+      "paid in ETH. Choose the share once — it cannot be changed or undone.</p>" +
+      '<div class="ptabs evm-share">' +
+      '<button data-b="2500">25%</button><button data-b="5000">50%</button>' +
+      '<button data-b="7500">75%</button><button data-b="10000" class="on">100%</button></div>' +
+      '<div class="acts"><button class="go2">Activate</button>' +
+      '<button class="no2">Cancel</button></div>';
+    rowEl.appendChild(box);
+
+    var bps = 10000;
+    box.querySelector(".evm-share").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-b]");
+      if (!b) return;
+      bps = +b.dataset.b;
+      [].slice.call(box.querySelectorAll(".evm-share button")).forEach(function (x) {
+        x.className = x === b ? "on" : "";
+      });
+    });
+    box.querySelector(".no2").onclick = function () { box.remove(); };
+    box.querySelector(".go2").onclick = async function () {
+      var go = box.querySelector(".go2");
+      go.disabled = true; go.textContent = "Confirm…";
+      say("", "");
+      try {
+        var keeper = window.MoonpadToken.chain().rewardsKeeper || null;
+        if (!keeper) throw new Error("No rewards keeper is configured for this chain yet.");
+        var hash = await window.MoonpadToken.pledgeToHolders(mint, bps, keeper);
+        await window.MoonpadToken.waitForTx(hash);
+        say("ok", "Holder rewards are on for this token.");
+        box.remove();
+        rowEl.querySelector(".rw").textContent = (bps / 100) + "% to holders";
+        btn.textContent = "Rewards active"; btn.disabled = true;
+      } catch (e) {
+        var m = String(e.message || e);
+        if (/reject|denied/i.test(m)) m = "You cancelled the transaction.";
+        say("err", esc(m.slice(0, 200)));
+        go.disabled = false; go.textContent = "Activate";
+      }
+    };
+  }
+
+  var IS_EVM_PAGE = !!(window.Shell && Shell.chain && Shell.chain() === "robinhood");
+
+  /* Fees do not sit in a pool on this chain — they accrue in the curve contract
+   * against your address, and one claim takes the lot. Leaving the Solana copy
+   * up would describe a mechanism that is not there. */
+  if (IS_EVM_PAGE) {
+    $("lede").textContent = "Every trade of your token pays your share into the curve " +
+      "contract, where it accrues against your address until you claim it. " +
+      "One balance covers every token you have launched here.";
+  }
+
   $("gate-connect").addEventListener("click", async function () {
     var w = await Shell.connect();
-    if (w) load();
+    if (w || (window.MoonpadWallet || {}).account) IS_EVM_PAGE ? loadEvm() : load();
   });
-  if (window.Wallet.current()) load();
-  var n = 0, iv = setInterval(function () {
-    if (window.Wallet.current()) { load(); clearInterval(iv); }
-    if (++n > 10) clearInterval(iv);
-  }, 500);
+
+  if (IS_EVM_PAGE) {
+    // evm-wallet.js announces a connection on this event, not through window.Wallet
+    if ((window.MoonpadWallet || {}).account) loadEvm();
+    window.addEventListener("moonpad-wallet", function () { loadEvm(); });
+  } else {
+    if (window.Wallet.current()) load();
+    var n = 0, iv = setInterval(function () {
+      if (window.Wallet.current()) { load(); clearInterval(iv); }
+      if (++n > 10) clearInterval(iv);
+    }, 500);
+  }
 })();
 </script>
 </body>
