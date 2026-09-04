@@ -275,22 +275,47 @@ async function ethPoolsFor(asset) {
 async function bestPool(keys, amountIn) {
   if (!SWAP_ROUTER || !keys.length) return null;
 
-  /* Chunked because each quote is a full swap simulation. Robinhood drops the
-   * connection outright when one call asks for too much state, and USDG has
-   * eighty pools. */
-  const LIMIT = 12;
+  /* ⚠️ Four at a time, and never skip a batch that fails.
+   *
+   * Each quote is a full swap simulation, and Robinhood's eth_call gas cap
+   * refuses eight of them in one call — "out of gas", which no explicit gas
+   * parameter raises. A batch of twelve therefore ALWAYS failed for an asset
+   * with many pools, and a failed batch used to be skipped, so the keeper
+   * concluded nothing could fill and paid ETH instead. Silently, and only for
+   * the assets people are most likely to choose.
+   *
+   * USDG is the case that found it: five empty pools, then live ones at
+   * positions six, eight, nine and ten. A batch of four sees only empties; a
+   * batch of twelve sees nothing at all. So a batch that fails is retried one
+   * pool at a time rather than dropped — slower, and it gets the right answer.
+   */
+  const LIMIT = 4;
   let best = null;
+  const consider = (key, got) => {
+    if (got > 0n && (!best || got > best.out)) best = { key, out: got };
+  };
+
   for (let i = 0; i < keys.length && i < 48; i += LIMIT) {
     const batch = keys.slice(i, i + LIMIT);
-    let out;
+    let out = null;
     try {
       out = await rpc("eth_call", [
         { to: SWAP_ROUTER, data: encQuoteBest(batch, amountIn) }, "latest"]);
-    } catch (e) { continue; }
-    if (!out || out === "0x") continue;
-    const idx = Number(word(out, 0));
-    const got = word(out, 1);
-    if (got > 0n && (!best || got > best.out)) best = { key: batch[idx], out: got };
+    } catch (e) { out = null; }
+
+    if (out && out !== "0x") {
+      consider(batch[Number(word(out, 0))], word(out, 1));
+      continue;
+    }
+
+    // the batch was refused: ask about each pool on its own
+    for (const key of batch) {
+      try {
+        const one = await rpc("eth_call", [
+          { to: SWAP_ROUTER, data: encQuoteBest([key], amountIn) }, "latest"]);
+        if (one && one !== "0x") consider(key, word(one, 1));
+      } catch (e) { /* this pool cannot be priced; the others still can */ }
+    }
   }
   return best;
 }
