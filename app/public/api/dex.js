@@ -63,16 +63,27 @@ const MAX_SPAN = 50000;            // the widest window this chain answers
 
 let rpcId = 0;
 async function rpc(method, params) {
-  const r = await fetch(RPC, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }),
-    signal: AbortSignal.timeout(20000)
-  });
-  if (!r.ok) throw new Error("rpc " + r.status);
-  const j = await r.json();
-  if (j.error) throw new Error(j.error.message || "rpc error");
-  return j.result;
+  /* Retried, because Robinhood rate-limits a burst hard and a single refusal
+   * used to end a whole scan — which surfaced as "unknown pair" for a token
+   * that had plainly launched. A transient 429 is not an answer. */
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await fetch(RPC, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }),
+        signal: AbortSignal.timeout(20000)
+      });
+      if (r.status === 429) throw new Error("429");
+      if (!r.ok) throw new Error("rpc " + r.status);
+      const j = await r.json();
+      if (j.error) throw new Error(j.error.message || "rpc error");
+      return j.result;
+    } catch (e) {
+      if (attempt === 2) throw e;
+      await new Promise((s) => setTimeout(s, 350 * (attempt + 1)));
+    }
+  }
 }
 
 const hex = (n) => "0x" + BigInt(n).toString(16);
@@ -119,7 +130,46 @@ async function blockTime(n) {
 /* When a token launched, and with what fee. Read from the curve's own Launched
  * event so the adapter needs nothing from our database — an aggregator asking
  * about a pair we have never listed still gets a correct answer. */
+/* The launch block, from the listing we already keep.
+ *
+ * Walking the curve's log backwards for it works but costs one 50,000-block
+ * query per window, and this chain refuses a burst of those — so a token that
+ * launched half a million blocks ago took ten queries to find and reported
+ * "unknown pair" the moment one was throttled. We recorded the block at launch
+ * precisely because it cannot be recovered cheaply later; using it turns the
+ * whole search into a single query against one known block. */
+async function knownLaunchBlock(token) {
+  try {
+    const { kv } = await import("./_guard.js");
+    const db = await kv();
+    if (!db) return null;
+    const raw = await db.lrange("tokens", 0, 199);
+    for (const r of raw || []) {
+      const t = typeof r === "string" ? JSON.parse(r) : r;
+      if (t && String(t.mint).toLowerCase() === token && t.block > 0) return Number(t.block);
+    }
+  } catch (e) { /* fall back to the scan */ }
+  return null;
+}
+
 async function launchOf(token, latest) {
+  const known = await knownLaunchBlock(token);
+  if (known) {
+    try {
+      const logs = await rpc("eth_getLogs", [{
+        address: CURVE, fromBlock: hex(known), toBlock: hex(known),
+        topics: [LAUNCHED, "0x" + "0".repeat(24) + token.slice(2)]
+      }]);
+      if (logs && logs.length) {
+        return {
+          block: known,
+          txn: logs[0].transactionHash,
+          feeBps: Number(word(logs[0].data, 0))
+        };
+      }
+    } catch (e) { /* the scan below still has a go */ }
+  }
+
   let cursor = latest;
   for (let i = 0; i < 60 && cursor > 0; i++) {
     const from = Math.max(0, cursor - MAX_SPAN);
@@ -129,7 +179,7 @@ async function launchOf(token, latest) {
         address: CURVE, fromBlock: hex(from), toBlock: hex(cursor),
         topics: [LAUNCHED, "0x" + "0".repeat(24) + token.slice(2)]
       }]);
-    } catch (e) { break; }
+    } catch (e) { /* this window is unreadable; the next one may not be */ }
     if (logs.length) {
       const l = logs[0];
       return {
