@@ -80,6 +80,24 @@ const word = (d, i) => BigInt("0x" + String(d).replace(/^0x/, "").slice(i * 64, 
 const PLATFORM_BPS = { 100: 40, 200: 50, 300: 60, 400: 70, 500: 80, 1000: 90 };
 
 /**
+ * The keeper's key, in the form viem wants.
+ *
+ * MetaMask exports a private key as bare hex with no 0x, and viem rejects that
+ * with "invalid private key, expected hex or 32 bytes, got string". Refusing a
+ * correct key over a missing prefix is a pointless way to break a payout run,
+ * so both forms are accepted and anything else is rejected clearly.
+ */
+function keeperKey() {
+  const raw = String(process.env.RH_KEEPER_SECRET || "").trim();
+  if (!raw) return null;
+  const hex = raw.startsWith("0x") ? raw : "0x" + raw;
+  if (!/^0x[0-9a-fA-F]{64}$/.test(hex)) {
+    throw new Error("RH_KEEPER_SECRET is not a 32-byte hex private key");
+  }
+  return hex;
+}
+
+/**
  * What this token has earned for its holders since the last payout.
  *
  * Walked from the curve's own trade events. `fee` on each is what the trader
@@ -128,7 +146,7 @@ async function accrued(db, token, feeBps, rewardsBps, fromBlock, latest) {
 
 async function keeperTx(to, data, value, gas) {
   const { privateKeyToAccount } = await import("viem/accounts");
-  const account = privateKeyToAccount(process.env.RH_KEEPER_SECRET);
+  const account = privateKeyToAccount(keeperKey());
   const [nonce, block] = await Promise.all([
     rpc("eth_getTransactionCount", [account.address, "pending"]),
     rpc("eth_getBlockByNumber", ["latest", false])
@@ -168,7 +186,7 @@ export default async function handler(req, res) {
     }
     try {
       const { privateKeyToAccount } = await import("viem/accounts");
-      const derived = privateKeyToAccount(process.env.RH_KEEPER_SECRET).address;
+      const derived = privateKeyToAccount(keeperKey()).address;
       const expected = "0xAcA1d1bE05f47090a6d8D918AB26d4543fD3Af81";
       return res.status(200).json({
         ok: derived.toLowerCase() === expected.toLowerCase(),
@@ -194,7 +212,7 @@ export default async function handler(req, res) {
   try {
     const db = await kv();
     const { privateKeyToAccount } = await import("viem/accounts");
-    const keeper = privateKeyToAccount(process.env.RH_KEEPER_SECRET).address;
+    const keeper = privateKeyToAccount(keeperKey()).address;
 
     /* ⚠️ Reported every run so it can be eyeballed against evm-chains.js. If
      * this key does not match the rewardsKeeper written into pledges, those

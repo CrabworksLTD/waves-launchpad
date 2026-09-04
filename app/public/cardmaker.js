@@ -124,7 +124,7 @@
       try { g.filter = "blur(24px)"; } catch (e) {}
       mark();
       g.restore();
-      mark();   // sharp, on top of its own glow
+      staircase(g, pal);   // the sharp mark, back at its original spot, on top
     }
 
     // scrim: the body sits on darkness. There is always a branded background now
