@@ -15,6 +15,10 @@
     {
       "source": "/m/:id/:file",
       "destination": "/api/meta?id=:id&file=:file"
+    },
+    {
+      "source": "/dex/:path",
+      "destination": "/api/dex?path=:path"
     }
   ],
   "redirects": [
