@@ -1753,16 +1753,6 @@
           ${quotes.indexOf("usdc") < 0 ? raw("disabled") : ""}>USDC</button>
       </div>`}
 
-      <div class="fold2" id="tk-econ">
-        <div class="row"><span class="k">Trading fee</span><b id="tk-fee">${tierPct(flow) + "%"}</b></div>
-        <div class="row"><span class="k">Graduates at</span><b id="tk-grad">reading the curve…</b></div>
-        <div class="row" style="border-bottom:0"><span class="k">Migrates to</span><b>${
-          isEvm() ? "Uniswap V3, liquidity locked" : "Meteora DAMM v2, LP locked"}</b></div>
-        <p class="note" style="margin-top:6px">${isEvm()
-          ? "Set when the curve contract was deployed and immutable since — identical for every launch, so nobody negotiates a better curve than you."
-          : "Locked in the launchpad's config — identical for every launch, so nobody negotiates a better curve than you."}</p>
-      </div>
-
       <label>Your first buy (${qLabel}) — optional</label>
       <input id="lp-tbuy" type="number" min="0" step="${isEvm() ? "0.005" : "0.1"}" value="${flow.tbuy || 0}">
       <p class="note" id="tk-buyshare"></p>
@@ -1835,45 +1825,6 @@
       <button class="go" id="lp-next" ${window.Token.configKey() ? "" : raw("disabled")}>Continue</button></div>
     `);
 
-    /* Live economics, read from the config this launch will actually use — not
-     * hardcoded copy, and not the standard rung's numbers shown against a rung
-     * the creator picked instead. Re-read when the rung changes. */
-    function paintEconomics() {
-      if (isEvm()) return paintEvmEconomics();
-      window.Token.describeConfig(flow.quote, flow.tier || "standard").then(function (d) {
-        var el = box.querySelector("#tk-grad");
-        if (!el) return;
-        if (!d) { el.textContent = "shown at launch"; return; }
-        el.textContent = UI.fmt(d.graduation) + " " + qLabel + " raised";
-        if (d.feePct) box.querySelector("#tk-fee").textContent =
-          d.feePct + "% — " + Math.round(80 * d.creatorShare / 100) + "% you / " +
-          Math.round(80 * (100 - d.creatorShare) / 100) + "% platform / 20% Meteora";
-      });
-    }
-    /* Read from the contract, not from constants.
-     *
-     * The curve's parameters are constructor arguments and immutable, so the
-     * only truthful source for "graduates at" is the deployment itself — a page
-     * quoting last month's numbers at a curve deployed with different ones is
-     * worse than a page that says it does not know. */
-    function paintEvmEconomics() {
-      var grad = box.querySelector("#tk-grad");
-      var feeEl = box.querySelector("#tk-fee");
-      var sp = evmSplit(flow);
-      if (feeEl && sp) {
-        feeEl.textContent = sp.total + "% — " + sp.creator + "% you / " + sp.platform + "% platform";
-      }
-      if (!grad) return;
-      if (!window.MoonpadToken || !window.MoonpadToken.curveAddress()) {
-        grad.textContent = "not open on this chain yet";
-        return;
-      }
-      window.MoonpadToken.terms().then(function (t) {
-        grad.textContent = UI.fmt(Number(t.graduationEth) / 1e18) + " ETH raised";
-      }).catch(function () { grad.textContent = "shown at launch"; });
-    }
-
-    paintEconomics();
 
     function collect() {
       flow.tname = box.querySelector("#lp-tname").value;
@@ -1972,7 +1923,6 @@
       /* The rung sets the size of the pot, not who gets it — the split below
        * is the only thing that decides that, and it survives a rung change. */
       paintTax();
-      paintEconomics();          // each rung has its own curve, not just its own fee
     });
     /* What a trader pays, and only that. Where it goes is documentation — the
      * creator is choosing a headline number here, not auditing a split. */
