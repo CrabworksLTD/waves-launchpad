@@ -71,10 +71,17 @@ const SEL_BALANCE_OF = "0x70a08231";    // ERC20 balanceOf(address)
 const CHUNK = 50000n;
 const MAX_CHUNKS = 12;
 const GAS_PER_TRANSFER = 21000n;
-/* An ERC20 transfer writes two balances instead of moving native value, so it
- * costs three times an ETH send. Budgeting 21000 for it would pass the
- * worth-it test and then run the keeper dry mid-payout. */
-const GAS_PER_ERC20 = 65000n;
+/* ⚠️ Measured, not assumed. A textbook ERC20 transfer is about 51,000 and the
+ * 65,000 budgeted here was reasoning from that — but Robinhood's tokenised
+ * equities are not textbook ERC20s, and an MSFT transfer burned 64,484 and
+ * still ran out. The transaction reverted, and because a reverted receipt used
+ * to count as success the holder was recorded as paid.
+ *
+ * Generous now, because an unused gas limit costs nothing: the sender pays for
+ * gas USED. Only the worth-it estimate is affected, and over-estimating there
+ * is the safe direction — it waits for a bigger pot rather than starting a run
+ * it cannot finish. */
+const GAS_PER_ERC20 = 250000n;
 const GAS_SWAP = 400000n;
 // two swaps in one lock, so roughly twice the work plus the second settlement
 const GAS_SWAP2 = 700000n;
@@ -443,10 +450,28 @@ async function bestRoute(asset, amountIn) {
   return null;
 }
 
+/**
+ * Wait for a transaction, and REFUSE one that reverted.
+ *
+ * ⚠️ This returned the receipt without looking at its status, so a reverted
+ * transaction counted as a completed one. The consequence was not subtle: a
+ * payout whose transfer ran out of gas advanced `sent`, moved the cursors,
+ * deleted the plan and reported "paid 1 of 1, complete" — while the money sat
+ * in the keeper and the holder had nothing. A run that fails is recoverable;
+ * a run that fails and says it succeeded is not.
+ *
+ * Found by checking the chain after a green result rather than believing it.
+ */
 async function mined(hash) {
   for (let i = 0; i < 60; i++) {
     const r = await rpc("eth_getTransactionReceipt", [hash]).catch(() => null);
-    if (r) return r;
+    if (r) {
+      if (r.status === "0x0") {
+        throw new Error("transaction reverted (" + hash + ", gas used " +
+          parseInt(r.gasUsed || "0x0", 16) + ")");
+      }
+      return r;
+    }
     await new Promise((s) => setTimeout(s, 2000));
   }
   throw new Error("not mined");
@@ -839,8 +864,12 @@ async function payOut(db, planKey, plan) {
       sent = i + 1;
       await db.set(planKey, JSON.stringify({ ...plan, sent }));
     } catch (e) {
-      failures.push({ to: p.to, error: String(e.message || e).slice(0, 100) });
-      break;               // stop on the first failure; the next run resumes here
+      /* Stop, keep the plan, and leave `sent` where it is. The next run picks
+       * up from exactly here — which only works because a revert now reaches
+       * this handler instead of being read as a completed payment. */
+      failures.push({ to: p.to, asset: p.asset || null,
+        error: String(e.message || e).slice(0, 160) });
+      break;
     }
   }
 

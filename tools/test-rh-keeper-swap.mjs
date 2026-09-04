@@ -40,6 +40,11 @@ const USDG_OUT = 1_000_000n;
 // what the two-hop route returns, in NOPOOL's 18
 const HOP_OUT = 5_000_000_000_000_000n;
 
+/* Set by the second pass below: replays the run with every ERC20 transfer
+ * reverting, which is what actually happened on the first mainnet payout. */
+let REVERT_TRANSFERS = false;
+const revertedHashes = new Set();
+
 const store = new Map();
 const db = {
   get: async (k) => store.get(k) ?? null,
@@ -93,10 +98,29 @@ async function stubFetch(url, opts) {
   if (method === "eth_getBlockByNumber") return reply({ baseFeePerGas: "0x1" });
   if (method === "eth_getBalance") return reply("0x" + (100n * ETH).toString(16));
   if (method === "eth_getTransactionCount") return reply("0x0");
-  if (method === "eth_getTransactionReceipt") return reply({ status: "0x1" });
+  if (method === "eth_getTransactionReceipt") {
+    /* ⚠️ The ERC20 transfers revert here, deliberately.
+     *
+     * On the first real run they did — Robinhood's tokenised equities cost more
+     * gas than a plain ERC20 and the budget was too low — and the keeper
+     * reported "paid 1 of 1, complete" anyway, because a receipt was taken as
+     * success without reading its status. The holder had nothing and the asset
+     * sat in the keeper. This fixture reproduces that exactly. */
+    if (REVERT_TRANSFERS && revertedHashes.has(params[0])) {
+      return reply({ status: "0x0", gasUsed: "0xfbf4" });
+    }
+    return reply({ status: "0x1" });
+  }
   if (method === "eth_sendRawTransaction") {
     sent.push(params[0]);
-    return reply("0x" + "ab".repeat(32));
+    /* The hash a signed transaction gets here is derived from its raw bytes the
+     * same way the keeper derives it, so a specific one can be failed. */
+    const h = viemCore.keccak256(params[0]);
+    const tx = signedTxs[parseInt(params[0].slice(2), 16) - 1];
+    if (REVERT_TRANSFERS && tx && String(tx.data || "").startsWith("0xa9059cbb")) {
+      revertedHashes.add(h);
+    }
+    return reply(h);
   }
 
   if (method === "eth_call") {
@@ -254,5 +278,35 @@ check("the two-hop route carries both legs",
 const plan = store.get("rhk:plan");
 check("the plan was cleared once everything was paid", !plan);
 
-console.log(bad ? `\n${bad} failed` : "\nthe swap leg pays the right asset to the right people");
+/* ── and again, with the transfers reverting ────────────────────────────────
+ *
+ * The property under test is that a run which cannot pay says so. Before this,
+ * a reverted transfer advanced `sent`, moved the cursors, deleted the plan and
+ * reported success — the worst possible failure mode, because nothing after it
+ * would ever retry. */
+console.log("\n  replaying with every ERC20 transfer reverting:\n");
+
+store.clear();
+store.set("rhix:" + A + ":h", { [H1]: (75n * ETH).toString(), [H2]: (25n * ETH).toString() });
+store.set("rhix:" + B + ":h", { [H3]: (10n * ETH).toString() });
+store.set("rhix:" + C + ":h", { [H4]: (10n * ETH).toString() });
+for (const t of [A, B, C]) store.set("rhk:" + t + ":cursor", "1000");
+signedTxs.length = 0; sent.length = 0; signCount = 0;
+REVERT_TRANSFERS = true;
+
+const res2 = { code: 0, body: null, status(c){this.code=c;return this;}, json(b){this.body=b;return this;} };
+await handler({ headers: {}, query: {} }, res2);
+
+const b2 = res2.body || {};
+check("a reverted payout is NOT reported complete", b2.complete !== true,
+  "complete=" + b2.complete);
+check("the failure is reported rather than swallowed",
+  Array.isArray(b2.failures) && b2.failures.length > 0,
+  (b2.failures || []).length + " failures");
+check("the plan survives so the next run can retry", !!store.get("rhk:plan"));
+check("the cursors did NOT advance past unpaid earnings",
+  store.get("rhk:" + A + ":cursor") === "1000",
+  "cursor " + store.get("rhk:" + A + ":cursor"));
+
+console.log(bad ? `\n${bad} failed` : "\nthe swap leg pays the right asset to the right people, and says so when it cannot");
 process.exit(bad ? 1 : 0);
