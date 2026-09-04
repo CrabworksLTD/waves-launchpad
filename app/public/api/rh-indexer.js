@@ -209,15 +209,23 @@ export default async function handler(req, res) {
        * Summing the table would give the float, which is the wrong basis and
        * also wrong in a different way while the cursor is behind. */
       let supply = 0;
+      let supplyError = null;
       try {
         const hex = await rpc("eth_call", [{ to: want, data: "0x18160ddd" }, "latest"]);
         supply = Number(BigInt(hex || "0x0")) / 1e18;
-      } catch (e) { /* leave 0; percentages come out as 0 rather than wrong */ }
+        if (!supply) supplyError = "empty: " + JSON.stringify(hex);
+      } catch (e) {
+        /* Reported rather than swallowed. A silent failure here does not look
+         * like a failure — it looks like every holder owning 0% of the token,
+         * which is a number, and wrong numbers are worse than absent ones. */
+        supplyError = String(e.message || e).slice(0, 160);
+      }
 
       return res.status(200).json({
         ok: true,
         holders: rows.length,
         supply,
+        supplyError,
         top: rows.slice(0, 20).map((r) => {
           const amount = Number(r.amt) / 1e18;
           return { owner: r.owner, amount, pct: supply ? (amount / supply) * 100 : 0 };
