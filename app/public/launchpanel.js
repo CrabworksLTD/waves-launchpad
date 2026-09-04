@@ -1753,12 +1753,6 @@
           ${quotes.indexOf("usdc") < 0 ? raw("disabled") : ""}>USDC</button>
       </div>`}
 
-      <label>Your first buy (${qLabel}) — optional</label>
-      <input id="lp-tbuy" type="number" min="0" step="${isEvm() ? "0.005" : "0.1"}" value="${flow.tbuy || 0}">
-      <p class="note" id="tk-buyshare"></p>
-      <p class="note">Lands in the same transaction as the pool, so nobody can snipe
-      the opening price ahead of you.</p>
-
       <label>Creator tax</label>
       <div class="ptabs" id="tk-tiers">${raw(tierButtons(flow))}</div>
       <p class="note" id="tk-taxtxt"></p>
@@ -1820,6 +1814,12 @@
       ${window.Token.configKey() ? "" : raw(
         '<p class="err">Token launches are not configured on this deployment yet — ' +
         "the form is a preview and the launch button is disabled.</p>")}
+      <label>Your first buy (${qLabel}) — optional</label>
+      <input id="lp-tbuy" type="number" min="0" step="${isEvm() ? "0.005" : "0.1"}" value="${flow.tbuy || 0}">
+      <p class="note" id="tk-buyshare"></p>
+      <p class="note">Lands in the same transaction as the pool, so nobody can snipe
+      the opening price ahead of you.</p>
+
       <div id="lp-err"></div>
       <div class="acts"><button id="lp-x">${nft ? "Skip token" : "Back"}</button>
       <button class="go" id="lp-next" ${window.Token.configKey() ? "" : raw("disabled")}>Continue</button></div>
