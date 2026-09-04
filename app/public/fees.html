@@ -443,15 +443,44 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
     }
     var box = document.createElement("div");
     box.className = "actbox";
+    /* ⚠️ Name the asset the creator actually chose.
+     *
+     * This said "paid out to them in ETH" for everyone, which was true when it
+     * was written — the keeper could not swap. It can now, so telling a creator
+     * who picked TSLA that their holders get ETH is describing the old
+     * behaviour on the screen where they commit to the new one, and the pledge
+     * cannot be undone afterwards.
+     *
+     * Filled in asynchronously: the asset list is a fetch, and the box must not
+     * wait on the network to appear. ETH is the honest placeholder because it
+     * is also the honest answer whenever the lookup finds nothing. */
     box.innerHTML =
       "<b>Pay your holders from every trade</b>" +
       "<p>Give holders of this token a share of every trading fee it earns, " +
       ((rec || {}).rewardMode === "burn"
         ? "used to buy the token back and burn it. "
-        : "paid out to them in ETH. ") +
+        : '<span class="paidin">paid out to them in ETH.</span> ') +
       "One signature — <b>it cannot be undone.</b></p>" +
       '<button class="go">Activate</button>' +
       '<button class="cancel">Cancel</button>';
+
+    var asset = (rec || {}).rewardMint;
+    if (asset && (rec || {}).rewardMode !== "burn") {
+      fetch("/rh-assets.json").then(function (r) { return r.json(); })
+        .then(function (j) {
+          var hit = (j.tokens || []).find(function (t) {
+            return String(t.address).toLowerCase() === String(asset).toLowerCase();
+          });
+          var el = box.querySelector(".paidin");
+          if (!hit || !el || String(asset).toLowerCase() === "0x" + "0".repeat(40)) return;
+          /* An asset with no market cannot be bought, so saying holders are
+           * paid it would be a promise the keeper declines to keep. */
+          el.innerHTML = hit.liquid === false
+            ? "paid out to them in <b>ETH</b> — nothing trades " + esc(hit.symbol) +
+              " on this chain yet, so it cannot be bought."
+            : "converted to <b>" + esc(hit.symbol) + "</b> and paid out to them.";
+        }).catch(function () { /* the ETH wording stands */ });
+    }
     /* After the row, not inside it. .frow is a flex container, so appending put
      * the panel in the row as another flex item, squeezing the token beside it. */
     rowEl.insertAdjacentElement("afterend", box);
