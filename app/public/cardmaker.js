@@ -109,8 +109,7 @@
        * continuous chain gradient, scaled up and placed like the reference. It
        * is drawn twice at the SAME spot — a blurred copy underneath for a soft
        * glow, then a sharp copy on top. */
-      var MS = 330, x0 = 110, y0 = 470;
-      function mark() {
+      function mark(MS, x0, y0) {
         [0, 1, 2].forEach(function (i) {
           var px = x0 + i * MS, py = y0 - i * MS;
           var lg = g.createLinearGradient(px, py + MS, px + MS, py);
@@ -120,11 +119,13 @@
           g.fillRect(px, py, MS, MS);
         });
       }
+      // the large blurred copy behind — a cast shadow, offset down-right
       g.save();
-      try { g.filter = "blur(24px)"; } catch (e) {}
-      mark();
+      try { g.filter = "blur(52px)"; } catch (e) {}
+      mark(350, 60, 515);
       g.restore();
-      staircase(g, pal);   // the sharp mark, back at its original spot, on top
+      // the sharp logo that casts it — at its original staircase position
+      mark(210, 0, 420);
     }
 
     // scrim: the body sits on darkness. There is always a branded background now

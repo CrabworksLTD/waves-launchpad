@@ -36,29 +36,37 @@ async function draw() {
   g.fillStyle = "#000";
   g.fillRect(0, 0, 1200, 630);
 
-  // gradient leak, bottom-right corner
+  // gradient leak, bottom-right corner — tinted to the chain
   var leak = g.createRadialGradient(1200, 630, 0, 1200, 630, 620);
-  leak.addColorStop(0, "rgba(20,241,149,.34)");
-  leak.addColorStop(.45, "rgba(153,69,255,.16)");
-  leak.addColorStop(1, "rgba(0,0,0,0)");
+  if (RH) {
+    leak.addColorStop(0, "rgba(204,255,0,.32)");   // lime
+    leak.addColorStop(.45, "rgba(217,217,217,.12)"); // grey
+    leak.addColorStop(1, "rgba(0,0,0,0)");
+  } else {
+    leak.addColorStop(0, "rgba(20,241,149,.34)");   // green
+    leak.addColorStop(.45, "rgba(153,69,255,.16)"); // purple
+    leak.addColorStop(1, "rgba(0,0,0,0)");
+  }
   g.fillStyle = leak;
   g.fillRect(0, 0, 1200, 630);
 
-  // the mark, giant: three squares climbing from the bottom-left corner off
-  // the top edge, gradient running along the climb
-  // flush: first square sits ON the bottom-left corner, third ends exactly
-  // at the top edge — 3 x 210 spans the full 630
-  var S = 210, GAP = 0;
-  var steps = [
-    [0, 630 - S],
-    [S, 630 - 2 * S],
-    [2 * S, 0]
-  ];
-  var mg = g.createLinearGradient(steps[0][0], steps[0][1] + S, steps[2][0] + S, steps[2][1]);
-  mg.addColorStop(0, PAL.a);
-  mg.addColorStop(1, PAL.b);
-  g.fillStyle = mg;
-  steps.forEach(function (p) { g.fillRect(p[0], p[1], S, S); });
+  // the mark, giant: three squares climbing from the bottom-left corner off the
+  // top edge, gradient running along the climb. Drawn as a sharp logo over a
+  // large blurred cast shadow, matching the launch share cards (cardmaker.js).
+  function markAt(MS, x0, y0) {
+    var mg = g.createLinearGradient(x0, y0 + MS, x0 + 3 * MS, y0 - 2 * MS);
+    mg.addColorStop(0, PAL.a);
+    mg.addColorStop(1, PAL.b);
+    g.fillStyle = mg;
+    [[x0, y0], [x0 + MS, y0 - MS], [x0 + 2 * MS, y0 - 2 * MS]].forEach(function (p) {
+      g.fillRect(p[0], p[1], MS, MS);
+    });
+  }
+  g.save();
+  g.filter = "blur(52px)";
+  markAt(350, 60, 515);          // the large blurred cast shadow, offset down-right
+  g.restore();
+  markAt(210, 0, 420);           // the sharp mark, flush to the bottom-left, on top
 
   // WAVES dead centre of the card
   g.fillStyle = "#fff";
@@ -72,6 +80,36 @@ async function draw() {
   g.letterSpacing = "2px";
   g.fillStyle = "rgba(255,255,255,.62)";
   g.fillText("DEPLOY… EVERYTHING.", 600, 427);
+
+  // @waveslaunchpad, top-right, with a soft dark shadow for legibility over the
+  // bright leak — the same handle the launch share cards carry
+  g.save();
+  g.textAlign = "right";
+  g.textBaseline = "alphabetic";
+  g.font = "700 28px Archivo";
+  g.letterSpacing = "0px";
+  g.fillStyle = "rgba(255,255,255,.92)";
+  g.shadowColor = "rgba(0,0,0,.62)";
+  g.shadowBlur = 12;
+  g.shadowOffsetY = 1;
+  g.fillText("@waveslaunchpad", 1144, 78);
+  g.restore();
+
+  // chain logo, bottom-right — the same mark the launch share cards carry
+  var logo = await new Promise(function (res) {
+    var im = new Image();
+    im.onload = function () { res(im); };
+    im.onerror = function () { res(null); };
+    im.src = RH ? "/art/robinhood.svg" : "/art/solana.svg";
+  });
+  if (logo) {
+    var lh = RH ? 54 : 42, ar = (logo.width && logo.height) ? logo.width / logo.height : 1;
+    var lw = lh * ar;
+    g.save();
+    g.globalAlpha = 0.95;
+    g.drawImage(logo, 1200 - 56 - lw, 630 - 56 - lh, lw, lh);
+    g.restore();
+  }
 
   var name = Q.get("save");
   if (name) {

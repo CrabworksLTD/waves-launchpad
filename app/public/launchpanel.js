@@ -1980,8 +1980,14 @@
       if (b) box.querySelector("#lp-tbuy").value = b.dataset.v;
     });
     box.querySelector("#lp-x").onclick = function () {
+      /* A paired launch steps back to its collection — there is a deployed
+       * collection behind it that still needs recording, so it cannot simply
+       * vanish. A standalone token launch has nothing behind it: the panel was
+       * opened over whatever page the creator was on, so backing out should
+       * give them that page back, not send them to the collection chooser they
+       * never asked for. */
       if (nft) { recordCollection(nft.cfg, nft.res, null, nft.up); nftDone(nft.cfg, nft.res, nft.up); }
-      else modeSelect();
+      else close();
     };
     // present on both chains now; the reward ASSET picker is the Solana-only part
     var modeTabs = box.querySelector("#tk-modes");
@@ -2617,8 +2623,23 @@
     `);
     box.querySelector("#lp-back").onclick = function () { tokenDetails(flow); };
 
-    /* Refuse early if there is no curve to launch into. Better here, on a screen
-     * that has taken nothing, than after the storage fee has been paid. */
+    /* ⚠️ Wait for the EVM stack before asking it anything.
+     *
+     * This checked window.MoonpadToken synchronously, but that module is loaded
+     * on demand — so whenever the check won the race it found nothing and told
+     * the creator the curve "has not been deployed" while it was deployed,
+     * wired in and answering. It looked exactly like a stale config, which is
+     * what it was mistaken for.
+     *
+     * Refusing early is still right: better on a screen that has taken nothing
+     * than after the storage fee has been paid. It just has to ask the loaded
+     * module, not whichever one happens to exist yet. */
+    try {
+      await window.Shell.ensureEvmLaunch();
+    } catch (e) {
+      return fail(box, "Could not load the Robinhood contracts — reload and try again.");
+    }
+
     if (!window.MoonpadToken || !window.MoonpadToken.curveAddress()) {
       box.querySelector("#lp-fee").textContent = "—";
       return fail(box, "Token launches are not open on Robinhood Chain yet — " +
