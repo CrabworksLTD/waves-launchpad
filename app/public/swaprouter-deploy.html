@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WAVES — deploy the swap router</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+/* Internal tool, deliberately unlinked from the nav — the same shape as
+ * curve-deploy.html and for the same reason: what it deploys is permanent, so
+ * the wallet that signs it should be a browser or Ledger wallet rather than a
+ * keyfile on disk.
+ *
+ * This deploys contracts/WavesSwapRouter.sol, which is what lets the rewards
+ * keeper pay holders the asset their creator chose. Until it exists the keeper
+ * pays ETH to everyone regardless. */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--void);color:var(--ink);font:400 15px/1.6 Inter,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono",monospace}
+main{max-width:660px;margin:0 auto;padding:48px 24px 90px}
+h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}
+h2{font-family:Archivo;font-size:15px;font-weight:800;margin:26px 0 10px}
+.sub{color:var(--dim);margin:0 0 26px;font-size:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:20px 22px;margin-bottom:18px}
+.row{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;
+  padding:8px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row b{font-weight:600;text-align:right;font-family:"IBM Plex Mono",monospace;
+  word-break:break-all}
+.k{color:var(--dim)}
+.warn{border:1px solid rgba(255,180,80,.35);background:rgba(255,180,80,.07);
+  border-radius:8px;padding:13px 15px;font-size:13px;color:#ffd9a0;margin-bottom:18px}
+.warn b{display:block;margin-bottom:4px}
+.ok{border:1px solid rgba(140,220,140,.35);background:rgba(140,220,140,.07);
+  border-radius:8px;padding:13px 15px;font-size:13px;color:#b8e6b8;margin-bottom:18px}
+.err{border:1px solid rgba(255,110,110,.4);background:rgba(255,110,110,.08);
+  border-radius:8px;padding:13px 15px;font-size:13px;color:#ff9d9d;margin-bottom:18px}
+button{width:100%;padding:13px;border:0;border-radius:9px;font:700 14px Inter,sans-serif;
+  cursor:pointer;background:var(--accent);color:#0b0d10}
+button:disabled{opacity:.45;cursor:default}
+button.ghost{background:transparent;color:var(--dim);border:1px solid var(--line);margin-top:9px}
+pre{background:var(--void);border:1px solid var(--line);border-radius:7px;padding:12px 14px;
+  overflow-x:auto;font:500 12.5px/1.6 "IBM Plex Mono",monospace;color:var(--ink);margin:10px 0 0}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Deploy the swap router</h1>
+  <p class="sub">What lets the rewards keeper pay holders the asset their
+  creator picked, instead of ETH. Done once.</p>
+
+  <div class="warn">
+    <b>Why this contract exists.</b>
+    A Uniswap V4 swap only happens inside a lock the PoolManager hands out, and
+    it hands it back by calling a contract. The keeper is a wallet, so it cannot
+    receive that call — which is why it pays ETH to everyone today, whatever
+    they chose. This is the piece that closes that gap.
+  </div>
+
+  <div class="panel">
+    <div class="row"><span class="k">Chain</span><b id="p-chain">…</b></div>
+    <div class="row"><span class="k">PoolManager</span><b id="p-pm">…</b></div>
+    <div class="row"><span class="k">Bytecode</span><b id="p-size">…</b></div>
+    <div class="row"><span class="k">Compiler</span><b id="p-solc">…</b></div>
+  </div>
+
+  <div class="warn">
+    <b>It holds nothing, and nobody owns it.</b>
+    No owner, no withdrawal, no upgrade, and no storage that survives a call.
+    Anyone may use it — they spend their own ETH and name their own recipient —
+    so there is nothing in it to steal and nothing that can be stranded in it.
+    <br><br>
+    <b style="display:inline">Not audited.</b> Fork-tested against the real V4
+    pools on this chain, which is not the same thing.
+  </div>
+
+  <div id="msg"></div>
+  <button id="sim">Simulate the deployment (free)</button>
+  <button id="go" class="ghost">Connect wallet</button>
+
+  <div class="panel" id="after" hidden>
+    <h2>Deployed</h2>
+    <div class="row"><span class="k">Address</span><b id="r-addr"></b></div>
+    <div class="row"><span class="k">Reads back</span><b id="r-verify"></b></div>
+    <div class="row"><span class="k">Live quote</span><b id="r-quote">…</b></div>
+    <p class="sub" style="margin:14px 0 0">
+      Set this in Vercel as an environment variable, then redeploy — env vars
+      are injected at build time, so the keeper will not see it until you do.
+      Until it is set the keeper pays ETH, which is the behaviour before this
+      existed rather than a breakage.
+    </p>
+    <pre id="r-snippet"></pre>
+  </div>
+</main>
+
+<script src="/brand.js"></script>
+<script src="/ui.js"></script>
+<script src="/evm-chains.js"></script>
+<script src="/evm-wallet.js"></script>
+<script src="/evm-contract.js"></script>
+<script src="/evm-launch.js"></script>
+<script src="/evm-wavescurve.js"></script>
+<script src="/evm-wavesswaprouter.js"></script>
+<script src="/evm-token.js"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  function say(k, h) { $("msg").innerHTML = h ? '<div class="' + k + '">' + h + "</div>" : ""; }
+
+  var art = window.WAVES_WAVESSWAPROUTER;
+  var chain = window.MoonpadToken.chain();
+
+  /* The same singleton the curve graduates into. Passing anything else would
+   * produce a router that quotes and swaps on a different venue than the one
+   * these tokens actually trade on — and it is a constructor argument, so it
+   * cannot be corrected afterwards. */
+  var POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951";
+
+  $("p-chain").textContent = chain.name + " (" + chain.id + ")";
+  $("p-pm").textContent = POOL_MANAGER;
+  $("p-size").textContent = ((art.bytecode.length - 2) / 2).toLocaleString() + " bytes";
+  $("p-solc").textContent = art.version;
+
+  function encodeArgs() {
+    return "0".repeat(24) + POOL_MANAGER.toLowerCase().replace(/^0x/, "");
+  }
+
+  async function connected() {
+    var a = (window.MoonpadWallet || {}).account;
+    if (a) return a;
+    return window.MoonpadLaunch.connect();
+  }
+
+  /* Simulate before spending. eth_call against a constructor runs the whole
+   * deployment on the real chain and returns the runtime code without mining
+   * anything — so a constructor that would revert says so for free. */
+  $("sim").onclick = async function () {
+    say("", "");
+    $("sim").disabled = true;
+    try {
+      var from = await connected();
+      var out = await window.MoonpadRPC.send(chain.rpc, "eth_call",
+        [{ from: from, data: art.bytecode + encodeArgs() }, "latest"]);
+      if (!out || out === "0x") throw new Error("The constructor returned no code.");
+      say("ok", "Simulated on " + chain.name + ": the constructor runs and returns " +
+        ((out.length - 2) / 2).toLocaleString() + " bytes of runtime code. " +
+        "Nothing was deployed and nothing was spent.");
+    } catch (e) {
+      say("err", "Simulation failed: " + String(e.message || e).slice(0, 300));
+    }
+    $("sim").disabled = false;
+  };
+
+  function paintButton() {
+    var a = (window.MoonpadWallet || {}).account;
+    $("go").disabled = false;
+    $("go").textContent = a ? "Deploy the swap router" : "Connect wallet";
+    $("go").className = a ? "" : "ghost";
+  }
+  paintButton();
+  window.addEventListener("moonpad-wallet", paintButton);
+
+  $("go").onclick = async function () {
+    var a = (window.MoonpadWallet || {}).account;
+    if (!a) { await window.MoonpadLaunch.connect(); return paintButton(); }
+
+    $("go").disabled = true; $("go").textContent = "Confirm in your wallet…";
+    say("", "");
+    try {
+      var hash = await window.MoonpadLaunch.deployRaw(
+        art.bytecode + encodeArgs(), a, chain.id);
+      $("go").textContent = "Waiting for the block…";
+      var rc = await window.MoonpadToken.waitForTx(hash);
+      var addr = rc.contractAddress;
+
+      $("after").hidden = false;
+      $("r-addr").textContent = addr;
+      $("r-snippet").textContent = "RH_SWAP_ROUTER=" + addr;
+
+      /* Read the constructor argument back OUT of the deployed contract. A
+       * deploy that succeeded with the wrong PoolManager is the failure worth
+       * catching here, and it is completely silent otherwise. */
+      var pm = await window.MoonpadRPC.send(chain.rpc, "eth_call",
+        [{ to: addr, data: "0xdc4c90d3" }, "latest"]);
+      var same = ("0x" + String(pm).slice(-40)).toLowerCase() === POOL_MANAGER;
+      $("r-verify").textContent = same ? "the right PoolManager" : "WRONG PoolManager";
+
+      /* And prove it can actually price a pool. A router that deploys but
+       * cannot quote is one the keeper would silently fall back from, paying
+       * ETH forever while looking configured. */
+      try {
+        var assets = await fetch("/rh-assets.json").then(function (r) { return r.json(); });
+        var tsla = (assets.tokens || []).find(function (t) { return t.symbol === "TSLA"; });
+        var keys = ((tsla && tsla.ethPools) || []).filter(function (k) {
+          return k.hooks === "0x0000000000000000000000000000000000000000";
+        }).slice(0, 8);
+        if (!keys.length) throw new Error("no pools to try");
+
+        var pad = function (v) { return BigInt(v).toString(16).padStart(64, "0"); };
+        var ad = function (x) { return String(x).replace(/^0x/, "").toLowerCase().padStart(64, "0"); };
+        var data = "0x33a3a81b" + pad(64) + pad(1000000000000000n) + pad(keys.length) +
+          keys.map(function (k) {
+            return ad(k.currency0) + ad(k.currency1) + pad(k.fee) + pad(k.tickSpacing) + ad(k.hooks);
+          }).join("");
+        var q = await window.MoonpadRPC.send(chain.rpc, "eth_call",
+          [{ to: addr, data: data }, "latest"]);
+        var got = BigInt("0x" + String(q).replace(/^0x/, "").slice(64, 128));
+        $("r-quote").textContent = got > 0n
+          ? (Number(got) / 1e18).toFixed(6) + " TSLA per 0.001 ETH"
+          : "quoted zero — check the pools";
+      } catch (e) {
+        $("r-quote").textContent = "could not quote: " + String(e.message || e).slice(0, 60);
+      }
+
+      say(same ? "ok" : "err", same
+        ? "Deployed and verified. Set the variable below in Vercel and redeploy."
+        : "Deployed, but it reads back the wrong PoolManager. Do not use it.");
+      $("go").textContent = "Deployed";
+    } catch (e) {
+      var m = String(e.message || e);
+      if (/reject|denied/i.test(m)) m = "You cancelled the transaction.";
+      say("err", m.slice(0, 300));
+      $("go").disabled = false; $("go").textContent = "Deploy the swap router";
+    }
+  };
+})();
+</script>
+</body>
+</html>

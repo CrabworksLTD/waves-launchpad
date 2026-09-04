@@ -83,6 +83,16 @@ function compile(name) {
     "};\n";
   fs.writeFileSync(target, body);
 
+  /* The same bytes, as plain hex, so a fork test can deploy EXACTLY what ships.
+   *
+   * forge builds its own copy from the same source and settings, and it is 74
+   * bytes different — metadata, as far as anyone can tell, which is a phrase
+   * that should not appear anywhere near a contract that moves other people's
+   * money. Testing this file instead removes the question. */
+  const hexDir = path.join(root, "forge-out", "shipped");
+  fs.mkdirSync(hexDir, { recursive: true });
+  fs.writeFileSync(path.join(hexDir, name + ".hex"), bytecode);
+
   console.log("  " + name.padEnd(16) +
     (bytecode.length - 2) / 2 + " bytes  ->  " + path.relative(root, target));
   return { name, size: (bytecode.length - 2) / 2 };

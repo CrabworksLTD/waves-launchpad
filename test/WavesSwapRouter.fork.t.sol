@@ -41,9 +41,27 @@ contract WavesSwapRouterForkTest is Test {
         _;
     }
 
+    /**
+     * ⚠️ Deploys the bytes that SHIP, not forge's build of the same source.
+     *
+     * tools/build-contract.js and forge compile the same file with the same
+     * solc, optimizer and viaIR settings and still produce output that differs
+     * by 74 bytes. That is almost certainly only metadata — and "almost
+     * certainly" is not a standard to apply to a contract that moves other
+     * people's payouts. The artifact the site deploys is the artifact tested.
+     */
     function setUp() public {
         if (block.chainid != 4663) return;
-        router = new WavesSwapRouter(POOL_MANAGER);
+
+        bytes memory code = vm.parseBytes(vm.readFile("forge-out/shipped/WavesSwapRouter.hex"));
+        bytes memory initCode = abi.encodePacked(code, abi.encode(POOL_MANAGER));
+        address deployed;
+        assembly { deployed := create(0, add(initCode, 0x20), mload(initCode)) }
+        require(deployed != address(0), "shipped bytecode failed to deploy");
+        router = WavesSwapRouter(payable(deployed));
+
+        // it must be the same contract, not merely a contract
+        require(address(router.poolManager()) == POOL_MANAGER, "wrong poolManager");
     }
 
     function _key(address token, uint24 fee, int24 spacing) internal pure returns (PoolKey memory) {

@@ -546,9 +546,7 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
       '<span class="sym">' + esc(o.sym || "") + "</span>" +
       (o.reward ? '<span class="rw"' + (o.rewardMint ? ' data-mint="' + esc(o.rewardMint) + '"' : "") +
         ">" + esc(o.reward.replace(/^ +/, "") || "REWARDS") + "</span>" : "") +
-      '<div class="stat" data-stat><b>—</b></div>' +
-      '<div class="foot"><span>' + esc(o.addr ? shortAddr(o.addr) : "") + "</span>" +
-      "<span>" + esc(ago(o.at)) + "</span></div></div></a>";
+      '<div class="foot"><span>' + esc(ago(o.at)) + "</span></div></div></a>";
   }
   function setStat(el, value, label) {
     if (!el) return;

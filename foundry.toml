@@ -16,6 +16,9 @@ evm_version = "paris"
 # hand-encodes this call, and flat arguments are far easier to get right — and
 # to check against `cast calldata` — than a nested dynamic struct.
 via_ir = true
+# So a fork test can deploy the exact bytes tools/build-contract.js ships,
+# rather than forge's own build of the same source.
+fs_permissions = [{ access = "read", path = "./forge-out/shipped" }]
 
 [fuzz]
 runs = 512

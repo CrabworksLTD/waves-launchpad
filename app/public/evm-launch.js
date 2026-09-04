@@ -597,8 +597,31 @@
     return ("0x" + r.slice(-40)).toLowerCase();
   }
 
+  /**
+   * Deploy a contract from bytecode that already has its constructor arguments
+   * appended. Estimated and priced like every other transaction here, so a
+   * constructor that would revert says so before the wallet opens rather than
+   * after the gas is spent.
+   *
+   * Used by the internal deploy pages, which are the only places a contract is
+   * created by hand rather than by the launch path.
+   */
+  async function deployRaw(data, from, chainId) {
+    from = from || await connect();
+    if (chainId) await switchChain(chainId);
+    var tx = { from: from, data: data, value: "0x0" };
+    try {
+      tx.gas = pad(await provider().request({ method: "eth_estimateGas", params: [tx] }));
+    } catch (e) {
+      throw new Error("The deployment would fail: " + (e && e.message ? e.message : e));
+    }
+    await priceTx(tx);
+    return provider().request({ method: "eth_sendTransaction", params: [tx] });
+  }
+
   window.MoonpadLaunch = {
     ownerCall: ownerCall,
+    deployRaw: deployRaw,
     readVaultPayToken: readVaultPayToken,
     feeFor: feeFor,
     registerOn: registerOn,
