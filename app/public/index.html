@@ -99,12 +99,19 @@ h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:te
   background:rgba(var(--accent-rgb),.09)}
 .scard .sym{display:block;margin-top:1px;font:400 12px "IBM Plex Mono",monospace;
   color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.scard .stat{margin-top:9px;font:600 15px "IBM Plex Mono",monospace;
-  font-variant-numeric:tabular-nums}
-.scard .stat i{font-style:normal;font-weight:400;font-size:11px;color:var(--faint);
-  margin-left:5px;letter-spacing:.06em}
+.scard .stat{margin-top:8px}
+.scard .stat b{font:700 18px Archivo;letter-spacing:-.01em;color:var(--ink)}
+.scard .stat i{font-style:normal;font:600 11px "IBM Plex Mono",monospace;color:var(--faint);
+  margin-left:6px;letter-spacing:.04em}
+/* the bonding-curve progress bar, like the reference cards */
+.scard .bar{display:flex;align-items:center;gap:9px;margin-top:9px}
+.scard .bar .track{flex:1;height:5px;border-radius:99px;background:var(--line2);overflow:hidden}
+.scard .bar .fill{height:100%;border-radius:99px;background:var(--accent);width:0;transition:width .4s}
+.scard .bar .pct{font:600 11.5px "IBM Plex Mono",monospace;color:var(--faint);
+  white-space:nowrap;font-variant-numeric:tabular-nums}
 .scard .foot{display:flex;justify-content:space-between;gap:8px;margin-top:9px;
   font:400 10.5px "IBM Plex Mono",monospace;color:var(--faint)}
+.scard .foot .t{color:var(--accent)}
 .feature{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px}
 .feature .wide3{grid-template-columns:1fr 1fr 1fr}
 .ban{position:relative;display:block;border:1px solid transparent;
@@ -341,6 +348,22 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
 (function () {
   "use strict";
   var esc = UI.esc, shortAddr = UI.shortAddr;
+
+  /* SOL→USD, so a spotlight card can show market cap in dollars like the
+   * reference. Fetched once; a card that fills before it lands falls back to the
+   * quote-currency figure and is correct either way. */
+  var solUsd = 0;
+  fetch("/api/stats?usd=sol").then(function (r) { return r.json(); })
+    .then(function (j) { solUsd = Number(j && j.usd) || 0; }).catch(function () {});
+  // compact dollars: 18100 → "$18.1k", 4600 → "$4.6k", 1.2e6 → "$1.2M"
+  function usdShort(n) {
+    if (n == null || isNaN(n) || n <= 0) return null;
+    var a = Math.abs(n);
+    if (a >= 1e6) return "$" + (n / 1e6).toFixed(a >= 1e7 ? 0 : 1).replace(/\.0$/, "") + "M";
+    if (a >= 1e3) return "$" + (n / 1e3).toFixed(a >= 1e4 ? 0 : 1).replace(/\.0$/, "") + "k";
+    return "$" + Math.round(n);
+  }
+
   /* Read art through the mirror so a just-launched collection's avatar shows
    * instantly here too, instead of waiting for arweave.net to seed the fresh
    * upload. Non-arweave urls (tokens already on our /m/ path) pass through. */
@@ -546,11 +569,24 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
       '<span class="sym">' + esc(o.sym || "") + "</span>" +
       (o.reward ? '<span class="rw"' + (o.rewardMint ? ' data-mint="' + esc(o.rewardMint) + '"' : "") +
         ">" + esc(o.reward.replace(/^ +/, "") || "REWARDS") + "</span>" : "") +
-      '<div class="foot"><span>' + esc(ago(o.at)) + "</span></div></div></a>";
+      '<div class="stat" data-stat><b>—</b></div>' +
+      '<div class="bar" data-bar hidden><span class="track"><span class="fill"></span></span>' +
+        '<span class="pct"></span></div>' +
+      '<div class="foot"><span>' + esc(o.addr ? shortAddr(o.addr) : "") + "</span>" +
+      '<span class="t">' + esc(ago(o.at)) + "</span></div></div></a>";
   }
   function setStat(el, value, label) {
     if (!el) return;
     el.innerHTML = "<b>" + esc(value) + "</b>" + (label ? "<i>" + esc(label) + "</i>" : "");
+  }
+  /* Fill and reveal a card's progress bar (0..1), with the % beside it. */
+  function setBar(card, progress) {
+    var bar = card && card.querySelector("[data-bar]");
+    if (!bar) return;
+    var p = Math.max(0, Math.min(1, progress || 0));
+    bar.hidden = false;
+    var fill = bar.querySelector(".fill"); if (fill) fill.style.width = (p * 100) + "%";
+    var lbl = bar.querySelector(".pct"); if (lbl) lbl.textContent = (p * 100).toFixed(2) + "%";
   }
 
   function draw(collections, tokens, templates) {
@@ -637,8 +673,13 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
       if (it.kind === "token") {
         window.Token.readMarket(it.rec.mint).then(function (m) {
           it.size = m.raised || 0;
-          if (m.migrated) setStat(statEl, "Graduated", "");
-          else setStat(statEl, UI.fmt(m.raised, 2) + " " + m.quote, "raised");
+          if (m.migrated) { setStat(statEl, "Graduated", ""); setBar(card, 1); return; }
+          // market cap in dollars (SOL-quoted × the rate; USDC is already USD)
+          var q = String(m.quote || "").toLowerCase();
+          var mcUsd = m.mcap == null ? null : (q === "sol" ? m.mcap * solUsd : m.mcap);
+          setStat(statEl, usdShort(mcUsd) ||
+            (m.mcap != null ? UI.fmt(m.mcap, 1) + " " + m.quote : "—"), "MC");
+          setBar(card, m.progress);
         }).catch(function () {});
         return;
       }
@@ -652,6 +693,7 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
         var symEl = card.querySelector(".sym");
         if (symEl) symEl.textContent = m.available.toLocaleString() + " supply";
         setStat(statEl, m.redeemed.toLocaleString() + " / " + m.available.toLocaleString(), "minted");
+        setBar(card, m.available ? m.redeemed / m.available : 0);
       }).catch(function () {});
     });
 

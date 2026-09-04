@@ -322,11 +322,34 @@ export default async function handler(req, res) {
       const { privateKeyToAccount } = await import("viem/accounts");
       const derived = privateKeyToAccount(keeperKey()).address;
       const expected = "0xAcA1d1bE05f47090a6d8D918AB26d4543fD3Af81";
+
+      /* The router, checked the same way and for the same reason: a keeper
+       * that cannot swap does not fail, it quietly pays ETH to holders who
+       * were promised something else. That is indistinguishable from working
+       * unless something asks. Reading poolManager() off the address proves
+       * there is really a router there and that it points at the venue these
+       * tokens trade on — a wrong or absent one is worth knowing before a pot
+       * exists rather than after it has been paid out. */
+      let router = { configured: !!SWAP_ROUTER, address: SWAP_ROUTER };
+      if (SWAP_ROUTER) {
+        try {
+          const pm = await rpc("eth_call", [{ to: SWAP_ROUTER, data: "0xdc4c90d3" }, "latest"]);
+          const got = "0x" + String(pm || "").slice(-40).toLowerCase();
+          router.poolManager = got;
+          router.ok = got === "0x8366a39cc670b4001a1121b8f6a443a643e40951";
+        } catch (e) {
+          router.ok = false;
+          router.error = String(e.message || e).slice(0, 120);
+        }
+      }
+
       return res.status(200).json({
         ok: derived.toLowerCase() === expected.toLowerCase(),
-        derived, expected,
+        derived, expected, router,
         note: derived.toLowerCase() === expected.toLowerCase()
-          ? "the deployed key signs for the keeper on chain"
+          ? (router.ok ? "key signs for the keeper, and the swap router answers"
+             : router.configured ? "key is right, but the swap router does not check out"
+             : "key is right; no swap router set, so holders are paid ETH")
           : "MISMATCH — pledges name an address this key cannot sign for"
       });
     } catch (e) {
