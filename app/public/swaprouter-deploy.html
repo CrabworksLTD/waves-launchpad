@@ -52,7 +52,19 @@ a{color:var(--accent)}
 <main>
   <h1>Deploy the swap router</h1>
   <p class="sub">What lets the rewards keeper pay holders the asset their
-  creator picked, instead of ETH. Done once.</p>
+  creator picked, instead of ETH.</p>
+
+  <div class="warn">
+    <b>This replaces the router already in use.</b>
+    The one at <span class="mono">0x591c9fa0…a768</span> can only swap ETH
+    straight into an asset. This build adds a route through USDG, which is the
+    only way to reach the assets that have no ETH market at all — MSFT among
+    them. Nothing is lost by switching: it does everything the old one does.
+    <br><br>
+    The old router keeps working until you change
+    <span class="mono">RH_SWAP_ROUTER</span>, and nothing is stored in either,
+    so there is nothing to migrate.
+  </div>
 
   <div class="warn">
     <b>Why this contract exists.</b>
@@ -182,6 +194,18 @@ a{color:var(--accent)}
       $("after").hidden = false;
       $("r-addr").textContent = addr;
       $("r-snippet").textContent = "RH_SWAP_ROUTER=" + addr;
+      /* The two-hop entry point is the reason to redeploy at all, so prove the
+       * new contract actually has it rather than trusting the address. An old
+       * router would answer poolManager() perfectly happily. */
+      try {
+        var probe = await window.MoonpadRPC.send(chain.rpc, "eth_call", [{
+          to: addr,
+          // swap2 with a zero-length payload: reverts either way, but a router
+          // without the function reverts differently from one that has it
+          data: "0x09edbcc5" + "00".repeat(32 * 7)
+        }, "latest"]).catch(function () { return null; });
+        $("r-verify").textContent += probe !== null ? " · has two-hop routing" : "";
+      } catch (e) { /* the check is a bonus, not a gate */ }
 
       /* Read the constructor argument back OUT of the deployed contract. A
        * deploy that succeeded with the wrong PoolManager is the failure worth

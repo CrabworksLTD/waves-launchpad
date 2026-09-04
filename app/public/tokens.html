@@ -89,6 +89,7 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   color:var(--dim)}
 .tk .tag.curve{color:var(--accent);border-color:rgba(var(--accent-rgb),.45)}
 .tk .tag.grad{color:var(--accent-2-hi);border-color:rgba(var(--accent-2-rgb),.5)}
+.tk .tag.reward{color:var(--accent);border-color:rgba(var(--accent-rgb),.45)}
 .tk .body{display:flex;flex-direction:column;flex:1;padding:10px 12px 11px}
 .tk .body b{display:block;font:700 14px Archivo;letter-spacing:-.01em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -346,8 +347,9 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
         '<span class="art">' +
           (r.icon ? '<img alt="" loading="lazy" src="' + esc(art(r.icon)) + '">'
                   : '<span class="ltr">' + esc(sym.slice(0, 1) || "$") + "</span>") +
-          (m ? '<span class="tag ' + (m.migrated ? "grad" : "curve") + '">' +
-                (m.migrated ? "Graduated" : "On the curve") + "</span>" : "") +
+          ((r.feeSharePct || 0) > 0
+            ? '<span class="tag reward">' + (r.rewardMode === "burn" ? "BUYBACK" : "DIVIDEND") + "</span>"
+            : "") +
         "</span>" +
         '<span class="body">' +
           "<b>" + esc(r.name || "Token") + "</b>" +
