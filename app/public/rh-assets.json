@@ -20,6 +20,30 @@
       "kind": "stable"
     },
     {
+      "address": "0xc9a981fee1f9dec688bb123ccdecc63d0debfc4e",
+      "symbol": "GLD",
+      "name": "SPDR Gold Trust \u2022 Robinhood Token",
+      "decimals": 18,
+      "pools": 101,
+      "kind": "commodity"
+    },
+    {
+      "address": "0x411efb0e7f985935daec3d4c3ebaea0d0ad7d89f",
+      "symbol": "SLV",
+      "name": "iShares Silver Trust \u2022 Robinhood Token",
+      "decimals": 18,
+      "pools": 57,
+      "kind": "commodity"
+    },
+    {
+      "address": "0xa30fa36db767ad9ed3f7a60fc79526fb4d56d344",
+      "symbol": "USO",
+      "name": "United States Oil Fund \u2022 Robinhood Token",
+      "decimals": 18,
+      "pools": 57,
+      "kind": "commodity"
+    },
+    {
       "address": "0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec",
       "symbol": "NVDA",
       "name": "NVIDIA \u2022 Robinhood Token",
@@ -105,14 +129,6 @@
       "name": "iShares MSCI India ETF \u2022 Robinhood Token",
       "decimals": 18,
       "pools": 103,
-      "kind": "equity"
-    },
-    {
-      "address": "0xc9a981fee1f9dec688bb123ccdecc63d0debfc4e",
-      "symbol": "GLD",
-      "name": "SPDR Gold Trust \u2022 Robinhood Token",
-      "decimals": 18,
-      "pools": 101,
       "kind": "equity"
     },
     {
@@ -265,22 +281,6 @@
       "name": "Roblox \u2022 Robinhood Token",
       "decimals": 18,
       "pools": 62,
-      "kind": "equity"
-    },
-    {
-      "address": "0x411efb0e7f985935daec3d4c3ebaea0d0ad7d89f",
-      "symbol": "SLV",
-      "name": "iShares Silver Trust \u2022 Robinhood Token",
-      "decimals": 18,
-      "pools": 57,
-      "kind": "equity"
-    },
-    {
-      "address": "0xa30fa36db767ad9ed3f7a60fc79526fb4d56d344",
-      "symbol": "USO",
-      "name": "United States Oil Fund \u2022 Robinhood Token",
-      "decimals": 18,
-      "pools": 57,
       "kind": "equity"
     },
     {

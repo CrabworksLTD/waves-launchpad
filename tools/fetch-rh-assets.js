@@ -47,6 +47,28 @@ const SKIP = new Set(["0x0bd7d308f8e1639fab988df18a8011f41eacad73"]);
  *
  * An equity can be recognised by its name because Robinhood issues it and says
  * so. Nothing else can, so nothing else is guessed at. */
+/* Commodity funds, by TICKER.
+ *
+ * Unlike the stablecoin allowlist, this one is presentational rather than a
+ * safety boundary — everything here has already passed the "• Robinhood Token"
+ * check, so the only question is which tab it appears under. It is still an
+ * explicit list because the obvious alternative does not work: matching names
+ * against /gold|silver|oil|metal|corn/ files Corning under commodities on
+ * "corn" and Formation Metals on "metal". Both are ordinary equities.
+ *
+ * Names not currently on the chain are included so a later run picks them up
+ * without anyone having to remember this file exists. */
+const COMMODITIES = new Set([
+  "GLD", "IAU", "GLDM", "SGOL",           // gold
+  "SLV", "SIVR",                          // silver
+  "PPLT", "PALL",                         // platinum, palladium
+  "CPER",                                 // copper
+  "USO", "BNO", "UNG", "UGA",             // oil and gas
+  "DBA", "CORN", "WEAT", "SOYB", "CANE",  // agriculture
+  "DBC", "GSG", "PDBC",                   // broad baskets
+  "URA", "URNM"                           // uranium
+]);
+
 const STABLES = {
   "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "USDG"
 };
@@ -208,7 +230,9 @@ async function onChain(address) {
       decimals: chain.decimals,
       pools: info.liquidity,
       // Robinhood's own tokenised equities say so in their name
-      kind: isReal ? "equity" : "stable"
+      kind: !isReal ? "stable"
+          : COMMODITIES.has(chain.symbol) ? "commodity"
+          : "equity"
     };
     out.push(rec);
     bySymbol.set(chain.symbol, rec);
@@ -253,7 +277,7 @@ async function onChain(address) {
 
   out.sort((a, b) => {
     // native first, then stablecoins, then equities by how widely they trade
-    const rank = (t) => (t.kind === "native" ? 0 : t.kind === "stable" ? 1 : 2);
+    const rank = (t) => ({ native: 0, stable: 1, commodity: 2 }[t.kind] ?? 3);
     return rank(a) - rank(b) || b.pools - a.pools || a.symbol.localeCompare(b.symbol);
   });
   fs.writeFileSync(OUT, JSON.stringify({

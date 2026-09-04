@@ -2059,6 +2059,7 @@
         <button data-t="all" class="on">All</button>
         <button data-t="native">ETH</button>
         <button data-t="stable">USDG</button>
+        <button data-t="commodity">Commodities</button>
         <button data-t="equity">Stocks &amp; ETFs</button>
       </div>
       <div class="plist" id="lp-list"><p class="note" style="padding:12px">Loading…</p></div>
@@ -2092,6 +2093,7 @@
         });
         var native = rows.filter(function (t) { return t.kind === "native"; });
         var stable = rows.filter(function (t) { return t.kind === "stable"; });
+        var comm   = rows.filter(function (t) { return t.kind === "commodity"; });
         var equity = rows.filter(function (t) { return t.kind === "equity"; });
         var html = "";
         /* ETH first: it is what the fees already are, so choosing it means no
@@ -2103,6 +2105,7 @@
          * hid the one thing it contained. */
         if (stable.length) html += head(stable.length === 1 ? stable[0].symbol : "Stablecoins",
                                         stable.length) + stable.map(rowHtml).join("");
+        if (comm.length) html += head("Commodities", comm.length) + comm.map(rowHtml).join("");
         if (equity.length) html += head("Stocks & ETFs", equity.length) + equity.map(rowHtml).join("");
         box.querySelector("#lp-list").innerHTML =
           html || '<p class="note" style="padding:12px">Nothing matches that.</p>';
