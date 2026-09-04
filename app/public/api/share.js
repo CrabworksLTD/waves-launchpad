@@ -76,7 +76,10 @@ export default async function handler(req) {
      so the suffix made every unfurl read "WAVES / $MOAR · moar cat — WAVES".
      The title is the launch; the site name is the site. */
   const title = esc(name);
-  const desc = "Cross-chain token and NFT launchpad";
+  // name the chain the launch is actually on, matching the badge on its card
+  const desc = isEvm
+    ? "Token and NFT launchpad on Robinhood Chain"
+    : "Token and NFT launchpad on Solana";
   const human = dest + "?hp=1";
 
   const html = '<!doctype html><html lang="en"><head><meta charset="utf-8">' +

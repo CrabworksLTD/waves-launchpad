@@ -56,6 +56,52 @@ async function rpc(method, params) {
 
 const addrOf = (topic) => "0x" + String(topic).slice(-40).toLowerCase();
 
+// keccak("Launched(address,address,uint16,string,string)")
+const LAUNCHED = "0xcf74280e4eafa3845516f297991e114213dc6a4c132199d8338fe6ba26b216e4";
+
+/**
+ * The block a token launched in, for records written before it was captured.
+ *
+ * Without it there is nowhere honest to start: this chain prunes historical
+ * state within minutes, so a contract cannot be asked when it appeared, and
+ * starting one window back silently misses every transfer before that — a
+ * holder table short of the people who bought first.
+ *
+ * The curve knows, because it announced the launch. Searching ITS log is cheap
+ * where searching the token's is not: there are a handful of launches, not a
+ * trade every few seconds. Cached once found, so this runs once per token ever.
+ */
+async function findLaunchBlock(db, curveAddr, token, latest) {
+  const key = "rhix:" + token + ":start";
+  const cached = await db.get(key).catch(() => null);
+  if (cached) return BigInt(cached);
+
+  let cursor = latest;
+  for (let i = 0; i < 40 && cursor > 0n; i++) {     // ~2.3 days back
+    const from = cursor > CHUNK ? cursor - CHUNK : 0n;
+    let logs = [];
+    try {
+      logs = await rpc("eth_getLogs", [{
+        address: curveAddr,
+        fromBlock: "0x" + from.toString(16),
+        toBlock: "0x" + cursor.toString(16),
+        topics: [LAUNCHED, null, null]
+      }]);
+    } catch (e) {
+      break;
+    }
+    const hit = logs.find((l) => addrOf(l.topics[1]) === token);
+    if (hit) {
+      const b = BigInt(hit.blockNumber);
+      await db.set(key, b.toString());
+      return b;
+    }
+    cursor = from;
+    if (from === 0n) break;
+  }
+  return null;
+}
+
 /**
  * Advance one token's holder table as far as this run can.
  *
@@ -71,13 +117,19 @@ async function indexToken(db, rec, curveAddr) {
   const latest = BigInt(await rpc("eth_blockNumber", []));
   let from = BigInt((await db.get(cursorKey).catch(() => null)) || rec.block || 0);
   if (from <= 0n) {
-    /* No launch block recorded — a token from before that was stored. Rather
-     * than scan from genesis (which this chain will not answer anyway), start
-     * one window back and say so. The table will be short by whatever happened
-     * before that, which is why the block is captured at launch now. */
-    from = latest > CHUNK ? latest - CHUNK : 0n;
+    // recorded before the launch block was captured — ask the curve
+    const found = await findLaunchBlock(db, String(curveAddr).toLowerCase(), token, latest);
+    from = found !== null ? found : (latest > CHUNK ? latest - CHUNK : 0n);
   }
   if (from >= latest) return { token, moved: 0, upTo: Number(from), done: true };
+
+  /* Not holders, and counting them would be worse than useless.
+   *
+   * The curve holds every token that has not been sold yet — at launch that is
+   * the entire supply — and after graduation the PoolManager holds the
+   * liquidity. Both would swamp the table and take most of every payout back to
+   * the contracts the money came from. The zero address is where burns go. */
+  const skip = new Set([ZERO, String(curveAddr).toLowerCase(), POOL_MANAGER]);
 
   const balances = new Map();
   let moved = 0;
@@ -105,8 +157,8 @@ async function indexToken(db, rec, curveAddr) {
       const toA = addrOf(lg.topics[2]);
       const value = BigInt(lg.data || "0x0");
       if (value === 0n) continue;
-      if (fromA !== ZERO) balances.set(fromA, (balances.get(fromA) || 0n) - value);
-      if (toA !== ZERO) balances.set(toA, (balances.get(toA) || 0n) + value);
+      if (!skip.has(fromA)) balances.set(fromA, (balances.get(fromA) || 0n) - value);
+      if (!skip.has(toA)) balances.set(toA, (balances.get(toA) || 0n) + value);
       moved++;
     }
     cursor = to;
@@ -150,7 +202,6 @@ export default async function handler(req, res) {
     if (only) toks = toks.filter((t) => String(t.mint).toLowerCase() === String(only).toLowerCase());
     else toks = toks.filter((t) => (t.feeSharePct || 0) > 0);
 
-    const chains = (await import("../evm-chains.js").catch(() => null), null);
     const curveAddr = process.env.RH_CURVE || "0x77ddd6ceb454e4b71a1952fcaafb8cf9975f55c0";
 
     const out = [];

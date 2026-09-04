@@ -104,6 +104,17 @@
       g.restore();
       staircase(g, pal);
     } else {
+      /* No launch art at all: the brand card. A soft accent glow behind the
+       * staircase so it reads like the website's own share card rather than an
+       * empty panel — the rich look a PFP's wash gives, without a PFP. */
+      var glow = g.createRadialGradient(W * 0.72, H * 0.30, 40, W * 0.72, H * 0.30, W * 0.62);
+      glow.addColorStop(0, pal.accent);
+      glow.addColorStop(1, "transparent");
+      g.save();
+      g.globalAlpha = 0.20;
+      g.fillStyle = glow;
+      g.fillRect(0, 0, W, H);
+      g.restore();
       staircase(g, pal);
     }
 
@@ -181,7 +192,7 @@
     g.fillStyle = "rgba(255,255,255,.62)";
     var chips = [(o.chain === "robinhood" ? "ROBINHOOD" : "SOLANA")];
     if (o.sym) chips.unshift("$" + String(o.sym).toUpperCase());
-    chips.push(o.kind === "token" ? "BONDING CURVE" : "COLLECTION");
+    chips.push(o.kind === "token" ? "TOKEN" : "COLLECTION");
     g.fillText(chips.join("  ·  "), tx, ay + 140);
 
     // the numbers along the bottom
@@ -203,7 +214,10 @@
      * degrades — loadImage resolves null and this is skipped. */
     var logo = await loadImage("/art/" + (o.chain === "robinhood" ? "robinhood" : "solana") + ".svg");
     if (logo) {
-      var lh = 42, ar = (logo.width && logo.height) ? logo.width / logo.height : 1;
+      // the Robinhood feather is more compact than Solana's wide bars, so give
+      // it a few more px to carry the same visual weight
+      var lh = (o.chain === "robinhood" ? 54 : 42);
+      var ar = (logo.width && logo.height) ? logo.width / logo.height : 1;
       var lw = lh * ar;
       g.save();
       g.globalAlpha = 0.95;
