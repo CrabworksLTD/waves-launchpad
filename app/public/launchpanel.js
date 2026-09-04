@@ -2848,9 +2848,17 @@
       <div class="row"><span class="k">Trading fees</span><b>yours to claim</b></div>
       <div class="tip">
         <b>Want your holders to earn from every trade?</b>
-        <span>Turn on holder rewards from the fee page — one transaction, and your
-        share starts paying out. You can do it whenever you like.</span>
-        <a class="go" href="/fees">Open the fee page →</a>
+        <span>${(function () {
+          /* Name what they picked. rewardLabel() is a whole phrase for the
+           * summary rows; here only the ticker belongs in the sentence. */
+          var sym = flow && flow.reward && flow.reward.symbol;
+          sym = sym ? String(sym).replace(/^\$/, "") : null;
+          return sym && sym !== "ETH"
+            ? "Every trading fee gets converted to " + sym + " and paid to holders, hourly."
+            : "Every trading fee gets paid to holders in ETH, hourly.";
+        })()}
+        One transaction, whenever you like.</span>
+        <a class="go" href="/fees?activate=${encodeURIComponent(res.token)}">Activate holder rewards →</a>
       </div>
       ${raw(caRow("Token CA", res.token))}
       <label>Token page</label>

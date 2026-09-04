@@ -72,6 +72,33 @@ export default async function handler(req, res) {
   const ext = (file.split(".").pop() || "").toLowerCase();
   const type = TYPES[ext] || "application/octet-stream";
 
+  /* ⚠️ The mirror FIRST, not last.
+   *
+   * This tried three Arweave gateways before falling back here, at eight
+   * seconds each. For a launch minutes old that is the one case where no
+   * gateway has the bundle yet — so every image on the page waited out up to
+   * twenty-four seconds of timeouts before being served from a copy that was
+   * sitting in Redis the whole time. The fallback existed precisely for that
+   * window and was reached only after the window's entire cost had been paid.
+   *
+   * A Redis read is milliseconds, the mirror only exists for our own launches,
+   * and it expires after two days — by which point Arweave has long since
+   * caught up and this misses cheaply. Arweave is still the source of truth and
+   * still what the on-chain metadata points at; it is just no longer on the
+   * critical path for the first two days of a token's life. */
+  try {
+    const db = await kv();
+    const early = db ? await db.get("mir:" + id + ":" + file) : null;
+    if (early) {
+      res.setHeader("Content-Type", type);
+      /* Short, so the permanent Arweave-backed copy takes over once it is
+       * available rather than this being pinned for a year. */
+      res.setHeader("Cache-Control", "public, max-age=300");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      return res.status(200).send(Buffer.from(String(early), "base64"));
+    }
+  } catch (e) { /* no mirror; the gateways are next anyway */ }
+
   for (const gw of GATEWAYS) {
     try {
       const r = await fetch(gw + "/" + id + "/" + file, {
@@ -98,20 +125,10 @@ export default async function handler(req, res) {
     } catch (e) { /* try the next gateway */ }
   }
 
-  /* Nothing served it. The browser mirrors a launch's art at upload time, so
-   * this covers the minutes before ANY gateway has the bundle — the gap that
-   * made a brand-new token look broken on the page that just created it. */
-  try {
-    const db = await kv();
-    const hit = db ? await db.get("mir:" + id + ":" + file) : null;
-    if (hit) {
-      res.setHeader("Content-Type", type);
-      res.setHeader("Cache-Control", "public, max-age=300");
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      return res.status(200).send(Buffer.from(String(hit), "base64"));
-    }
-  } catch (e) { /* fall through */ }
-
+  /* No trailing mirror check: it now runs before the gateways, which is the
+   * whole point — it was the fast path being used as the slow one.
+   *
+   */
   /* Short cache on a miss, so a caller that arrives during the gap is not told
    * "gone" for a year by its own cache. */
   res.setHeader("Cache-Control", "public, max-age=30");

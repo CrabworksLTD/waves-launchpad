@@ -387,6 +387,12 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
         '<button class="act" disabled>Activate holder rewards</button></div>';
     }).join("");
 
+    /* Arriving from a launch with ?activate=<mint>: open that token's panel and
+     * scroll to it. The post-launch screen sends creators straight here, and
+     * making them find their own token in a list they have never seen before is
+     * the step where people give up. */
+    var wanted = (qs.get("activate") || "").toLowerCase();
+
     [].slice.call($("evm-tokens").querySelectorAll(".frow")).forEach(function (el) {
       var mint = el.dataset.mint;
       var rec = mine.find(function (x) { return x.mint === mint; }) || {};
@@ -408,6 +414,10 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
         amt.textContent = "none";
         act.disabled = false;
         act.onclick = function () { openEvmActivate(el, mint, act, rec); };
+        if (wanted && mint.toLowerCase() === wanted) {
+          openEvmActivate(el, mint, act, rec);
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
       }).catch(function () { el.querySelector(".rw").textContent = "—"; });
     });
   }
