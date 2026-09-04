@@ -22,7 +22,8 @@
     "@upstash/redis": "^1.38.3",
     "bs58": "^6.0.0",
     "pngjs": "^7.0.0",
-    "solc": "^0.8.28"
+    "solc": "^0.8.28",
+    "viem": "^2.56.0"
   },
   "devDependencies": {
     "buffer": "^6.0.3",

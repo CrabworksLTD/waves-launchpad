@@ -1,10 +1,10 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
-<title>card preview — no launch art</title>
+<title>card preview — pfp blur</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>body{background:#222;margin:0;padding:24px;display:grid;gap:22px;font-family:sans-serif}
-h3{color:#fff;margin:0 0 6px} img{width:720px;max-width:100%;display:block;border:1px solid #333}</style>
+h3{color:#fff;margin:0 0 6px} img{width:760px;max-width:100%;display:block;border:1px solid #333}</style>
 </head><body>
 <div id="out"></div>
 <script src="/brand.js"></script>
@@ -12,12 +12,10 @@ h3{color:#fff;margin:0 0 6px} img{width:720px;max-width:100%;display:block;borde
 <script>
 (async () => {
   const cases = [
-    { label:"solana — token, no launch art", o:{ chain:"solana", kind:"token", name:"moar cat", sym:"MOAR",
-        stats:[["priced in","SOL"],["swap fee","1%"],["chain","Solana"]] } },
-    { label:"robinhood — token, no launch art", o:{ chain:"robinhood", kind:"token", name:"moar cat", sym:"MOAR",
-        stats:[["priced in","ETH"],["swap fee","3%"],["chain","Robinhood"]] } },
-    { label:"solana — collection, no launch art (real item count)", o:{ chain:"solana", kind:"collection", name:"moar cat", sym:"MOAR",
-        stats:[["items","1000"],["price","Free"],["chain","Solana"]] } }
+    { label:"solana — with pfp (blur 30)", o:{ chain:"solana", kind:"collection", name:"moar cat", sym:"MOAR",
+        avatar:"/art/pfp.png", stats:[["items","1000"],["price","Free"],["chain","Solana"]] } },
+    { label:"robinhood — with pfp (blur 30)", o:{ chain:"robinhood", kind:"token", name:"moar cat", sym:"MOAR",
+        avatar:"/art/pfp.png", stats:[["priced in","ETH"],["swap fee","3%"],["chain","Robinhood"]] } }
   ];
   for (const c of cases) {
     let img;

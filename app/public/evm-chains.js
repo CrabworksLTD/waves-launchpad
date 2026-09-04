@@ -183,7 +183,7 @@ window.MOONPAD_CHAINS = [
      * irreversible and names this address on chain, so a wrong value here is
      * permanent for every token that pledges to it — the fee page refuses to
      * offer the button while this is unset rather than guessing. */
-    rewardsKeeper: null,
+    rewardsKeeper: "0xAcA1d1bE05f47090a6d8D918AB26d4543fD3Af81",
     // A $-token (coin) allowlist reads holder balances at the block the sale
     // opened on, for the whole wave. This RPC prunes that state after ~10 min
     // (measured live 2026-08-20), so a longer wave locks holders out — the gate

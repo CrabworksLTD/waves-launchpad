@@ -84,6 +84,10 @@
     {
       "path": "/api/rh-indexer",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/rh-keeper",
+      "schedule": "0 9 * * *"
     }
   ]
 }
