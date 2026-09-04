@@ -2099,15 +2099,26 @@
     var tab = "all";
     loadRhAssets().then(function (list) {
       /* Same three columns the Solana picker uses — ticker, name, then the
-       * detail that matters. There it is depth; here it is how many pools use
-       * the asset, which is the closest thing to "can this actually be sold". */
+       * detail that matters.
+       *
+       * ⚠️ That detail used to be a POOL COUNT, which is not the question. An
+       * asset can appear in eighty pools and be unbuyable: most were created
+       * once and never funded, and an empty V4 pool fills for zero rather than
+       * refusing. NVDA has sixteen ETH pools and not one of them can fill.
+       *
+       * tools/rank-rh-pools.js asks the router what each pool would really pay,
+       * so `liquid` is a live answer to "can holders actually be paid this".
+       * Saying so here is the difference between a creator choosing NVDA
+       * knowingly and finding out months later that everyone got ETH. */
       function rowHtml(t) {
         var name = (t.name || "").replace(/ • Robinhood Token$/, "");
+        var dry = t.kind !== "native" && t.liquid === false;
         var detail = t.kind === "native" ? "paid as-is"
+          : dry ? "no market — paid in ETH"
           : t.pools + (t.pools === 1 ? " pool" : " pools");
         return '<button class="prow" data-a="' + esc(t.address) + '">' +
           "<b>" + esc(t.symbol) + "</b><span>" + esc(name) + "</span>" +
-          '<i class="' + (t.kind === "native" || t.pools >= 3 ? "" : "dim") + '">' +
+          '<i class="' + (t.kind === "native" || (!dry && t.pools >= 3) ? "" : "dim") + '">' +
           esc(detail) + "</i></button>";
       }
       function head(label, n) {

@@ -70,13 +70,14 @@ h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:te
 .panel .sechead{margin-top:0}
 /* spotlight cards: square art, a status badge on it, then name, ticker,
    the one number that matters, and where/when it came from */
-.spot{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:20px}
+.spot{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:14px;margin-top:20px}
 .spotnone{grid-column:1/-1;border:1px dashed var(--line2);border-radius:14px;
   padding:38px 24px;text-align:center;color:var(--faint);font-size:13.5px}
 .spotnone a{color:var(--accent)}
-@media (max-width:1180px){.spot{grid-template-columns:repeat(3,1fr)}}
-@media (max-width:720px){.spot{grid-template-columns:repeat(2,1fr)}}
-.scard{display:block;border-radius:14px;overflow:hidden;background:var(--panel);
+/* auto-fill keeps the cards compact (~180px) at every width, like the reference —
+   no per-breakpoint column counts that balloon the cards on a mid-size screen */
+@media (max-width:420px){.spot{grid-template-columns:1fr}}
+.scard{display:flex;flex-direction:column;border-radius:14px;overflow:hidden;background:var(--panel);
   border:1px solid var(--line);transition:border-color .2s,transform .2s}
 .scard:hover{border-color:var(--faint);transform:translateY(-3px)}
 .scard .art{position:relative;aspect-ratio:1;background:var(--bg);overflow:hidden}
@@ -90,27 +91,29 @@ h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:te
   color:var(--dim)}
 .scard .badge.live{color:var(--accent);border-color:rgba(var(--accent-rgb),.45)}
 .scard .badge.done{color:var(--accent-2-hi);border-color:rgba(var(--accent-2-rgb),.5)}
-.scard .sinfo{padding:12px 14px 14px}
-.scard .sinfo b{display:block;font:700 15px Archivo;letter-spacing:-.01em;
+.scard .sinfo{padding:10px 12px 11px;flex:1;display:flex;flex-direction:column}
+.scard .sinfo b{display:block;font:700 14px Archivo;letter-spacing:-.01em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.scard .rw{display:inline-block;margin-top:7px;padding:3px 8px;border-radius:999px;
-  font:600 10px "IBM Plex Mono",monospace;letter-spacing:.08em;
+.scard .rw{display:inline-block;align-self:flex-start;margin-top:6px;padding:2px 7px;border-radius:999px;
+  font:600 9px "IBM Plex Mono",monospace;letter-spacing:.07em;
   color:var(--accent);border:1px solid var(--accent);
   background:rgba(var(--accent-rgb),.09)}
-.scard .sym{display:block;margin-top:1px;font:400 12px "IBM Plex Mono",monospace;
+.scard .sym{display:block;margin-top:1px;font:400 11px "IBM Plex Mono",monospace;
   color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.scard .stat{margin-top:8px}
-.scard .stat b{font:700 18px Archivo;letter-spacing:-.01em;color:var(--ink)}
-.scard .stat i{font-style:normal;font:600 11px "IBM Plex Mono",monospace;color:var(--faint);
-  margin-left:6px;letter-spacing:.04em}
+/* market cap, number and label on ONE line (override the block .sinfo b above) */
+.scard .stat{margin-top:7px}
+.scard .stat b{display:inline;font:700 16px Archivo;letter-spacing:-.01em;color:var(--ink)}
+.scard .stat i{font-style:normal;font:600 10px "IBM Plex Mono",monospace;color:var(--faint);
+  margin-left:5px;letter-spacing:.04em}
 /* the bonding-curve progress bar, like the reference cards */
-.scard .bar{display:flex;align-items:center;gap:9px;margin-top:9px}
-.scard .bar .track{flex:1;height:5px;border-radius:99px;background:var(--line2);overflow:hidden}
+.scard .bar{display:flex;align-items:center;gap:8px;margin-top:7px}
+.scard .bar .track{flex:1;height:4px;border-radius:99px;background:var(--line2);overflow:hidden}
 .scard .bar .fill{height:100%;border-radius:99px;background:var(--accent);width:0;transition:width .4s}
-.scard .bar .pct{font:600 11.5px "IBM Plex Mono",monospace;color:var(--faint);
+.scard .bar .pct{font:600 10.5px "IBM Plex Mono",monospace;color:var(--faint);
   white-space:nowrap;font-variant-numeric:tabular-nums}
-.scard .foot{display:flex;justify-content:space-between;gap:8px;margin-top:9px;
-  font:400 10.5px "IBM Plex Mono",monospace;color:var(--faint)}
+/* pinned to the bottom so cards with different market data stay even */
+.scard .foot{display:flex;justify-content:space-between;gap:8px;margin-top:auto;padding-top:9px;
+  font:400 10px "IBM Plex Mono",monospace;color:var(--faint)}
 .scard .foot .t{color:var(--accent)}
 .feature{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px}
 .feature .wide3{grid-template-columns:1fr 1fr 1fr}
