@@ -318,7 +318,18 @@
         catch (e) { tip = 0n; }
         if (tip <= 0n) tip = base / 10n + 1n;
         tx.maxPriorityFeePerGas = "0x" + tip.toString(16);
-        tx.maxFeePerGas = "0x" + (base * 3n + tip).toString(16);   // ~9 blocks of headroom
+        /* A modest ceiling, deliberately.
+         *
+         * maxFeePerGas is a LIMIT, not a price — the sender pays base + tip
+         * whatever this says — so headroom is free in ETH terms. It is not free
+         * in trust: at 3x the base fee MetaMask flags the transaction with a red
+         * "Review alert" on the network fee, and a creator halfway through a
+         * launch reads that as the site trying something. Costing them nothing
+         * while looking alarming is the worst of both.
+         *
+         * Blocks here arrive every ~0.1s and the base fee barely moves, so 2x
+         * plus the tip is still several blocks of room. */
+        tx.maxFeePerGas = "0x" + (base * 2n + tip).toString(16);
         return tx;
       }
       var gp = BigInt(await ask("eth_gasPrice", []));

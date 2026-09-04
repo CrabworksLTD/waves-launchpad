@@ -975,7 +975,16 @@
         gateSigner: "0x0000000000000000000000000000000000000000",
         gateSeconds: 0
       });
-      var addr = await window.MoonpadLaunch.waitForContract(dep.hash, 4663);
+      /* ⚠️ waitForContract returns {address, explorer}, not a string.
+       *
+       * Used directly this stringified to "[object Object]", so the mint link
+       * read /mint/[object Object] — which matches neither the 0x nor the
+       * base58 pattern, so the page fell through to the Solana driver and
+       * asked for a candy machine address. The listing POST sent an object
+       * where an address belonged and was rejected, so the collection was
+       * never recorded either. One unwrapped value, three broken things. */
+      var deployed = await window.MoonpadLaunch.waitForContract(dep.hash, 4663);
+      var addr = deployed.address;
       mark("deploy", "done");
       if (cfg.devTotal > 0) mark("dev", "done");
 
@@ -984,7 +993,7 @@
         address: addr,
         chain: dep.chain,
         mintUrl: location.origin + "/mint/" + addr,
-        explorer: dep.chain.explorer + "/address/" + addr
+        explorer: deployed.explorer
       };
       recordEvmCollection(cfg, res, up);
       evmDone(cfg, res);
@@ -1087,6 +1096,7 @@
         candyMachine: res.candyMachine, collection: res.collection,
         name: cfg.name, cluster: res.cluster, tokenMint: tokenMint || null,
         avatar: (up && up.avatarUri) || null,
+        banner: (up && up.bannerUri) || null,
         card: (up && up.cardUri) || null,
         creator: (window.Wallet.current() || {}).publicKey || null
     });
@@ -2756,6 +2766,8 @@
       name: flow.tname,
       symbol: flow.tsym,
       creator: (window.MoonpadWallet || {}).account || null,
+      // where the holder indexer starts reading Transfer events from
+      block: res.block || null,
       icon: (meta && meta.iconUri) || null,
       banner: (meta && meta.bannerUri) || null,
       card: (meta && meta.cardUri) || null,

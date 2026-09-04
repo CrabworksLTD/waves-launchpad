@@ -196,6 +196,21 @@
       sx += Math.max(g.measureText(String(st[1])).width, 120) + 64;
     });
 
+    /* Chain badge, bottom-right corner — the network's own mark, so the card
+     * reads as Solana or Robinhood at a glance and not only from the text chip.
+     * Both SVGs are same-origin (no canvas taint) and brand-coloured, so they
+     * sit legibly on the near-black bottom of the scrim. A missing logo just
+     * degrades — loadImage resolves null and this is skipped. */
+    var logo = await loadImage("/art/" + (o.chain === "robinhood" ? "robinhood" : "solana") + ".svg");
+    if (logo) {
+      var lh = 42, ar = (logo.width && logo.height) ? logo.width / logo.height : 1;
+      var lw = lh * ar;
+      g.save();
+      g.globalAlpha = 0.95;
+      g.drawImage(logo, W - 56 - lw, H - 56 - lh, lw, lh);
+      g.restore();
+    }
+
     var blob = await new Promise(function (res) { cv.toBlob(res, "image/png"); });
     if (!blob) throw new Error("Could not compose the share card");
     return new Uint8Array(await blob.arrayBuffer());

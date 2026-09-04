@@ -1,0 +1,168 @@
+// GET /api/rh-indexer — keep a holder table for every Robinhood launch.
+//
+// The keeper cannot pay holders it cannot name, and on this chain there is no
+// way to ask "who holds this token". Solana has getProgramAccounts, which
+// returns every holder in one call. An ERC20 has nothing of the sort: the only
+// record of who owns what is the Transfer log, and the balances are whatever
+// you get from adding it all up.
+//
+// So this walks the log once, forward, and keeps the running total.
+//
+// ── Why it cannot be done on demand ──────────────────────────────────────────
+// Measured on 2026-09-03: blocks arrive every 0.104s, so a week is 5.8 million
+// of them. An open-ended eth_getLogs is answered with "log query timed out", a
+// wide one with "logs matched by query exceeds limit of 10000", and a
+// 50,000-block window — about 1.4 hours — is what actually works. A token with
+// any history cannot be summed inside one request, and a keeper run that tried
+// would time out holding money it had already claimed.
+//
+// Hence a cursor. Each run advances as far as it can and stores where it got
+// to; the next picks up there. A busy token catches up over several runs rather
+// than failing on all of them.
+//
+// ── What is not a holder ─────────────────────────────────────────────────────
+// The curve holds every token that has not been sold yet, and after graduation
+// the pool holds the liquidity. Neither is a person. Counting them would hand
+// most of every payout back to the contracts it came from, so both are excluded
+// — along with the zero address, which is where burns go.
+
+import { kv } from "./_guard.js";
+
+export const config = { runtime: "nodejs" };
+
+const RPC = process.env.RH_RPC || "https://rpc.mainnet.chain.robinhood.com";
+const POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951";
+
+// keccak("Transfer(address,address,uint256)")
+const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
+const CHUNK = 50000n;            // the widest window this chain will answer
+const MAX_CHUNKS = 12;           // per token per run — keeps a run inside its timeout
+const ZERO = "0x0000000000000000000000000000000000000000";
+
+let rpcId = 0;
+async function rpc(method, params) {
+  const r = await fetch(RPC, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }),
+    signal: AbortSignal.timeout(25000)
+  });
+  if (!r.ok) throw new Error("rpc " + r.status);
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message || "rpc error");
+  return j.result;
+}
+
+const addrOf = (topic) => "0x" + String(topic).slice(-40).toLowerCase();
+
+/**
+ * Advance one token's holder table as far as this run can.
+ *
+ * Balances are kept as decimal strings because they are uint256 and JSON has no
+ * integer that wide — a float would silently round someone's balance and pay
+ * them the wrong amount.
+ */
+async function indexToken(db, rec, curveAddr) {
+  const token = String(rec.mint).toLowerCase();
+  const cursorKey = "rhix:" + token + ":cursor";
+  const holdersKey = "rhix:" + token + ":h";
+
+  const latest = BigInt(await rpc("eth_blockNumber", []));
+  let from = BigInt((await db.get(cursorKey).catch(() => null)) || rec.block || 0);
+  if (from <= 0n) {
+    /* No launch block recorded — a token from before that was stored. Rather
+     * than scan from genesis (which this chain will not answer anyway), start
+     * one window back and say so. The table will be short by whatever happened
+     * before that, which is why the block is captured at launch now. */
+    from = latest > CHUNK ? latest - CHUNK : 0n;
+  }
+  if (from >= latest) return { token, moved: 0, upTo: Number(from), done: true };
+
+  const balances = new Map();
+  let moved = 0;
+  let cursor = from;
+
+  for (let i = 0; i < MAX_CHUNKS && cursor < latest; i++) {
+    const to = cursor + CHUNK > latest ? latest : cursor + CHUNK;
+    let logs;
+    try {
+      logs = await rpc("eth_getLogs", [{
+        address: token,
+        fromBlock: "0x" + cursor.toString(16),
+        toBlock: "0x" + to.toString(16),
+        topics: [TRANSFER]
+      }]);
+    } catch (e) {
+      /* A refused window is not a failure: stop here, keep what was counted,
+       * and let the next run resume. Pushing on would leave a gap in the sum,
+       * which is worse than being behind. */
+      break;
+    }
+    for (const lg of logs) {
+      if (!lg.topics || lg.topics.length < 3) continue;
+      const fromA = addrOf(lg.topics[1]);
+      const toA = addrOf(lg.topics[2]);
+      const value = BigInt(lg.data || "0x0");
+      if (value === 0n) continue;
+      if (fromA !== ZERO) balances.set(fromA, (balances.get(fromA) || 0n) - value);
+      if (toA !== ZERO) balances.set(toA, (balances.get(toA) || 0n) + value);
+      moved++;
+    }
+    cursor = to;
+  }
+
+  if (balances.size) {
+    /* Read, add, write. The deltas above are only what THIS run saw; the stored
+     * figure is the running total. */
+    const prior = (await db.hgetall(holdersKey).catch(() => null)) || {};
+    const out = {};
+    const del = [];
+    for (const [addr, delta] of balances) {
+      const now = BigInt(prior[addr] || "0") + delta;
+      if (now > 0n) out[addr] = now.toString();
+      else del.push(addr);            // sold out; not a holder any more
+    }
+    if (Object.keys(out).length) await db.hset(holdersKey, out);
+    if (del.length) await db.hdel(holdersKey, ...del);
+  }
+
+  await db.set(cursorKey, cursor.toString());
+  return { token, moved, upTo: Number(cursor), done: cursor >= latest };
+}
+
+export default async function handler(req, res) {
+  const secret = process.env.CRON_SECRET;
+  const authed = !secret || req.headers.authorization === "Bearer " + secret;
+  const only = (req.query && req.query.token) || null;
+  // one token by name is open, like /api/indexer: a launch wants its own page
+  // to fill in without waiting for the next sweep
+  if (!authed && !only) return res.status(401).json({ error: "no" });
+
+  try {
+    const db = await kv();
+    const raw = await db.lrange("tokens", 0, 199);
+    const all = (raw || []).map((r) => (typeof r === "string" ? JSON.parse(r) : r));
+
+    /* Only Robinhood launches, and only ones that pledged. Indexing holders for
+     * a token whose creator kept every fee is work nobody will ever read. */
+    let toks = all.filter((t) => t && t.chain === "robinhood");
+    if (only) toks = toks.filter((t) => String(t.mint).toLowerCase() === String(only).toLowerCase());
+    else toks = toks.filter((t) => (t.feeSharePct || 0) > 0);
+
+    const chains = (await import("../evm-chains.js").catch(() => null), null);
+    const curveAddr = process.env.RH_CURVE || "0x77ddd6ceb454e4b71a1952fcaafb8cf9975f55c0";
+
+    const out = [];
+    for (const t of toks.slice(0, 8)) {
+      try {
+        out.push(await indexToken(db, t, curveAddr));
+      } catch (e) {
+        out.push({ token: t.mint, error: String(e.message || e).slice(0, 140) });
+      }
+    }
+    return res.status(200).json({ ok: true, indexed: out.length, results: out });
+  } catch (e) {
+    return res.status(200).json({ ok: false, error: String(e.message || e).slice(0, 200) });
+  }
+}

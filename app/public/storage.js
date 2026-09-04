@@ -423,9 +423,15 @@
       collectionUri: "https://arweave.net/" + metaCid + "/_collection.json",
       preview: "https://arweave.net/" + metaCid + "/1.json",
       index: "https://arweave.net/" + metaCid + "/_index.json",
+      // imageCid-based, so these are the SAME urls _collection.json writes for
+      // col.image / col.banner. That match matters: the mirror is keyed by the
+      // arweave path, so the copy stored here is found when a page asks for the
+      // exact url the metadata points at. (They used to be metaCid-based, which
+      // keyed the mirror somewhere no page ever requested — a silent miss.)
       avatarUri: opts.avatar
-        ? "https://arweave.net/" + metaCid + "/_avatar.png"
+        ? "https://arweave.net/" + imageCid + "/_avatar.png"
         : "https://arweave.net/" + imageCid + "/1.png",
+      bannerUri: opts.banner ? "https://arweave.net/" + imageCid + "/_banner.png" : null,
       cardUri: opts.card ? "https://arweave.net/" + metaCid + "/_card.png" : null
     };
     mirror(ret.avatarUri, opts.avatar || (files[0] && files[0].bytes));

@@ -124,6 +124,11 @@ export default async function handler(req, res) {
         // launch window promised it would route here.
         feeWallet: (feeWallet && B58.test(feeWallet)) ? feeWallet : null,
         config: (config && B58.test(config)) ? config : null,
+        /* The block an EVM launch happened in. The holder indexer needs a start
+         * point and cannot recover one later: this chain prunes historical
+         * state within minutes, so there is no asking what block a contract
+         * appeared in. Solana records stay null; they do not need it. */
+        block: Number.isFinite(body.block) && body.block > 0 ? Math.floor(body.block) : null,
         collection: collection || null,
         creator: (creator && B58.test(creator)) ? creator : null,
         at: Date.now()

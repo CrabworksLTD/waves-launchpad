@@ -239,6 +239,7 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
   var lists = null;                                // _allowlist.json phases, by label
   var myPhase = null;                              // {group, wallets} for mintOne
   var metaDir = null;                              // arweave dir the metadata lives in
+  var nameSet = false;                             // real name in place — don't flash "Mint"
   var tab = "minted";
 
   function say(kind, html) {
@@ -300,16 +301,57 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
     };
   }
 
-  /* ---- identity, from the files pinned at launch ---- */
+  /* Read art through the mirror — /api/mirror serves our short-lived copy of a
+   * fresh upload and redirects to Arweave otherwise, so a just-launched banner
+   * and pfp show instantly instead of waiting minutes for arweave.net to seed
+   * them. The same helper the token page uses. */
+  function art(u) {
+    return u && /^https:\/\/arweave\.net\//.test(u)
+      ? "/api/mirror?u=" + encodeURIComponent(u) : u;
+  }
+
+  /* Load an image through the mirror, retrying quietly if the gateway 404s a
+   * fresh upload rather than flashing a broken tile. Idempotent per slot, so
+   * the record (fast) and the _collection.json fallback (slow) can both call it
+   * and whichever arrives first wins. */
+  var artSet = { pfp: false, banner: false };
+  function loadArt(slot, url, apply) {
+    if (artSet[slot] || !url) return;
+    artSet[slot] = true;
+    var src = art(url), im = new Image();
+    im.alt = "";
+    im.onload = function () { apply(im); };
+    im.onerror = function () {
+      var tries = 0;
+      var retry = setInterval(function () {
+        if (++tries > 10) return clearInterval(retry);   // ~5 minutes
+        im.src = src + (src.indexOf("?") < 0 ? "?" : "&") + "r=" + tries;
+      }, 30000);
+    };
+    im.src = src;
+  }
+  function setPfp(url) {
+    loadArt("pfp", url, function (im) { var a = $("ava"); a.innerHTML = ""; a.appendChild(im); });
+  }
+  function setBanner(url) {
+    loadArt("banner", url, function (im) { $("banner").src = im.src; $("banner").hidden = false; });
+  }
+
+  /* ---- identity, from the files pinned at launch ----
+   * The record (loadPairedToken) sets the pfp and banner first, straight from
+   * KV with no gateway round-trip. This is the fallback for the name and
+   * description, and for older collections the record predates — but it still
+   * routes its images through the mirror, and setPfp/setBanner are idempotent,
+   * so it never overrides the faster record path. */
   function loadIdentity() {
     if (!metaDir) return;
     fetch(metaDir + "_collection.json").then(function (r) { return r.ok ? r.json() : null; })
       .then(function (col) {
         if (!col) return;
-        if (col.name) $("name").textContent = col.name;
+        if (col.name) { $("name").textContent = col.name; nameSet = true; }
         if (col.description) { $("desc").textContent = col.description; $("desc").hidden = false; }
-        if (col.image) $("ava").innerHTML = '<img alt="" src="' + esc(col.image) + '">';
-        if (col.banner) { $("banner").src = col.banner; $("banner").hidden = false; }
+        setPfp(col.image);
+        setBanner(col.banner);
       }).catch(function () {});
     fetch(metaDir + "_links.json").then(function (r) { return r.ok ? r.json() : null; })
       .then(function (links) { renderLinks(links); })
@@ -435,6 +477,10 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
       return;
     }
     $("addr").textContent = shortAddr(CM, 5);
+    // identity from the record, fired before the chain read so the banner and
+    // pfp are on their way while we wait — the record only needs CM, which we
+    // already have
+    loadPairedToken();
     try {
       state = await window.Launch.readMachine(CM);
     } catch (e) {
@@ -446,10 +492,9 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
     if (state.firstItemUri && /^https?:/.test(state.firstItemUri)) {
       metaDir = state.firstItemUri.replace(/[^/]+$/, "");
     }
-    $("name").textContent = "Mint";
+    if (!nameSet) $("name").textContent = "Mint";
     $("creator").textContent = shortAddr(state.authority, 5);
     loadIdentity();
-    loadPairedToken();
 
     if (state.groups.length) lists = await loadLists();
     resolvePhase();
@@ -556,7 +601,13 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
     fetch("/api/collections").then(function (r) { return r.json(); })
       .then(function (j) {
         var rec = (j.collections || []).find(function (c) { return c.candyMachine === CM; });
-        if (!rec || !rec.tokenMint) return null;
+        if (!rec) return null;
+        // identity straight from KV — no _collection.json gateway hop — served
+        // through the mirror, so the banner and pfp are up before the chain read
+        if (rec.name) { $("name").textContent = rec.name; nameSet = true; }
+        setPfp(rec.avatar);
+        setBanner(rec.banner);
+        if (!rec.tokenMint) return null;
         return fetch("/api/tokens").then(function (r) { return r.json(); })
           .then(function (t) {
             var tok = (t.tokens || []).find(function (x) { return x.mint === rec.tokenMint; });

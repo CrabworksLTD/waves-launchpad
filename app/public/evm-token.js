@@ -298,7 +298,15 @@
             token: token,
             creator: "0x" + String(lg.topics[2]).replace(/^0x/, "").slice(24),
             explorer: c.explorer + "/address/" + token,
-            hash: hash
+            hash: hash,
+            /* The block it launched in, recorded with the listing.
+             *
+             * The holder indexer has to start somewhere, and there is no way to
+             * find a contract's birth block on this chain after the fact —
+             * historical state is pruned within about ten minutes, so
+             * eth_getCode against an old block cannot answer. Capturing it here,
+             * once, is the only cheap moment. */
+            block: parseInt(res.blockNumber, 16)
           };
         }
         /* Mined, succeeded, and no Launched event — which should be impossible.

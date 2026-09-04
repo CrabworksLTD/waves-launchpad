@@ -67,7 +67,7 @@ export default async function handler(req, res) {
 
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const { candyMachine, collection, name, cluster, tokenMint, creator, avatar,
-            chain, address } = body;
+            banner, chain, address } = body;
 
     const isEvm = chain === "robinhood";
     if (isEvm) {
@@ -92,6 +92,9 @@ export default async function handler(req, res) {
         name: String(name || "Untitled").slice(0, 40),
         // only arweave art, never an arbitrary URL someone POSTs at us
         avatar: okArt(avatar, req.headers.host),
+        // the wide hero, pinned beside the art — read from here so the mint page
+        // shows it without first fetching _collection.json off a slow gateway
+        banner: okArt(banner, req.headers.host),
         // the launch's own share card, pinned beside its art
         card: okArt(body.card, req.headers.host),
         tokenMint: (tokenMint && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(tokenMint)) ? tokenMint : null,
