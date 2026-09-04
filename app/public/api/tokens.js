@@ -122,7 +122,7 @@ export default async function handler(req, res) {
         // where the creator's KEPT portion goes. Dropped on the floor until
         // 2026-08-31, so the keeper always paid the deployer wallet while the
         // launch window promised it would route here.
-        feeWallet: (feeWallet && B58.test(feeWallet)) ? feeWallet : null,
+        feeWallet: (feeWallet && (B58.test(feeWallet) || EVM.test(feeWallet))) ? feeWallet : null,
         config: (config && B58.test(config)) ? config : null,
         /* The block an EVM launch happened in. The holder indexer needs a start
          * point and cannot recover one later: this chain prunes historical
@@ -130,7 +130,13 @@ export default async function handler(req, res) {
          * appeared in. Solana records stay null; they do not need it. */
         block: Number.isFinite(body.block) && body.block > 0 ? Math.floor(body.block) : null,
         collection: collection || null,
-        creator: (creator && B58.test(creator)) ? creator : null,
+        /* ⚠️ An address is base58 OR 0x, depending on the chain — the same
+         * split the mint check above makes, and the one collections.js already
+         * makes. Validating both of these as base58 alone silently nulled them
+         * on every Robinhood launch: the creator, so /fees could not match a
+         * launch to the wallet that made it, and the fee wallet, so the kept
+         * portion lost the destination the creator had chosen for it. */
+        creator: (creator && (B58.test(creator) || EVM.test(creator))) ? creator : null,
         at: Date.now()
       };
       /* Maintenance correction. Filling blanks is open to anyone (it cannot
