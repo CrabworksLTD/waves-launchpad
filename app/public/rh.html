@@ -236,12 +236,17 @@ footer .id .x{display:inline-grid;place-items:center;width:34px;height:34px;
   border:1px solid var(--line2);border-radius:9px;color:var(--dim);
   transition:color .2s,border-color .2s}
 footer .id .x:hover{color:var(--ink);border-color:var(--faint)}
+footer .id .x + .x{margin-left:8px}
 footer .id small{display:block;margin-top:16px;font-size:11.5px;color:var(--faint)}
 footer h3{font:700 13px Archivo;color:var(--ink);margin:4px 0 12px;letter-spacing:.02em}
 footer ul{list-style:none;margin:0;padding:0}
 footer li{margin-bottom:9px}
 footer li a{color:var(--dim);transition:color .18s}
 footer li a:hover{color:var(--ink)}
+/* a not-yet-live item: muted, unclickable, with the same amber SOON pill as the nav */
+footer li .soon{color:var(--faint);cursor:default;display:inline-flex;align-items:center;gap:8px}
+footer li .soon i{font-style:normal;font:600 9px "IBM Plex Mono",monospace;letter-spacing:.14em;
+  text-transform:uppercase;color:#ffb84d;border:1px solid rgba(255,180,80,.45);border-radius:99px;padding:2px 7px}
 footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opacity:.5}
 </style>
 </head>
@@ -288,6 +293,10 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
       <a class="x" href="https://x.com/waveslaunchpad" target="_blank" rel="noopener"
         aria-label="WAVES on X"><svg width="15" height="15" viewBox="0 0 24 24"
         fill="currentColor"><path d="M18.9 1.2h3.7l-8.1 9.3L24 22.8h-7.5l-5.9-7.7-6.7 7.7H.2l8.7-9.9L0 1.2h7.7l5.3 7 5.9-7Zm-1.3 19.4h2L6.6 3.3H4.4Z"/></svg></a>
+      <a class="x" href="mailto:waveslaunch@gmail.com" aria-label="Email WAVES"><svg
+        width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5"
+        width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></a>
       <small>© WAVES 2026</small>
     </div>
     <div>
@@ -295,7 +304,7 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
       <ul>
         <li><a href="/app?launch=token">Token</a></li>
         <li><a href="/launch?mode=collection">Collection</a></li>
-        <li><a href="/launch?mode=pair">Pair</a></li>
+        <li><span class="soon">Pair <i>soon</i></span></li>
       </ul>
     </div>
     <div>

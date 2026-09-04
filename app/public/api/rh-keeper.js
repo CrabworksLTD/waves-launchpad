@@ -49,10 +49,35 @@ const CURVE = process.env.RH_CURVE || "0x77ddd6ceb454e4b71a1952fcaafb8cf9975f55c
 const BOUGHT = "0x7ce543d1780f3bdc3dac42da06c95da802653cd1b212b8d74ec3e3c33ad7095c";
 const SOLD   = "0x9be8a5ca22b7e6e81f04b5879f0248227bb770114291bd47dfaee4c3a82ad60e";
 
+/* The V4 router that turns the pot into the asset a creator chose. Absent
+ * until it is deployed, and absent means "pay ETH" — the behaviour before this
+ * existed, which is honest rather than broken. */
+const SWAP_ROUTER = process.env.RH_SWAP_ROUTER || null;
+
+// WavesSwapRouter.swap((address,address,uint24,int24,address),uint256,address)
+const SEL_SWAP = "0x4ea88ad7";
+// WavesSwapRouter.quoteBest((address,address,uint24,int24,address)[],uint256)
+const SEL_QUOTE_BEST = "0x33a3a81b";
+const SEL_TRANSFER = "0xa9059cbb";      // ERC20 transfer(address,uint256)
+const SEL_BALANCE_OF = "0x70a08231";    // ERC20 balanceOf(address)
+
 const CHUNK = 50000n;
 const MAX_CHUNKS = 12;
 const GAS_PER_TRANSFER = 21000n;
+/* An ERC20 transfer writes two balances instead of moving native value, so it
+ * costs three times an ETH send. Budgeting 21000 for it would pass the
+ * worth-it test and then run the keeper dry mid-payout. */
+const GAS_PER_ERC20 = 65000n;
+const GAS_SWAP = 400000n;
 const GAS_CLAIM = 80000n;
+
+/* How much worse than the quote a fill is allowed to be. The keeper is the only
+ * thing trading these pools at this size, but the mempool is public and an
+ * unprotected swap is a sandwich waiting to happen. 3% is loose enough that
+ * ordinary drift between quoting and mining does not abort a payout. */
+const SLIPPAGE_BPS = 300n;
+
+const ZERO_ADDR = "0x" + "0".repeat(40);
 /* The pot must be worth this many times the gas to move it. Below that the run
  * waits: forwarding a dollar at a cost of a dollar helps nobody. */
 const WORTH_IT = 5n;
@@ -72,6 +97,29 @@ async function rpc(method, params) {
 }
 
 const addrOf = (t) => "0x" + String(t).slice(-40).toLowerCase();
+
+/* Hand-rolled encoding, because this file has no ABI library and a payout is a
+ * bad place to discover a dependency. Every one of these was checked against
+ * `cast calldata` byte for byte before it was used to move money.
+ *
+ * A PoolKey is five static words, so it inlines with no offset — the tuple is
+ * not dynamic. The ARRAY of them is dynamic and needs the offset/length header,
+ * which is the part that is easy to get wrong and silently quote garbage. */
+const pad = (v) => BigInt(v).toString(16).padStart(64, "0");
+const encAddr = (a) => String(a).replace(/^0x/, "").toLowerCase().padStart(64, "0");
+const encKey = (k) =>
+  encAddr(k.currency0) + encAddr(k.currency1) + pad(k.fee) + pad(k.tickSpacing) + encAddr(k.hooks);
+
+function encQuoteBest(keys, amountIn) {
+  return SEL_QUOTE_BEST +
+    pad(64) +                       // offset to the array: two head words in
+    pad(amountIn) +
+    pad(keys.length) +
+    keys.map(encKey).join("");
+}
+
+const encSwap = (key, minOut, to) => SEL_SWAP + encKey(key) + pad(minOut) + encAddr(to);
+const encTransfer = (to, amount) => SEL_TRANSFER + encAddr(to) + pad(amount);
 const word = (d, i) => BigInt("0x" + String(d).replace(/^0x/, "").slice(i * 64, i * 64 + 64));
 
 /* The platform's cut, in basis points OF VOLUME, by rung. Mirrors
@@ -144,7 +192,20 @@ async function accrued(db, token, feeBps, rewardsBps, fromBlock, latest) {
   return { wei: total, upTo: cursor };
 }
 
-async function keeperTx(to, data, value, gas) {
+/**
+ * Sign a transaction WITHOUT sending it, and say what its hash will be.
+ *
+ * ⚠️ This split is what makes the swap safe to retry.
+ *
+ * A transfer that is sent twice is a rounding error — the second one fails on
+ * balance, or overpays one holder. A SWAP sent twice spends a slice of the pot
+ * that has already been spent, and the second attempt eats into another token's
+ * money. So the swap's hash is written down before it is broadcast: a run that
+ * dies mid-swap resumes by asking whether that exact hash landed, and either
+ * uses its result or rebroadcasts the identical bytes. Same nonce, same
+ * transaction — the chain cannot apply it twice.
+ */
+async function signKeeperTx(to, data, value, gas) {
   const { privateKeyToAccount } = await import("viem/accounts");
   const account = privateKeyToAccount(keeperKey());
   const [nonce, block] = await Promise.all([
@@ -153,12 +214,85 @@ async function keeperTx(to, data, value, gas) {
   ]);
   const base = BigInt(block.baseFeePerGas || 0);
   const tip = base / 10n + 1n;
-  const signed = await account.signTransaction({
+  const raw = await account.signTransaction({
     to, data: data || "0x", value: value || 0n, gas,
     maxFeePerGas: base * 2n + tip, maxPriorityFeePerGas: tip,
     nonce: parseInt(nonce, 16), chainId: 4663, type: "eip1559"
   });
-  return rpc("eth_sendRawTransaction", [signed]);
+  const { keccak256 } = await import("viem");
+  return { raw, hash: keccak256(raw) };
+}
+
+async function keeperTx(to, data, value, gas) {
+  const { raw } = await signKeeperTx(to, data, value, gas);
+  return rpc("eth_sendRawTransaction", [raw]);
+}
+
+/**
+ * The ETH pools for a reward asset, from the file the launch picker uses.
+ *
+ * Read from disk rather than fetched: it ships with the deployment, so there is
+ * no network call and no chance of a payout run stalling on our own CDN.
+ */
+let assetCache = null;
+async function ethPoolsFor(asset) {
+  if (!assetCache) {
+    try {
+      const fs = await import("node:fs/promises");
+      const path = await import("node:path");
+      const file = path.join(process.cwd(), "public", "rh-assets.json");
+      assetCache = JSON.parse(await fs.readFile(file, "utf8"));
+    } catch (e) {
+      /* Vercel's layout for static files is not guaranteed; fall back to our
+       * own origin rather than silently paying ETH for every token. */
+      try {
+        const base = process.env.VERCEL_URL
+          ? "https://" + process.env.VERCEL_URL
+          : "https://www.waveslaunchpad.xyz";
+        assetCache = await fetch(base + "/rh-assets.json",
+          { signal: AbortSignal.timeout(10000) }).then((r) => r.json());
+      } catch (e2) { assetCache = { tokens: [] }; }
+    }
+  }
+  const hit = (assetCache.tokens || []).find(
+    (t) => String(t.address).toLowerCase() === String(asset).toLowerCase());
+  /* Hookless only. A hook can charge, reject or reprice a swap arbitrarily, and
+   * this is other people's money — the sweeper found a hookless ETH pool for
+   * every asset that has one at all, so nothing is lost by refusing them. */
+  return ((hit && hit.ethPools) || []).filter((k) => k.hooks === ZERO_ADDR);
+}
+
+/**
+ * Which pool pays best for this many wei, and what it pays.
+ *
+ * One eth_call for all of them. `quoteBest` runs each swap on chain and throws
+ * the result away, so the number is a true fill rather than our arithmetic
+ * about someone else's curve — and an empty pool, which fills for ZERO without
+ * reverting, scores zero and loses. That last part is not a nicety: the first
+ * ETH pool recorded for USDG is empty, so "use the first key" would have paid
+ * every holder nothing.
+ */
+async function bestPool(keys, amountIn) {
+  if (!SWAP_ROUTER || !keys.length) return null;
+
+  /* Chunked because each quote is a full swap simulation. Robinhood drops the
+   * connection outright when one call asks for too much state, and USDG has
+   * eighty pools. */
+  const LIMIT = 12;
+  let best = null;
+  for (let i = 0; i < keys.length && i < 48; i += LIMIT) {
+    const batch = keys.slice(i, i + LIMIT);
+    let out;
+    try {
+      out = await rpc("eth_call", [
+        { to: SWAP_ROUTER, data: encQuoteBest(batch, amountIn) }, "latest"]);
+    } catch (e) { continue; }
+    if (!out || out === "0x") continue;
+    const idx = Number(word(out, 0));
+    const got = word(out, 1);
+    if (got > 0n && (!best || got > best.out)) best = { key: batch[idx], out: got };
+  }
+  return best;
 }
 
 async function mined(hash) {
@@ -230,6 +364,18 @@ export default async function handler(req, res) {
     const plan = await db.get(planKey).catch(() => null);
     if (plan) {
       const p = typeof plan === "string" ? JSON.parse(plan) : plan;
+      /* A plan can stop at any stage. Finish the swaps it had not done, then
+       * build the payments if it never got that far, then pay. Each step is
+       * skipped if it is already recorded, so resuming repeats nothing. */
+      if (p.slices && !p.payments) {
+        const tbl = {};
+        for (const sl of p.slices) {
+          tbl[sl.mint] = (await db.hgetall("rhix:" + sl.mint + ":h").catch(() => null)) || {};
+        }
+        await runSwaps(db, planKey, p, keeper);
+        buildPayments(p, tbl);
+        await db.set(planKey, JSON.stringify(p));
+      }
       const done = await payOut(db, planKey, p);
       return res.status(200).json({ ok: true, keeper, resumed: true, ...done });
     }
@@ -249,9 +395,14 @@ export default async function handler(req, res) {
 
     // ── 2. attribute the pot across the tokens that earned it ────────────────
     const shares = [];
+    const assets = {};
     let attributed = 0n;
     for (const t of toks) {
       const mint = String(t.mint).toLowerCase();
+      /* What the creator chose to pay holders in. Null, missing or ETH itself
+       * all mean the same thing: no swap, pay the native coin. */
+      const rm = t.rewardMint && String(t.rewardMint).toLowerCase();
+      assets[mint] = rm && rm !== ZERO_ADDR && /^0x[0-9a-f]{40}$/.test(rm) ? rm : null;
       const curve = await rpc("eth_call", [{
         to: CURVE, data: "0x2cc3dc6e" + "0".repeat(24) + mint.slice(2)
       }, "latest"]);
@@ -276,7 +427,14 @@ export default async function handler(req, res) {
     }
     if (!holderCount) return res.status(200).json({ ok: true, keeper, note: "no holders indexed yet" });
 
-    const gasCost = (GAS_CLAIM + GAS_PER_TRANSFER * BigInt(holderCount)) * gasPrice;
+    /* Budget for the dearer path. A token paying an asset costs a swap plus an
+     * ERC20 transfer per holder, and a run that priced itself as ETH sends
+     * would pass the worth-it test and then strand halfway through, holding
+     * money it had already claimed. */
+    const swapping = shares.filter((s) => assets[s.mint] && SWAP_ROUTER).length;
+    const perHolder = swapping ? GAS_PER_ERC20 : GAS_PER_TRANSFER;
+    const gasCost = (GAS_CLAIM + GAS_SWAP * BigInt(swapping) +
+      perHolder * BigInt(holderCount)) * gasPrice;
     if (pot < gasCost * WORTH_IT) {
       return res.status(200).json({
         ok: true, keeper, note: "pot too small to be worth the gas",
@@ -296,30 +454,171 @@ export default async function handler(req, res) {
     const claimHash = await keeperTx(CURVE, "0x4e71d92d", 0n, GAS_CLAIM);
     await mined(claimHash);
 
-    const payments = [];
-    for (const s of shares) {
-      const table = tables[s.mint];
-      const supply = Object.values(table).reduce((a, b) => a + BigInt(b), 0n);
-      if (supply === 0n) continue;
-      // this token's slice of the pot, then each holder's slice of that
-      const slice = (pot * s.wei) / attributed;
-      for (const [addr, held] of Object.entries(table)) {
-        const amount = (slice * BigInt(held)) / supply;
-        if (amount > 0n) payments.push({ to: addr, wei: amount.toString(), mint: s.mint });
-      }
-    }
+    /* The plan exists the moment the money does.
+     *
+     * Written before any of it is spent, and before the swaps, because from
+     * here on a crash must be recoverable rather than a loss. It records what
+     * each token is owed in ETH; the swap stage below turns those into assets
+     * and the payment stage turns them into transfers. */
     const record = {
       at: Date.now(), claimHash, potWei: pot.toString(),
       cursors: shares.map((s) => ({ mint: s.mint, upTo: s.upTo.toString() })),
-      payments, sent: 0
+      slices: shares.map((s) => ({
+        mint: s.mint,
+        wei: ((pot * s.wei) / attributed).toString(),
+        asset: assets[s.mint] || null
+      })),
+      swaps: {}, payments: null, sent: 0
     };
     await db.set(planKey, JSON.stringify(record));
 
+    await runSwaps(db, planKey, record, keeper);
+    buildPayments(record, tables);
+    await db.set(planKey, JSON.stringify(record));
+
     const done = await payOut(db, planKey, record);
-    return res.status(200).json({ ok: true, keeper, claimHash, ...done, log });
+    return res.status(200).json({
+      ok: true, keeper, claimHash, swaps: record.swaps, ...done, log
+    });
   } catch (e) {
     return res.status(200).json({ ok: false, error: String(e.message || e).slice(0, 300), log });
   }
+}
+
+/**
+ * Turn each token's ETH slice into the asset its creator chose.
+ *
+ * ⚠️ Exactly once, or a token spends another token's money.
+ *
+ * The hash is written into the plan BEFORE the transaction is broadcast, so a
+ * crash anywhere in here is recoverable: the next run asks the chain whether
+ * that exact hash landed. If it did, its result is read off the receipt. If it
+ * did not, the identical signed bytes go out again — same nonce, so the chain
+ * will apply it at most once no matter how many times this runs.
+ *
+ * A swap that cannot be done is not an error. No router, no pool, no liquidity,
+ * a quote of zero, a revert — every one of them falls back to paying ETH, which
+ * is what holders got before any of this existed. The alternative is stranding
+ * money that has already been claimed for the sake of a preference.
+ */
+async function runSwaps(db, planKey, plan, keeper) {
+  if (!SWAP_ROUTER) return;
+
+  for (const sl of plan.slices || []) {
+    if (!sl.asset) continue;                       // paying ETH by choice
+    if (plan.swaps[sl.mint] && plan.swaps[sl.mint].done) continue;   // already swapped
+
+    const amountIn = BigInt(sl.wei);
+    if (amountIn <= 0n) continue;
+
+    try {
+      let pending = plan.swaps[sl.mint];
+
+      if (!pending) {
+        const keys = await ethPoolsFor(sl.asset);
+        const best = await bestPool(keys, amountIn);
+        if (!best) { plan.swaps[sl.mint] = { skipped: "no pool could fill" }; continue; }
+
+        /* minOut off the live quote. Never zero: the mempool is public and an
+         * unprotected swap of someone else's payout is a free lunch. */
+        const minOut = (best.out * (10000n - SLIPPAGE_BPS)) / 10000n;
+
+        /* ⚠️ What the keeper already holds, read BEFORE the swap and written
+         * into the plan with it.
+         *
+         * This token's proceeds are the DELTA, not the balance. Measuring the
+         * balance instead meant two tokens choosing the same asset could not be
+         * settled in one run — the second would count the first's tokens as its
+         * own — and the version that handled that by deferring the second one
+         * swapped its ETH anyway and then advanced its cursor without paying
+         * anyone. Its holders got nothing and the asset sat in the keeper.
+         *
+         * Recorded before broadcasting so a resume can still work the delta out
+         * after the fact, when "before" is no longer observable. */
+        const beforeHex = await rpc("eth_call", [
+          { to: sl.asset, data: SEL_BALANCE_OF + encAddr(keeper) }, "latest"]);
+
+        const { raw, hash } = await signKeeperTx(
+          SWAP_ROUTER, encSwap(best.key, minOut, keeper), amountIn, GAS_SWAP);
+
+        // written down BEFORE it exists on chain — that is the whole point
+        pending = {
+          hash, raw, asset: sl.asset, quoted: best.out.toString(),
+          before: BigInt(beforeHex || "0x0").toString(), done: false
+        };
+        plan.swaps[sl.mint] = pending;
+        await db.set(planKey, JSON.stringify(plan));
+      }
+
+      /* Ask before sending. On a resume this transaction may already be mined,
+       * and rebroadcasting a mined transaction is not harmful but reading its
+       * receipt is how we learn what it bought. */
+      let receipt = await rpc("eth_getTransactionReceipt", [pending.hash]).catch(() => null);
+      if (!receipt) {
+        await rpc("eth_sendRawTransaction", [pending.raw]).catch(() => null);
+        receipt = await mined(pending.hash);
+      }
+      if (!receipt || receipt.status === "0x0") {
+        plan.swaps[sl.mint] = { skipped: "swap reverted", hash: pending.hash };
+        await db.set(planKey, JSON.stringify(plan));
+        continue;
+      }
+
+      /* How much actually arrived, from the token itself rather than from the
+       * quote. The quote was a prediction; the balance is the fact, and the
+       * holders are paid out of the fact. */
+      const balHex = await rpc("eth_call", [
+        { to: sl.asset, data: SEL_BALANCE_OF + encAddr(keeper) }, "latest"]);
+      const after = BigInt(balHex || "0x0");
+      const received = after - BigInt(pending.before || "0");
+      if (received <= 0n) {
+        plan.swaps[sl.mint] = { skipped: "nothing arrived", hash: pending.hash };
+      } else {
+        plan.swaps[sl.mint] = {
+          hash: pending.hash, asset: sl.asset,
+          received: received.toString(), quoted: pending.quoted, done: true
+        };
+      }
+      await db.set(planKey, JSON.stringify(plan));
+    } catch (e) {
+      plan.swaps[sl.mint] = { skipped: String(e.message || e).slice(0, 120) };
+      await db.set(planKey, JSON.stringify(plan));
+    }
+  }
+}
+
+/**
+ * Split every slice across the people holding that token.
+ *
+ * A slice that was swapped pays the asset; one that was not pays ETH. Both are
+ * pro-rata by holding, and both round down — the dust that leaves behind is
+ * swept into the next run rather than being sent as a transfer that costs more
+ * gas than it moves.
+ */
+function buildPayments(plan, tables) {
+  const payments = [];
+
+  for (const sl of plan.slices || []) {
+    const table = tables[sl.mint] || {};
+    const supply = Object.values(table).reduce((a, b) => a + BigInt(b), 0n);
+    if (supply === 0n) continue;
+
+    /* Each swap recorded what IT brought in, so two tokens paying the same
+     * asset settle side by side without either counting the other's tokens. */
+    const sw = plan.swaps[sl.mint];
+    const swapped = sw && sw.done;
+    const asset = swapped ? sw.asset : null;
+    const total = swapped ? BigInt(sw.received) : BigInt(sl.wei);
+
+    for (const [addr, held] of Object.entries(table)) {
+      const amount = (total * BigInt(held)) / supply;
+      if (amount > 0n) {
+        payments.push({ to: addr, wei: amount.toString(), mint: sl.mint, asset });
+      }
+    }
+  }
+  plan.payments = payments;
+  plan.sent = plan.sent || 0;
 }
 
 /**
@@ -330,12 +629,17 @@ export default async function handler(req, res) {
  * end. A run that dies halfway is finished by the next one.
  */
 async function payOut(db, planKey, plan) {
+  if (!plan.payments) return { paid: 0, of: 0, failures: [], complete: false };
   let sent = plan.sent || 0;
   const failures = [];
   for (let i = sent; i < plan.payments.length; i++) {
     const p = plan.payments[i];
     try {
-      const h = await keeperTx(p.to, "0x", BigInt(p.wei), GAS_PER_TRANSFER);
+      /* An asset payment is a transfer ON the token; an ETH one is value on a
+       * bare send. Same plan, same ordering, different instrument. */
+      const h = p.asset
+        ? await keeperTx(p.asset, encTransfer(p.to, BigInt(p.wei)), 0n, GAS_PER_ERC20)
+        : await keeperTx(p.to, "0x", BigInt(p.wei), GAS_PER_TRANSFER);
       await mined(h);
       sent = i + 1;
       await db.set(planKey, JSON.stringify({ ...plan, sent }));
