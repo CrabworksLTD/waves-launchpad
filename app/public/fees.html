@@ -135,6 +135,47 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
 
   function say(k, h) { var m = $("msg"); m.className = "msg " + k; m.innerHTML = h; }
 
+  /* The ticker a token's rewards are paid in, filled into badges after render.
+   *
+   * Both chains resolve it from their own list — Solana's RWA set, Robinhood's
+   * verified assets — and both fall back silently, because a badge that cannot
+   * name the asset should still say the rewards are on rather than say nothing.
+   */
+  var symCache = {};
+  function nameRewardAsset(el, mint, evm) {
+    if (!mint || !el) return;
+    var key = (evm ? "e:" : "s:") + mint;
+    var got = function (sym) {
+      if (!sym) return;
+      symCache[key] = sym;
+      var slot = el.querySelector(".rsym");
+      if (slot) slot.textContent = String(sym).replace(/^\$/, "") + " ";
+    };
+    if (symCache[key]) return got(symCache[key]);
+    if (evm) {
+      fetch("/rh-assets.json").then(function (r) { return r.json(); }).then(function (j) {
+        var hit = (j.tokens || []).find(function (x) {
+          return String(x.address).toLowerCase() === String(mint).toLowerCase();
+        });
+        if (hit && hit.liquid !== false) got(hit.symbol);
+      }).catch(function () {});
+    } else if (window.Token && window.Token.rwa) {
+      window.Token.rwa().then(function (list) {
+        var hit = (list || []).find(function (x) { return x.mint === mint; });
+        if (hit) got(hit.symbol);
+      }).catch(function () {});
+    }
+  }
+
+  /* "TSLA AUTO-SHARED HOURLY". The share is named only when it is NOT all of
+   * it — 100% is the only option on Robinhood and the common one on Solana, so
+   * printing it on every badge was noise that crowded out the useful part. */
+  function sharedBadge(pct, title) {
+    return '<span class="shared"' + (title ? ' title="' + esc(title) + '"' : "") + ">" +
+      (pct && pct < 100 ? pct + "% " : "") +
+      '<span class="rsym"></span>AUTO-SHARED HOURLY</span>';
+  }
+
   function row(t, kind, amt) {
     var sym = (t.symbol || "?").toUpperCase();
     var pct = t.feeSharePct || (t.feeShare === "holders" ? 100 : 0);
@@ -151,9 +192,9 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
           "<span>sent to holders</span></span>"
         : "") +
       (shared
-        ? '<span class="shared" title="The keeper claims this pool and pays ' + pct +
-          '% to holders automatically; your ' + (100 - pct) +
-          '% arrives at your fee wallet in the same run.">' + pct + '% AUTO-SHARED</span>'
+        ? sharedBadge(pct, "The keeper claims this pool hourly and pays " + pct +
+            "% to holders automatically; your " + (100 - pct) +
+            "% arrives at your fee wallet in the same run.")
         : '<button class="cl" disabled>Claim</button>' +
           (kind === "creator"
             ? '<button class="act">Activate holder rewards</button>' : "")) +
@@ -248,6 +289,15 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
         ? tokens.map(function (t) { return row(t, "partner", null); }).join("")
         : '<div class="none">No pools yet.</div>';
     }
+
+    /* Fill each pledged badge with the ticker it pays out in. Done after the
+     * rows exist rather than inside row(), which is a string builder — and
+     * asynchronously, because the asset list is a fetch and a badge saying
+     * "AUTO-SHARED HOURLY" for a moment is fine while a missing one is not. */
+    tokens.forEach(function (t) {
+      var el = document.querySelector('.frow[data-mint="' + t.mint + '"]');
+      if (el && el.querySelector(".rsym")) nameRewardAsset(el, t.rewardMint, false);
+    });
 
     // stream the live numbers in; arm buttons as they land
     var rows = [].slice.call(document.querySelectorAll(".frow"));
@@ -383,7 +433,6 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
           : esc(sym.slice(0, 1))) + "</span>" +
         '<span class="who"><b>$' + esc(sym) + " · " + esc(t.name) + "</b>" +
         "<span>" + esc(shortAddr(t.mint)) + "</span></span>" +
-        '<span class="owed"><b class="rw">…</b><span>holder share</span></span>' +
         '<button class="act" disabled>Activate holder rewards</button></div>';
     }).join("");
 
@@ -397,28 +446,34 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
       var mint = el.dataset.mint;
       var rec = mine.find(function (x) { return x.mint === mint; }) || {};
       TK.curveOf(mint).then(function (c) {
-        var amt = el.querySelector(".rw");
         var act = el.querySelector(".act");
-        if (!c) { amt.textContent = "—"; return; }
+        if (!c) { act.textContent = "—"; return; }
         if (c.rewardsBps > 0) {
           /* Pledged: the same badge the Solana row shows, in place of the
            * button — there is nothing left to press, and a disabled button
-           * reads like something that failed. */
+           * reads like something that failed.
+           *
+           * The share is gone from the label because it is always 100% here:
+           * bps is fixed at 10000 on this chain, so printing it said nothing
+           * and pushed out the part that does — what holders actually get. */
           var pct = c.rewardsBps / 100;
-          amt.textContent = pct + "%";
-          act.outerHTML = '<span class="shared" title="The keeper claims these fees ' +
-            'and pays ' + pct + '% to holders automatically; your ' + (100 - pct) +
-            '% arrives at your fee wallet in the same run.">' + pct + '% AUTO-SHARED</span>';
+          act.outerHTML = sharedBadge(pct,
+            "The keeper claims these fees hourly, converts them and pays holders " +
+            "automatically. Nothing for them to claim.");
+          nameRewardAsset(el, rec.rewardMint, true);
           return;
         }
-        amt.textContent = "none";
         act.disabled = false;
         act.onclick = function () { openEvmActivate(el, mint, act, rec); };
         if (wanted && mint.toLowerCase() === wanted) {
           openEvmActivate(el, mint, act, rec);
           el.scrollIntoView({ behavior: "smooth", block: "center" });
         }
-      }).catch(function () { el.querySelector(".rw").textContent = "—"; });
+      }).catch(function () {
+        // the holder-share column is gone; say it on the control that remains
+        var a = el.querySelector(".act");
+        if (a) { a.textContent = "Could not read"; a.disabled = true; }
+      });
     });
   }
 
@@ -508,8 +563,8 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
         await window.MoonpadToken.waitForTx(hash);
         say("ok", "Holder rewards are on for this token.");
         box.remove();
-        rowEl.querySelector(".rw").textContent = (bps / 100) + "%";
-        btn.outerHTML = '<span class="shared">' + (bps / 100) + '% AUTO-SHARED</span>';
+        btn.outerHTML = sharedBadge(bps / 100, "");
+        nameRewardAsset(rowEl, (rec || {}).rewardMint, true);
       } catch (e) {
         var m = String(e.message || e);
         if (/reject|denied/i.test(m)) m = "You cancelled the transaction.";
