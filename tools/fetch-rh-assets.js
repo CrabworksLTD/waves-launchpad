@@ -214,6 +214,25 @@ async function onChain(address) {
     bySymbol.set(chain.symbol, rec);
   }
 
+  /* ETH itself, always first.
+   *
+   * The chain's own coin is the most obvious thing to pay holders in and the
+   * only one that needs no swap at all — fees arrive as ETH, so choosing it
+   * means the keeper hands them straight on. Address zero because that is how
+   * Uniswap V4 denotes native currency, which is also what the curve pays in.
+   *
+   * It was previously left off on the reasoning that a creator wanting ETH just
+   * would not pledge into a swap. That is backwards: the picker should let them
+   * SAY so, not require them to know that omitting a choice means ETH. */
+  out.unshift({
+    address: "0x0000000000000000000000000000000000000000",
+    symbol: "ETH",
+    name: "Ether",
+    decimals: 18,
+    pools: 0,
+    kind: "native"
+  });
+
   /* The stablecoins are the point of the category, so they do not depend on
    * whether the swept window happened to include a pool that used one. USDG
    * was missing from the first run for exactly that reason. */
@@ -232,7 +251,11 @@ async function onChain(address) {
     console.log(`  added ${symbol} (allowlisted stablecoin)`);
   }
 
-  out.sort((a, b) => b.pools - a.pools || a.symbol.localeCompare(b.symbol));
+  out.sort((a, b) => {
+    // native first, then stablecoins, then equities by how widely they trade
+    const rank = (t) => (t.kind === "native" ? 0 : t.kind === "stable" ? 1 : 2);
+    return rank(a) - rank(b) || b.pools - a.pools || a.symbol.localeCompare(b.symbol);
+  });
   fs.writeFileSync(OUT, JSON.stringify({
     generated: new Date().toISOString(),
     chain: 4663,

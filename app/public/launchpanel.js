@@ -1374,19 +1374,6 @@
     file.arrayBuffer().then(function (buf) { onOk(new Uint8Array(buf)); });
   }
 
-  /* Dev-buy presets, in the chain's own coin.
-   *
-   * The Solana ladder tops out at 10, which is about right for SOL and absurd
-   * for ETH — 10 ETH is a $25,000 "optional first buy" on a curve that
-   * graduates at four. Same idea, an order of magnitude down. */
-  function buyChips() {
-    var vals = isEvm() ? [0.025, 0.05, 0.1, 0.25, 0.5, 1]
-                       : [0.1, 0.25, 0.5, 1, 5, 10];
-    return vals.map(function (v) {
-      return '<button data-v="' + v + '">' + v + "</button>";
-    }).join("");
-  }
-
   /* ETH spot and the live curve terms, each fetched once per panel session.
    * The terms come from the DEPLOYED contract rather than constants — they are
    * immutable there, so the contract is the only honest source. */
@@ -1546,8 +1533,8 @@
     /* Default to the chain's own unit of account: SOL on Solana, USDG here.
      * BUILTIN_REWARDS[0] is SOL, which does not exist on Robinhood. */
     flow.reward = flow.reward || (isEvm()
-      ? { mint: "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
-          symbol: "USDG", name: "Global Dollar", liquidity: 113246 }
+      ? { mint: "0x0000000000000000000000000000000000000000",
+          symbol: "ETH", name: "Ether" }
       : BUILTIN_REWARDS[0]);
 
     var box = shell(H`
@@ -1580,7 +1567,6 @@
 
       <label>Your first buy (${isEvm() ? "ETH" : "SOL"}) — optional</label>
       <input id="lp-tbuy" type="number" min="0" step="${isEvm() ? "0.005" : "0.1"}" value="${flow.tbuy || 0}">
-      <div class="ptabs" id="tk-chips">${raw(buyChips())}</div>
       <p class="note" id="tk-buyshare"></p>
       <p class="note">Lands in the same transaction as the pool, so nobody can snipe
       the opening price ahead of you.</p>
@@ -1664,7 +1650,9 @@
     }
     paintBuyShare();
     box.querySelector("#lp-tbuy").addEventListener("input", paintBuyShare);
-    box.querySelector("#tk-chips").addEventListener("click", function (e) {
+    // the suggested-amount chips are gone; the field is typed into directly
+    var chipRow = box.querySelector("#tk-chips");
+    if (chipRow) chipRow.addEventListener("click", function (e) {
       var b = e.target.closest("button[data-v]");
       if (b) box.querySelector("#lp-tbuy").value = b.dataset.v;
       setTimeout(paintBuyShare, 0);        // after the chip writes the value
@@ -1706,8 +1694,8 @@
     /* Default to the chain's own unit of account: SOL on Solana, USDG here.
      * BUILTIN_REWARDS[0] is SOL, which does not exist on Robinhood. */
     flow.reward = flow.reward || (isEvm()
-      ? { mint: "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
-          symbol: "USDG", name: "Global Dollar", liquidity: 113246 }
+      ? { mint: "0x0000000000000000000000000000000000000000",
+          symbol: "ETH", name: "Ether" }
       : BUILTIN_REWARDS[0]);
     /* Robinhood Chain prices in ETH and nothing else — the curve takes the
      * chain's native coin, there is no USDC config and no RWA quote. */
@@ -1766,7 +1754,6 @@
       </div>`}
 
       <div class="fold2" id="tk-econ">
-        <div class="row"><span class="k">Total supply</span><b>1,000,000,000 · fixed</b></div>
         <div class="row"><span class="k">Trading fee</span><b id="tk-fee">${tierPct(flow) + "%"}</b></div>
         <div class="row"><span class="k">Graduates at</span><b id="tk-grad">reading the curve…</b></div>
         <div class="row" style="border-bottom:0"><span class="k">Migrates to</span><b>${
@@ -1778,7 +1765,6 @@
 
       <label>Your first buy (${qLabel}) — optional</label>
       <input id="lp-tbuy" type="number" min="0" step="${isEvm() ? "0.005" : "0.1"}" value="${flow.tbuy || 0}">
-      <div class="ptabs" id="tk-chips">${raw(buyChips())}</div>
       <p class="note" id="tk-buyshare"></p>
       <p class="note">Lands in the same transaction as the pool, so nobody can snipe
       the opening price ahead of you.</p>
@@ -1841,11 +1827,6 @@
         <div><label>Website</label><input id="tk-web" value="${flow.web || ""}" placeholder="site.xyz"></div>
         <div><label>X</label><input id="tk-x" value="${flow.x || ""}" placeholder="@handle"></div>
       </div>
-      <div class="two">
-        <div><label>Telegram</label><input id="tk-tg" value="${flow.tg || ""}" placeholder="t.me/…"></div>
-        <div><label>Discord</label><input id="tk-dc" value="${flow.dc || ""}" placeholder="discord.gg/…"></div>
-      </div>
-
       ${window.Token.configKey() ? "" : raw(
         '<p class="err">Token launches are not configured on this deployment yet — ' +
         "the form is a preview and the launch button is disabled.</p>")}
@@ -1903,8 +1884,12 @@
       flow.feeWallet = fw ? fw.value.trim() : (flow.feeWallet || "");
       flow.web = box.querySelector("#tk-web").value.trim();
       flow.x = box.querySelector("#tk-x").value.trim();
-      flow.tg = box.querySelector("#tk-tg").value.trim();
-      flow.dc = box.querySelector("#tk-dc").value.trim();
+      /* Telegram and Discord were dropped from the form. Read defensively so a
+       * flow that still carries them (a launch resumed from an older tab) is
+       * not clobbered, and so this cannot throw on a field that is gone. */
+      var tg = box.querySelector("#tk-tg"), dc = box.querySelector("#tk-dc");
+      if (tg) flow.tg = tg.value.trim();
+      if (dc) flow.dc = dc.value.trim();
     }
 
     box.querySelector("#tk-logobtn").onclick = function () { box.querySelector("#tk-logo").click(); };
@@ -1967,7 +1952,9 @@
     }
     paintBuyShare();
     box.querySelector("#lp-tbuy").addEventListener("input", paintBuyShare);
-    box.querySelector("#tk-chips").addEventListener("click", function () {
+    // the suggested-amount chips are gone; the field is typed into directly
+    var chipRow = box.querySelector("#tk-chips");
+    if (chipRow) chipRow.addEventListener("click", function () {
       setTimeout(paintBuyShare, 0);      // after the chip has written the value
     });
 
@@ -2026,7 +2013,9 @@
       flow.quote = b.dataset.q;
       tokenDetails(flow);
     });
-    box.querySelector("#tk-chips").addEventListener("click", function (e) {
+    // the suggested-amount chips are gone; the field is typed into directly
+    var chipRow = box.querySelector("#tk-chips");
+    if (chipRow) chipRow.addEventListener("click", function (e) {
       var b = e.target.closest("button[data-v]");
       if (b) box.querySelector("#lp-tbuy").value = b.dataset.v;
     });
@@ -2118,6 +2107,7 @@
       <input id="lp-q" type="search" placeholder="Search…" autocomplete="off">
       <div class="ptabs" id="lp-tabs">
         <button data-t="all" class="on">All</button>
+        <button data-t="native">ETH</button>
         <button data-t="stable">Stablecoins</button>
         <button data-t="equity">Stocks &amp; ETFs</button>
       </div>
@@ -2134,10 +2124,12 @@
        * the asset, which is the closest thing to "can this actually be sold". */
       function rowHtml(t) {
         var name = (t.name || "").replace(/ • Robinhood Token$/, "");
+        var detail = t.kind === "native" ? "paid as-is"
+          : t.pools + (t.pools === 1 ? " pool" : " pools");
         return '<button class="prow" data-a="' + esc(t.address) + '">' +
           "<b>" + esc(t.symbol) + "</b><span>" + esc(name) + "</span>" +
-          '<i class="' + (t.pools >= 3 ? "" : "dim") + '">' +
-          esc(t.pools + (t.pools === 1 ? " pool" : " pools")) + "</i></button>";
+          '<i class="' + (t.kind === "native" || t.pools >= 3 ? "" : "dim") + '">' +
+          esc(detail) + "</i></button>";
       }
       function head(label, n) {
         return '<div class="phead">' + label + " · " + n + "</div>";
@@ -2148,10 +2140,14 @@
           if (tab !== "all" && t.kind !== tab) return false;
           return !q || (t.symbol + " " + (t.name || "")).toLowerCase().indexOf(q) >= 0;
         });
+        var native = rows.filter(function (t) { return t.kind === "native"; });
         var stable = rows.filter(function (t) { return t.kind === "stable"; });
         var equity = rows.filter(function (t) { return t.kind === "equity"; });
         var html = "";
-        // stablecoins first: the least surprising thing to be paid in
+        /* ETH first: it is what the fees already are, so choosing it means no
+         * swap, no slippage and nothing that can fail between the claim and the
+         * payout. */
+        if (native.length) html += head("No conversion", native.length) + native.map(rowHtml).join("");
         if (stable.length) html += head("Stablecoins", stable.length) + stable.map(rowHtml).join("");
         if (equity.length) html += head("Stocks & ETFs", equity.length) + equity.map(rowHtml).join("");
         box.querySelector("#lp-list").innerHTML =
