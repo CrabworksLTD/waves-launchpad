@@ -554,7 +554,20 @@ export default async function handler(req, res) {
     const raw = await db.lrange("tokens", 0, 199);
     const toks = (raw || [])
       .map((r) => (typeof r === "string" ? JSON.parse(r) : r))
-      .filter((t) => t && t.chain === "robinhood" && (t.feeSharePct || 0) > 0);
+      /* ⚠️ NOT filtered on feeSharePct.
+       *
+       * The pledge lives on the curve, and activating it from /fees is one
+       * on-chain call that touches nothing of ours — so a creator who pledged
+       * after launching still has 0 in the listing. Filtering on it here meant
+       * the keeper skipped exactly those tokens and never paid their holders,
+       * silently, while the curve had been routing fees to the keeper all
+       * along. WAVE4 is one: rewardsBps 10000 on chain, feeSharePct 0 in the
+       * record.
+       *
+       * rewardsBps is read from the curve for each of these a few lines down
+       * and anything unpledged is dropped there, so the only cost of not
+       * pre-filtering is one eth_call per Robinhood launch. */
+      .filter((t) => t && t.chain === "robinhood");
     if (!toks.length) return res.status(200).json({ ok: true, keeper, note: "nothing pledged" });
 
     const latest = BigInt(await rpc("eth_blockNumber", []));
@@ -607,7 +620,15 @@ export default async function handler(req, res) {
     // budget the dearer of the two routes; which one wins is not known until quoted
     const gasCost = (GAS_CLAIM + GAS_SWAP2 * BigInt(swapping) +
       perHolder * BigInt(holderCount)) * gasPrice;
-    if (pot < gasCost * WORTH_IT) {
+    /* An explicit, authenticated override for testing the path end to end.
+     *
+     * The economics are real — forwarding a pot smaller than the gas costs more
+     * than it moves — but "wait until a test token has traded several hundred
+     * dollars" is not a way to find out whether the swap leg works. Requires
+     * the deploy secret, so only someone who could change the code anyway. */
+    const force = !!(req.query && req.query.force) && !!secret &&
+      req.headers.authorization === "Bearer " + secret;
+    if (!force && pot < gasCost * WORTH_IT) {
       return res.status(200).json({
         ok: true, keeper, note: "pot too small to be worth the gas",
         potWei: pot.toString(), gasWei: gasCost.toString(), holders: holderCount

@@ -252,7 +252,12 @@ export default async function handler(req, res) {
      * a token whose creator kept every fee is work nobody will ever read. */
     let toks = all.filter((t) => t && t.chain === "robinhood");
     if (only) toks = toks.filter((t) => String(t.mint).toLowerCase() === String(only).toLowerCase());
-    else toks = toks.filter((t) => (t.feeSharePct || 0) > 0);
+    /* Every Robinhood launch, not only the ones whose LISTING says they
+     * pledged. Activating rewards from /fees is an on-chain call that does not
+     * touch our record, so filtering on feeSharePct skipped the holder tables
+     * of exactly the tokens that needed them — and the keeper cannot pay
+     * holders it cannot name. */
+    // (no filter: the sweep is capped at 8 tokens per run either way)
 
     const curveAddr = process.env.RH_CURVE || "0x77ddd6ceb454e4b71a1952fcaafb8cf9975f55c0";
 
