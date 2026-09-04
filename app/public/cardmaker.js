@@ -206,6 +206,14 @@
     chips.push(o.kind === "token" ? "TOKEN" : "COLLECTION");
     g.fillText(chips.join("  ·  "), tx, ay + 140);
 
+    // active reward, right under the chip line — so a shared token card tells
+    // people what holding it earns them (accent-coloured to stand out)
+    if (o.reward) {
+      g.font = '500 23px "IBM Plex Mono", monospace';
+      g.fillStyle = pal.accent;
+      g.fillText(String(o.reward), tx, ay + 180);
+    }
+
     // the numbers along the bottom
     var sx = 56, sy = H - 92;
     (o.stats || []).forEach(function (st) {

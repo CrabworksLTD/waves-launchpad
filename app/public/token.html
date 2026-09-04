@@ -239,11 +239,14 @@ input:focus{outline:none;border-color:var(--accent)}
         <button class="on buy" id="t-buy">Buy</button>
         <button class="sell" id="t-sell">Sell</button>
       </div>
-      <label id="amt-label">Amount (SOL)</label>
-      <input id="amt" type="number" min="0" step="0.05" placeholder="0.0">
+      <!-- Both of these are rewritten by setSide() at boot: the currency is not
+           known until the mint is, and a Robinhood token priced in SOL is a lie
+           on the one screen where the number means money. -->
+      <label id="amt-label">Amount</label>
+      <input id="amt" type="number" min="0" step="0.01" placeholder="0.0">
       <div class="chips" id="chips">
-        <button data-v="0.1">0.1</button><button data-v="0.5">0.5</button>
-        <button data-v="1">1</button><button data-v="5">5</button>
+        <button data-v="0.01">0.01</button><button data-v="0.025">0.025</button>
+        <button data-v="0.05">0.05</button><button data-v="0.1">0.1</button>
       </div>
       <div class="est"><span>You receive ≈</span><b id="est">—</b></div>
       <div class="est"><span>Slippage</span><b>1%</b></div>
@@ -1196,7 +1199,13 @@ input:focus{outline:none;border-color:var(--accent)}
       });
     });
     $("amt").addEventListener("input", requote);
-    paintGo();
+    /* ⚠️ Draw the buy side once, rather than waiting for a click.
+     *
+     * setSide() is what puts the right currency on the label, and it was only
+     * ever reached by clicking a tab — so a page opened fresh sat on whatever
+     * the static HTML said, which was SOL. Every Robinhood token asked for an
+     * "Amount (SOL)" and then spent ETH. */
+    setSide("buy");
   }
 
   function setSide(s) {
@@ -1206,7 +1215,7 @@ input:focus{outline:none;border-color:var(--accent)}
     $("amt-label").textContent = s === "buy"
       ? (IS_EVM ? "Amount (ETH)" : "Amount (SOL)") : "Amount (tokens)";
     $("chips").innerHTML = s === "buy"
-      ? '<button data-v="0.1">0.1</button><button data-v="0.5">0.5</button><button data-v="1">1</button><button data-v="5">5</button>'
+      ? '<button data-v="0.01">0.01</button><button data-v="0.025">0.025</button><button data-v="0.05">0.05</button><button data-v="0.1">0.1</button>'
       : '<button data-p="10">10%</button><button data-p="25">25%</button><button data-p="50">50%</button><button data-p="100">100%</button>';
     $("est").textContent = "—"; lastQuote = null; requote(); paintGo();
   }

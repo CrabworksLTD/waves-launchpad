@@ -864,6 +864,17 @@
     return !!(window.Shell && window.Shell.chain && window.Shell.chain() === "robinhood");
   }
 
+  /* The active holder reward, phrased for the token share card — or null for a
+   * plain token that keeps its fees, so no reward line is drawn. Dividend pays
+   * holders in the chosen reward asset; burn buys back and burns. */
+  function rewardLabel(flow) {
+    var mode = flow && flow.rewardMode;
+    if (!mode || mode === "none") return null;
+    if (mode === "burn") return "Buyback & burn";
+    var sym = flow && flow.reward && flow.reward.symbol;
+    return sym ? "Holders earn " + String(sym).replace(/^\$/, "") : "Holders earn rewards";
+  }
+
   /* The share card for a launch, composed here and pinned with the art. Never
    * fatal: a launch that succeeded must not be reported as failed because a
    * picture did not draw — a missing card simply falls back to the brand one. */
@@ -900,6 +911,7 @@
         sym: cfg.symbol,
         avatar: blobUrl(cfg.avatar) || first,
         banner: blobUrl(cfg.banner),
+        reward: cfg.reward || null,
         stats: stats
       });
     } catch (e) { return null; }
@@ -2407,7 +2419,8 @@
       mark("meta", "on");
       var tcard = await makeCard({
         name: flow.tname, symbol: flow.tsym,
-        avatar: flow.icon || null, banner: flow.banner || null
+        avatar: flow.icon || null, banner: flow.banner || null,
+        reward: rewardLabel(flow)
       }, "token", [
         ["priced in", (flow.quote || "SOL").toUpperCase()],
         ["swap fee", tierPct(flow) + "%"],
@@ -2692,7 +2705,8 @@
       mark("meta", "on");
       var tcard = await makeCard({
         name: flow.tname, symbol: flow.tsym,
-        avatar: flow.icon || null, banner: flow.banner || null
+        avatar: flow.icon || null, banner: flow.banner || null,
+        reward: rewardLabel(flow)
       }, "token", [
         ["priced in", "ETH"],
         ["swap fee", (evmSplit(flow) || {}).total + "%"],
@@ -2786,7 +2800,17 @@
       mint: res.token,
       name: flow.tname,
       symbol: flow.tsym,
-      creator: (window.MoonpadWallet || {}).account || null,
+      /* The address the CURVE says launched it, not whichever wallet the page
+       * happens to have connected. waitForLaunch reads it out of the Launched
+       * event's indexed creator topic, so it is the sender of the transaction
+       * that actually exists on chain.
+       *
+       * This read window.MoonpadWallet.account, which is only set once someone
+       * connects through the header chip — the launch flow connects through its
+       * own eth_requestAccounts and never touches it. So every Robinhood launch
+       * was filed with creator: null, and /fees, which matches launches by
+       * creator, told the person who launched them they had none. */
+      creator: res.creator || (window.MoonpadWallet || {}).account || null,
       // where the holder indexer starts reading Transfer events from
       block: res.block || null,
       icon: (meta && meta.iconUri) || null,
