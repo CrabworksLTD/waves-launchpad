@@ -35,6 +35,7 @@ const RPC = process.env.RH_RPC || "https://rpc.mainnet.chain.robinhood.com";
 const ROUTER = process.env.RH_SWAP_ROUTER || "0x591c9fa02df270df71225ed3d6dda62a55e0a768";
 const OUT = path.join(__dirname, "..", "app", "public", "rh-assets.json");
 const ZERO = "0x" + "0".repeat(40);
+const USDG_ADDR = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
 
 // what to price with: small enough to be a fair read of a thin pool
 const AMOUNT = 10n ** 15n;             // 0.001 ETH
@@ -52,6 +53,9 @@ const encKey = (k) => ad(k.currency0) + ad(k.currency1) + pad(k.fee) + pad(k.tic
 // quoteBest((address,address,uint24,int24,address)[],uint256)
 const encQuoteBest = (keys, a) =>
   "0x33a3a81b" + pad(64) + pad(a) + pad(keys.length) + keys.map(encKey).join("");
+// quote2((address,address,uint24,int24,address),(address,address,uint24,int24,address),uint256)
+const SEL_QUOTE2 = "0x1df3fc0c";
+const encQuote2 = (a, b, amt) => SEL_QUOTE2 + encKey(a) + encKey(b) + pad(amt);
 
 let id = 0;
 async function rpc(method, params) {
@@ -88,44 +92,96 @@ async function quoteOne(key) {
   }
 }
 
+/* The far leg of ETH -> USDG -> asset, priced end to end. quoteOne cannot do
+ * this: it assumes zero-for-one with ETH on the near side, and half these pools
+ * have USDG as currency1 because the asset's address sorts below it. */
+async function quoteTwo(nearKey, farKey) {
+  try {
+    const out = await rpc("eth_call", [
+      { to: ROUTER, data: encQuote2(nearKey, farKey, AMOUNT) }, "latest"]);
+    if (!out || out === "0x") return 0n;
+    return BigInt(out);
+  } catch (e) {
+    return 0n;
+  }
+}
+
 async function main() {
   const doc = JSON.parse(fs.readFileSync(OUT, "utf8"));
   const assets = (doc.tokens || []).filter(
     (t) => String(t.address).toLowerCase() !== ZERO && (t.ethPools || []).length);
   console.log(`Pricing ${assets.length} assets through ${ROUTER}\n`);
 
-  let liquid = 0, dry = [];
+  /* The near leg every two-hop route shares: the deepest ETH/USDG pool. Priced
+   * first, because if THIS is empty there is no two-hop route to anywhere and
+   * the whole second pass is wasted. */
+  const usdgAsset = (doc.tokens || []).find(
+    (t) => String(t.address).toLowerCase() === USDG_ADDR);
+  let nearKey = null;
+  if (usdgAsset) {
+    let bestNear = 0n;
+    for (const k of (usdgAsset.ethPools || []).filter(
+           (x) => x.hooks === ZERO && Number(x.fee) <= MAX_POOL_FEE)) {
+      const out = await quoteOne(k);
+      if (out > bestNear) { bestNear = out; nearKey = k; }
+    }
+    console.log(nearKey
+      ? `  near leg: ETH -> USDG through fee ${nearKey.fee} (${Number(bestNear) / 1e6} USDG)`
+      : "  ⚠️  no ETH -> USDG pool can fill — two-hop routing is unavailable");
+  }
+
+  let liquid = 0, viaUsdg = 0, dry = [];
   for (let i = 0; i < assets.length; i++) {
     const t = assets[i];
-    const hookless = (t.ethPools || []).filter(
-      (k) => k.hooks === ZERO && Number(k.fee) <= MAX_POOL_FEE);
-    const scored = [];
-    for (const k of hookless) scored.push({ k, out: await quoteOne(k) });
+    const usable = (k) => k.hooks === ZERO && Number(k.fee) <= MAX_POOL_FEE;
 
+    // ── the direct route ────────────────────────────────────────────────────
+    const scored = [];
+    for (const k of (t.ethPools || []).filter(usable)) scored.push({ k, out: await quoteOne(k) });
     /* Best first. Empty pools keep their place at the back rather than being
      * removed — this is one reading of a market that moves. */
     scored.sort((a, b) => (b.out > a.out ? 1 : b.out < a.out ? -1 : 0));
-    // kept, but behind everything the keeper would actually use
-    const rest = (t.ethPools || []).filter(
-      (k) => !(k.hooks === ZERO && Number(k.fee) <= MAX_POOL_FEE));
-    t.ethPools = scored.map((s) => s.k).concat(rest);
+    t.ethPools = scored.map((s) => s.k)
+      .concat((t.ethPools || []).filter((k) => !usable(k)));
+    const bestDirect = scored.length ? scored[0].out : 0n;
 
-    const best = scored.length ? scored[0].out : 0n;
+    // ── and through USDG ────────────────────────────────────────────────────
+    let bestHop = 0n;
+    if (nearKey && String(t.address).toLowerCase() !== USDG_ADDR) {
+      const hopped = [];
+      for (const k of (t.usdgPools || []).filter(usable)) {
+        hopped.push({ k, out: await quoteTwo(nearKey, k) });
+      }
+      hopped.sort((a, b) => (b.out > a.out ? 1 : b.out < a.out ? -1 : 0));
+      t.usdgPools = hopped.map((s) => s.k)
+        .concat((t.usdgPools || []).filter((k) => !usable(k)));
+      bestHop = hopped.length ? hopped[0].out : 0n;
+    }
+
+    /* Whichever actually pays more. A two-hop route costs two fees and two lots
+     * of price impact, so it usually loses — but for an asset whose only direct
+     * pool charges seventy per cent, or has nothing in it at all, it is the
+     * difference between being paid the asset and being paid ETH. */
+    const best = bestHop > bestDirect ? bestHop : bestDirect;
+    t.route = best === 0n ? "none" : (bestHop > bestDirect ? "usdg" : "direct");
     t.liquid = best > 0n;
     t.quotedAt = best > 0n ? (Number(best) / Math.pow(10, t.decimals || 18)) : 0;
     if (t.liquid) liquid++; else dry.push(t.symbol);
+    if (t.route === "usdg") viaUsdg++;
 
     process.stdout.write(
-      `\r  ${i + 1}/${assets.length}  ${liquid} fillable` + " ".repeat(20));
+      `\r  ${i + 1}/${assets.length}  ${liquid} fillable, ${viaUsdg} via USDG` + " ".repeat(12));
   }
   console.log("");
 
   doc.rankedAt = new Date().toISOString();
-  doc.note = "Verified on chain. `ethPools` are ETH-paired PoolKeys, best-first " +
-    "by a live quote; `liquid` is whether any of them could fill at all.";
+  doc.note = "Verified on chain. `ethPools` and `usdgPools` are PoolKeys sorted " +
+    "best-first by a live quote; `route` is which of the two pays more " +
+    "(direct / usdg / none) and `liquid` whether either can fill at all.";
   fs.writeFileSync(OUT, JSON.stringify(doc, null, 2) + "\n");
 
   console.log(`\n${liquid}/${assets.length} assets can actually be bought with ETH`);
+  console.log(`${viaUsdg} of them pay better through USDG than directly`);
   if (dry.length) {
     console.log(`\n⚠️  ${dry.length} have pools but none that can fill — holders ` +
       `choosing these are paid ETH:\n   ${dry.join(" ")}`);

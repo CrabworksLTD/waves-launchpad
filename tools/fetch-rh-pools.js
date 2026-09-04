@@ -41,6 +41,16 @@
  * swap arbitrarily, and a keeper moving other people's money should not walk
  * into one blind — the keeper prefers hookless pools and only falls back to a
  * hooked one if that is all there is.
+ *
+ * ── USDG pairs, for the assets ETH cannot reach ──────────────────────────────
+ * Six assets have no ETH pool at all and several more have only empty or
+ * extortionate ones. Every one of them trades against USDG, which does have
+ * deep ETH pools, so `usdgPools` is recorded alongside — it is the far leg of
+ * an ETH → USDG → asset route.
+ *
+ * Recorded for EVERY asset, not only the stranded ones: a two-hop route
+ * sometimes beats a direct pool outright, and SPY, NFLX and INTC have nothing
+ * direct better than a pool charging seventy per cent.
  */
 "use strict";
 const fs = require("fs");
@@ -52,6 +62,8 @@ const OUT = path.join(__dirname, "..", "app", "public", "rh-assets.json");
 const PM = "0x8366a39cc670b4001a1121b8f6a443a643e40951";
 const INIT = "0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438";
 const ZERO = "0x" + "0".repeat(40);
+
+const USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
 
 const CHUNK = 50000n;                                   // ~1.4h; wider is refused
 const CHUNKS = Number(process.env.RH_CHUNKS || 40);     // ~2.3 days of pools
@@ -101,7 +113,8 @@ async function main() {
   console.log(`Looking for ETH pools for ${wanted.size} reward assets`);
 
   const latest = BigInt(await rpc("eth_blockNumber", []));
-  const found = new Map();               // asset -> Map(keyString -> key)
+  const found = new Map();               // asset -> Map(keyString -> key)  [ETH pairs]
+  const viaUsdg = new Map();             // asset -> Map(keyString -> key)  [USDG pairs]
   let initEvents = 0;
 
   for (let i = 0; i < CHUNKS; i++) {
@@ -125,21 +138,35 @@ async function main() {
       initEvents++;
       const c0 = "0x" + l.topics[2].slice(-40).toLowerCase();
       const c1 = "0x" + l.topics[3].slice(-40).toLowerCase();
-      // V4 orders currencies by address, so native ETH is always currency0
-      if (c0 !== ZERO) continue;
-      if (!wanted.has(c1)) continue;
 
       const d = String(l.data || "").replace(/^0x/, "");
       const key = {
-        currency0: ZERO,
+        currency0: c0,
         currency1: c1,
         fee: numAt(d, 0),
         tickSpacing: intAt(d, 1),
         hooks: addrAt(d, 2)
       };
       const sig = `${key.fee}:${key.tickSpacing}:${key.hooks}`;
-      if (!found.has(c1)) found.set(c1, new Map());
-      found.get(c1).set(sig, key);
+
+      // V4 orders currencies by address, so native ETH is always currency0
+      if (c0 === ZERO && wanted.has(c1)) {
+        if (!found.has(c1)) found.set(c1, new Map());
+        found.get(c1).set(sig, key);
+        continue;
+      }
+
+      /* The far leg of a two-hop route. USDG sits on either side depending on
+       * how the addresses sort — MSFT above it, SPY below — so both
+       * orientations have to be caught, and the key is stored exactly as the
+       * chain declared it because that IS the pool's identity. */
+      if (c0 === USDG && wanted.has(c1) && c1 !== USDG) {
+        if (!viaUsdg.has(c1)) viaUsdg.set(c1, new Map());
+        viaUsdg.get(c1).set(sig, key);
+      } else if (c1 === USDG && wanted.has(c0) && c0 !== USDG) {
+        if (!viaUsdg.has(c0)) viaUsdg.set(c0, new Map());
+        viaUsdg.get(c0).set(sig, key);
+      }
     }
     process.stdout.write(
       `\r  swept ${i + 1}/${CHUNKS} windows · ${initEvents} pools · ` +
@@ -150,18 +177,20 @@ async function main() {
   let withPools = 0, hookless = 0;
   for (const t of doc.tokens || []) {
     const a = String(t.address).toLowerCase();
-    if (a === ZERO) { t.ethPools = []; continue; }
-    const keys = [...(found.get(a) || new Map()).values()];
+    if (a === ZERO) { t.ethPools = []; t.usdgPools = []; continue; }
+    const byHookless = (x, y) => (x.hooks === ZERO ? 0 : 1) - (y.hooks === ZERO ? 0 : 1);
     /* Hookless first: those are the pools the keeper can reason about. A hook
      * can charge or reject a swap arbitrarily and this money is not ours. */
-    keys.sort((x, y) => (x.hooks === ZERO ? 0 : 1) - (y.hooks === ZERO ? 0 : 1));
+    const keys = [...(found.get(a) || new Map()).values()].sort(byHookless);
     t.ethPools = keys;
+    t.usdgPools = [...(viaUsdg.get(a) || new Map()).values()].sort(byHookless);
     if (keys.length) withPools++;
     if (keys.some((k) => k.hooks === ZERO)) hookless++;
   }
 
   doc.note = "Verified on chain. `pools` is how many V4 pools use the asset; " +
-    "`ethPools` are the ETH-paired PoolKeys the keeper can swap through.";
+    "`ethPools` are ETH-paired PoolKeys and `usdgPools` the USDG-paired far leg " +
+    "of an ETH -> USDG -> asset route.";
   doc.poolsAt = new Date().toISOString();
   fs.writeFileSync(OUT, JSON.stringify(doc, null, 2) + "\n");
 
@@ -174,10 +203,12 @@ async function main() {
    * either hidden from the picker or shown as ETH-paid. Name them. */
   const orphans = (doc.tokens || [])
     .filter((t) => String(t.address).toLowerCase() !== ZERO && !(t.ethPools || []).length)
-    .map((t) => t.symbol);
+    .map((t) => t.symbol + "(" + (t.usdgPools || []).length + " usdg)");
   if (orphans.length) {
     console.log(`\n⚠️  no ETH pool found for ${orphans.length}: ${orphans.slice(0, 40).join(" ")}`);
   }
+  const usdgCount = (doc.tokens || []).filter((t) => (t.usdgPools || []).length).length;
+  console.log(`${usdgCount} assets also have a USDG pair to route through`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

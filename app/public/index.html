@@ -70,7 +70,7 @@ h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:te
 .panel .sechead{margin-top:0}
 /* spotlight cards: square art, a status badge on it, then name, ticker,
    the one number that matters, and where/when it came from */
-.spot{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:14px;margin-top:20px}
+.spot{display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:12px;margin-top:20px}
 .spotnone{grid-column:1/-1;border:1px dashed var(--line2);border-radius:14px;
   padding:38px 24px;text-align:center;color:var(--faint);font-size:13.5px}
 .spotnone a{color:var(--accent)}
@@ -91,15 +91,14 @@ h1 .gship{background:var(--grad);-webkit-background-clip:text;background-clip:te
   color:var(--dim)}
 .scard .badge.live{color:var(--accent);border-color:rgba(var(--accent-rgb),.45)}
 .scard .badge.done{color:var(--accent-2-hi);border-color:rgba(var(--accent-2-rgb),.5)}
+.scard .badge.reward{color:var(--accent);border-color:rgba(var(--accent-rgb),.45)}
 .scard .sinfo{padding:10px 12px 11px;flex:1;display:flex;flex-direction:column}
 .scard .sinfo b{display:block;font:700 14px Archivo;letter-spacing:-.01em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.scard .rw{display:inline-block;align-self:flex-start;margin-top:6px;padding:2px 7px;border-radius:999px;
-  font:600 9px "IBM Plex Mono",monospace;letter-spacing:.07em;
-  color:var(--accent);border:1px solid var(--accent);
-  background:rgba(var(--accent-rgb),.09)}
 .scard .sym{display:block;margin-top:1px;font:400 11px "IBM Plex Mono",monospace;
   color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* the reward stock worn on the ticker (e.g. $MOAR/GMEx) instead of a big badge */
+.scard .sym .rwsym{color:var(--accent)}
 /* market cap, number and label on ONE line (override the block .sinfo b above) */
 .scard .stat{margin-top:7px}
 .scard .stat b{display:inline;font:700 16px Archivo;letter-spacing:-.01em;color:var(--ink)}
@@ -363,7 +362,7 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
     if (n == null || isNaN(n) || n <= 0) return null;
     var a = Math.abs(n);
     if (a >= 1e6) return "$" + (n / 1e6).toFixed(a >= 1e7 ? 0 : 1).replace(/\.0$/, "") + "M";
-    if (a >= 1e3) return "$" + (n / 1e3).toFixed(a >= 1e4 ? 0 : 1).replace(/\.0$/, "") + "k";
+    if (a >= 1e3) return "$" + (n / 1e3).toFixed(a >= 1e4 ? 0 : 1).replace(/\.0$/, "") + "K";
     return "$" + Math.round(n);
   }
 
@@ -548,9 +547,9 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
     window.Token.rwa().then(function (list) {
       RWA = {};
       (list || []).forEach(function (t) { RWA[t.mint] = t.symbol; });
-      document.querySelectorAll(".scard .rw").forEach(function (el) {
+      document.querySelectorAll(".scard .rwsym[data-mint]").forEach(function (el) {
         var m = el.dataset.mint;
-        if (m && RWA[m]) el.textContent = RWA[m] + " REWARDS";
+        if (m && RWA[m]) el.textContent = "/" + RWA[m];
       });
     }).catch(function () {});
   }
@@ -565,13 +564,14 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
         (o.img ? '<img alt="" loading="lazy" src="' + esc(art(o.img)) + '">'
                : o.canvas ? "<canvas></canvas>"
                : '<span class="none">' + esc((o.name || "?").slice(0, 1).toUpperCase()) + "</span>") +
-        '<span class="badge' + (o.badgeKind ? " " + o.badgeKind : "") + '">' +
-          esc(o.badge || "") + "</span>" +
+        (o.badge ? '<span class="badge' + (o.badgeKind ? " " + o.badgeKind : "") + '">' +
+          esc(o.badge) + "</span>" : "") +
       "</div>" +
       '<div class="sinfo"><b>' + esc(o.name) + "</b>" +
-      '<span class="sym">' + esc(o.sym || "") + "</span>" +
-      (o.reward ? '<span class="rw"' + (o.rewardMint ? ' data-mint="' + esc(o.rewardMint) + '"' : "") +
-        ">" + esc(o.reward.replace(/^ +/, "") || "REWARDS") + "</span>" : "") +
+      '<span class="sym">' + esc(o.sym || "") +
+        (o.rewardMint ? '<span class="rwsym" data-mint="' + esc(o.rewardMint) + '">' +
+          (rewardSym(o.rewardMint) ? "/" + esc(rewardSym(o.rewardMint)) : "") + "</span>" : "") +
+        "</span>" +
       '<div class="stat" data-stat><b>—</b></div>' +
       '<div class="bar" data-bar hidden><span class="track"><span class="fill"></span></span>' +
         '<span class="pct"></span></div>' +
@@ -629,16 +629,18 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
         return spotCard({
           name: r.name || "Token", sym: "$" + String(r.symbol || "").toUpperCase(),
           href: "/token/" + r.mint, img: r.icon || null,
-          badge: "TOKEN", badgeKind: "live", addr: r.mint, at: r.at,
+          // a badge by reward type — DIVIDEND / BUYBACK — nothing if it keeps fees
+          badge: (r.feeSharePct || 0) > 0
+            ? (r.rewardMode === "burn" ? "BUYBACK" : "DIVIDEND") : "",
+          badgeKind: "reward",
+          addr: r.mint, at: r.at,
           /* Only once rewards are actually running. feeSharePct is zero at
            * launch now — it is set when the creator activates, which is also
            * when the pool's creator role moves to the keeper — so a non-zero
            * value here means the chain is already paying holders. */
-          reward: (r.feeSharePct || 0) > 0
-            ? (r.rewardMode === "burn" ? "BUYBACK & BURN"
-               : (rewardSym(r.rewardMint) + " REWARDS").trim())
-            : null,
-          rewardMint: r.rewardMode === "burn" ? null : (r.rewardMint || null)
+          // reward stock worn on the ticker (/GMEx); burn tokens show nothing
+          rewardMint: ((r.feeSharePct || 0) > 0 && r.rewardMode !== "burn")
+            ? (r.rewardMint || null) : null
         });
       }
       if (it.kind === "col") {
@@ -653,6 +655,29 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
         href: "/app", canvas: true, badge: "TEMPLATE"
       });
     }).join("");
+
+    /* Market caps from the indexer — one bulk call for every spotlight token.
+     * The live swap-quote probe in readMarket returns null for a thin pool
+     * (that is why moar cat read "—"); the indexer computed a real mcap for it,
+     * so this is the reliable source. readMarket below still drives the progress
+     * bar, and is only a fallback for the number. */
+    var mcapUsd = {};
+    var tokMints = items.filter(function (it) { return it.kind === "token"; })
+      .map(function (it) { return it.rec.mint; }).filter(Boolean);
+    if (tokMints.length) {
+      fetch("/api/stats?mints=" + tokMints.join(",")).then(function (r) { return r.json(); })
+        .then(function (j) {
+          var st = (j && j.stats) || {};
+          items.forEach(function (it, i) {
+            if (it.kind !== "token") return;
+            var s = st[it.rec.mint];
+            if (!s || s.mcapUsd == null) return;
+            mcapUsd[it.rec.mint] = s.mcapUsd;
+            var el = box.children[i] && box.children[i].querySelector("[data-stat]");
+            setStat(el, usdShort(s.mcapUsd) || "—", "MC");
+          });
+        }).catch(function () {});
+    }
 
     // art and numbers stream in after the first paint
     items.forEach(function (it, i) {
@@ -677,10 +702,11 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
         window.Token.readMarket(it.rec.mint).then(function (m) {
           it.size = m.raised || 0;
           if (m.migrated) { setStat(statEl, "Graduated", ""); setBar(card, 1); return; }
-          // market cap in dollars (SOL-quoted × the rate; USDC is already USD)
+          // prefer the indexer's mcap (set above); the live figure is the
+          // fallback (SOL-quoted × the rate; USDC is already USD)
           var q = String(m.quote || "").toLowerCase();
           var mcUsd = m.mcap == null ? null : (q === "sol" ? m.mcap * solUsd : m.mcap);
-          setStat(statEl, usdShort(mcUsd) ||
+          setStat(statEl, usdShort(mcapUsd[it.rec.mint]) || usdShort(mcUsd) ||
             (m.mcap != null ? UI.fmt(m.mcap, 1) + " " + m.quote : "—"), "MC");
           setBar(card, m.progress);
         }).catch(function () {});

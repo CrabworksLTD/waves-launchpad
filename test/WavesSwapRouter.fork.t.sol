@@ -190,4 +190,135 @@ contract WavesSwapRouterForkTest is Test {
         vm.expectRevert(WavesSwapRouter.NotSelf.selector);
         router.quoteRevert(_key(TSLA, 45000, 450), 0.001 ether);
     }
+
+    // ─────────────────────────────────────────────── two hops, via USDG
+
+    address constant MSFT = 0xe93237C50D904957Cf27E7B1133b510C669c2e74;
+    address constant NVDA = 0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC;
+    address constant SPY  = 0x117cc2133c37B721F49dE2A7a74833232B3B4C0C;
+
+    /// The near leg every route shares: the deepest ETH/USDG pool.
+    function _ethToUsdg() internal pure returns (PoolKey memory) {
+        return _key(USDG, 91, 1);
+    }
+
+    /* A pool between USDG and something else. Which side USDG sits on is fixed
+     * by address order, not by us — MSFT sorts above it and SPY below — so the
+     * two are built differently on purpose. */
+    function _usdgPair(address other, uint24 fee, int24 spacing)
+        internal pure returns (PoolKey memory)
+    {
+        bool usdgFirst = uint160(USDG) < uint160(other);
+        return PoolKey({
+            currency0: Currency.wrap(usdgFirst ? USDG : other),
+            currency1: Currency.wrap(usdgFirst ? other : USDG),
+            fee: fee,
+            tickSpacing: spacing,
+            hooks: address(0)
+        });
+    }
+
+    /* MSFT's three hookless USDG pools, in the order the sweeper records them.
+     * The first is empty and the other two are not — the same trap as the ETH
+     * side, one leg further along, and the reason the far leg is chosen by
+     * quoting rather than by position. */
+    function _msftFarLegs() internal pure returns (PoolKey[] memory keys) {
+        keys = new PoolKey[](3);
+        keys[0] = _usdgPair(MSFT, 40000, 400);
+        keys[1] = _usdgPair(MSFT, 10000, 200);
+        keys[2] = _usdgPair(MSFT, 900, 9);
+    }
+
+    /**
+     * MSFT has NO ETH pool at all — it was simply unpayable before this, and a
+     * creator picking it got their holders ETH forever. USDG is currency0 in
+     * its pools, so the second hop runs zero-for-one.
+     */
+    function test_twoHopReachesAnAssetEthCannot() public onFork {
+        PoolKey memory a = _ethToUsdg();
+        PoolKey[] memory legs = _msftFarLegs();
+
+        (uint256 idx, uint256 quoted) = router.quoteBest2(a, legs, 0.001 ether);
+        assertGt(quoted, 0, "no two-hop quote for MSFT");
+        assertGt(idx, 0, "expected the first far leg to be the empty one");
+
+        uint256 out = router.swap2{value: 0.001 ether}(a, legs[idx], 0, holder);
+        assertEq(out, quoted, "the two-hop quote did not predict the fill");
+        assertEq(IERC20(MSFT).balanceOf(holder), out, "recipient did not get MSFT");
+        emit log_named_uint("MSFT out for 0.001 ETH (18dp)", out);
+    }
+
+    /**
+     * ⚠️ An empty FAR leg must not strand the middle asset.
+     *
+     * The first hop credits USDG and the second is supposed to spend exactly
+     * that. If the far pool fills nothing, the credit is left unresolved and V4
+     * rejects the whole lock with CurrencyNotSettled rather than quietly
+     * leaving USDG here — which is the right outcome and worth pinning down,
+     * because the alternative would be the router silently accumulating a
+     * balance that the next caller could spend.
+     */
+    function test_emptyFarLegRevertsRatherThanStrandingTheMiddle() public onFork {
+        vm.expectRevert();
+        router.swap2{value: 0.001 ether}(_ethToUsdg(), _usdgPair(MSFT, 40000, 400), 0, holder);
+        assertEq(IERC20(USDG).balanceOf(address(router)), 0, "USDG stranded in the router");
+    }
+
+    /**
+     * ⚠️ The direction of the second hop comes from the ADDRESSES, not the
+     * caller. SPY sorts below USDG, so USDG is currency1 in that pair and the
+     * hop must run one-for-zero; MSFT sorts above, so it runs zero-for-one.
+     * Hard-coding either would silently swap the wrong way round for half the
+     * assets on this chain.
+     *
+     * SPY's USDG pools happen to be empty, so this pins the ORIENTATION rather
+     * than a fill: the route must be recognised as connected and priced (at
+     * zero) rather than rejected as unroutable.
+     */
+    function test_theMiddleCanBeEitherCurrency() public onFork {
+        PoolKey memory spyLeg = _usdgPair(SPY, 3000, 30);
+        assertEq(Currency.unwrap(spyLeg.currency1), USDG, "expected USDG to sort second here");
+        assertEq(Currency.unwrap(_usdgPair(MSFT, 900, 9).currency0), USDG,
+            "expected USDG to sort first here");
+
+        // connected, therefore priced rather than reverted — the pool is just empty
+        assertEq(router.quote2(_ethToUsdg(), spyLeg, 0.001 ether), 0);
+    }
+
+    /// quoteBest2 must pick among the far legs, not just take the first.
+    function test_quoteBest2PicksTheBestFarLeg() public onFork {
+        PoolKey[] memory legs = _msftFarLegs();
+        (uint256 idx, uint256 best) = router.quoteBest2(_ethToUsdg(), legs, 0.001 ether);
+
+        assertGt(best, 0, "no MSFT route found");
+        assertEq(best, router.quote2(_ethToUsdg(), legs[idx], 0.001 ether), "not reproducible");
+        // it must not have settled for legs[0], which is the empty one
+        assertGt(idx, 0, "quoteBest2 chose the empty far leg");
+        emit log_named_uint("MSFT best far leg", idx);
+        emit log_named_uint("MSFT out for 0.001 ETH (18dp)", best);
+    }
+
+    /// Two pools with nothing in common are not a route.
+    function test_disconnectedPoolsAreRefused() public onFork {
+        vm.expectRevert(WavesSwapRouter.PoolsDoNotConnect.selector);
+        router.swap2{value: 0.001 ether}(_ethToUsdg(), _key(TSLA, 45000, 450), 0, holder);
+    }
+
+    /// The middle leg must never be left behind in the router.
+    function test_twoHopKeepsNoUsdg() public onFork {
+        router.swap2{value: 0.01 ether}(_ethToUsdg(), _usdgPair(MSFT, 900, 9), 0, holder);
+        assertEq(IERC20(USDG).balanceOf(address(router)), 0, "router kept the middle leg");
+        assertEq(address(router).balance, 0, "router kept ETH");
+        assertEq(IERC20(MSFT).balanceOf(address(router)), 0, "router kept the output");
+    }
+
+    /// minOut protects the two-hop route too.
+    function test_twoHopRevertsWhenShort() public onFork {
+        PoolKey memory a = _ethToUsdg();
+        PoolKey memory b = _usdgPair(MSFT, 900, 9);
+        uint256 quoted = router.quote2(a, b, 0.001 ether);
+        assertGt(quoted, 0, "expected a live far leg for this test");
+        vm.expectRevert();
+        router.swap2{value: 0.001 ether}(a, b, quoted * 2, holder);
+    }
 }

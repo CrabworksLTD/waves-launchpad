@@ -37,6 +37,8 @@ const POT = EARNED * 3n;                                                   // th
 
 // what the swap returns, in USDG's 6 decimals
 const USDG_OUT = 1_000_000n;
+// what the two-hop route returns, in NOPOOL's 18
+const HOP_OUT = 5_000_000_000_000_000n;
 
 const store = new Map();
 const db = {
@@ -74,7 +76,13 @@ async function stubFetch(url, opts) {
         { currency0: "0x" + "0".repeat(40), currency1: USDG, fee: 100, tickSpacing: 1,
           hooks: "0x" + "9".repeat(40) }
       ] },
-      { address: NOPOOL, symbol: "NOPOOL", decimals: 18, ethPools: [] }
+      /* No ETH pool at all — the MSFT case. Only reachable through USDG, which
+       * is exactly what a creator picking it is promised. */
+      { address: NOPOOL, symbol: "NOPOOL", decimals: 18, ethPools: [],
+        usdgPools: [
+          { currency0: USDG, currency1: NOPOOL, fee: 900, tickSpacing: 9,
+            hooks: "0x" + "0".repeat(40) }
+        ] }
     ] }) };
   }
 
@@ -95,11 +103,18 @@ async function stubFetch(url, opts) {
     const to = String(params[0].to || "").toLowerCase();
     const d = params[0].data;
 
-    if (to === ROUTER) {                       // quoteBest
+    if (to === ROUTER) {
       quoteCalls++;
-      /* Pool 1 (fee 500) is the deep one; pool 0 is empty and quotes zero.
-       * Returning index 1 is the answer a real quoteBest would give. */
+      // quoteBest2 — the two-hop route, which is all NOPOOL has
+      if (d.startsWith("0x09edbcc5")) return reply("0x" + hex32(0) + hex32(HOP_OUT));
+      /* quoteBest. Pool 1 (fee 500) is the deep one; pool 0 is empty and quotes
+       * zero. Returning index 1 is the answer a real quoteBest would give. */
       return reply("0x" + hex32(1) + hex32(USDG_OUT));
+    }
+    if (to === NOPOOL) {
+      const hops = signedTxs.filter(
+        (t) => String(t.data || "").startsWith("0xe235cc1c")).length;
+      return reply("0x" + hex32(BigInt(hops) * HOP_OUT));
     }
     if (to === USDG) {
       /* balanceOf. Grows by USDG_OUT with every swap already signed, so the
@@ -196,9 +211,9 @@ const swappedFee = swaps[0] && Number(BigInt("0x" + swaps[0].data.slice(10 + 2 *
 check("it swapped through the pool the quote named", swappedFee === 500, "fee " + swappedFee);
 
 // ── who got paid, and how much ──────────────────────────────────────────────
-check("all three USDG holders were paid in USDG",
-  erc20.length === 3 && erc20.every((t) => t.to.toLowerCase() === USDG),
-  erc20.length + " erc20 transfers");
+check("the USDG holders were paid in USDG",
+  erc20.filter((t) => t.to.toLowerCase() === USDG).length === 3,
+  erc20.length + " erc20 transfers in total");
 check("the whole swap output went out",
   (paid[H1] || 0n) + (paid[H2] || 0n) === USDG_OUT,
   `expected ${USDG_OUT}, paid ${(paid[H1] || 0n) + (paid[H2] || 0n)}`);
@@ -215,9 +230,25 @@ check("token B's holder got B's swap, not a share of A's",
 check("A and B did not double-count the same balance",
   (paid[H1] || 0n) + (paid[H2] || 0n) + (paid[H3] || 0n) === USDG_OUT * 2n,
   `total ${(paid[H1] || 0n) + (paid[H2] || 0n) + (paid[H3] || 0n)}`);
-check("token C fell back to ETH when its asset had no pool",
-  ethSends.some((t) => t.to.toLowerCase() === H4 && t.value === POT / 3n),
-  ethSends.length + " eth sends");
+/* ⚠️ Token C's asset has NO ETH pool — before two-hop routing its holders were
+ * paid ETH and nobody was told the choice had been silently dropped. It should
+ * now be reached through USDG. */
+const hops = signedTxs.filter((t) => String(t.data || "").startsWith("0xe235cc1c"));
+check("the asset with no ETH pool was reached through USDG",
+  hops.length === 1, hops.length + " two-hop swaps");
+check("the two-hop swap spent token C's slice",
+  hops[0] && hops[0].value === POT / 3n, "value " + (hops[0] && hops[0].value));
+check("its holder was paid the asset, not ETH",
+  paid[H4] === HOP_OUT, "H4 got " + (paid[H4] || 0n));
+check("nothing fell back to an ETH payout",
+  ethSends.length === 0, ethSends.length + " eth sends");
+
+/* The near leg is shared by every hopped asset and must be a REAL quote, not
+ * assumed: routing through an empty ETH/USDG pool would land the whole payout
+ * in a pool that pays nothing. */
+check("the two-hop route carries both legs",
+  hops[0] && hops[0].data.length === 2 + 8 + 64 * 12,
+  "calldata words " + (hops[0] ? (hops[0].data.length - 10) / 64 : 0));
 
 // ── resumability ────────────────────────────────────────────────────────────
 const plan = store.get("rhk:plan");

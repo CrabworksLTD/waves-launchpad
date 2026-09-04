@@ -204,7 +204,10 @@
         var acct = await cli.state.getPool(addrs[i]);
         return { publicKey: addrs[i], account: acct };
       }
-      return null;
+      /* Derivation found nothing — the pool was launched under a config this
+       * build does not know how to derive (moar cat did this: "No pool" even
+       * though it trades and the indexer sees it). Fall through to the SDK's own
+       * base-mint lookup rather than giving up. */
     }
     return cli.state.getPoolByBaseMint(new X.PublicKey(baseMint));
   }

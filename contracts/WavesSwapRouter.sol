@@ -33,6 +33,20 @@ pragma solidity ^0.8.28;
  * debt is settled, and the number is the true fill rather than a reimplementation
  * of the curve that can only ever be approximately right.
  *
+ * ── Two hops, for the assets ETH cannot reach ────────────────────────────────
+ * Not everything on this chain has a usable ETH pair. Six assets have no ETH
+ * pool at all, NVDA has sixteen and every one is empty, and SPY, NFLX and INTC
+ * have nothing better than a pool charging seventy per cent. All of them trade
+ * against USDG, which does have deep ETH pools — so the route is ETH → USDG →
+ * asset.
+ *
+ * Both hops happen inside ONE lock, which is the whole reason this is cheap and
+ * safe: the intermediate USDG is never held. V4's flash accounting nets the
+ * first hop's credit against the second hop's debt, so nothing is transferred
+ * in or out for the middle leg and there is no moment where a failure could
+ * strand USDG in this contract. Exact-input on the second hop is what makes the
+ * two exactly cancel.
+ *
  * ⚠️ It holds nothing. There is no owner, no withdrawal, no upgrade and no
  * storage that survives a call. Anyone may call it; they are spending their own
  * ETH and naming their own recipient, so there is nothing here to steal and no
@@ -84,6 +98,8 @@ contract WavesSwapRouter {
 
     uint8 internal constant MODE_SWAP = 0;
     uint8 internal constant MODE_QUOTE = 1;
+    uint8 internal constant MODE_SWAP2 = 2;
+    uint8 internal constant MODE_QUOTE2 = 3;
 
     /* The ends of the tick range, as sqrt prices. A V4 swap will not run
      * without a limit, and for a payout there is no price we want to stop at —
@@ -91,6 +107,11 @@ contract WavesSwapRouter {
      * the thing actually being promised. A price limit would silently deliver a
      * partial fill instead, leaving ETH unspent and holders short. */
     uint160 internal constant MIN_SQRT_PRICE = 4295128739 + 1;
+    /* The other end of the range. The second hop's direction depends on how the
+     * middle asset's address sorts against the output's, so it can run either
+     * way and needs both bounds. */
+    uint160 internal constant MAX_SQRT_PRICE =
+        1461446703485210103287273052203988822378723970342 - 1;
 
     error NotPoolManager();
     error NotNative();
@@ -99,6 +120,8 @@ contract WavesSwapRouter {
     error TooLittleOut(uint256 got, uint256 wanted);
     error TransferFailed();
     error NotSelf();
+    /// The two pools do not share a currency, so there is no route through them.
+    error PoolsDoNotConnect();
 
     /// Not a failure: how a quote returns its answer. See `quote`.
     error QuoteResult(uint256 amountOut);
@@ -143,6 +166,49 @@ contract WavesSwapRouter {
         emit Swapped(Currency.unwrap(key.currency1), to, msg.value, amountOut);
     }
 
+    /**
+     * ETH → `keyA`'s other currency → `keyB`'s other currency, in one lock.
+     *
+     * For assets ETH cannot reach directly. `keyA` must be an ETH pair, and the
+     * two pools must share a currency — that shared one is the middle leg, and
+     * it is never held: the first hop's credit pays the second hop's debt
+     * inside the same lock.
+     */
+    function swap2(PoolKey calldata keyA, PoolKey calldata keyB, uint256 minOut, address recipient)
+        external payable returns (uint256 amountOut)
+    {
+        if (Currency.unwrap(keyA.currency0) != address(0)) revert NotNative();
+        if (msg.value == 0) revert NothingIn();
+        _outputOf(keyA, keyB);              // reverts unless they connect
+
+        address to = recipient == address(0) ? msg.sender : recipient;
+        bytes memory out = poolManager.unlock(
+            abi.encode(MODE_SWAP2, keyA, keyB, msg.value, to));
+        amountOut = abi.decode(out, (uint256));
+
+        if (amountOut == 0) revert NothingOut();
+        if (amountOut < minOut) revert TooLittleOut(amountOut, minOut);
+
+        emit Swapped(Currency.unwrap(_outputOf(keyA, keyB)), to, msg.value, amountOut);
+    }
+
+    /**
+     * Which currency comes out the far end, and a check that there is a far end.
+     *
+     * The middle leg is whichever currency the two pools share. Everything else
+     * about the route follows from that, including which way the second hop
+     * runs — V4 orders a pool's currencies by address, so the direction is a
+     * property of the addresses rather than something the caller chooses.
+     */
+    function _outputOf(PoolKey calldata keyA, PoolKey calldata keyB)
+        internal pure returns (Currency)
+    {
+        Currency mid = keyA.currency1;              // ETH is currency0, so this is the middle
+        if (Currency.unwrap(mid) == Currency.unwrap(keyB.currency0)) return keyB.currency1;
+        if (Currency.unwrap(mid) == Currency.unwrap(keyB.currency1)) return keyB.currency0;
+        revert PoolsDoNotConnect();
+    }
+
     // ───────────────────────────────────────────────────────────── quoting
 
     /**
@@ -182,6 +248,46 @@ contract WavesSwapRouter {
     }
 
     /**
+     * What `amountIn` wei would buy through a two-hop route, right now. Zero if
+     * either leg cannot fill or the pools do not connect.
+     */
+    function quote2(PoolKey calldata keyA, PoolKey calldata keyB, uint256 amountIn)
+        public returns (uint256)
+    {
+        if (amountIn == 0) return 0;
+        try this.quote2Revert(keyA, keyB, amountIn) {
+            return 0;                      // unreachable
+        } catch (bytes memory reason) {
+            return _decodeQuote(reason);
+        }
+    }
+
+    /**
+     * One first hop, many second hops, one call.
+     *
+     * The middle asset is the same for every candidate — on this chain it is
+     * always USDG, which is what everything without an ETH market trades
+     * against — so only the far leg varies. Fixing the near leg keeps this to
+     * one quote per candidate rather than the product of both lists, which
+     * matters: Robinhood's gas cap refuses even a handful of these.
+     */
+    function quoteBest2(PoolKey calldata keyA, PoolKey[] calldata keysB, uint256 amountIn)
+        external returns (uint256 bestIndex, uint256 bestOut)
+    {
+        for (uint256 i = 0; i < keysB.length; i++) {
+            uint256 out = quote2(keyA, keysB[i], amountIn);
+            if (out > bestOut) { bestOut = out; bestIndex = i; }
+        }
+    }
+
+    function quote2Revert(PoolKey calldata keyA, PoolKey calldata keyB, uint256 amountIn)
+        external
+    {
+        if (msg.sender != address(this)) revert NotSelf();
+        poolManager.unlock(abi.encode(MODE_QUOTE2, keyA, keyB, amountIn, address(0)));
+    }
+
+    /**
      * Runs the swap and then throws the result, so the pool unwinds.
      *
      * External because a contract cannot catch its own internal reverts —
@@ -215,13 +321,24 @@ contract WavesSwapRouter {
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
         if (msg.sender != address(poolManager)) revert NotPoolManager();
 
-        (uint8 mode, PoolKey memory key, uint256 ethIn, address recipient) =
-            abi.decode(data, (uint8, PoolKey, uint256, address));
+        uint8 mode = abi.decode(data[0:32], (uint8));
+        bool twoHop = mode == MODE_SWAP2 || mode == MODE_QUOTE2;
+
+        PoolKey memory key;
+        PoolKey memory keyB;
+        uint256 ethIn;
+        address recipient;
+        if (twoHop) {
+            (, key, keyB, ethIn, recipient) =
+                abi.decode(data, (uint8, PoolKey, PoolKey, uint256, address));
+        } else {
+            (, key, ethIn, recipient) = abi.decode(data, (uint8, PoolKey, uint256, address));
+        }
 
         int256 delta = poolManager.swap(
             key,
             SwapParams({
-                // ETH is currency0, so buying the token is always zero-for-one
+                // ETH is currency0, so buying with ETH is always zero-for-one
                 zeroForOne: true,
                 amountSpecified: -int256(ethIn),
                 sqrtPriceLimitX96: MIN_SQRT_PRICE
@@ -233,18 +350,46 @@ contract WavesSwapRouter {
         int128 owed0 = int128(delta >> 128);
         int128 got1 = int128(delta);
         uint256 amountOut = got1 > 0 ? uint256(uint128(got1)) : 0;
+        Currency outCurrency = key.currency1;
+
+        if (twoHop && amountOut > 0) {
+            /* Spend the first hop's proceeds exactly, so the middle leg nets to
+             * zero and never has to be settled or held. Which way this runs is
+             * decided by the addresses, not by us: V4 sorts a pool's currencies,
+             * so the middle asset is currency0 in some pairs and currency1 in
+             * others and the direction follows. */
+            bool zeroForOne =
+                Currency.unwrap(key.currency1) == Currency.unwrap(keyB.currency0);
+            outCurrency = zeroForOne ? keyB.currency1 : keyB.currency0;
+
+            int256 d2 = poolManager.swap(
+                keyB,
+                SwapParams({
+                    zeroForOne: zeroForOne,
+                    amountSpecified: -int256(amountOut),
+                    sqrtPriceLimitX96: zeroForOne ? MIN_SQRT_PRICE : MAX_SQRT_PRICE
+                }),
+                ""
+            );
+            int128 b0 = int128(d2 >> 128);
+            int128 b1 = int128(d2);
+            int128 got = zeroForOne ? b1 : b0;
+            amountOut = got > 0 ? uint256(uint128(got)) : 0;
+        } else if (twoHop) {
+            amountOut = 0;                  // the first hop filled nothing
+        }
 
         /* A quote stops here and unwinds. Nothing is settled and nothing is
          * taken, so the pool is left exactly as it was found — which is the
          * point, and also why no ETH is needed to ask. */
-        if (mode == MODE_QUOTE) revert QuoteResult(amountOut);
+        if (mode == MODE_QUOTE || mode == MODE_QUOTE2) revert QuoteResult(amountOut);
 
         if (owed0 < 0) {
             // native: handed over with the call, so no sync/measure step
             poolManager.settle{value: uint256(uint128(-owed0))}();
         }
         if (amountOut > 0) {
-            poolManager.take(key.currency1, recipient, amountOut);
+            poolManager.take(outCurrency, recipient, amountOut);
         }
 
         /* Exact input should consume the lot, but a hooked pool can take less

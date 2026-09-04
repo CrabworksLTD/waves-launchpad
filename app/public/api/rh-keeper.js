@@ -58,6 +58,13 @@ const SWAP_ROUTER = process.env.RH_SWAP_ROUTER || null;
 const SEL_SWAP = "0x4ea88ad7";
 // WavesSwapRouter.quoteBest((address,address,uint24,int24,address)[],uint256)
 const SEL_QUOTE_BEST = "0x33a3a81b";
+// swap2(PoolKey,PoolKey,uint256,address) / quoteBest2(PoolKey,PoolKey[],uint256)
+const SEL_SWAP2 = "0xe235cc1c";
+const SEL_QUOTE_BEST2 = "0x09edbcc5";
+/* The middle of every two-hop route. Everything on this chain without a usable
+ * ETH market trades against USDG, so there is one intermediate rather than a
+ * graph to search. */
+const USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
 const SEL_TRANSFER = "0xa9059cbb";      // ERC20 transfer(address,uint256)
 const SEL_BALANCE_OF = "0x70a08231";    // ERC20 balanceOf(address)
 
@@ -69,6 +76,8 @@ const GAS_PER_TRANSFER = 21000n;
  * worth-it test and then run the keeper dry mid-payout. */
 const GAS_PER_ERC20 = 65000n;
 const GAS_SWAP = 400000n;
+// two swaps in one lock, so roughly twice the work plus the second settlement
+const GAS_SWAP2 = 700000n;
 const GAS_CLAIM = 80000n;
 
 /* How much worse than the quote a fill is allowed to be. The keeper is the only
@@ -133,6 +142,17 @@ function encQuoteBest(keys, amountIn) {
 }
 
 const encSwap = (key, minOut, to) => SEL_SWAP + encKey(key) + pad(minOut) + encAddr(to);
+
+/* Two static PoolKeys inline, so no offsets — unlike quoteBest2 below, whose
+ * array is dynamic and needs one. Both checked against `cast calldata`. */
+const encSwap2 = (a, b, minOut, to) =>
+  SEL_SWAP2 + encKey(a) + encKey(b) + pad(minOut) + encAddr(to);
+
+function encQuoteBest2(nearKey, farKeys, amountIn) {
+  // head: keyA (5 words) + offset + amountIn = 7 words, so the array starts at 224
+  return SEL_QUOTE_BEST2 + encKey(nearKey) + pad(224) + pad(amountIn) +
+    pad(farKeys.length) + farKeys.map(encKey).join("");
+}
 const encTransfer = (to, amount) => SEL_TRANSFER + encAddr(to) + pad(amount);
 const word = (d, i) => BigInt("0x" + String(d).replace(/^0x/, "").slice(i * 64, i * 64 + 64));
 
@@ -274,8 +294,21 @@ async function ethPoolsFor(asset) {
    * swap arbitrarily, and this is other people's money — the sweeper found a
    * hookless ETH pool for every asset that has one at all, so nothing is lost
    * by refusing them. */
-  return ((hit && hit.ethPools) || []).filter(
-    (k) => k.hooks === ZERO_ADDR && Number(k.fee) <= MAX_POOL_FEE);
+  const usable = (k) => k.hooks === ZERO_ADDR && Number(k.fee) <= MAX_POOL_FEE;
+  return {
+    direct: ((hit && hit.ethPools) || []).filter(usable),
+    viaUsdg: ((hit && hit.usdgPools) || []).filter(usable)
+  };
+}
+
+/* The near leg of every two-hop route: ETH into USDG. Read from the same file
+ * and cached for the run, because every hopped asset shares it. */
+let nearLegP = null;
+function ethToUsdgLeg() {
+  if (!nearLegP) {
+    nearLegP = ethPoolsFor(USDG).then((p) => p.direct).catch(() => []);
+  }
+  return nearLegP;
 }
 
 /**
@@ -334,6 +367,74 @@ async function bestPool(keys, amountIn) {
     }
   }
   return best;
+}
+
+/**
+ * The best route to an asset: straight from ETH, or through USDG.
+ *
+ * ⚠️ Two hops is not a fallback, it is a competitor.
+ *
+ * Six assets have no ETH pool at all — MSFT among them — so a creator picking
+ * one had their holders paid ETH forever with nobody told. Others have ETH
+ * pools that are empty, or that charge seventy per cent, which the fee cap
+ * rightly refuses. For all of those the route through USDG is the only way the
+ * promise gets kept.
+ *
+ * But it is also priced against the direct route rather than used only when
+ * that fails, because two fees and two lots of price impact usually lose and
+ * occasionally win. Whichever actually pays holders more is the one taken.
+ */
+async function bestRoute(asset, amountIn) {
+  if (!SWAP_ROUTER) return null;
+  const legs = await ethPoolsFor(asset);
+
+  const direct = await bestPool(legs.direct, amountIn);
+  let hopped = null;
+
+  if (legs.viaUsdg.length && String(asset).toLowerCase() !== USDG) {
+    const near = await ethToUsdgLeg();
+    const nearBest = await bestPool(near, amountIn);
+    if (nearBest) {
+      /* Two at a time. Each of these simulates BOTH hops, so it is twice the
+       * work of a single quote and the gas cap bites twice as fast. */
+      const LIMIT = 2;
+      for (let i = 0; i < legs.viaUsdg.length && i < 24; i += LIMIT) {
+        const batch = legs.viaUsdg.slice(i, i + LIMIT);
+        let out = null;
+        try {
+          out = await rpc("eth_call", [{
+            to: SWAP_ROUTER, data: encQuoteBest2(nearBest.key, batch, amountIn)
+          }, "latest"]);
+        } catch (e) { out = null; }
+        if (out && out !== "0x") {
+          const got = word(out, 1);
+          const key = batch[Number(word(out, 0))];
+          if (got > 0n && (!hopped || got > hopped.out)) {
+            hopped = { out: got, near: nearBest.key, far: key };
+          }
+          continue;
+        }
+        for (const far of batch) {
+          try {
+            const one = await rpc("eth_call", [{
+              to: SWAP_ROUTER, data: encQuoteBest2(nearBest.key, [far], amountIn)
+            }, "latest"]);
+            if (!one || one === "0x") continue;
+            const got = word(one, 1);
+            if (got > 0n && (!hopped || got > hopped.out)) {
+              hopped = { out: got, near: nearBest.key, far };
+            }
+          } catch (e) { /* this leg cannot be priced; the others still can */ }
+        }
+      }
+    }
+  }
+
+  if (hopped && (!direct || hopped.out > direct.out)) {
+    return { kind: "usdg", out: hopped.out, key: hopped.near, keyB: hopped.far };
+  }
+  if (direct) return { kind: "direct", out: direct.out, key: direct.key };
+  return null;
 }
 
 async function mined(hash) {
@@ -497,7 +598,8 @@ export default async function handler(req, res) {
      * money it had already claimed. */
     const swapping = shares.filter((s) => assets[s.mint] && SWAP_ROUTER).length;
     const perHolder = swapping ? GAS_PER_ERC20 : GAS_PER_TRANSFER;
-    const gasCost = (GAS_CLAIM + GAS_SWAP * BigInt(swapping) +
+    // budget the dearer of the two routes; which one wins is not known until quoted
+    const gasCost = (GAS_CLAIM + GAS_SWAP2 * BigInt(swapping) +
       perHolder * BigInt(holderCount)) * gasPrice;
     if (pot < gasCost * WORTH_IT) {
       return res.status(200).json({
@@ -579,9 +681,8 @@ async function runSwaps(db, planKey, plan, keeper) {
       let pending = plan.swaps[sl.mint];
 
       if (!pending) {
-        const keys = await ethPoolsFor(sl.asset);
-        const best = await bestPool(keys, amountIn);
-        if (!best) { plan.swaps[sl.mint] = { skipped: "no pool could fill" }; continue; }
+        const best = await bestRoute(sl.asset, amountIn);
+        if (!best) { plan.swaps[sl.mint] = { skipped: "no route could fill" }; continue; }
 
         /* minOut off the live quote. Never zero: the mempool is public and an
          * unprotected swap of someone else's payout is a free lunch. */
@@ -602,12 +703,15 @@ async function runSwaps(db, planKey, plan, keeper) {
         const beforeHex = await rpc("eth_call", [
           { to: sl.asset, data: SEL_BALANCE_OF + encAddr(keeper) }, "latest"]);
 
+        const data = best.kind === "usdg"
+          ? encSwap2(best.key, best.keyB, minOut, keeper)
+          : encSwap(best.key, minOut, keeper);
         const { raw, hash } = await signKeeperTx(
-          SWAP_ROUTER, encSwap(best.key, minOut, keeper), amountIn, GAS_SWAP);
+          SWAP_ROUTER, data, amountIn, best.kind === "usdg" ? GAS_SWAP2 : GAS_SWAP);
 
         // written down BEFORE it exists on chain — that is the whole point
         pending = {
-          hash, raw, asset: sl.asset, quoted: best.out.toString(),
+          hash, raw, asset: sl.asset, route: best.kind, quoted: best.out.toString(),
           before: BigInt(beforeHex || "0x0").toString(), done: false
         };
         plan.swaps[sl.mint] = pending;
@@ -639,7 +743,7 @@ async function runSwaps(db, planKey, plan, keeper) {
         plan.swaps[sl.mint] = { skipped: "nothing arrived", hash: pending.hash };
       } else {
         plan.swaps[sl.mint] = {
-          hash: pending.hash, asset: sl.asset,
+          hash: pending.hash, asset: sl.asset, route: pending.route,
           received: received.toString(), quoted: pending.quoted, done: true
         };
       }
