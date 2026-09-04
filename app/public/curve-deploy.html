@@ -118,7 +118,11 @@ a{color:var(--accent)}
   var ETHER = 1000000000000000000n;
   var ARGS = {
     platform: null,                       // filled from the chain's feeTo below
-    graduationEth: 4n * ETHER,
+    /* 3.5 ETH — about a $39,000 market cap at graduation, chosen over 4 ETH
+     * ($47,500) to shorten the climb without making a real Uniswap pool cheap
+     * to buy. It is a constructor argument with no setter, so this number is
+     * fixed for every token this curve ever launches. */
+    graduationEth: 3500000000000000000n,
     virtualEth: 1410000000000000000n,     // 1.41
     virtualTokens: 1073000000n * ETHER,
     curveSupply: 1000000000n * ETHER,
@@ -145,14 +149,14 @@ a{color:var(--accent)}
     .then(function (r) { return r.json(); })
     .then(function (j) {
       var px = Number(j.data.amount);
-      var vt = 1073000000, cs = 1000000000, ve = 1.41, grad = 4;
+      var vt = 1073000000, cs = 1000000000, ve = 1.41, grad = 3.5;
       var open = (ve / vt) * px * cs;
       var sold = vt - (ve * vt) / (ve + grad);
       var gradMc = ((ve + grad) / (vt - sold)) * px * cs;
       var m = function (n) { return "$" + Math.round(n).toLocaleString(); };
       $("d-open").textContent = m(open) + " market cap";
       $("d-grad").textContent = m(gradMc) + " market cap";
-      $("d-raise").textContent = "4 ETH (" + m(grad * px) + ")";
+      $("d-raise").textContent = grad + " ETH (" + m(grad * px) + ")";
       $("d-note").textContent =
         "At ETH $" + px.toLocaleString() + ". These figures move with ETH — the " +
         "parameters are fixed, the dollar values are not. They were chosen " +
