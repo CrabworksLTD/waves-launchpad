@@ -62,11 +62,11 @@ async function draw() {
       g.fillRect(p[0], p[1], MS, MS);
     });
   }
+  // blurred only — no sharp mark on top (matches the launch share cards)
   g.save();
   g.filter = "blur(52px)";
-  markAt(350, 60, 515);          // the large blurred cast shadow, offset down-right
+  markAt(350, 60, 515);
   g.restore();
-  markAt(210, 0, 420);           // the sharp mark, flush to the bottom-left, on top
 
   // WAVES dead centre of the card
   g.fillStyle = "#fff";

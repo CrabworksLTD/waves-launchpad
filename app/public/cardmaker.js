@@ -98,34 +98,26 @@
     if (banner) {
       drawCover(g, banner, 0, 0, W, H);
     } else {
-      /* No banner: the WAVES logo, drawn in the CHAIN's own gradient and blurred
-       * to fill the frame — so the background always reads as Solana or Robinhood
-       * and looks the same whether or not the launch has a PFP. A PFP only ever
-       * appears in its tile below; it is never washed across the card. The three
-       * squares climb bottom-left → top-right like the mark; blur turns them into
-       * a soft logo, and the sharp staircase sits over it. */
-      /* The WAVES mark as the background: three squares climbing bottom-left →
-       * top-right, corners touching (step +MS, -MS), each a slice of one
-       * continuous chain gradient, scaled up and placed like the reference. It
-       * is drawn twice at the SAME spot — a blurred copy underneath for a soft
-       * glow, then a sharp copy on top. */
-      function mark(MS, x0, y0) {
-        [0, 1, 2].forEach(function (i) {
-          var px = x0 + i * MS, py = y0 - i * MS;
-          var lg = g.createLinearGradient(px, py + MS, px + MS, py);
-          lg.addColorStop(0, pal.stops[i]);
-          lg.addColorStop(1, pal.stops[i + 1]);
-          g.fillStyle = lg;
-          g.fillRect(px, py, MS, MS);
-        });
-      }
-      // the large blurred copy behind — a cast shadow, offset down-right
+      /* No banner: the WAVES logo as a soft brand background — the mark drawn in
+       * the CHAIN's own gradient and heavily blurred to fill the frame, so the
+       * card always reads as Solana or Robinhood whether or not the launch has a
+       * PFP (a PFP only ever fills its tile below, never washes the card). Three
+       * squares climbing bottom-left → top-right, corners touching (step +MS,
+       * -MS), each a slice of one continuous chain gradient. Blurred only — no
+       * sharp copy on top (that was tried; the soft logo alone read cleaner). */
+      var lg;
       g.save();
       try { g.filter = "blur(52px)"; } catch (e) {}
-      mark(350, 60, 515);
+      var MS = 350, x0 = 60, y0 = 515;
+      [0, 1, 2].forEach(function (i) {
+        var px = x0 + i * MS, py = y0 - i * MS;
+        lg = g.createLinearGradient(px, py + MS, px + MS, py);
+        lg.addColorStop(0, pal.stops[i]);
+        lg.addColorStop(1, pal.stops[i + 1]);
+        g.fillStyle = lg;
+        g.fillRect(px, py, MS, MS);
+      });
       g.restore();
-      // the sharp logo that casts it — at its original staircase position
-      mark(210, 0, 420);
     }
 
     // scrim: the body sits on darkness. There is always a branded background now

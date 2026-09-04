@@ -112,7 +112,8 @@
       { label: "Tokens",      href: "/tokens" },
       { label: "Collections", href: "/collections" },
       { label: "Staking",     href: "/stake" },
-      { label: "Claim fees",   href: "/fees" }
+      { label: "Claim fees",   href: "/fees" },
+      { label: "Editor",      href: "/app" }
     ]},
     { id: "docs",        label: "Docs",        href: "/docs" },
     { id: "faq",         label: "FAQ",         href: "/faq" }
