@@ -569,7 +569,7 @@ export default async function handler(req, res) {
           tbl[sl.mint] = (await db.hgetall("rhix:" + sl.mint + ":h").catch(() => null)) || {};
         }
         await runSwaps(db, planKey, p, keeper);
-        buildPayments(p, tbl);
+        await buildPayments(db, p, tbl);
         await db.set(planKey, JSON.stringify(p));
       }
       const done = await payOut(db, planKey, p);
@@ -686,17 +686,20 @@ export default async function handler(req, res) {
         wei: ((pot * s.wei) / attributed).toString(),
         asset: assets[s.mint] || null
       })),
-      swaps: {}, payments: null, sent: 0
+      swaps: {}, payments: null, sent: 0,
+      // what a transfer costs, so the dust threshold survives into a resumed run
+      gasPriceWei: gasPrice.toString()
     };
     await db.set(planKey, JSON.stringify(record));
 
     await runSwaps(db, planKey, record, keeper);
-    buildPayments(record, tables);
+    await buildPayments(db, record, tables);
     await db.set(planKey, JSON.stringify(record));
 
     const done = await payOut(db, planKey, record);
     return res.status(200).json({
-      ok: true, keeper, claimHash, swaps: record.swaps, ...done, log
+      ok: true, keeper, claimHash, swaps: record.swaps,
+      carriedToNextRun: record.carried || 0, ...done, log
     });
   } catch (e) {
     return res.status(200).json({ ok: false, error: String(e.message || e).slice(0, 300), log });
@@ -815,8 +818,27 @@ async function runSwaps(db, planKey, plan, keeper) {
  * swept into the next run rather than being sent as a transfer that costs more
  * gas than it moves.
  */
-function buildPayments(plan, tables) {
+async function buildPayments(db, plan, tables) {
   const payments = [];
+
+  /* ⚠️ Dust is carried, not dropped and not redistributed.
+   *
+   * A holder owed less than the gas it takes to send costs more to pay than
+   * they receive — at 50 holders that tail is most of the bill. But skipping
+   * them and splitting their share among the rest would quietly take small
+   * holders' money and give it to large ones, which is worse than the gas.
+   *
+   * So their amount is remembered and added to what they are owed next time,
+   * until it clears the threshold. The tokens are already in the keeper, and
+   * because each swap measures its OWN delta a carried balance sitting there
+   * cannot inflate a later payout.
+   *
+   * The threshold is in the asset's own units, derived from this run's actual
+   * swap rate — no oracle, no second quote. */
+  const carryKey = "rhk:carry";
+  const carried = (await db.hgetall(carryKey).catch(() => null)) || {};
+  const nextCarry = {};
+  const gasPrice = BigInt(plan.gasPriceWei || "0");
 
   for (const sl of plan.slices || []) {
     const table = tables[sl.mint] || {};
@@ -830,14 +852,38 @@ function buildPayments(plan, tables) {
     const asset = swapped ? sw.asset : null;
     const total = swapped ? BigInt(sw.received) : BigInt(sl.wei);
 
+    /* What one transfer costs, expressed in whatever is being sent. For an
+     * asset that is the gas converted at the rate this run's own swap got; for
+     * ETH the two are the same currency already. */
+    const sendGas = asset ? GAS_PER_ERC20 : GAS_PER_TRANSFER;
+    const gasInEth = sendGas * gasPrice;
+    const threshold = (asset && BigInt(sl.wei) > 0n)
+      ? (total * gasInEth) / BigInt(sl.wei)
+      : gasInEth;
+
     for (const [addr, held] of Object.entries(table)) {
-      const amount = (total * BigInt(held)) / supply;
-      if (amount > 0n) {
-        payments.push({ to: addr, wei: amount.toString(), mint: sl.mint, asset });
+      const share = (total * BigInt(held)) / supply;
+      const ck = (asset || "eth") + ":" + addr;
+      const owed = share + BigInt(carried[ck] || "0");
+      if (owed <= 0n) continue;
+
+      if (owed < threshold) {
+        nextCarry[ck] = owed.toString();     // wait for it to be worth sending
+        continue;
       }
+      payments.push({ to: addr, wei: owed.toString(), mint: sl.mint, asset });
     }
   }
+
+  /* Written now, not after paying. A payment already includes whatever was
+   * carried, and the plan survives a failure and is retried with the same
+   * amounts — so clearing here cannot lose anyone's balance. */
+  const stale = Object.keys(carried).filter((k) => !(k in nextCarry));
+  if (Object.keys(nextCarry).length) await db.hset(carryKey, nextCarry);
+  if (stale.length) await db.hdel(carryKey, ...stale);
+
   plan.payments = payments;
+  plan.carried = Object.keys(nextCarry).length;
   plan.sent = plan.sent || 0;
 }
 

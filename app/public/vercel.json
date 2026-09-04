@@ -87,7 +87,7 @@
     },
     {
       "path": "/api/rh-keeper",
-      "schedule": "0 9 * * *"
+      "schedule": "0 * * * *"
     }
   ]
 }

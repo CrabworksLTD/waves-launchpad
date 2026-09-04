@@ -43,6 +43,7 @@ const HOP_OUT = 5_000_000_000_000_000n;
 /* Set by the second pass below: replays the run with every ERC20 transfer
  * reverting, which is what actually happened on the first mainnet payout. */
 let REVERT_TRANSFERS = false;
+let GAS_PRICE_HIGH = false;
 const revertedHashes = new Set();
 
 const store = new Map();
@@ -51,6 +52,8 @@ const db = {
   set: async (k, v) => void store.set(k, v),
   del: async (k) => void store.delete(k),
   hgetall: async (k) => store.get(k) || null,
+  hset: async (k, o) => { store.set(k, { ...(store.get(k) || {}), ...o }); },
+  hdel: async (k, ...f) => { const h = store.get(k) || {}; for (const x of f) delete h[x]; store.set(k, h); },
   lpush: async () => {}, ltrim: async () => {},
   lrange: async () => [
     JSON.stringify({ mint: A, chain: "robinhood", feeSharePct: 100, block: 1000, rewardMint: USDG }),
@@ -95,7 +98,10 @@ async function stubFetch(url, opts) {
   const reply = (result) => ({ ok: true, json: async () => ({ jsonrpc: "2.0", id: 1, result }) });
 
   if (method === "eth_blockNumber") return reply("0x" + (2000).toString(16));
-  if (method === "eth_getBlockByNumber") return reply({ baseFeePerGas: "0x1" });
+  if (method === "eth_getBlockByNumber") {
+    // high enough that a millionth of the pot is not worth a transfer
+    return reply({ baseFeePerGas: GAS_PRICE_HIGH ? "0x3B9ACA00" : "0x1" });
+  }
   if (method === "eth_getBalance") return reply("0x" + (100n * ETH).toString(16));
   if (method === "eth_getTransactionCount") return reply("0x0");
   if (method === "eth_getTransactionReceipt") {
@@ -284,6 +290,44 @@ check("the plan was cleared once everything was paid", !plan);
  * a reverted transfer advanced `sent`, moved the cursors, deleted the plan and
  * reported success — the worst possible failure mode, because nothing after it
  * would ever retry. */
+/* ── dust ───────────────────────────────────────────────────────────────────
+ *
+ * A holder owed less than the gas to send it should be carried to the next run,
+ * not paid at a loss and not quietly redistributed to the bigger holders. */
+console.log("\n  a holder too small to be worth a transfer:\n");
+
+store.clear();
+const TINY = "0x9999999999999999999999999999999999999999";
+/* H1 holds nearly everything; TINY holds a millionth, so its slice of the
+ * payout is worth far less than a transfer costs. */
+store.set("rhix:" + A + ":h", { [H1]: (100000n * ETH).toString(), [TINY]: ETH.toString() });
+store.set("rhix:" + B + ":h", { [H3]: (10n * ETH).toString() });
+store.set("rhix:" + C + ":h", { [H4]: (10n * ETH).toString() });
+for (const t of [A, B, C]) store.set("rhk:" + t + ":cursor", "1000");
+signedTxs.length = 0; sent.length = 0; signCount = 0;
+GAS_PRICE_HIGH = true;          // make a transfer expensive relative to the pot
+
+const res3 = { code: 0, body: null, status(c){this.code=c;return this;}, json(b){this.body=b;return this;} };
+await handler({ headers: {}, query: {} }, res3);
+
+const paid3 = Object.fromEntries(signedTxs
+  .filter((t) => String(t.data || "").startsWith("0xa9059cbb"))
+  .map(decodeTransfer).map((x) => [x.to, x.amount]));
+const carry = store.get("rhk:carry") || {};
+
+check("the dust holder was not paid at a loss", !paid3[TINY],
+  "TINY got " + (paid3[TINY] || 0n));
+check("their share is carried, not lost",
+  Object.keys(carry).some((k) => k.endsWith(TINY)),
+  "carry keys: " + Object.keys(carry).length);
+check("the big holder was still paid", (paid3[H1] || 0n) > 0n);
+/* ⚠️ The failure mode this guards: skipping dust and letting the remaining
+ * holders absorb it takes small holders' money and hands it to large ones. */
+check("the dust was NOT redistributed to the big holder",
+  (paid3[H1] || 0n) < USDG_OUT, "H1 got " + (paid3[H1] || 0n) + " of " + USDG_OUT);
+
+GAS_PRICE_HIGH = false;
+
 console.log("\n  replaying with every ERC20 transfer reverting:\n");
 
 store.clear();
