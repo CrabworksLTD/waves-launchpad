@@ -184,6 +184,50 @@ async function indexToken(db, rec, curveAddr) {
 }
 
 export default async function handler(req, res) {
+  /* Reading the table is not indexing it.
+   *
+   * The sweep walks the chain and costs real time; the token page just wants
+   * the count and the top holders, which is one hash read. Keeping them on the
+   * same endpoint but different verbs means a page load never triggers a walk
+   * it then has to wait for.
+   *
+   * Percentages are of TOTAL SUPPLY, matching api/indexer.js — against the
+   * circulating float they add to 100% and read as though the token is fully
+   * distributed while the curve still holds most of it. */
+  const want = (req.query && req.query.holders) || null;
+  if (want) {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(want)) return res.status(400).json({ error: "bad token" });
+    try {
+      const db = await kv();
+      const table = (await db.hgetall("rhix:" + want.toLowerCase() + ":h")) || {};
+      const rows = Object.entries(table)
+        .map(([owner, amt]) => ({ owner, amt: BigInt(amt) }))
+        .filter((r) => r.amt > 0n)
+        .sort((a, b) => (b.amt > a.amt ? 1 : b.amt < a.amt ? -1 : 0));
+
+      /* The denominator is the token's own totalSupply, asked of the token.
+       * Summing the table would give the float, which is the wrong basis and
+       * also wrong in a different way while the cursor is behind. */
+      let supply = 0;
+      try {
+        const hex = await rpc("eth_call", [{ to: want, data: "0x18160ddd" }, "latest"]);
+        supply = Number(BigInt(hex || "0x0")) / 1e18;
+      } catch (e) { /* leave 0; percentages come out as 0 rather than wrong */ }
+
+      return res.status(200).json({
+        ok: true,
+        holders: rows.length,
+        supply,
+        top: rows.slice(0, 20).map((r) => {
+          const amount = Number(r.amt) / 1e18;
+          return { owner: r.owner, amount, pct: supply ? (amount / supply) * 100 : 0 };
+        })
+      });
+    } catch (e) {
+      return res.status(200).json({ ok: false, error: String(e.message || e).slice(0, 140) });
+    }
+  }
+
   const secret = process.env.CRON_SECRET;
   const authed = !secret || req.headers.authorization === "Bearer " + secret;
   const only = (req.query && req.query.token) || null;

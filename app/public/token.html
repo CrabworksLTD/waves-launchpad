@@ -610,9 +610,11 @@ input:focus{outline:none;border-color:var(--accent)}
     }
     var sym = ($("sym").textContent || "").replace(/^\$/, "");
     box.innerHTML = top.map(function (h, i) {
+      var href = IS_EVM
+        ? window.MoonpadToken.chain().explorer + "/address/" + h.owner
+        : "https://explorer.solana.com/address/" + h.owner;
       return '<a class="hrow' + (h.pct >= 10 ? " big" : "") +
-        '" href="https://explorer.solana.com/address/' + esc(h.owner) +
-        '" target="_blank" rel="noopener">' +
+        '" href="' + esc(href) + '" target="_blank" rel="noopener">' +
         '<span class="rk">' + (i + 1) + "</span>" +
         '<span class="who">' + esc(shortWho(h.owner)) + "</span>" +
         '<span class="amt2">' + UI.fmt(h.amount, 0) + " " + esc(sym) + "</span>" +
@@ -651,6 +653,33 @@ input:focus{outline:none;border-color:var(--accent)}
     $("tf-note").textContent = "…";
     loadStats();
   });
+
+  /* Holders on Robinhood.
+   *
+   * /api/stats is fed by the Solana indexer, so this number was a permanent "—"
+   * on the other chain. api/rh-indexer.js keeps the equivalent table — built
+   * from Transfer logs, because an ERC20 has no way to ask who holds it — and
+   * now answers ?holders= with the count and the top twenty.
+   *
+   * If the table is empty the token may simply never have been swept: the cron
+   * only sweeps launches that pledged. Ask for a run for THIS token, once, the
+   * same shape healIfEmpty() uses on Solana. */
+  var rhHealed = false;
+  async function loadEvmHolders() {
+    try {
+      var d = await fetch("/api/rh-indexer?holders=" + encodeURIComponent(MINT))
+        .then(function (r) { return r.json(); });
+      if ((!d || !d.holders) && !rhHealed) {
+        rhHealed = true;
+        await fetch("/api/rh-indexer?token=" + encodeURIComponent(MINT));
+        d = await fetch("/api/rh-indexer?holders=" + encodeURIComponent(MINT))
+          .then(function (r) { return r.json(); }).catch(function () { return d; });
+      }
+      if (!d || !d.ok) return;
+      $("s-holders").textContent = d.holders == null ? "—" : d.holders.toLocaleString();
+      drawHolders({ holders: d.holders, top: d.top });
+    } catch (e) { /* the page keeps its dash */ }
+  }
 
   function loadTrades() {
     /* ⚠️ Only Solana needs a pool here.
@@ -818,10 +847,41 @@ input:focus{outline:none;border-color:var(--accent)}
       renderFees();          // the numbers may have resolved before this paint
     }
 
+    /* Named, but honest about the currency that actually arrives. */
+    function paintEvmAsset(sym) {
+      box.innerHTML = "<b>Holder rewards are active</b>" +
+        "<span>Paid in " + esc(QUOTE) + " for now — " + esc(sym) +
+        " payouts arrive when conversion is live.</span>" +
+        '<div class="rfees" hidden>' +
+          '<div><span>Fees accrued</span><b class="rf-accrued">—</b></div>' +
+          '<div><span>Distributed</span><b class="rf-dist">—</b></div>' +
+        "</div>";
+      box.hidden = false;
+      var slash = $("rsym");
+      if (slash) { slash.textContent = "/" + QUOTE; slash.hidden = false; }
+      renderFees();
+    }
+
     if (!asset) return paint(null, true);
-    // the picker's list carries both the ticker and whether anything trades it
-    // RWA reward assets are a Solana-side feature; paint the plain state
-    if (IS_EVM) return paint(null, true);
+    /* ⚠️ On Robinhood the keeper pays ETH, whatever was picked.
+     *
+     * The launch window says fees are "converted into this before your holders
+     * are paid", and api/rh-keeper.js does no such thing — it claims the pot and
+     * sends plain ETH transfers. There is no swap step yet. So name the asset
+     * the creator chose, and say plainly what is actually landing in holders'
+     * wallets, rather than announcing a payout that is not happening. */
+    if (IS_EVM) {
+      return fetch("/rh-assets.json").then(function (r) { return r.json(); })
+        .then(function (j) {
+          var hit = (j.tokens || []).find(function (t) {
+            return String(t.mint).toLowerCase() === String(asset).toLowerCase();
+          });
+          if (!hit || String(asset).toLowerCase() === "0x0000000000000000000000000000000000000000") {
+            return paint(null, true);
+          }
+          paintEvmAsset(hit.symbol);
+        }).catch(function () { paint(null, true); });
+    }
     window.Token.rwa().then(function (list) {
       var hit = (list || []).find(function (t) { return t.mint === asset; });
       if (!hit) return paint(null, true);
@@ -1049,6 +1109,8 @@ input:focus{outline:none;border-color:var(--accent)}
     /* Indexed history if we have it, the chain if we do not — a token launched
      * between cron runs still shows its trades. */
     loadStats().then(function (ok) { if (!ok) loadTrades(); });
+    // the Solana indexer feeds loadStats(); Robinhood has its own holder table
+    if (IS_EVM) loadEvmHolders();
     loadPairedCollection();
 
     if (market.migrated) {

@@ -2485,6 +2485,11 @@
         feeSharePct: flow.feeSharePct || 0,
         firstBuySol: flow.tbuy,
         rewardMode: flow.rewardMode === "burn" ? "burn" : "dividend",
+      /* The asset they chose in the picker. Recorded for the same reason the
+       * Solana path records it and dropped for no reason at all: without it the
+       * token page has nothing to name and falls back to the quote currency, so
+       * a creator who picked one thing is told their holders earn another. */
+      rewardMint: (flow.reward && flow.reward.mint) || null,
         // a burn buys the token itself, so there is no reward asset to name
         rewardMint: flow.reward ? flow.reward.mint : null,
         feeWallet: flow.feeWallet || null,
