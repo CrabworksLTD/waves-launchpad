@@ -105,11 +105,11 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
   <section id="evm-wrap" hidden>
     <h2 class="disp">Robinhood Chain</h2>
     <div class="frow" id="evm-claim">
-      <div class="fmeta">
+      <span class="who">
         <b>Claimable across all your launches</b>
-        <span class="k2">One balance for every token you have launched here.</span>
-      </div>
-      <div class="famt"><span class="amt" id="evm-owed">reading…</span></div>
+        <span>One balance for every token you have launched here.</span>
+      </span>
+      <span class="owed"><b id="evm-owed">…</b><span>accrued</span></span>
       <button class="cl" id="evm-claim-btn" disabled>Claim</button>
     </div>
     <div id="evm-tokens"></div>
@@ -386,11 +386,19 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
       return;
     }
 
+    /* The same skeleton row() builds for Solana — coin, who, owed, action.
+     *
+     * This used to invent .fmeta/.famt/.k2, none of which the stylesheet
+     * defines, so the row got no layout at all and the name, address and status
+     * ran together in one wrapping clump. */
     $("evm-tokens").innerHTML = mine.map(function (t) {
+      var sym = (t.symbol || "?").toUpperCase();
       return '<div class="frow" data-mint="' + esc(t.mint) + '">' +
-        '<div class="fmeta"><b>' + esc(t.name) + ' · $' + esc(t.symbol) + '</b>' +
-        '<span class="k2 mono">' + esc(shortAddr(t.mint)) + '</span></div>' +
-        '<div class="famt"><span class="amt rw">reading…</span></div>' +
+        '<span class="coin">' + (t.icon ? '<img alt="" src="' + esc(t.icon) + '">'
+          : esc(sym.slice(0, 1))) + "</span>" +
+        '<span class="who"><b>$' + esc(sym) + " · " + esc(t.name) + "</b>" +
+        "<span>" + esc(shortAddr(t.mint)) + "</span></span>" +
+        '<span class="owed"><b class="rw">…</b><span>holder share</span></span>' +
         '<button class="act" disabled>Activate holder rewards</button></div>';
     }).join("");
 
@@ -402,12 +410,17 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
         var act = el.querySelector(".act");
         if (!c) { amt.textContent = "—"; return; }
         if (c.rewardsBps > 0) {
-          amt.textContent = (c.rewardsBps / 100) + "% to holders";
-          act.textContent = "Rewards active";
-          act.disabled = true;
+          /* Pledged: the same badge the Solana row shows, in place of the
+           * button — there is nothing left to press, and a disabled button
+           * reads like something that failed. */
+          var pct = c.rewardsBps / 100;
+          amt.textContent = pct + "%";
+          act.outerHTML = '<span class="shared" title="The keeper claims these fees ' +
+            'and pays ' + pct + '% to holders automatically; your ' + (100 - pct) +
+            '% arrives at your fee wallet in the same run.">' + pct + '% AUTO-SHARED</span>';
           return;
         }
-        amt.textContent = "you keep everything";
+        amt.textContent = "none";
         act.disabled = false;
         act.onclick = function () { openEvmActivate(el, mint, act, rec); };
       }).catch(function () { el.querySelector(".rw").textContent = "—"; });
@@ -438,7 +451,11 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
   /* A pledge cannot be undone, so it is confirmed rather than fired off a
    * single click — the same care the Solana side takes over the equivalent. */
   function openEvmActivate(rowEl, mint, btn, rec) {
-    if (rowEl.querySelector(".actbox")) return;
+    if (rowEl.nextElementSibling &&
+        rowEl.nextElementSibling.classList.contains("actbox")) {
+      rowEl.nextElementSibling.remove();
+      return;
+    }
     var box = document.createElement("div");
     box.className = "actbox";
     /* Default to the share they chose in the launch window. That choice was
@@ -448,20 +465,28 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
     var opts = [2500, 5000, 7500, 10000];
     if (opts.indexOf(chosen) === -1) chosen = 10000;
 
+    /* .opts / .go / .cancel are what the stylesheet dresses, and they are what
+     * the Solana box uses. This asked for .ptabs / .acts / .go2 / .no2, none of
+     * which exist here, so every button fell through to the default .frow
+     * button rule and came out as an identical green pill — Cancel included. */
     box.innerHTML =
+      "<b>Pay your holders from every trade</b>" +
       "<p>Give holders of this token a share of every trading fee it earns, " +
       ((rec || {}).rewardMode === "burn"
         ? "used to buy the token back and burn it. "
         : "paid out to them in ETH. ") +
-      "Choose the share once — it cannot be changed or undone.</p>" +
-      '<div class="ptabs evm-share">' +
+      "Choose the share once — <b>it cannot be changed or undone.</b></p>" +
+      '<div class="opts evm-share">' +
       opts.map(function (b) {
         return '<button data-b="' + b + '"' + (b === chosen ? ' class="on"' : "") + ">" +
-          (b / 100) + "%</button>";
+          (b === 10000 ? "All to holders"
+            : (b / 100) + "% holders · " + (100 - b / 100) + "% you") + "</button>";
       }).join("") + "</div>" +
-      '<div class="acts"><button class="go2">Activate</button>' +
-      '<button class="no2">Cancel</button></div>';
-    rowEl.appendChild(box);
+      '<button class="go">Activate</button>' +
+      '<button class="cancel">Cancel</button>';
+    /* After the row, not inside it. .frow is a flex container, so appending put
+     * the panel in the row as another flex item, squeezing the token beside it. */
+    rowEl.insertAdjacentElement("afterend", box);
 
     var bps = chosen;
     box.querySelector(".evm-share").addEventListener("click", function (e) {
@@ -472,9 +497,9 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
         x.className = x === b ? "on" : "";
       });
     });
-    box.querySelector(".no2").onclick = function () { box.remove(); };
-    box.querySelector(".go2").onclick = async function () {
-      var go = box.querySelector(".go2");
+    box.querySelector(".cancel").onclick = function () { box.remove(); };
+    box.querySelector(".go").onclick = async function () {
+      var go = box.querySelector(".go");
       go.disabled = true; go.textContent = "Confirm…";
       say("", "");
       try {
@@ -484,8 +509,8 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
         await window.MoonpadToken.waitForTx(hash);
         say("ok", "Holder rewards are on for this token.");
         box.remove();
-        rowEl.querySelector(".rw").textContent = (bps / 100) + "% to holders";
-        btn.textContent = "Rewards active"; btn.disabled = true;
+        rowEl.querySelector(".rw").textContent = (bps / 100) + "%";
+        btn.outerHTML = '<span class="shared">' + (bps / 100) + '% AUTO-SHARED</span>';
       } catch (e) {
         var m = String(e.message || e);
         if (/reject|denied/i.test(m)) m = "You cancelled the transaction.";

@@ -701,6 +701,25 @@ input:focus{outline:none;border-color:var(--accent)}
    * same honesty the launch window owes the creator. */
   async function drawRewards(rec) {
     var pct = rec && rec.feeSharePct;
+
+    /* ⚠️ On Robinhood the pledge is on the curve, not in the listing.
+     *
+     * A Solana creator activates rewards through /api/rewards, which writes the
+     * share back into the record — so feeSharePct is current. The Robinhood
+     * activate flow is one on-chain call and touches nothing of ours, so the
+     * record keeps whatever it was launched with, which for a creator who
+     * pledged afterwards is 0. Reading the record alone hid the badge on a
+     * token that was demonstrably paying its holders.
+     *
+     * rewardsBps is the same number, from the contract that enforces it, and it
+     * cannot disagree with itself. */
+    if (IS_EVM) {
+      try {
+        await tkReady;
+        var cv = await window.MoonpadToken.curveOf(rec.mint);
+        if (cv && cv.rewardsBps > 0) pct = cv.rewardsBps / 100;
+      } catch (e) { /* keep whatever the record said */ }
+    }
     if (!pct || pct <= 0) return;
 
     /* Intent is not the same as active.
@@ -720,7 +739,7 @@ input:focus{outline:none;border-color:var(--accent)}
      * $MOAR's rewards were live, verified creator == keeper, yet the indicator
      * showed only intermittently). Fall back to the live check only for older
      * records saved before this flag existed. */
-    var active = !!rec.rewardsActivatedAt;
+    var active = !!rec.rewardsActivatedAt || (IS_EVM && pct > 0);
     if (!active) {
       try {
         active = IS_EVM
