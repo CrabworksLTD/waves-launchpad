@@ -479,7 +479,11 @@ input:focus{outline:none;border-color:var(--accent)}
    * directly, which is what the page always did. A launch minutes old should
    * not look dead while it waits for the first cron. */
   var tf = "all";
-  var QUOTE = "SOL";                    // replaced by the pool's real quote symbol
+  /* Replaced by the pool's real quote symbol once the market is read — but seed
+   * it from the chain, which is knowable from the mint alone. drawRewards()
+   * paints well before that read returns, so a Robinhood token announced "SOL
+   * rewards are active" and wore $TICKER/SOL next to its name. */
+  var QUOTE = IS_EVM ? "ETH" : "SOL";
   var USD = null;                       // quote asset in dollars, from the indexer
 
   /* Money, written the way people read it.
@@ -649,7 +653,19 @@ input:focus{outline:none;border-color:var(--accent)}
   });
 
   function loadTrades() {
-    if (!poolHint) { $("hist-note").textContent = "no pool recorded"; return; }
+    /* ⚠️ Only Solana needs a pool here.
+     *
+     * On Solana the trades ARE the pool's swaps, so without one there is
+     * nothing to read. A Robinhood curve has no pool until it graduates — it
+     * emits its own Bought/Sold events and the address is the curve's — so this
+     * gate switched the feed off for the entire life of every token on that
+     * chain, which is also its whole trading history.
+     *
+     * It took the chart with it: the price series below is built from these
+     * trades, and loadStats() has no indexed points to fall back on for a chain
+     * the indexer does not cover. So a token with real volume showed an empty
+     * chart, 0 trades and no price change. */
+    if (!IS_EVM && !poolHint) { $("hist-note").textContent = "no pool recorded"; return; }
     (IS_EVM
       ? tkReady.then(function () { return tk.recentTrades(MINT, 15); })
       : window.Token.recentTrades(MINT, poolHint, 15)).then(function (list) {
@@ -659,6 +675,18 @@ input:focus{outline:none;border-color:var(--accent)}
         return;
       }
       $("hist-note").textContent = "";
+      /* Volume and the trade count, from the trades themselves.
+       *
+       * loadStats() fills these from the indexer, which does not cover
+       * Robinhood — so they sat at "$0 / 0 trades" next to a feed visibly
+       * listing trades. Only written when the indexer has not already spoken. */
+      if (IS_EVM) {
+        var since = Date.now() - 86400000;
+        var day = list.filter(function (t) { return t.at >= since; });
+        var vol = day.reduce(function (a, t) { return a + (t.sol || 0); }, 0);
+        $("s-vol").textContent = USD ? money(vol * USD) : native(vol);
+        $("s-trades").textContent = day.length + " trade" + (day.length === 1 ? "" : "s");
+      }
       /* Same reads, two uses: oldest first, price = SOL per token. Trades with
        * no token or no SOL side (a pool creation, say) carry no price. */
       var series = list.filter(function (t) { return t.tokens > 0 && t.sol > 0; })
@@ -668,7 +696,8 @@ input:focus{outline:none;border-color:var(--accent)}
         drawPrice(series);
         var first = series[0].price, now = series[series.length - 1].price;
         var chg = first > 0 ? ((now - first) / first) * 100 : 0;
-        $("s-price").textContent = now.toPrecision(3);
+        // in dollars when the rate is known, like every other figure on the row
+        $("s-price").textContent = USD ? money(now * USD) : now.toPrecision(3);
         var cel = $("s-chg");
         if (cel) {
           cel.textContent = (chg >= 0 ? "+" : "") + chg.toFixed(1) + "%";
@@ -676,7 +705,9 @@ input:focus{outline:none;border-color:var(--accent)}
         }
       }
       $("hist").innerHTML = list.map(function (t) {
-        return '<a class="trow" href="https://explorer.solana.com/tx/' + esc(t.sig) +
+        var txHref = IS_EVM ? tk.txUrl(t.sig)
+          : "https://explorer.solana.com/tx/" + t.sig;
+        return '<a class="trow" href="' + esc(txHref) +
           '" target="_blank" rel="noopener">' +
           '<span class="dir ' + t.side + '">' + (t.side === "buy" ? "↗" : "↙") + "</span>" +
           '<span class="amt"><b>' + UI.fmt(t.tokens, 2) + " " +
@@ -978,7 +1009,7 @@ input:focus{outline:none;border-color:var(--accent)}
     $("bar").style.width = (market.progress * 100).toFixed(1) + "%";
     $("pct").textContent = (market.progress * 100).toFixed(1) + "% to graduation";
     drawCurve(market.progress);
-    QUOTE = market.quote || "SOL";
+    QUOTE = market.quote || (IS_EVM ? "ETH" : "SOL");
     // the rate, so a token the indexer has not seen still shows dollars
     if (USD == null) {
       try {
