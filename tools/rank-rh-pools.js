@@ -39,6 +39,13 @@ const ZERO = "0x" + "0".repeat(40);
 // what to price with: small enough to be a fair read of a thin pool
 const AMOUNT = 10n ** 15n;             // 0.001 ETH
 
+/* Matches MAX_POOL_FEE in api/rh-keeper.js. A pool the keeper will not use must
+ * not count towards an asset being buyable, or the picker promises a payout the
+ * keeper then declines to make. V4 fees are hundredths of a bip, so this is 10%
+ * — every normal asset on this chain wins between 0.01% and 5.01%; the handful
+ * above that are 20% and 70% pools which would eat most of a payout. */
+const MAX_POOL_FEE = 100000;
+
 const pad = (v) => BigInt(v).toString(16).padStart(64, "0");
 const ad = (x) => String(x).replace(/^0x/, "").toLowerCase().padStart(64, "0");
 const encKey = (k) => ad(k.currency0) + ad(k.currency1) + pad(k.fee) + pad(k.tickSpacing) + ad(k.hooks);
@@ -90,15 +97,18 @@ async function main() {
   let liquid = 0, dry = [];
   for (let i = 0; i < assets.length; i++) {
     const t = assets[i];
-    const hookless = (t.ethPools || []).filter((k) => k.hooks === ZERO);
+    const hookless = (t.ethPools || []).filter(
+      (k) => k.hooks === ZERO && Number(k.fee) <= MAX_POOL_FEE);
     const scored = [];
     for (const k of hookless) scored.push({ k, out: await quoteOne(k) });
 
     /* Best first. Empty pools keep their place at the back rather than being
      * removed — this is one reading of a market that moves. */
     scored.sort((a, b) => (b.out > a.out ? 1 : b.out < a.out ? -1 : 0));
-    const hooked = (t.ethPools || []).filter((k) => k.hooks !== ZERO);
-    t.ethPools = scored.map((s) => s.k).concat(hooked);
+    // kept, but behind everything the keeper would actually use
+    const rest = (t.ethPools || []).filter(
+      (k) => !(k.hooks === ZERO && Number(k.fee) <= MAX_POOL_FEE));
+    t.ethPools = scored.map((s) => s.k).concat(rest);
 
     const best = scored.length ? scored[0].out : 0n;
     t.liquid = best > 0n;

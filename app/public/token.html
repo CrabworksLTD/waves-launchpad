@@ -847,39 +847,23 @@ input:focus{outline:none;border-color:var(--accent)}
       renderFees();          // the numbers may have resolved before this paint
     }
 
-    /* Named, but honest about the currency that actually arrives. */
-    function paintEvmAsset(sym) {
-      box.innerHTML = "<b>Holder rewards are active</b>" +
-        "<span>Paid in " + esc(QUOTE) + " for now — " + esc(sym) +
-        " payouts arrive when conversion is live.</span>" +
-        '<div class="rfees" hidden>' +
-          '<div><span>Fees accrued</span><b class="rf-accrued">—</b></div>' +
-          '<div><span>Distributed</span><b class="rf-dist">—</b></div>' +
-        "</div>";
-      box.hidden = false;
-      var slash = $("rsym");
-      if (slash) { slash.textContent = "/" + QUOTE; slash.hidden = false; }
-      renderFees();
-    }
-
     if (!asset) return paint(null, true);
-    /* ⚠️ On Robinhood the keeper pays ETH, whatever was picked.
-     *
-     * The launch window says fees are "converted into this before your holders
-     * are paid", and api/rh-keeper.js does no such thing — it claims the pot and
-     * sends plain ETH transfers. There is no swap step yet. So name the asset
-     * the creator chose, and say plainly what is actually landing in holders'
-     * wallets, rather than announcing a payout that is not happening. */
+    /* The keeper really does convert now — it swaps each token's slice through
+     * the V4 router before paying holders. But not every asset can be bought:
+     * some have ETH pools that are all empty, and some only have pools that
+     * charge so much the payout is worth less than the ETH it came from. The
+     * list carries `liquid` for exactly that, and the same wording the Solana
+     * side uses for an asset with no market is the honest thing to show. */
     if (IS_EVM) {
       return fetch("/rh-assets.json").then(function (r) { return r.json(); })
         .then(function (j) {
           var hit = (j.tokens || []).find(function (t) {
-            return String(t.mint).toLowerCase() === String(asset).toLowerCase();
+            return String(t.address).toLowerCase() === String(asset).toLowerCase();
           });
           if (!hit || String(asset).toLowerCase() === "0x0000000000000000000000000000000000000000") {
             return paint(null, true);
           }
-          paintEvmAsset(hit.symbol);
+          paint(hit.symbol, hit.liquid !== false);
         }).catch(function () { paint(null, true); });
     }
     window.Token.rwa().then(function (list) {

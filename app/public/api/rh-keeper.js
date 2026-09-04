@@ -78,6 +78,20 @@ const GAS_CLAIM = 80000n;
 const SLIPPAGE_BPS = 300n;
 
 const ZERO_ADDR = "0x" + "0".repeat(40);
+
+/* ⚠️ The most a pool may charge before the payout is worse than not swapping.
+ *
+ * V4 fees are hundredths of a bip, so 100000 is 10%. That sounds generous until
+ * you look at the chain: of 177 fillable reward assets, every normal one wins on
+ * a tier between 0.01% and 5.01% — the equities cluster tightly around 4.8%.
+ * Four are different. SPY, NFLX and INTC have nothing better than a 70% pool and
+ * MCD nothing better than 20%.
+ *
+ * quoteBest picks by output, so it would have chosen those quite correctly: they
+ * ARE the best available price. But "best available" and "worth doing" are not
+ * the same question when the answer costs holders seventy per cent of their
+ * money. ETH is better than that, so those assets fall back. */
+const MAX_POOL_FEE = 100000;
 /* The pot must be worth this many times the gas to move it. Below that the run
  * waits: forwarding a dollar at a cost of a dollar helps nobody. */
 const WORTH_IT = 5n;
@@ -256,10 +270,12 @@ async function ethPoolsFor(asset) {
   }
   const hit = (assetCache.tokens || []).find(
     (t) => String(t.address).toLowerCase() === String(asset).toLowerCase());
-  /* Hookless only. A hook can charge, reject or reprice a swap arbitrarily, and
-   * this is other people's money — the sweeper found a hookless ETH pool for
-   * every asset that has one at all, so nothing is lost by refusing them. */
-  return ((hit && hit.ethPools) || []).filter((k) => k.hooks === ZERO_ADDR);
+  /* Hookless only, and not extortionate. A hook can charge, reject or reprice a
+   * swap arbitrarily, and this is other people's money — the sweeper found a
+   * hookless ETH pool for every asset that has one at all, so nothing is lost
+   * by refusing them. */
+  return ((hit && hit.ethPools) || []).filter(
+    (k) => k.hooks === ZERO_ADDR && Number(k.fee) <= MAX_POOL_FEE);
 }
 
 /**
