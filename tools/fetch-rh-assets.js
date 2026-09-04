@@ -36,6 +36,21 @@ const MIN_LIQUIDITY = 1000;          // dollars; below this a payout cannot be s
 // ETH rewards simply does not pledge into a swap.
 const SKIP = new Set(["0x0bd7d308f8e1639fab988df18a8011f41eacad73"]);
 
+/* ⚠️ Stablecoins by ADDRESS, never by name.
+ *
+ * The first version classified anything whose name matched /dollar/ as a
+ * stablecoin, and the picker filled up with "22 MILLION DOLLARS IN 3 HOURS",
+ * "Gold Dollar" and "NL Dollars" — memecoins, listed under the one category a
+ * creator would trust without looking. That is the same "a ticker is not an
+ * identity" mistake this whole file exists to prevent, made one level up in the
+ * classifier instead of in the list.
+ *
+ * An equity can be recognised by its name because Robinhood issues it and says
+ * so. Nothing else can, so nothing else is guessed at. */
+const STABLES = {
+  "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "USDG"
+};
+
 let id = 0;
 async function rpc(method, params) {
   const r = await fetch(RPC, {
@@ -180,8 +195,9 @@ async function onChain(address) {
       out.splice(out.indexOf(prior), 1);   // the impostor was seen first
       console.log(`  drop ${chain.symbol} at ${prior.address} — duplicate ticker`);
     }
-    if (!isReal && !/dollar/i.test(chain.name || "")) {
-      console.log(`  skip ${chain.symbol} — not a Robinhood equity or a stablecoin`);
+    const isStable = Object.prototype.hasOwnProperty.call(STABLES, address);
+    if (!isReal && !isStable) {
+      console.log(`  skip ${chain.symbol} — not a Robinhood equity or a known stablecoin`);
       continue;
     }
 
@@ -196,6 +212,24 @@ async function onChain(address) {
     };
     out.push(rec);
     bySymbol.set(chain.symbol, rec);
+  }
+
+  /* The stablecoins are the point of the category, so they do not depend on
+   * whether the swept window happened to include a pool that used one. USDG
+   * was missing from the first run for exactly that reason. */
+  for (const [address, symbol] of Object.entries(STABLES)) {
+    if (out.some((t) => t.address === address)) continue;
+    await new Promise((r) => setTimeout(r, 120));
+    const chain = await onChain(address);
+    if (!chain || chain.symbol !== symbol) {
+      console.log(`  WARNING: ${symbol} did not verify at ${address}`);
+      continue;
+    }
+    out.push({
+      address, symbol: chain.symbol, name: chain.name,
+      decimals: chain.decimals, pools: seen.get(address) || 0, kind: "stable"
+    });
+    console.log(`  added ${symbol} (allowlisted stablecoin)`);
   }
 
   out.sort((a, b) => b.pools - a.pools || a.symbol.localeCompare(b.symbol));

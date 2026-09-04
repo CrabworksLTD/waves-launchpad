@@ -249,22 +249,66 @@
     var royaltyBps = Math.round((opts.royaltyPercent || 5) * 100);
     opts._identity = umi.identity.publicKey;
 
-    /* ⚠️ ONE-TX-AT-A-TIME, on purpose. Folding these into a single
-     * signAllTransactions approval was tried (2026-09-03) and REVERTED: Phantom
-     * blocked it as "this dApp could be malicious." The deploy transactions are
-     * DEPENDENT — the machine references the collection, config lines reference
-     * the machine — so a batch presents Phantom transactions that reference
-     * accounts earlier ones in the same batch have not created yet. Blowfish
-     * simulates them all against CURRENT chain state, those simulations fail,
-     * and it flags the whole request. Sending one at a time and confirming
-     * before the next means every simulation sees the accounts it needs. (The
-     * mint flow CAN batch because its mints are independent.) A devnet keypair
-     * test missed this — Blowfish only runs in the real wallet. So: 5–6
-     * approvals, and that is the cost of Phantom not blocking the launch. */
+    /* THREE signatures for a normal launch (five with dev mints), and Phantom-
+     * SAFE — where naive batching was not. Folding the deploy into one
+     * signAllTransactions was tried and blocked (2026-09-03): Phantom simulates
+     * each tx in a batch against CURRENT state, so the machine tx (referencing
+     * the not-yet-created collection) failed and the request was flagged. The
+     * fix is not to batch dependent transactions but to put dependent steps
+     * INSIDE one transaction — a single tx runs its instructions in order, which
+     * Phantom simulates correctly:
+     *   1. collection + createCandyGuard in ONE tx (the guard is a PDA of the
+     *      machine's address, so it needs only the pubkey, not the account).
+     *   2. machine + wrap in ONE tx (wrap sees the machine created earlier in
+     *      the same tx). Skipped when there are dev mints — see below.
+     *   3. all config lines, batched via signAllTransactions — the ONE thing it
+     *      is safe for: independent txs that each reference the existing machine.
+     * Verified end to end on devnet by tools/deploy-combine-smoke.js. ⚠️ Never
+     * put a DEPENDENT tx in the batch — that is the thing that gets blocked. */
 
-    /* ---- 1. collection ---- */
-    progress({ step: "collection", state: "signing" });
+    /* signAllTransactions for INDEPENDENT txs only (config lines, dev mints —
+     * each references the already-existing machine). Falls back to one-at-a-time
+     * for wallets without it; each is a valid single tx. */
+    async function batch(items) {
+      items = items.filter(Boolean);
+      if (!items.length) return;
+      if (typeof umi.identity.signAllTransactions !== "function") {
+        for (var i = 0; i < items.length; i++) {
+          await items[i].b.sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
+        }
+        return;
+      }
+      var CAP = 12;                                  // blockhash-window safety
+      for (var s = 0; s < items.length; s += CAP) {
+        var chunk = items.slice(s, s + CAP);
+        var bh = await umi.rpc.getLatestBlockhash();
+        var unsigned = [];
+        for (var j = 0; j < chunk.length; j++) {
+          var tx = chunk[j].b.setBlockhash(bh).build(umi);
+          var sgs = chunk[j].signers || [];
+          for (var k = 0; k < sgs.length; k++) tx = await sgs[k].signTransaction(tx);
+          unsigned.push(tx);
+        }
+        var signed = await umi.identity.signAllTransactions(unsigned);
+        for (var n = 0; n < signed.length; n++) {
+          var sig = await umi.rpc.sendTransaction(signed[n], { maxRetries: 5 });
+          await umi.rpc.confirmTransaction(sig, {
+            strategy: { type: "blockhash", blockhash: bh.blockhash, lastValidBlockHeight: bh.lastValidBlockHeight },
+            commitment: "confirmed"
+          });
+        }
+      }
+    }
+
     var collection = mx.generateSigner(umi);
+    var candyMachine = mx.generateSigner(umi);
+    var built = buildGuards(mx, opts);
+    var candyGuard = mx.findCandyGuardPda(umi, { base: candyMachine.publicKey });
+    var devMints = (opts.devMints || []).filter(function (d) { return d.count > 0; });
+    var devTotal = devMints.reduce(function (a, d) { return a + d.count; }, 0);
+
+    /* ---- 1. collection + guard, one signature ---- */
+    progress({ step: "collection", state: "signing" });
     await mx.createCollection(umi, {
       collection: collection,
       name: opts.name,
@@ -280,13 +324,16 @@
         // None means marketplaces are asked, not forced — enforcing breaks transfers.
         ruleSet: { __kind: "None" }
       }]
-    }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
+    })
+      .add(mx.createCandyGuard(umi, { base: candyMachine, guards: built.guards, groups: built.groups }))
+      .sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
     progress({ step: "collection", state: "done", address: collection.publicKey });
 
-    /* ---- 2. the machine, WITHOUT its guard (dev mints need us as mint authority) ---- */
+    /* ---- 2. the machine, wrapped in the SAME tx when there are no dev mints.
+     * With dev mints the wrap is deferred, because a dev mint needs US as the
+     * mint authority — the wrap hands it to the guard. ---- */
     progress({ step: "machine", state: "signing" });
-    var candyMachine = mx.generateSigner(umi);
-    await (await mx.createCandyMachine(umi, {
+    var cmBuilder = await mx.createCandyMachine(umi, {
       candyMachine: candyMachine,
       collection: collection.publicKey,
       collectionUpdateAuthority: umi.identity,
@@ -294,10 +341,16 @@
       authority: umi.identity.publicKey,
       isMutable: true,
       configLineSettings: lineSettings(mx, opts.name, opts.baseUri, supply)
-    })).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
+    });
+    if (devTotal === 0) {
+      cmBuilder = cmBuilder.add(mx.wrap(umi, { candyGuard: candyGuard, candyMachine: candyMachine.publicKey }));
+    }
+    await cmBuilder.sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
     progress({ step: "machine", state: "done", address: candyMachine.publicKey });
 
-    /* ---- 3. config lines ---- */
+    /* ---- 3. config lines, batched (one signature; a few for a huge set) ---- */
+    progress({ step: "lines", state: "signing" });
+    var lineOps = [];
     var total = Math.ceil(supply / LINES_PER_TX);
     for (var b = 0; b < total; b++) {
       var start = b * LINES_PER_TX;
@@ -306,13 +359,9 @@
         var id = i + 1;
         lines.push({ name: String(id), uri: id + ".json" });
       }
-      progress({ step: "lines", state: "uploading", batch: b + 1, batches: total });
-      await mx.addConfigLines(umi, {
-        candyMachine: candyMachine.publicKey,
-        index: start,
-        configLines: lines
-      }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
+      lineOps.push({ b: mx.addConfigLines(umi, { candyMachine: candyMachine.publicKey, index: start, configLines: lines }), signers: [] });
     }
+    await batch(lineOps);
     var cm = await mx.fetchCandyMachine(umi, candyMachine.publicKey);
     if (Number(cm.itemsLoaded) !== supply) {
       throw new Error("Loaded " + cm.itemsLoaded + " of " + supply +
@@ -320,44 +369,31 @@
     }
     progress({ step: "lines", state: "done", loaded: cm.itemsLoaded });
 
-    /* ---- 4. creator supply, minted before the guard so it bypasses price/limits ---- */
-    var devMints = (opts.devMints || []).filter(function (d) { return d.count > 0; });
-    var devTotal = devMints.reduce(function (a, d) { return a + d.count; }, 0);
+    /* ---- 4. dev mints (batched), then the wrap (only when there are dev mints) ---- */
     if (devTotal > 0) {
-      var minted = 0;
+      progress({ step: "dev", state: "signing", batches: devTotal });
+      var devOps = [];
       for (var di = 0; di < devMints.length; di++) {
         for (var k = 0; k < devMints[di].count; k++) {
-          minted++;
-          progress({ step: "dev", state: "uploading", batch: minted, batches: devTotal });
           var devAsset = mx.generateSigner(umi);
-          await (await mx.mintAssetFromCandyMachine(umi, {
+          var mb = (await mx.mintAssetFromCandyMachine(umi, {
             candyMachine: candyMachine.publicKey,
             mintAuthority: umi.identity,
             asset: devAsset,
             assetOwner: mx.publicKey(devMints[di].to || umi.identity.publicKey),
             collection: collection.publicKey
-          }))
-            .prepend(mx.setComputeUnitLimit(umi, { units: 800000 }))
-            .sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
+          })).prepend(mx.setComputeUnitLimit(umi, { units: 800000 }));
+          devOps.push({ b: mb, signers: [devAsset] });
         }
       }
+      await batch(devOps);                           // independent mints, one approval
       progress({ step: "dev", state: "done", minted: devTotal });
+      // wrap on its own: it changes the mint authority, so keep it a plain single
+      // tx Phantom simulates cleanly rather than bundling it with the mints
+      progress({ step: "guard", state: "signing" });
+      await mx.wrap(umi, { candyGuard: candyGuard, candyMachine: candyMachine.publicKey })
+        .sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
     }
-
-    /* ---- 5. the guard, and hand it the mint authority ---- */
-    progress({ step: "guard", state: "signing" });
-    var built = buildGuards(mx, opts);
-    var guardBase = candyMachine;                  // guard PDA derives from this
-    await mx.createCandyGuard(umi, {
-      base: guardBase,
-      guards: built.guards,
-      groups: built.groups
-    }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
-    var candyGuard = mx.findCandyGuardPda(umi, { base: guardBase.publicKey });
-    await mx.wrap(umi, {
-      candyGuard: candyGuard,
-      candyMachine: candyMachine.publicKey
-    }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
     progress({ step: "guard", state: "done" });
 
     return {

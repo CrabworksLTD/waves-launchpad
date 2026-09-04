@@ -2116,29 +2116,60 @@
       <p class="sub">Trading fees are converted into this before your holders
       are paid. Every asset here is verified on chain and has a live market.</p>
       <input id="lp-q" type="search" placeholder="Search…" autocomplete="off">
-      <div id="lp-list" class="picklist"><div class="none">Loading…</div></div>
+      <div class="ptabs" id="lp-tabs">
+        <button data-t="all" class="on">All</button>
+        <button data-t="stable">Stablecoins</button>
+        <button data-t="equity">Stocks &amp; ETFs</button>
+      </div>
+      <div class="plist" id="lp-list"><p class="note" style="padding:12px">Loading…</p></div>
+      <p class="note" id="lp-count"></p>
       <div class="acts"><button id="lp-x">Back</button></div>
     `);
     box.querySelector("#lp-x").onclick = function () { tokenDetails(flow); };
 
+    var tab = "all";
     loadRhAssets().then(function (list) {
-      function paint(q) {
-        q = (q || "").trim().toLowerCase();
-        var rows = list.filter(function (t) {
-          return !q || t.symbol.toLowerCase().indexOf(q) >= 0 ||
-                 (t.name || "").toLowerCase().indexOf(q) >= 0;
-        });
-        box.querySelector("#lp-list").innerHTML = rows.length
-          ? rows.map(function (t) {
-              return '<button class="pickrow" data-a="' + esc(t.address) + '">' +
-                "<span><b>" + esc(t.symbol) + "</b> <span class=\"k2\">" +
-                esc((t.name || "").replace(/ • Robinhood Token$/, "")) + "</span></span>" +
-                '<span class="k2 mono">' + esc(shortAddr(t.address)) + "</span></button>";
-            }).join("")
-          : '<div class="none">Nothing matches that.</div>';
+      /* Same three columns the Solana picker uses — ticker, name, then the
+       * detail that matters. There it is depth; here it is how many pools use
+       * the asset, which is the closest thing to "can this actually be sold". */
+      function rowHtml(t) {
+        var name = (t.name || "").replace(/ • Robinhood Token$/, "");
+        return '<button class="prow" data-a="' + esc(t.address) + '">' +
+          "<b>" + esc(t.symbol) + "</b><span>" + esc(name) + "</span>" +
+          '<i class="' + (t.pools >= 3 ? "" : "dim") + '">' +
+          esc(t.pools + (t.pools === 1 ? " pool" : " pools")) + "</i></button>";
       }
-      paint("");
-      box.querySelector("#lp-q").addEventListener("input", function (e) { paint(e.target.value); });
+      function head(label, n) {
+        return '<div class="phead">' + label + " · " + n + "</div>";
+      }
+      function paint() {
+        var q = (box.querySelector("#lp-q").value || "").trim().toLowerCase();
+        var rows = list.filter(function (t) {
+          if (tab !== "all" && t.kind !== tab) return false;
+          return !q || (t.symbol + " " + (t.name || "")).toLowerCase().indexOf(q) >= 0;
+        });
+        var stable = rows.filter(function (t) { return t.kind === "stable"; });
+        var equity = rows.filter(function (t) { return t.kind === "equity"; });
+        var html = "";
+        // stablecoins first: the least surprising thing to be paid in
+        if (stable.length) html += head("Stablecoins", stable.length) + stable.map(rowHtml).join("");
+        if (equity.length) html += head("Stocks & ETFs", equity.length) + equity.map(rowHtml).join("");
+        box.querySelector("#lp-list").innerHTML =
+          html || '<p class="note" style="padding:12px">Nothing matches that.</p>';
+        box.querySelector("#lp-count").textContent =
+          rows.length + " of " + list.length + " assets · every one verified on chain";
+      }
+      paint();
+      box.querySelector("#lp-q").addEventListener("input", paint);
+      box.querySelector("#lp-tabs").addEventListener("click", function (e) {
+        var b = e.target.closest("button[data-t]");
+        if (!b) return;
+        tab = b.dataset.t;
+        [].slice.call(box.querySelectorAll("#lp-tabs button")).forEach(function (x) {
+          x.className = x === b ? "on" : "";
+        });
+        paint();
+      });
       box.querySelector("#lp-list").addEventListener("click", function (e) {
         var b = e.target.closest("button[data-a]");
         if (!b) return;
