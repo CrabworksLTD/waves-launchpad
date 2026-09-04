@@ -313,10 +313,24 @@
       var block = await ask("eth_getBlockByNumber", ["latest", false]);
       var base = BigInt((block && block.baseFeePerGas) || 0);
       if (base > 0n) {
-        var tip;
+        /* ⚠️ A node that answers ZERO is not a node that failed to answer.
+         *
+         * This treated both the same and replaced either with a tenth of the
+         * base fee. Nobody on this chain pays a priority fee — every tip in the
+         * last twenty blocks was zero, and eth_maxPriorityFeePerGas says zero —
+         * so that tenth was pure overpayment, and it scaled with the base fee,
+         * meaning it cost the most exactly when gas was already expensive. On a
+         * 5 gwei spike it added half a gwei to every transaction for nothing.
+         *
+         * So: use what the node says, floored at a small ABSOLUTE amount rather
+         * than a percentage. Only a node that refuses the question gets the
+         * generous fallback, because then we genuinely do not know. */
+        var tip = null;
         try { tip = BigInt(await ask("eth_maxPriorityFeePerGas", [])); }
-        catch (e) { tip = 0n; }
-        if (tip <= 0n) tip = base / 10n + 1n;
+        catch (e) { tip = null; }
+        var MIN_TIP = 10000000n;                  // 0.01 gwei
+        if (tip === null) tip = base / 10n + 1n;  // the node would not say
+        else if (tip < MIN_TIP) tip = MIN_TIP;
         tx.maxPriorityFeePerGas = "0x" + tip.toString(16);
         /* A modest ceiling, deliberately.
          *

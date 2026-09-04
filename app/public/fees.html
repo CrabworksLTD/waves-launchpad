@@ -180,27 +180,12 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
       "<p>Hands this pool's creator role to the WAVES keeper, which claims the " +
       "fees hourly and pays your holders pro-rata. One signature. " +
       "<b>This cannot be undone.</b></p>" +
-      '<div class="opts">' +
-        [25, 50, 75, 100].map(function (p) {
-          return '<button data-p="' + p + '"' + (p === 100 ? ' class="on"' : "") + ">" +
-            (p === 100 ? "All to holders" : p + "% holders · " + (100 - p) + "% you") +
-            "</button>";
-        }).join("") +
-      "</div>" +
       '<button class="go">Activate</button>' +
       '<button class="cancel">Cancel</button>' +
       '<div class="amsg" style="margin-top:10px;font-size:12.5px"></div>';
     rowEl.insertAdjacentElement("afterend", box);
 
     var msg = box.querySelector(".amsg");
-    box.querySelector(".opts").addEventListener("click", function (e) {
-      var b = e.target.closest("button[data-p]");
-      if (!b) return;
-      pct = +b.dataset.p;
-      box.querySelectorAll(".opts button").forEach(function (x) {
-        x.classList.toggle("on", x === b);
-      });
-    });
     box.querySelector(".cancel").onclick = function () { box.remove(); };
 
     box.querySelector(".go").onclick = async function () {
@@ -458,45 +443,20 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
     }
     var box = document.createElement("div");
     box.className = "actbox";
-    /* Default to the share they chose in the launch window. That choice was
-     * recorded with the launch precisely so it did not have to be remembered
-     * and re-entered weeks later in a different screen. */
-    var chosen = Math.round((Number((rec || {}).feeSharePct) || 100) * 100);
-    var opts = [2500, 5000, 7500, 10000];
-    if (opts.indexOf(chosen) === -1) chosen = 10000;
-
-    /* .opts / .go / .cancel are what the stylesheet dresses, and they are what
-     * the Solana box uses. This asked for .ptabs / .acts / .go2 / .no2, none of
-     * which exist here, so every button fell through to the default .frow
-     * button rule and came out as an identical green pill — Cancel included. */
     box.innerHTML =
       "<b>Pay your holders from every trade</b>" +
       "<p>Give holders of this token a share of every trading fee it earns, " +
       ((rec || {}).rewardMode === "burn"
         ? "used to buy the token back and burn it. "
         : "paid out to them in ETH. ") +
-      "Choose the share once — <b>it cannot be changed or undone.</b></p>" +
-      '<div class="opts evm-share">' +
-      opts.map(function (b) {
-        return '<button data-b="' + b + '"' + (b === chosen ? ' class="on"' : "") + ">" +
-          (b === 10000 ? "All to holders"
-            : (b / 100) + "% holders · " + (100 - b / 100) + "% you") + "</button>";
-      }).join("") + "</div>" +
+      "One signature — <b>it cannot be undone.</b></p>" +
       '<button class="go">Activate</button>' +
       '<button class="cancel">Cancel</button>';
     /* After the row, not inside it. .frow is a flex container, so appending put
      * the panel in the row as another flex item, squeezing the token beside it. */
     rowEl.insertAdjacentElement("afterend", box);
 
-    var bps = chosen;
-    box.querySelector(".evm-share").addEventListener("click", function (e) {
-      var b = e.target.closest("button[data-b]");
-      if (!b) return;
-      bps = +b.dataset.b;
-      [].slice.call(box.querySelectorAll(".evm-share button")).forEach(function (x) {
-        x.className = x === b ? "on" : "";
-      });
-    });
+    var bps = 10000;   // all trading fees to holders — no split to choose
     box.querySelector(".cancel").onclick = function () { box.remove(); };
     box.querySelector(".go").onclick = async function () {
       var go = box.querySelector(".go");

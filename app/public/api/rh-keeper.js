@@ -247,7 +247,13 @@ async function signKeeperTx(to, data, value, gas) {
     rpc("eth_getBlockByNumber", ["latest", false])
   ]);
   const base = BigInt(block.baseFeePerGas || 0);
-  const tip = base / 10n + 1n;
+  /* A tenth of the base fee, paid on every one of these, for nothing — no
+   * transaction on this chain pays a priority fee and the node suggests zero.
+   * A small absolute floor instead, so a gas spike does not multiply what the
+   * keeper hands over on a payout run that may be a hundred transfers long. */
+  const tip = await rpc("eth_maxPriorityFeePerGas", [])
+    .then((t) => { const n = BigInt(t || 0); return n < 10000000n ? 10000000n : n; })
+    .catch(() => base / 10n + 1n);
   const raw = await account.signTransaction({
     to, data: data || "0x", value: value || 0n, gas,
     maxFeePerGas: base * 2n + tip, maxPriorityFeePerGas: tip,
