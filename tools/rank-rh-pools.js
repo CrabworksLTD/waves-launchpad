@@ -108,8 +108,22 @@ async function quoteTwo(nearKey, farKey) {
 
 async function main() {
   const doc = JSON.parse(fs.readFileSync(OUT, "utf8"));
+  /* ⚠️ An asset with no ETH pool is the whole reason two-hop routing exists.
+   *
+   * This required ethPools to be non-empty, which skipped MSFT, SATS, BND,
+   * FOMO, Jet2 and ZEC — the six that can ONLY be reached through USDG. They
+   * came out of a full ranking run with no `route` and no `liquid` at all, so
+   * the picker could say nothing about them and the one asset proven reachable
+   * by the new router was recorded as unknown.
+   *
+   * RH_ONLY=SYM,SYM re-ranks a few by name, which is what an incremental fix
+   * needs — a full pass is roughly forty minutes of rate-limited quoting. */
+  const only = (process.env.RH_ONLY || "")
+    .split(",").map((x) => x.trim().toUpperCase()).filter(Boolean);
   const assets = (doc.tokens || []).filter(
-    (t) => String(t.address).toLowerCase() !== ZERO && (t.ethPools || []).length);
+    (t) => String(t.address).toLowerCase() !== ZERO &&
+      ((t.ethPools || []).length || (t.usdgPools || []).length) &&
+      (!only.length || only.includes(String(t.symbol).toUpperCase())));
   console.log(`Pricing ${assets.length} assets through ${ROUTER}\n`);
 
   /* The near leg every two-hop route shares: the deepest ETH/USDG pool. Priced
@@ -180,7 +194,8 @@ async function main() {
     "(direct / usdg / none) and `liquid` whether either can fill at all.";
   fs.writeFileSync(OUT, JSON.stringify(doc, null, 2) + "\n");
 
-  console.log(`\n${liquid}/${assets.length} assets can actually be bought with ETH`);
+  console.log(`\n${liquid}/${assets.length} assets can actually be bought with ETH` +
+    (only.length ? " (partial run: " + only.join(", ") + ")" : ""));
   console.log(`${viaUsdg} of them pay better through USDG than directly`);
   if (dry.length) {
     console.log(`\n⚠️  ${dry.length} have pools but none that can fill — holders ` +
