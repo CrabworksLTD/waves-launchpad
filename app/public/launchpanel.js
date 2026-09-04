@@ -2058,7 +2058,7 @@
       <div class="ptabs" id="lp-tabs">
         <button data-t="all" class="on">All</button>
         <button data-t="native">ETH</button>
-        <button data-t="stable">Stablecoins</button>
+        <button data-t="stable">USDG</button>
         <button data-t="equity">Stocks &amp; ETFs</button>
       </div>
       <div class="plist" id="lp-list"><p class="note" style="padding:12px">Loading…</p></div>
@@ -2098,7 +2098,11 @@
          * swap, no slippage and nothing that can fail between the claim and the
          * payout. */
         if (native.length) html += head("No conversion", native.length) + native.map(rowHtml).join("");
-        if (stable.length) html += head("Stablecoins", stable.length) + stable.map(rowHtml).join("");
+        /* Named for the asset rather than the category: USDG is the only
+         * stablecoin on this chain, so "Stablecoins · 1" was a heading that
+         * hid the one thing it contained. */
+        if (stable.length) html += head(stable.length === 1 ? stable[0].symbol : "Stablecoins",
+                                        stable.length) + stable.map(rowHtml).join("");
         if (equity.length) html += head("Stocks & ETFs", equity.length) + equity.map(rowHtml).join("");
         box.querySelector("#lp-list").innerHTML =
           html || '<p class="note" style="padding:12px">Nothing matches that.</p>';
