@@ -153,6 +153,35 @@ async function mined(hash) {
 }
 
 export default async function handler(req, res) {
+  /* ?whoami — does the deployed key match the keeper pledges name on chain?
+   *
+   * Open, because it discloses nothing: the address is already in
+   * evm-chains.js and written into every pledge on a public chain. What it
+   * confirms is that the SERVER holds a key for it, which is the one thing
+   * worth knowing before a pot exists — a mismatch is permanent per token, and
+   * finding out afterwards means those holders can never be paid.
+   *
+   * It signs nothing, reads no balances and moves nothing. */
+  if (req.query && req.query.whoami) {
+    if (!process.env.RH_KEEPER_SECRET) {
+      return res.status(200).json({ ok: false, error: "RH_KEEPER_SECRET is not set" });
+    }
+    try {
+      const { privateKeyToAccount } = await import("viem/accounts");
+      const derived = privateKeyToAccount(process.env.RH_KEEPER_SECRET).address;
+      const expected = "0xAcA1d1bE05f47090a6d8D918AB26d4543fD3Af81";
+      return res.status(200).json({
+        ok: derived.toLowerCase() === expected.toLowerCase(),
+        derived, expected,
+        note: derived.toLowerCase() === expected.toLowerCase()
+          ? "the deployed key signs for the keeper on chain"
+          : "MISMATCH — pledges name an address this key cannot sign for"
+      });
+    } catch (e) {
+      return res.status(200).json({ ok: false, error: String(e.message || e).slice(0, 160) });
+    }
+  }
+
   const secret = process.env.CRON_SECRET;
   if (secret && req.headers.authorization !== "Bearer " + secret) {
     return res.status(401).json({ error: "no" });

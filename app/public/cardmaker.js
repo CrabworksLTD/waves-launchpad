@@ -97,30 +97,34 @@
      * the card is unmistakably ours. */
     if (banner) {
       drawCover(g, banner, 0, 0, W, H);
-    } else if (avatar) {
-      /* No banner but a PFP: blur it in behind — but a TIGHT blur, so the mark
-       * stays readable rather than a smear — with the staircase on top for the
-       * brand. Drawn a little less oversized than before so the mark reads. */
-      g.save();
-      try { g.filter = "blur(16px)"; } catch (e) {}
-      drawCover(g, avatar, -W * 0.18, -H * 0.18, W * 1.36, H * 1.36);
-      g.restore();
-      staircase(g, pal);
     } else {
-      /* No launch art: the WAVES logo, drawn in the CHAIN's own gradient and
-       * blurred into the same spot a PFP would fill — so a bannerless launch has
-       * a branded background that still reads as Solana or Robinhood. The three
+      /* No banner: the WAVES logo, drawn in the CHAIN's own gradient and blurred
+       * to fill the frame — so the background always reads as Solana or Robinhood
+       * and looks the same whether or not the launch has a PFP. A PFP only ever
+       * appears in its tile below; it is never washed across the card. The three
        * squares climb bottom-left → top-right like the mark; blur turns them into
-       * a soft logo. The sharp staircase sits over it. */
+       * a soft logo, and the sharp staircase sits over it. */
+      /* The WAVES mark as the background: three squares climbing bottom-left →
+       * top-right, corners touching (step +MS, -MS), each a slice of one
+       * continuous chain gradient, scaled up and placed like the reference. It
+       * is drawn twice at the SAME spot — a blurred copy underneath for a soft
+       * glow, then a sharp copy on top. */
+      var MS = 330, x0 = 110, y0 = 470;
+      function mark() {
+        [0, 1, 2].forEach(function (i) {
+          var px = x0 + i * MS, py = y0 - i * MS;
+          var lg = g.createLinearGradient(px, py + MS, px + MS, py);
+          lg.addColorStop(0, pal.stops[i]);
+          lg.addColorStop(1, pal.stops[i + 1]);
+          g.fillStyle = lg;
+          g.fillRect(px, py, MS, MS);
+        });
+      }
       g.save();
       try { g.filter = "blur(24px)"; } catch (e) {}
-      var MS = 330, cols = [pal.stops[0], pal.stops[1], pal.accent];
-      [[110, 330], [440, 110], [770, -110]].forEach(function (p, i) {
-        g.fillStyle = cols[i];
-        g.fillRect(p[0], p[1], MS, MS);
-      });
+      mark();
       g.restore();
-      staircase(g, pal);
+      mark();   // sharp, on top of its own glow
     }
 
     // scrim: the body sits on darkness. There is always a branded background now
