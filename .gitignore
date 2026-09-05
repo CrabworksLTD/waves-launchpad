@@ -14,3 +14,6 @@ program/.anchor/
 forge-out/
 lib/forge-std/
 cache/
+forge-out-v4/
+lib/v4-core/
+lib/v4-periphery/

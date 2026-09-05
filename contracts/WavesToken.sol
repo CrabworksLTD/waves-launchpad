@@ -16,7 +16,7 @@
     https://waveslaunchpad.xyz
 
 */
-pragma solidity 0.8.28;
+pragma solidity ^0.8.26;
 
 /**
  * WavesToken — a fixed-supply ERC20 for a WAVES launch on an EVM chain.

@@ -8,8 +8,11 @@ out = "forge-out"
 libs = ["lib"]
 solc_version = "0.8.28"
 optimizer = true
-optimizer_runs = 800
+optimizer_runs = 44444444
 evm_version = "paris"
+# The V4-hook curve compiles only under [profile.v4] (solc 0.8.26 + cancin).
+# Skip it here so the standalone-curve pipeline is byte-identical to before.
+skip = ["contracts/WavesCurveHook.sol", "contracts/v4lib/*", "test/WavesCurveHook.t.sol"]
 # The launch path carries five strings now (name, symbol, logo, description,
 # socials) and the legacy pipeline runs out of stack slots. viaIR is the
 # supported answer and keeps launch() flat, which matters: the browser
@@ -30,3 +33,20 @@ runs = 512
 runs = 256
 depth = 64
 fail_on_revert = false
+
+# The V4-hook curve (contracts/WavesCurveHook.sol) compiles against Uniswap
+# v4-core, which pins solc 0.8.26 and needs cancun (transient storage). Kept in
+# its own profile so the standalone-curve build above is untouched.
+#   FOUNDRY_PROFILE=v4 forge test --match-path test/WavesCurveHook.t.sol
+[profile.v4]
+src = "contracts"
+# skip the 0.8.28-pinned standalone-curve files so one solc (0.8.26) serves the
+# whole v4 unit; the hook + WavesToken are ^0.8.26 and compile fine at 0.8.26.
+skip = ["contracts/WavesCurve.sol", "contracts/WavesSwapRouter.sol", "test/WavesCurve.t.sol", "test/WavesCurve.invariant.t.sol", "test/CurveHandler.sol", "test/WavesSwapRouter.fork.t.sol", "test/MockV4.sol"]
+test = "test"
+out = "forge-out-v4"
+libs = ["lib"]
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 44444444
+via_ir = true
