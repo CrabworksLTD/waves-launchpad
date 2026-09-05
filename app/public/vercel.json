@@ -90,6 +90,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/verify",
+      "schedule": "15 * * * *"
+    },
+    {
       "path": "/api/rh-keeper",
       "schedule": "0 * * * *"
     }

@@ -93,6 +93,22 @@ function compile(name) {
   fs.mkdirSync(hexDir, { recursive: true });
   fs.writeFileSync(path.join(hexDir, name + ".hex"), bytecode);
 
+  /* The exact compiler input, shipped, so anything can submit it for
+   * verification without carrying solc.
+   *
+   * Every WavesToken a launch creates has identical source and identical
+   * settings, so this file verifies all of them — which is what makes
+   * verification automatable at all. api/verify.js posts it; putting solc in a
+   * serverless function to rebuild something that never changes would be
+   * absurd, and would risk the two descriptions drifting apart. */
+  const inputDir = path.join(root, "app", "public", "verify");
+  fs.mkdirSync(inputDir, { recursive: true });
+  fs.writeFileSync(path.join(inputDir, name + ".json"), JSON.stringify({
+    compiler: "v" + (/^v?(\d+\.\d+\.\d+\+commit\.[0-9a-f]+)/.exec(solc.version()) || [])[1],
+    contractName: name,
+    input
+  }));
+
   console.log("  " + name.padEnd(16) +
     (bytecode.length - 2) / 2 + " bytes  ->  " + path.relative(root, target));
   return { name, size: (bytecode.length - 2) / 2 };
