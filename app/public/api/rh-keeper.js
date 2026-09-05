@@ -516,9 +516,24 @@ export default async function handler(req, res) {
         }
       }
 
+      /* Which curve this deployment is actually reading. evm-chains.js and
+       * RH_CURVE are set in different places and it is entirely possible to
+       * change one and not the other — in which case the site launches tokens
+       * onto a curve the keeper never looks at, and their holders are never
+       * paid. Silent, and only visible by asking. */
+      let curve = { address: CURVE };
+      try {
+        const g = await rpc("eth_call", [{ to: CURVE, data: "0x615bb453" }, "latest"]);
+        curve.graduationEth = (Number(BigInt(g || "0x0")) / 1e18) + " ETH";
+        curve.ok = BigInt(g || "0x0") > 0n;
+      } catch (e) {
+        curve.ok = false;
+        curve.error = String(e.message || e).slice(0, 120);
+      }
+
       return res.status(200).json({
         ok: derived.toLowerCase() === expected.toLowerCase(),
-        derived, expected, router,
+        derived, expected, router, curve,
         note: derived.toLowerCase() === expected.toLowerCase()
           ? (router.ok ? "key signs for the keeper, and the swap router answers"
              : router.configured ? "key is right, but the swap router does not check out"
