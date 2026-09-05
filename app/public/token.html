@@ -827,7 +827,9 @@ input:focus{outline:none;border-color:var(--accent)}
       if (!feeData) return;
       var el = box.querySelector(".rfees");
       if (!el) return;
-      el.querySelector(".rf-accrued").textContent = feeData.accrued;
+      var ac = el.querySelector(".rf-accrued");
+      ac.textContent = feeData.accrued;
+      if (feeData.accruedTitle) ac.title = feeData.accruedTitle;
       el.querySelector(".rf-dist").textContent = feeData.distributed;
       el.hidden = false;
     }
@@ -911,8 +913,20 @@ input:focus{outline:none;border-color:var(--accent)}
       var earned = Number(rw.earnedWei) / 1e18;
       var sent = Number(rw.paidAsset) / 1e18;
       var sym = rewardTicker || "";
+      /* Accrued in the same asset as distributed, so the two are directly
+       * comparable — "how much have I earned" against "how much have I been
+       * sent" is not a question you can answer if one side is in ETH.
+       *
+       * The conversion is a real quote through the router the keeper swaps
+       * with, so it is what the next payout would actually buy rather than a
+       * rate invented from two dollar prices. The ETH figure is kept on the
+       * title, because that is what the curve genuinely accrued. */
+      var earnedInAsset = rw.earnedAsset ? Number(rw.earnedAsset) / 1e18 : null;
       return {
-        accrued: UI.fmt(earned, 5) + " ETH",
+        accrued: (earnedInAsset != null && sym)
+          ? "≈" + UI.fmt(earnedInAsset, 5) + " " + sym
+          : UI.fmt(earned, 5) + " ETH",
+        accruedTitle: UI.fmt(earned, 6) + " ETH accrued on the curve",
         distributed: sent > 0 ? UI.fmt(sent, 5) + (sym ? " " + sym : "")
           /* Nothing sent yet is the normal state between hourly runs, and
            * "0" alone reads like a failure rather than a schedule. */

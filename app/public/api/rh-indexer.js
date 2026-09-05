@@ -303,7 +303,11 @@ async function indexTrades(db, rec, curveAddr, latest) {
   try {
     const paidWei = BigInt((await db.get("rhk:" + token + ":paidWei")) || "0");
     const paidAsset = BigInt((await db.get("rhk:" + token + ":paidAsset")) || "0");
-    const assetAddr = await db.get("rhk:" + token + ":paidAssetAddr");
+    /* Whichever we know: what the keeper last paid in, or — before any payout
+     * has happened — what the creator chose at launch. Without the fallback a
+     * token that has never had a run could not name its own reward asset. */
+    const assetAddr = (await db.get("rhk:" + token + ":paidAssetAddr")) ||
+      (rec.rewardMint ? String(rec.rewardMint).toLowerCase() : null);
     const cursor = BigInt((await db.get("rhk:" + token + ":cursor")) || rec.block || 0);
 
     const c = await rpc("eth_call", [{
@@ -325,8 +329,26 @@ async function indexTrades(db, rec, curveAddr, latest) {
         pending += ((r.fee - toPlatform) * BigInt(rewardsBps)) / 10000n;
       }
     }
+    /* What the earned ETH is worth in the asset holders actually get.
+     *
+     * A real quote through the same router the keeper swaps with, not a
+     * conversion invented from two dollar prices — so the figure is what the
+     * next payout would genuinely buy, at the depth it would genuinely hit.
+     * Reusing the keeper's own routing means the number on the page and the
+     * number in the payout cannot disagree. */
+    let earnedAsset = null;
+    try {
+      const earned = paidWei + pending;
+      if (earned > 0n && assetAddr) {
+        const { bestRoute } = await import("./rh-keeper.js");
+        const r = await bestRoute(assetAddr, earned);
+        if (r && r.out > 0n) earnedAsset = r.out.toString();
+      }
+    } catch (e) { /* the ETH figure still stands on its own */ }
+
     rewards = {
       earnedWei: (paidWei + pending).toString(),
+      earnedAsset,
       pendingWei: pending.toString(),
       paidWei: paidWei.toString(),
       paidAsset: paidAsset.toString(),

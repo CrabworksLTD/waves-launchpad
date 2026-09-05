@@ -116,6 +116,9 @@ const src = fs.readFileSync(path.join(root, "app/public/api/rh-keeper.js"), "utf
   .replace('import { kv } from "./_guard.js";', "const kv = async () => db;")
   .replace(/await import\("viem\/accounts"\)/g, "viemStub")
   .replace("export const config", "const config")
+  /* new Function() cannot parse a module, so every export has to become a
+   * plain declaration — including the named one the indexer imports. */
+  .replace("export async function bestRoute", "async function bestRoute")
   .replace("export default async function handler", "async function handler");
 const handler = new Function("db", "fetch", "AbortSignal", "viemStub", "process",
   src + "; return handler;")(db, stubFetch, AbortSignal, viemStub, process);

@@ -397,7 +397,7 @@ async function bestPool(keys, amountIn) {
  * that fails, because two fees and two lots of price impact usually lose and
  * occasionally win. Whichever actually pays holders more is the one taken.
  */
-async function bestRoute(asset, amountIn) {
+export async function bestRoute(asset, amountIn) {
   if (!SWAP_ROUTER) return null;
   const legs = await ethPoolsFor(asset);
 
