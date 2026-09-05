@@ -43,7 +43,7 @@ export const config = { runtime: "nodejs" };
 import { allow, tooMany } from "./_guard.js";
 
 const RPC = process.env.RH_RPC || "https://rpc.mainnet.chain.robinhood.com";
-const CURVE = (process.env.RH_CURVE || "0x77ddd6ceb454e4b71a1952fcaafb8cf9975f55c0").toLowerCase();
+const CURVE = (process.env.RH_CURVE || "0x87c04ca8633a56c30e68919566c605fd970196d3").toLowerCase();
 const CHAIN_ID = 4663;
 
 /* Robinhood's wrapped ether. Named as the quote asset because DexScreener

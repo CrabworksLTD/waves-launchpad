@@ -259,7 +259,7 @@ export default async function handler(req, res) {
      * holders it cannot name. */
     // (no filter: the sweep is capped at 8 tokens per run either way)
 
-    const curveAddr = process.env.RH_CURVE || "0x77ddd6ceb454e4b71a1952fcaafb8cf9975f55c0";
+    const curveAddr = process.env.RH_CURVE || "0x87c04ca8633a56c30e68919566c605fd970196d3";
 
     const out = [];
     for (const t of toks.slice(0, 8)) {

@@ -175,7 +175,7 @@ window.MOONPAD_CHAINS = [
      * 0x4b90e471…c3a051 graduates into V3, and its tokens carry no on-chain
      * logo. Both still launch and trade, which is exactly why they must stay
      * unreachable — anything launched on them ends up somewhere nobody looks. */
-    curve: "0x77ddd6ceb454e4b71a1952fcaafb8cf9975f55c0",
+    curve: "0x87c04ca8633a56c30e68919566c605fd970196d3",
 
     /* Who receives a creator's pledged share, and pays it out to holders.
      *

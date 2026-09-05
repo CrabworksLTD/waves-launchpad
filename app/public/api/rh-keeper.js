@@ -43,7 +43,7 @@ import { kv } from "./_guard.js";
 export const config = { runtime: "nodejs" };
 
 const RPC = process.env.RH_RPC || "https://rpc.mainnet.chain.robinhood.com";
-const CURVE = process.env.RH_CURVE || "0x77ddd6ceb454e4b71a1952fcaafb8cf9975f55c0";
+const CURVE = process.env.RH_CURVE || "0x87c04ca8633a56c30e68919566c605fd970196d3";
 
 // Bought(address,address,uint256,uint256,uint256) / Sold(...)
 const BOUGHT = "0x7ce543d1780f3bdc3dac42da06c95da802653cd1b212b8d74ec3e3c33ad7095c";
