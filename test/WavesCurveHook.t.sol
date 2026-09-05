@@ -304,6 +304,185 @@ contract WavesCurveHookTest is Test {
         );
     }
 
+    function _sell(PoolKey memory key, address who, uint256 amt) internal {
+        vm.startPrank(who);
+        WavesToken(Currency.unwrap(key.currency1)).approve(address(swapRouter), amt);
+        swapRouter.swap(
+            key,
+            SwapParams({zeroForOne: false, amountSpecified: -int256(amt), sqrtPriceLimitX96: MAX_SQRT - 1}),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            ""
+        );
+        vm.stopPrank();
+    }
+
+    /* The core invariant. The token side is per-curve: the hook's claim balance
+     * of each token == that curve's tokensLeft. The ETH side is GLOBAL — the hook
+     * holds ONE pooled ETH-claim (currency id 0) covering every curve's raised
+     * plus all accrued fees — so it's checked against the sum, not one curve. If
+     * either drifts, money was created or destroyed. */
+    function _assertTokenConserved(address token, PoolKey memory key) internal {
+        (,,,,, , uint96 left,,) = hook.curves(key.toId());
+        assertEq(manager.balanceOf(address(hook), uint256(uint160(token))), uint256(left), "token claim != tokensLeft");
+    }
+
+    // single-curve convenience: with one curve, global ETH == this curve's books
+    function _assertConserved(address token, PoolKey memory key) internal {
+        _assertTokenConserved(token, key);
+        (,,,,, uint96 raised,,,) = hook.curves(key.toId());
+        uint256 totalOwed = hook.owed(platform) + hook.owed(creator);
+        assertEq(manager.balanceOf(address(hook), 0), uint256(raised) + totalOwed, "ETH claim != raised + owed");
+    }
+
+    // ── access control ────────────────────────────────────────────────
+    function test_only_manager_calls_beforeSwap() public {
+        (, PoolKey memory key) = _launch();
+        vm.expectRevert(WavesCurveHook.NotManager.selector);
+        hook.beforeSwap(address(this), key, SwapParams({zeroForOne: true, amountSpecified: -1, sqrtPriceLimitX96: MIN_SQRT + 1}), "");
+    }
+
+    function test_only_manager_calls_unlockCallback() public {
+        vm.expectRevert(WavesCurveHook.NotManager.selector);
+        hook.unlockCallback("");
+    }
+
+    function test_rogue_pool_on_the_hook_is_rejected() public {
+        // someone initializes their own pool pointing at our hook → NotHook
+        PoolKey memory rogue = PoolKey({
+            currency0: Currency.wrap(address(0)),
+            currency1: Currency.wrap(address(0xBEEF)),
+            fee: 0, tickSpacing: 60, hooks: IHooks(address(hook))
+        });
+        vm.expectRevert();
+        manager.initialize(rogue, MIN_SQRT + 1);
+    }
+
+    // ── revert paths ──────────────────────────────────────────────────
+    function test_bad_fee_rung_reverts() public {
+        vm.prank(creator);
+        vm.expectRevert(WavesCurveHook.BadFee.selector);
+        hook.launch("X", "X", 250, "", "", ""); // 250 is not a rung
+    }
+
+    function test_exact_output_reverts() public {
+        (, PoolKey memory key) = _launch();
+        vm.deal(buyer, 1 ether);
+        vm.prank(buyer);
+        vm.expectRevert(); // ExactOutputUnsupported (wrapped)
+        swapRouter.swap{value: 1 ether}(
+            key,
+            SwapParams({zeroForOne: true, amountSpecified: int256(1e18), sqrtPriceLimitX96: MIN_SQRT + 1}),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            ""
+        );
+    }
+
+    function test_graduate_before_full_reverts() public {
+        (address token,) = _launch();
+        vm.expectRevert(WavesCurveHook.CurveComplete.selector);
+        hook.graduate(token);
+    }
+
+    function test_graduate_twice_reverts() public {
+        (address token, ) = _launch();
+        _buy(_key(token), GRAD + 1 ether);
+        hook.graduate(token);
+        vm.expectRevert(WavesCurveHook.AlreadyGraduated.selector);
+        hook.graduate(token);
+    }
+
+    function test_claim_with_nothing_owed_is_a_noop() public {
+        uint256 before = address(0xF00D).balance;
+        vm.prank(address(0xF00D));
+        hook.claim();
+        assertEq(address(0xF00D).balance, before);
+    }
+
+    function _key(address token) internal view returns (PoolKey memory) {
+        return PoolKey({
+            currency0: Currency.wrap(address(0)),
+            currency1: Currency.wrap(token),
+            fee: 0, tickSpacing: 60, hooks: IHooks(address(hook))
+        });
+    }
+
+    // ── fee pledge split ──────────────────────────────────────────────
+    function test_pledge_splits_the_fee_to_the_keeper() public {
+        (address token, PoolKey memory key) = _launch();
+        address keeper = address(0x11EE);
+        vm.prank(creator);
+        hook.pledge(token, keeper, 10_000); // 100% of the creator side to holders
+        _buy(key, 1 ether);
+        // platform still earns; keeper now earns the whole creator side; creator ~0
+        assertGt(hook.owed(platform), 0, "platform got nothing");
+        assertGt(hook.owed(keeper), 0, "keeper (holders) got nothing");
+        assertEq(hook.owed(creator), 0, "creator kept a pledged-away share");
+    }
+
+    function test_pledge_only_creator_and_once() public {
+        (address token, ) = _launch();
+        vm.prank(address(0xBAD));
+        vm.expectRevert(WavesCurveHook.UnknownToken.selector);
+        hook.pledge(token, address(1), 100);
+        vm.prank(creator);
+        hook.pledge(token, address(1), 100);
+        vm.prank(creator);
+        vm.expectRevert(WavesCurveHook.AlreadyPledged.selector);
+        hook.pledge(token, address(2), 100);
+    }
+
+    // ── isolation, conservation, round trip ───────────────────────────
+    function test_two_tokens_do_not_interfere() public {
+        (address a, PoolKey memory ka) = _launch();
+        vm.prank(address(0xDEAD));
+        address b = hook.launch("B", "B", 200, "", "", "");
+        PoolKey memory kb = _key(b);
+
+        _buy(ka, 0.5 ether);
+        // B's curve is untouched by a buy on A
+        (,,,,, uint96 rb, uint96 lb,,) = hook.curves(kb.toId());
+        assertEq(rb, 0, "buying A moved B's raised");
+        assertEq(uint256(lb), SUPPLY, "buying A moved B's tokensLeft");
+        // token claims are per-token and must each match their own books
+        _assertTokenConserved(a, ka);
+        _assertTokenConserved(b, kb);
+        // ETH claim is global: it equals both curves' raised plus all fees owed
+        (,,,,, uint96 ra,,,) = hook.curves(ka.toId());
+        uint256 totalOwed = hook.owed(platform) + hook.owed(creator) + hook.owed(address(0xDEAD));
+        assertEq(
+            manager.balanceOf(address(hook), 0),
+            uint256(ra) + uint256(rb) + totalOwed,
+            "global ETH claim != sum(raised) + owed"
+        );
+    }
+
+    function test_round_trip_conserves() public {
+        (address token, PoolKey memory key) = _launch();
+        _buy(key, 0.7 ether);
+        _assertConserved(token, key);
+        uint256 held = WavesToken(token).balanceOf(buyer);
+        _sell(key, buyer, held);
+        _assertConserved(token, key);
+    }
+
+    // ── fuzz: any buy keeps the books conserved and the curve sane ─────
+    function testFuzz_buy_conserves(uint256 ethIn) public {
+        ethIn = bound(ethIn, 1e12, 3 ether); // 1 microether .. under graduation
+        (address token, PoolKey memory key) = _launch();
+        vm.deal(buyer, ethIn);
+        vm.prank(buyer);
+        swapRouter.swap{value: ethIn}(
+            key,
+            SwapParams({zeroForOne: true, amountSpecified: -int256(ethIn), sqrtPriceLimitX96: MIN_SQRT + 1}),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            ""
+        );
+        _assertConserved(token, key);
+        (,,,,, uint96 raised, uint96 left,,) = hook.curves(key.toId());
+        assertLe(uint256(raised), GRAD, "raised exceeded the graduation target");
+        assertLe(uint256(left), SUPPLY, "tokensLeft exceeded supply");
+    }
+
     // MIN_SQRT_PRICE from TickMath, inlined to avoid the import
     uint160 constant MIN_SQRT = 4295128739;
     uint160 constant MAX_SQRT = 1461446703485210103287273052203988822378723970342;

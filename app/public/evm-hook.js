@@ -127,9 +127,11 @@
       [{ to: to || hookAddress(), data: data }, "latest"]);
   }
 
-  /* curves(poolId) → the Curve struct:
+  /* curves(poolId) → the Curve struct. NINE words — a `full` latch (set the
+   * instant raised first reaches graduationEth, which freezes the curve) sits
+   * between tokensLeft and graduated:
    * (address token, address creator, uint16 feeBps, uint16 rewardsBps,
-   *  address keeper, uint96 raised, uint96 tokensLeft, bool graduated) */
+   *  address keeper, uint96 raised, uint96 tokensLeft, bool full, bool graduated) */
   async function curveOf(token) {
     var hex = await read("0x" + SEL.curves + poolId(token).replace(/^0x/, ""));
     if (!hex || hex === "0x") return null;
@@ -145,7 +147,8 @@
       keeper: "0x" + w(4).slice(24),
       raised: BigInt("0x" + w(5)),
       tokensLeft: BigInt("0x" + w(6)),
-      graduated: BigInt("0x" + w(7)) === 1n
+      full: BigInt("0x" + w(7)) === 1n,      // curve sold out, awaiting graduate()
+      graduated: BigInt("0x" + w(8)) === 1n
     };
   }
 
