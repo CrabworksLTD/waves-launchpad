@@ -46,16 +46,29 @@ const ZERO = "0x0000000000000000000000000000000000000000";
 
 let rpcId = 0;
 async function rpc(method, params) {
-  const r = await fetch(RPC, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }),
-    signal: AbortSignal.timeout(25000)
-  });
-  if (!r.ok) throw new Error("rpc " + r.status);
-  const j = await r.json();
-  if (j.error) throw new Error(j.error.message || "rpc error");
-  return j.result;
+  /* ⚠️ Retried. Robinhood throttles a burst hard, and this had no backoff at
+   * all — so a run that made it through the log walk would be refused on a
+   * later eth_call and lose whatever that call was for. The reward figures
+   * failed on every single run for exactly this reason, and because the catch
+   * around them was empty it read as "this token has no rewards" rather than
+   * "the node said 429". */
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const r = await fetch(RPC, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }),
+        signal: AbortSignal.timeout(25000)
+      });
+      if (!r.ok) throw new Error("rpc " + r.status);
+      const j = await r.json();
+      if (j.error) throw new Error(j.error.message || "rpc error");
+      return j.result;
+    } catch (e) {
+      if (attempt === 3) throw e;
+      await new Promise((s) => setTimeout(s, 400 * Math.pow(2, attempt)));
+    }
+  }
 }
 
 const addrOf = (topic) => "0x" + String(topic).slice(-40).toLowerCase();
