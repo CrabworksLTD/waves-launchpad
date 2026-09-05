@@ -872,7 +872,7 @@
     if (!mode || mode === "none") return null;
     if (mode === "burn") return "Buyback & burn";
     var sym = flow && flow.reward && flow.reward.symbol;
-    return sym ? "Holders earn " + String(sym).replace(/^\$/, "") : "Holders earn rewards";
+    return sym ? "Rewards in " + String(sym).replace(/^\$/, "") : "Holder rewards";
   }
 
   /* The share card for a launch, composed here and pinned with the art. Never
