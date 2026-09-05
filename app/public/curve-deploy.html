@@ -134,6 +134,28 @@ a{color:var(--accent)}
     poolFee: 10000
   };
 
+  /* ?grad=<eth> deploys a curve with a different graduation threshold.
+   *
+   * For proving the graduation path, which has never run on mainnet — it is the
+   * one place a token's liquidity moves into a real Uniswap pool, it is now the
+   * whole of how a token becomes discoverable, and it has only ever been
+   * exercised against a fork. Filling a 3.5 ETH curve to test it costs $8,600;
+   * filling a 0.01 ETH one costs about $25, and the code path is identical.
+   *
+   * ⚠️ A curve deployed this way is a TEST ARTEFACT. Its threshold is immutable
+   * like any other, so it must never end up in evm-chains.js as the live one —
+   * every token launched on it would graduate almost immediately into a pool
+   * with nothing in it. */
+  var qs = new URLSearchParams(location.search);
+  var gradOverride = parseFloat(qs.get("grad"));
+  if (gradOverride > 0) {
+    ARGS.graduationEth = BigInt(Math.round(gradOverride * 1e9)) * (ETHER / 1000000000n);
+    document.querySelector("main").insertAdjacentHTML("afterbegin",
+      '<div class="err"><b>TEST CURVE — graduation set to ' + gradOverride + ' ETH</b>' +
+      'Deployed to exercise the graduation path cheaply. Do not put this address ' +
+      'in evm-chains.js as the live curve.</div>');
+  }
+
   var chain = window.MoonpadToken.chain();
   ARGS.platform = chain.feeTo;
   $("p-chain").textContent = chain.name + " (" + chain.id + ")";
@@ -149,7 +171,8 @@ a{color:var(--accent)}
     .then(function (r) { return r.json(); })
     .then(function (j) {
       var px = Number(j.data.amount);
-      var vt = 1073000000, cs = 1000000000, ve = 1.41, grad = 3.5;
+      var vt = 1073000000, cs = 1000000000, ve = 1.41;
+      var grad = Number(ARGS.graduationEth) / 1e18;
       var open = (ve / vt) * px * cs;
       var sold = vt - (ve * vt) / (ve + grad);
       var gradMc = ((ve + grad) / (vt - sold)) * px * cs;
