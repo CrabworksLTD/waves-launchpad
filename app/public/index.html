@@ -543,19 +543,38 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
    * Filled once in the background; until it lands the pill says REWARDS, which
    * is still true and still worth showing. */
   var RWA = null;
-  if (window.Token && window.Token.rwa) {
-    window.Token.rwa().then(function (list) {
-      RWA = {};
-      (list || []).forEach(function (t) { RWA[t.mint] = t.symbol; });
-      document.querySelectorAll(".scard .rwsym[data-mint]").forEach(function (el) {
-        var m = el.dataset.mint;
-        if (m && RWA[m]) el.textContent = "/" + RWA[m];
-      });
-    }).catch(function () {});
+  function fillRewardSyms() {
+    document.querySelectorAll(".scard .rwsym[data-mint]").forEach(function (el) {
+      var m = (el.dataset.mint || "").toLowerCase();
+      if (m && RWA && RWA[m]) el.textContent = "/" + RWA[m];
+    });
   }
+  /* ⚠️ Each chain has its own list, and this only ever read Solana's.
+   *
+   * window.Token is the Solana module; on Robinhood it is not even loaded, so
+   * RWA stayed null and a card that pays TSLA showed a bare ticker. The reward
+   * asset is the most distinctive thing about a token on this pad — it is the
+   * whole pitch — and it was the one part the card would not say. */
+  (function loadRewardSyms() {
+    var got = function (pairs) {
+      RWA = {};
+      pairs.forEach(function (p) { if (p[0]) RWA[String(p[0]).toLowerCase()] = p[1]; });
+      fillRewardSyms();
+    };
+    if (EVM) {
+      fetch("/rh-assets.json").then(function (r) { return r.json(); })
+        .then(function (j) {
+          got((j.tokens || []).map(function (t) { return [t.address, t.symbol]; }));
+        }).catch(function () {});
+    } else if (window.Token && window.Token.rwa) {
+      window.Token.rwa().then(function (list) {
+        got((list || []).map(function (t) { return [t.mint, t.symbol]; }));
+      }).catch(function () {});
+    }
+  })();
   function rewardSym(mint) {
     if (!mint) return "HOLDER";
-    return (RWA && RWA[mint]) || "";
+    return (RWA && RWA[String(mint).toLowerCase()]) || "";
   }
 
   function spotCard(o) {
