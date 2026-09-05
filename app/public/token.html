@@ -830,7 +830,9 @@ input:focus{outline:none;border-color:var(--accent)}
       var ac = el.querySelector(".rf-accrued");
       ac.textContent = feeData.accrued;
       if (feeData.accruedTitle) ac.title = feeData.accruedTitle;
-      el.querySelector(".rf-dist").textContent = feeData.distributed;
+      var di = el.querySelector(".rf-dist");
+      di.textContent = feeData.distributed;
+      if (feeData.distributedTitle) di.title = feeData.distributedTitle;
       el.hidden = false;
     }
 
@@ -928,9 +930,13 @@ input:focus{outline:none;border-color:var(--accent)}
           : UI.fmt(earned, 5) + " ETH",
         accruedTitle: UI.fmt(earned, 6) + " ETH accrued on the curve",
         distributed: sent > 0 ? UI.fmt(sent, 5) + (sym ? " " + sym : "")
-          /* Nothing sent yet is the normal state between hourly runs, and
-           * "0" alone reads like a failure rather than a schedule. */
-          : (Number(rw.pendingWei) > 0 ? "next run" : "—")
+          /* Nothing sent yet: the keeper only moves the pot once it outweighs
+           * the gas of moving it (claim + swap + a transfer per holder, with
+           * margin), so a small pot can sit for many runs. "next run" promised
+           * a schedule it could not keep. */
+          : (Number(rw.pendingWei) > 0 ? "pending" : "—"),
+        distributedTitle: (sent > 0 || Number(rw.pendingWei) === 0) ? "" :
+          "Fees are accruing. The keeper pays out on the first hourly run where the pot is worth more than the gas it costs to move it."
       };
     }
     var res = await Promise.all([
