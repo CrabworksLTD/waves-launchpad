@@ -324,11 +324,13 @@ async function indexTrades(db, rec, curveAddr, latest) {
    * field. So a token visibly paying its holders advertised neither. Writing it
    * back here fixes every reader at once instead of teaching each one to go and
    * ask the curve. */
+  let synced = null, syncError = null;
   try {
     const c = await rpc("eth_call", [{
       to: curveAddr, data: "0x2cc3dc6e" + "0".repeat(24) + token.slice(2)
     }, "latest"]);
     const bps = Number(word(c, 2));
+    synced = "bps=" + bps + " listed=" + (rec.feeSharePct || 0);
     if (bps > 0 && (rec.feeSharePct || 0) !== bps / 100) {
       const raw = await db.lrange("tokens", 0, 199);
       for (let i = 0; i < (raw || []).length; i++) {
@@ -337,12 +339,18 @@ async function indexTrades(db, rec, curveAddr, latest) {
         cur.feeSharePct = bps / 100;
         cur.feeShare = "holders";
         await db.lset("tokens", i, JSON.stringify(cur));
+        synced = "wrote " + (bps / 100) + "% at index " + i;
         break;
       }
     }
-  } catch (e) { /* the chart does not depend on this */ }
+  } catch (e) {
+    /* Reported, not swallowed. A silent failure here looks exactly like "the
+     * creator has not pledged" — the badge and the reward ticker stay off and
+     * nothing anywhere says why. */
+    syncError = String(e.message || e).slice(0, 120);
+  }
 
-  return { token, trades: trades.length, price: last.price };
+  return { token, trades: trades.length, price: last.price, synced, syncError };
 }
 
 export default async function handler(req, res) {

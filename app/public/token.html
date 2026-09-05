@@ -837,7 +837,11 @@ input:focus{outline:none;border-color:var(--accent)}
      * paid so far. */
     function paint(sym, tradeable) {
       var a = sym || QUOTE;
-      box.innerHTML = "<b>" + esc(a) + " rewards are active</b>" +
+      /* "TSLA rewards are active · sent hourly". The cadence is the part a
+       * holder cares about and it was nowhere on the page — both chains pay on
+       * the hour, and saying so is the difference between a claim and a
+       * schedule. */
+      box.innerHTML = "<b>" + esc(a) + " rewards are active · sent hourly</b>" +
         (sym && !tradeable
           ? "<span>Paid in " + esc(QUOTE) + " until " + esc(sym) + " is tradeable.</span>"
           : "") +
