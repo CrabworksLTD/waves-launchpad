@@ -66,7 +66,10 @@ async function rpc(method, params) {
       return j.result;
     } catch (e) {
       if (attempt === 3) throw e;
-      await new Promise((s) => setTimeout(s, 400 * Math.pow(2, attempt)));
+      /* Up to ~7s in total. Robinhood's throttle window outlasted a
+       * sub-three-second backoff, so the retries all landed inside the same
+       * refusal and the call failed anyway. */
+      await new Promise((s) => setTimeout(s, 900 * Math.pow(2, attempt)));
     }
   }
 }
@@ -312,8 +315,21 @@ async function indexTrades(db, rec, curveAddr, latest) {
    * Pending is everything after the keeper's cursor — the fees a token has
    * earned for holders but not yet been paid out, which is most of what a
    * holder wants to know between hourly runs. */
+  /* One read of the curve for both the reward figures and the pledge sync.
+   *
+   * They each called curves(token) separately, in the same run, for the same
+   * answer — and on a chain that throttles this readily the second one was
+   * simply refused. Two calls for one fact is how a run runs out of budget. */
+  let curveState = null;
+  try {
+    curveState = await rpc("eth_call", [{
+      to: curveAddr, data: "0x2cc3dc6e" + "0".repeat(24) + token.slice(2)
+    }, "latest"]);
+  } catch (e) { /* both blocks below degrade on their own */ }
+
   let rewards = null;
   try {
+    if (!curveState) throw new Error("could not read the curve");
     const paidWei = BigInt((await db.get("rhk:" + token + ":paidWei")) || "0");
     const paidAsset = BigInt((await db.get("rhk:" + token + ":paidAsset")) || "0");
     /* Whichever we know: what the keeper last paid in, or — before any payout
@@ -323,11 +339,8 @@ async function indexTrades(db, rec, curveAddr, latest) {
       (rec.rewardMint ? String(rec.rewardMint).toLowerCase() : null);
     const cursor = BigInt((await db.get("rhk:" + token + ":cursor")) || rec.block || 0);
 
-    const c = await rpc("eth_call", [{
-      to: curveAddr, data: "0x2cc3dc6e" + "0".repeat(24) + token.slice(2)
-    }, "latest"]);
-    const feeBps = Number(word(c, 1));
-    const rewardsBps = Number(word(c, 2));
+    const feeBps = Number(word(curveState, 1));
+    const rewardsBps = Number(word(curveState, 2));
     const platBps = { 100: 40, 200: 50, 300: 60, 400: 70, 500: 80, 1000: 90 }[feeBps] ?? 40;
 
     /* Only trades the keeper has not settled yet. Its cursor is in blocks and
@@ -421,10 +434,8 @@ async function indexTrades(db, rec, curveAddr, latest) {
    * ask the curve. */
   let synced = null, syncError = null;
   try {
-    const c = await rpc("eth_call", [{
-      to: curveAddr, data: "0x2cc3dc6e" + "0".repeat(24) + token.slice(2)
-    }, "latest"]);
-    const bps = Number(word(c, 2));
+    if (!curveState) throw new Error("could not read the curve");
+    const bps = Number(word(curveState, 2));
     synced = "bps=" + bps + " listed=" + (rec.feeSharePct || 0);
     if (bps > 0 && (rec.feeSharePct || 0) !== bps / 100) {
       const raw = await db.lrange("tokens", 0, 199);
