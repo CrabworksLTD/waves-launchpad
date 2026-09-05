@@ -25,7 +25,7 @@ contract DeployWavesCurveHook is Script {
     // Robinhood Chain, from app/public/evm-chains.js
     address constant POOL_MANAGER = 0x8366a39CC670B4001A1121B8F6A443A643e40951;
     // ⚠️ SET THESE before broadcasting:
-    address constant PLATFORM = address(0);       // WAVES fee-owner wallet
+    address constant PLATFORM = 0xE52f574AC7006614EBe1c8a82913a5C07eC73CC7; // RH feeTo
     // curve template (same as WavesCurve.sol immutables)
     uint256 constant GRAD_ETH = 4 ether;
     uint256 constant VIRTUAL_ETH = 1.41 ether;
