@@ -69,8 +69,9 @@ contract WavesCurveHookTest is Test {
         assertEq(raised, 0);
         assertEq(uint256(left), SUPPLY);
         assertFalse(grad);
-        // the whole point: the token's supply sits on the hook, ready to sell
-        assertEq(WavesToken(token).balanceOf(address(hook)), SUPPLY);
+        // the supply is deposited into the manager as the hook's 6909 claim
+        assertEq(WavesToken(token).balanceOf(address(manager)), SUPPLY);
+        assertEq(manager.balanceOf(address(hook), uint256(uint160(token))), SUPPLY);
     }
 
     function test_buy_matches_the_curve_math() public {
@@ -99,6 +100,56 @@ contract WavesCurveHookTest is Test {
         assertGt(hook.owed(platform), 0, "platform earned nothing");
     }
 
+    function _buy(PoolKey memory key, uint256 ethIn) internal {
+        vm.deal(buyer, ethIn);
+        vm.prank(buyer);
+        swapRouter.swap{value: ethIn}(
+            key,
+            SwapParams({zeroForOne: true, amountSpecified: -int256(ethIn), sqrtPriceLimitX96: MIN_SQRT + 1}),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            ""
+        );
+    }
+
+    function test_sell_returns_eth_and_reprices() public {
+        (address token, PoolKey memory key) = _launch();
+        _buy(key, 0.5 ether);
+
+        uint256 held = WavesToken(token).balanceOf(buyer);
+        assertGt(held, 0);
+
+        // sell half of it back
+        uint256 sellAmt = held / 2;
+        vm.startPrank(buyer);
+        WavesToken(token).approve(address(swapRouter), sellAmt);
+        uint256 ethBefore = buyer.balance;
+        swapRouter.swap(
+            key,
+            SwapParams({zeroForOne: false, amountSpecified: -int256(sellAmt), sqrtPriceLimitX96: MAX_SQRT - 1}),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            ""
+        );
+        vm.stopPrank();
+
+        assertGt(buyer.balance, ethBefore, "seller received no ETH");
+        (,,,,, uint96 raised, uint96 left,) = hook.curves(key.toId());
+        assertGt(uint256(left), SUPPLY - held, "tokensLeft did not grow on sell");
+        assertLt(uint256(raised), 0.5 ether, "raised did not fall on sell");
+    }
+
+    function test_platform_can_claim_its_fees() public {
+        (, PoolKey memory key) = _launch();
+        _buy(key, 1 ether);
+
+        uint256 owed = hook.owed(platform);
+        assertGt(owed, 0, "platform earned nothing");
+        uint256 before = platform.balance;
+        vm.prank(platform);
+        hook.claim();
+        assertEq(platform.balance, before + owed, "claim paid the wrong amount");
+        assertEq(hook.owed(platform), 0, "owed not cleared");
+    }
+
     function test_outside_liquidity_is_blocked() public {
         (, PoolKey memory key) = _launch();
         vm.expectRevert();
@@ -107,4 +158,5 @@ contract WavesCurveHookTest is Test {
 
     // MIN_SQRT_PRICE from TickMath, inlined to avoid the import
     uint160 constant MIN_SQRT = 4295128739;
+    uint160 constant MAX_SQRT = 1461446703485210103287273052203988822378723970342;
 }

@@ -202,7 +202,39 @@ contract WavesCurveHook is IHooks {
          * valid non-zero starting point in the right ballpark. */
         manager.initialize(key, _openingSqrtPrice());
 
+        /* Deposit the whole supply into the PoolManager as the hook's ERC-6909
+         * claim. The hook's reserves — tokens AND the ETH it later takes — are
+         * held as claims, never as real balances: a native take at beforeSwap
+         * (before the swapper settles) would find the manager empty. With the
+         * supply as claims, a buy simply burns token-claims to hand tokens out
+         * and mints ETH-claims for what came in; a sell does the reverse. */
+        manager.unlock(abi.encode(uint8(0), token, curveSupply));
+
         emit Launched(token, msg.sender, feeBps, name, symbol);
+    }
+
+    /* The manager's callback. Two jobs, tagged by the leading byte:
+     *   0 = deposit a launch's supply as the hook's token-claim (from launch)
+     *   1 = burn ETH-claims back to native ETH and forward it (from claim())
+     * Only the manager can call this, and only we ever ask it to. */
+    function unlockCallback(bytes calldata data) external returns (bytes memory) {
+        if (msg.sender != address(manager)) revert NotManager();
+        uint8 op = uint8(data[31]); // first abi word's low byte
+
+        if (op == 0) {
+            (, address token, uint256 amount) = abi.decode(data, (uint8, address, uint256));
+            Currency tok = Currency.wrap(token);
+            manager.sync(tok);
+            WavesToken(token).transfer(address(manager), amount); // real tokens in
+            manager.settle();
+            manager.mint(address(this), tok.toId(), amount);      // ← as our claim
+        } else {
+            (, address to, uint256 amount) = abi.decode(data, (uint8, address, uint256));
+            Currency eth = Currency.wrap(address(0));
+            manager.burn(address(this), eth.toId(), amount);      // burn ETH-claims
+            manager.take(eth, to, amount);                        // → native ETH out
+        }
+        return "";
     }
 
     /* The token's fee/rewards split can be pledged to holders once, after launch
@@ -222,8 +254,9 @@ contract WavesCurveHook is IHooks {
         uint256 amount = owed[msg.sender];
         owed[msg.sender] = 0;
         if (amount == 0) return;
-        (bool ok, ) = msg.sender.call{value: amount}("");
-        if (!ok) revert TransferFailed();
+        /* The fees accrued as the hook's ETH-claims; unlock to burn them back to
+         * native ETH and forward it in one step. */
+        manager.unlock(abi.encode(uint8(1), msg.sender, amount));
         emit Claimed(msg.sender, amount);
     }
 
@@ -302,8 +335,8 @@ contract WavesCurveHook is IHooks {
              * would find the manager empty (OutOfFunds). The claim is pure
              * accounting the swapper's settle then backs; the hook holds its
              * reserves as claims and burns them to pay out. */
-            ethCur.take(manager, address(this), amountIn, true);      // claims=true
-            tokCur.settle(manager, address(this), tokensOut, false);  // real tokens → pool → user
+            ethCur.take(manager, address(this), amountIn, true);      // ETH in → our claim
+            tokCur.settle(manager, address(this), tokensOut, true);   // burn token-claims → user
             unspecified = -int128(int256(tokensOut));
             emit Bought(c.token, tx.origin, amountIn, tokensOut, _lastFee);
             if (c.raised >= graduationEth) _graduate(id, c, key);
