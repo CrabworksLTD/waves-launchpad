@@ -6,7 +6,12 @@
 <title>WAVES Launchpad</title>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/theme.css">
+<script>/* set the chain skin before paint so a Robinhood visitor gets no flash */
+try{var _c=localStorage.getItem("shl-chain");
+if(new URLSearchParams(location.search).get("chain")==="rh")_c="robinhood";
+if(_c==="robinhood")document.documentElement.dataset.chain="robinhood";}catch(e){}</script>
 <style>
+.ch-rh{display:none}[data-chain="robinhood"] .ch-sol{display:none}[data-chain="robinhood"] .ch-rh{display:inline}
 /* The fork page, after Moonpad's: a question, two cards, a trust line.
  * The editor is one of two equal choices, never the default destination. */
 *{box-sizing:border-box}
@@ -85,7 +90,7 @@ svg .df{stroke:var(--accent);stroke-dasharray:3 4}
           <path class="ac" d="M3 20 Q 12 19 16 12 T 21 4"/>
           <circle fill="var(--accent)" cx="21" cy="4" r="2.2"/></svg></span>
         <h2>Token</h2>
-        <p>A bonding-curve token priced in SOL or USDC. No liquidity to
+        <p>A bonding-curve token priced in <span class="ch-sol">SOL or USDC</span><span class="ch-rh">ETH or USDG</span>. No liquidity to
         manage — the curve is the market, graduation locks the LP.</p>
         <span class="cta">Launch a token →</span>
       </a>
