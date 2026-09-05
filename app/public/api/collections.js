@@ -51,7 +51,8 @@ export default async function handler(req, res) {
       const out = (raw || []).map((r) => (typeof r === "string" ? JSON.parse(r) : r));
       // Cache briefly at the edge. The list changes when someone launches,
       // which is rare; the live numbers come from chain regardless.
-      res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=600");
+      // same reasoning as api/tokens.js: a launch must appear promptly
+      res.setHeader("Cache-Control", "public, s-maxage=10, stale-while-revalidate=30");
       return res.status(200).json({ collections: out });
     } catch (e) {
       // An unreachable store must not 500 the homepage — the section simply

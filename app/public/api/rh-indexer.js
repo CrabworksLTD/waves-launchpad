@@ -439,7 +439,7 @@ export default async function handler(req, res) {
          * wants the table this run just refreshed rather than last run's. */
         try {
           const s = await indexTrades(db, t, curveAddr, BigInt(await rpc("eth_blockNumber", [])));
-          if (s) r.priced = s.trades;
+          if (s) { r.priced = s.trades; r.synced = s.synced; r.syncError = s.syncError; }
         } catch (e) { r.pricedError = String(e.message || e).slice(0, 90); }
         out.push(r);
       } catch (e) {

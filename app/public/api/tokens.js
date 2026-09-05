@@ -34,7 +34,18 @@ export default async function handler(req, res) {
       const db = await kv();
       const raw = await db.lrange(KEY, 0, MAX - 1);
       const out = (raw || []).map((r) => (typeof r === "string" ? JSON.parse(r) : r));
-      res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=600");
+      /* ⚠️ Short, because this list is what tells a creator their launch exists.
+       *
+       * It was s-maxage=60 with stale-while-revalidate=600, so the CDN could
+       * keep serving a ten-minute-old copy — and the copy that matters is the
+       * one from just BEFORE a launch. A creator finished launching, opened the
+       * homepage they had just added something to, and read "Nothing launched
+       * yet" for up to ten minutes. That is the worst possible moment to look
+       * broken, and it is exactly when someone shares the link.
+       *
+       * The list is one small KV read, so ten seconds of CDN caching still caps
+       * the origin at six requests a minute however much traffic arrives. */
+      res.setHeader("Cache-Control", "public, s-maxage=10, stale-while-revalidate=30");
       return res.status(200).json({ tokens: out });
     } catch (e) {
       // an unreachable store must not 500 the homepage
