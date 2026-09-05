@@ -359,7 +359,13 @@ async function indexTrades(db, rec, curveAddr, latest) {
       fromRecord: rec.rewardMint || null,
       rewardsBps
     };
-  } catch (e) { /* the chart does not depend on these */ }
+  } catch (e) {
+    /* ⚠️ Recorded. This was an empty catch, so a block that threw on every
+     * single run looked exactly like a token with no rewards to report — and
+     * three separate attempts to reason out why from the source were all
+     * slower than one line that says what happened. */
+    rewards = { error: String(e && e.message || e).slice(0, 160) };
+  }
 
   /* Dollars, because a card shows dollars. The Solana indexer stores these on
    * the same blob and the bulk endpoint hands them straight to the grid — an
