@@ -110,3 +110,26 @@ staking program still awaits (unaudited per project notes).
    creator's launch buy; preserve that in `beforeSwap`.
 4. Native ETH as currency0 with a custom-curve delta — verify settle/take
    accounting on ETH specifically (v4's native-currency path).
+
+---
+
+## STATUS — implemented on branch `v4-hook-curve` (2026-09-05)
+
+`contracts/WavesCurveHook.sol` + `test/WavesCurveHook.t.sol` + `script/DeployWavesCurveHook.s.sol`.
+Build/test under `FOUNDRY_PROFILE=v4` (solc 0.8.26 + cancun; v4-core/periphery gitignored, `forge install` to fetch).
+
+**Done & tested (6/6 on a local PoolManager):**
+- ✅ launch opens a live V4 pool from block zero; supply held as an ERC-6909 claim
+- ✅ buy prices EXACTLY against the ported curve, settles exact amounts, platform earns its cut
+- ✅ sell returns ETH and reprices
+- ✅ platform fee-claim converts claims → real ETH
+- ✅ graduation: filled curve → `graduate()` seeds one full-range hook-owned (=locked) position, pool flips to a normal AMM, later swaps trade against it (also clears the "Burnt/Locked LP" flag)
+- ✅ outside liquidity blocked during the curve phase
+- ✅ deploy script mines the CREATE2 salt for the hook's permission bits (mining proven in test setUp)
+- ✅ default (standalone-curve) build + 31 tests unaffected
+
+**Still owed before mainnet (audit-gated):**
+1. Fork tests against RH's real PoolManager (`0x8366a39C…e40951`) — run in a network-enabled env.
+2. Front-end wiring: point `evm-token.js` launch/trade at the deployed hook + its `launch()`/swap-router path; keeper reads fees from the hook.
+3. **Audit** — launch liquidity in a hook. Non-negotiable.
+4. Out of v1 scope by choice: exact-output swaps; a bundled first-buy inside `launch()`.

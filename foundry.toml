@@ -12,7 +12,7 @@ optimizer_runs = 44444444
 evm_version = "paris"
 # The V4-hook curve compiles only under [profile.v4] (solc 0.8.26 + cancin).
 # Skip it here so the standalone-curve pipeline is byte-identical to before.
-skip = ["contracts/WavesCurveHook.sol", "contracts/v4lib/*", "test/WavesCurveHook.t.sol"]
+skip = ["contracts/WavesCurveHook.sol", "contracts/v4lib/*", "test/WavesCurveHook.t.sol", "script/DeployWavesCurveHook.s.sol"]
 # The launch path carries five strings now (name, symbol, logo, description,
 # socials) and the legacy pipeline runs out of stack slots. viaIR is the
 # supported answer and keeps launch() flat, which matters: the browser
