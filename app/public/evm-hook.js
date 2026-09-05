@@ -155,13 +155,33 @@
   }
 
   // ── launch (fully wired) ──────────────────────────────────────────────
+  /* opts.firstBuyWei (a BigInt/decimal string, in wei) buys on the curve in the
+   * SAME transaction — the anti-snipe. The hook prices it atomically after the
+   * pool opens, so there is no separate first-buy for a bot to front-run. */
   async function launch(opts) {
     var from = opts.from || await window.MoonpadLaunch.connect();
     await window.MoonpadLaunch.switchChain(chain().id);
     var data = encodeLaunch(
       opts.name, opts.symbol, opts.feeBps, opts.logo || "", opts.description || "", opts.socials || "");
-    // launch() is non-payable in v1 (no bundled first-buy)
-    return window.WavesEvm.send(from, { to: hookAddress(), data: data, value: "0x0" });
+    var value = opts.firstBuyWei ? "0x" + BigInt(opts.firstBuyWei).toString(16) : "0x0";
+    return send(from, { to: hookAddress(), data: data, value: value });
+  }
+
+  /* Wallet send with a gas estimate and EIP-1559 pricing — self-contained so the
+   * adapter does not depend on evm-token.js's internals. */
+  async function send(from, tx) {
+    tx.from = from;
+    var p = window.ethereum;
+    if (!p) throw new Error("No wallet found in this browser.");
+    tx.gas = "0x" + ((BigInt(await p.request({ method: "eth_estimateGas", params: [tx] })) * 12n) / 10n).toString(16);
+    try {
+      var block = await p.request({ method: "eth_getBlockByNumber", params: ["latest", false] });
+      var base = BigInt((block && block.baseFeePerGas) || 0);
+      var tip = 1000000n;
+      tx.maxPriorityFeePerGas = "0x" + tip.toString(16);
+      tx.maxFeePerGas = "0x" + (base * 2n + tip).toString(16);
+    } catch (e) { /* legacy chains price it themselves */ }
+    return p.request({ method: "eth_sendTransaction", params: [tx] });
   }
 
   // ── buy / sell — gated on the V4 router (see header) ──────────────────

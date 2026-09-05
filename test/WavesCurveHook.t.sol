@@ -253,6 +253,39 @@ contract WavesCurveHookTest is Test {
         assertTrue(grad);
     }
 
+    function test_launch_with_atomic_first_buy_antisnipe() public {
+        // creator launches AND buys in one tx — the anti-snipe. The creator ends
+        // up holding tokens with no separate first-buy tx for a bot to front-run.
+        uint256 firstBuy = 0.3 ether;
+        uint256 fee = (firstBuy * 100) / 10_000;
+        uint256 inAfterFee = firstBuy - fee;
+        uint256 expOut = VTOK - ((VETH * VTOK) / (VETH + inAfterFee));
+
+        vm.deal(creator, 1 ether);
+        vm.prank(creator);
+        address token = hook.launch{value: firstBuy}("Snipe Me", "SNIPE", 100, "l", "d", "s");
+
+        PoolKey memory key = PoolKey({
+            currency0: Currency.wrap(address(0)),
+            currency1: Currency.wrap(token),
+            fee: 0, tickSpacing: 60, hooks: IHooks(address(hook))
+        });
+        // the creator already holds their curve tokens from the same tx
+        assertEq(WavesToken(token).balanceOf(creator), expOut, "atomic first buy gave the wrong amount");
+        (,,,,, uint96 raised, uint96 left,,) = hook.curves(key.toId());
+        assertEq(uint256(raised), inAfterFee, "first-buy ETH not on the curve");
+        assertEq(uint256(left), SUPPLY - expOut, "tokensLeft wrong after first buy");
+        assertGt(hook.owed(platform), 0, "platform earned nothing on the first buy");
+    }
+
+    function test_launch_without_value_still_works() public {
+        (address token, PoolKey memory key) = _launch(); // msg.value 0
+        (,,,,, uint96 raised, uint96 left,,) = hook.curves(key.toId());
+        assertEq(raised, 0);
+        assertEq(uint256(left), SUPPLY);
+        assertEq(WavesToken(token).balanceOf(creator), 0);
+    }
+
     function test_outside_liquidity_is_blocked() public {
         (address token, PoolKey memory key) = _launch();
         // a real add-liquidity through the standard router must hit the hook's

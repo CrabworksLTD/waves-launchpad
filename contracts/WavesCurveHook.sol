@@ -191,6 +191,11 @@ contract WavesCurveHook is IHooks {
      * A first buy is NOT bundled here in v1 — the creator buys with a normal
      * swap right after. Bundling it means a swap inside the initialize lock, and
      * keeping the two apart is what keeps this reviewable. */
+    /* Anti-snipe: any ETH sent with launch buys on the curve in this same
+     * transaction, atomically after the pool opens — the standard Pons-level
+     * defence, and exactly what the standalone WavesCurve does. It closes the
+     * one-block window a bot would otherwise have between the pool opening and
+     * the creator's first buy: there is no separate first-buy tx to front-run. */
     function launch(
         string calldata name,
         string calldata symbol,
@@ -198,7 +203,7 @@ contract WavesCurveHook is IHooks {
         string calldata logo,
         string calldata description,
         string calldata socials
-    ) external returns (address token) {
+    ) external payable returns (address token) {
         platformVolumeBps(feeBps); // reverts unless a real rung
 
         token = address(new WavesToken(
@@ -226,7 +231,9 @@ contract WavesCurveHook is IHooks {
          * (before the swapper settles) would find the manager empty. With the
          * supply as claims, a buy simply burns token-claims to hand tokens out
          * and mints ETH-claims for what came in; a sell does the reverse. */
-        manager.unlock(abi.encode(uint8(0), token, curveSupply));
+        /* op 0 also carries the atomic first buy (msg.value), so the deposit and
+         * the creator's buy happen in one lock — nothing lands between them. */
+        manager.unlock(abi.encode(uint8(0), token, curveSupply, msg.value, msg.sender));
 
         emit Launched(token, msg.sender, feeBps, name, symbol);
     }
@@ -240,12 +247,31 @@ contract WavesCurveHook is IHooks {
         uint8 op = uint8(data[31]); // first abi word's low byte
 
         if (op == 0) {
-            (, address token, uint256 amount) = abi.decode(data, (uint8, address, uint256));
+            (, address token, uint256 amount, uint256 buyValue, address buyer) =
+                abi.decode(data, (uint8, address, uint256, uint256, address));
             Currency tok = Currency.wrap(token);
             manager.sync(tok);
             WavesToken(token).transfer(address(manager), amount); // real tokens in
             manager.settle();
             manager.mint(address(this), tok.toId(), amount);      // ← as our claim
+
+            if (buyValue > 0) {
+                // Atomic first buy: price it on the curve, hold the ETH as our
+                // claim, and hand the buyer their tokens — all inside this lock.
+                Curve storage c = curves[poolOf[token]];
+                (uint256 out, uint256 accepted, uint256 fee) = _buy(c, buyValue);
+                Currency eth = Currency.wrap(address(0));
+                manager.settle{value: accepted}();                 // real ETH in
+                manager.mint(address(this), eth.toId(), accepted); // ← as our ETH-claim
+                manager.burn(address(this), tok.toId(), out);      // burn token-claims
+                manager.take(tok, buyer, out);                     // → tokens to the creator
+                emit Bought(token, buyer, accepted, out, fee);
+                // refund the overfill (buyValue - accepted) if the first buy alone fills the curve
+                if (buyValue > accepted) {
+                    (bool ok, ) = buyer.call{value: buyValue - accepted}("");
+                    if (!ok) revert TransferFailed();
+                }
+            }
         } else if (op == 1) {
             (, address to, uint256 amount) = abi.decode(data, (uint8, address, uint256));
             Currency eth = Currency.wrap(address(0));
