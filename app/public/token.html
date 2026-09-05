@@ -981,8 +981,13 @@ input:focus{outline:none;border-color:var(--accent)}
     var qUsd = prices[0], rUsd = prices[1];
     if (!qUsd || !rUsd) return inQuote();               // no price → stay honest in the quote
     var f = qUsd / rUsd;                                // reward units per 1 quote unit
+    /* Distributed is history — the pot that actually left for holders, which
+     * the keeper log records in the quote. Converting it at TODAY'S price
+     * invents a number nobody received (the swaps happened at other rates), so
+     * it stays in the quote. Accrued keeps the ≈ conversion: it answers "what
+     * would this buy now", which is exactly a live-rate question. */
     return { accrued: "≈ " + UI.fmt(accruedQuote * f, 4) + " " + rsym,
-             distributed: "≈ " + UI.fmt(distQuote * f, 4) + " " + rsym };
+             distributed: UI.fmt(distQuote, 4) + " " + q };
   }
 
   /* A paired launch links both ways. Someone who arrived at the token should
