@@ -286,16 +286,62 @@ async function indexTrades(db, rec, curveAddr, latest) {
   const holders = Object.keys(
     (await db.hgetall("rhix:" + token + ":h").catch(() => null)) || {}).length;
 
+  /* Dollars, because a card shows dollars. The Solana indexer stores these on
+   * the same blob and the bulk endpoint hands them straight to the grid — an
+   * EVM token without them priced as a dash no matter what the chain said. */
+  let ethUsd = 0;
+  try {
+    ethUsd = await fetch("https://api.coinbase.com/v2/prices/ETH-USD/spot",
+      { signal: AbortSignal.timeout(6000) })
+      .then((r) => r.json()).then((j) => Number(j.data.amount)) || 0;
+  } catch (e) { /* the native figures still stand */ }
+
+  const dayAgo = Date.now() - 86400000;
+  const day = trades.filter((x) => x.at >= dayAgo);
+  const vol24h = day.reduce((a, x) => a + x.quote, 0);
+
   await db.set("ix:" + token + ":trades", JSON.stringify(trades.slice(-600)));
   await db.set("ix:" + token + ":stats", JSON.stringify({
     price: last.price,
+    priceUsd: ethUsd ? last.price * ethUsd : null,
     supply,
     mcap: last.price * supply,
+    mcapUsd: ethUsd ? last.price * supply * ethUsd : null,
+    quoteUsd: ethUsd || null,
+    vol24h,
+    trades24h: day.length,
     holders,
     ath, athAt,
     quote: "ETH",
     at: Date.now()
   }));
+
+  /* ⚠️ Sync the pledge from the chain into the listing.
+   *
+   * A creator activates rewards with one on-chain call that touches nothing of
+   * ours, so feeSharePct stays 0 in the record — and the homepage card decides
+   * whether to show the rewards badge and the /TSLA suffix from exactly that
+   * field. So a token visibly paying its holders advertised neither. Writing it
+   * back here fixes every reader at once instead of teaching each one to go and
+   * ask the curve. */
+  try {
+    const c = await rpc("eth_call", [{
+      to: curveAddr, data: "0x2cc3dc6e" + "0".repeat(24) + token.slice(2)
+    }, "latest"]);
+    const bps = Number(word(c, 2));
+    if (bps > 0 && (rec.feeSharePct || 0) !== bps / 100) {
+      const raw = await db.lrange("tokens", 0, 199);
+      for (let i = 0; i < (raw || []).length; i++) {
+        const cur = typeof raw[i] === "string" ? JSON.parse(raw[i]) : raw[i];
+        if (!cur || String(cur.mint).toLowerCase() !== token) continue;
+        cur.feeSharePct = bps / 100;
+        cur.feeShare = "holders";
+        await db.lset("tokens", i, JSON.stringify(cur));
+        break;
+      }
+    }
+  } catch (e) { /* the chart does not depend on this */ }
+
   return { token, trades: trades.length, price: last.price };
 }
 

@@ -113,7 +113,11 @@ export default async function handler(req, res) {
    * page, and shipping them for twenty tokens would be most of a megabyte. */
   const many = (req.query && req.query.mints) || "";
   if (many) {
-    const mints = many.split(",").map((s) => s.trim()).filter((s) => B58.test(s)).slice(0, 60);
+    /* ⚠️ base58 OR 0x, same as the single-mint path below. Filtering to base58
+     * silently dropped every Robinhood token from the batch, so their cards
+     * priced nothing and showed a dash where the market cap goes. */
+    const mints = many.split(",").map((s) => s.trim())
+      .filter((s) => B58.test(s) || /^0x[0-9a-fA-F]{40}$/.test(s)).slice(0, 60);
     if (!mints.length) return res.status(200).json({ stats: {} });
     try {
       const db = await kv();
