@@ -28,6 +28,8 @@ import {BalanceDelta, BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/Bala
 import {BeforeSwapDelta, toBeforeSwapDelta} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {SwapParams, ModifyLiquidityParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
+import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 import {CurrencySettler} from "./v4lib/CurrencySettler.sol";
 import {LiquidityAmounts} from "./v4lib/LiquidityAmounts.sol";
 import {WavesToken} from "./WavesToken.sol";
@@ -82,6 +84,7 @@ contract WavesCurveHook is IHooks {
     using PoolIdLibrary for PoolKey;
     using CurrencySettler for Currency;
     using BalanceDeltaLibrary for BalanceDelta;
+    using StateLibrary for IPoolManager;
 
     // ─────────────────────────────────────────────────────────── immutables
     IPoolManager public immutable manager;
@@ -112,6 +115,7 @@ contract WavesCurveHook is IHooks {
         address keeper;
         uint96 raised;
         uint96 tokensLeft;
+        bool full;         // latched once raised first reaches graduationEth
         bool graduated;
     }
 
@@ -135,7 +139,6 @@ contract WavesCurveHook is IHooks {
     error UnknownToken();
     error AlreadyGraduated();
     error CurveComplete();
-    error Slippage();
     error BadFee();
     error TransferFailed();
     error NoDirectLiquidity();
@@ -156,8 +159,11 @@ contract WavesCurveHook is IHooks {
         virtualEth = virtualEth_;
         virtualTokens = virtualTokens_;
         curveSupply = curveSupply_;
+        /* raised and tokensLeft are uint96; a config whose reserves would not fit
+         * must be rejected here rather than truncated silently later. */
+        require(curveSupply_ <= type(uint96).max && graduationEth_ <= type(uint96).max, "config too large");
         /* Reverts unless this address has exactly the permission bits below — the
-         * whole point of mining the deploy salt (tools/mine-hook.js). */
+         * whole point of mining the deploy salt (script/DeployWavesCurveHook). */
         Hooks.validateHookPermissions(this, getHookPermissions());
     }
 
@@ -326,7 +332,7 @@ contract WavesCurveHook is IHooks {
     /* The curve. A buy is ETH→token (zeroForOne); a sell is token→ETH. Only
      * exact-input is supported — the shape every launchpad UI trades in, and the
      * one the curve math is written for. */
-    function beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata)
+    function beforeSwap(address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata)
         external
         onlyManager
         returns (bytes4, BeforeSwapDelta, uint24)
@@ -338,67 +344,66 @@ contract WavesCurveHook is IHooks {
          * locked liquidity — the hook steps aside and lets the swap through
          * with a zero delta. */
         if (c.graduated) return (IHooks.beforeSwap.selector, toBeforeSwapDelta(0, 0), 0);
+        /* Full but not yet graduated: the curve is closed. No buys, no sells —
+         * anyone may call graduate(); until then the pool is frozen so a sell
+         * cannot un-fill it (griefing). */
+        if (c.full) revert CurveComplete();
 
         if (params.amountSpecified > 0) revert ExactOutputUnsupported();
         uint256 amountIn = uint256(-params.amountSpecified);
         Currency ethCur = key.currency0;   // native ETH, always currency0
         Currency tokCur = key.currency1;
 
+        int128 specified;
         int128 unspecified;
         if (params.zeroForOne) {
-            // BUY: ETH in, tokens out
-            uint256 tokensOut = _buy(c, amountIn);
-            /* Take the incoming ETH as an ERC-6909 CLAIM, not real ETH: at
+            // BUY: ETH in, tokens out. `accepted` is what the curve actually
+            // takes — on the boundary buy it is less than amountIn, and only
+            // `accepted` is consumed so the swapper keeps the overfill (H1).
+            (uint256 tokensOut, uint256 accepted, uint256 fee) = _buy(c, amountIn);
+            /* Take the accepted ETH as an ERC-6909 CLAIM, not real ETH: at
              * beforeSwap the swapper has not settled yet, so a native take
-             * would find the manager empty (OutOfFunds). The claim is pure
-             * accounting the swapper's settle then backs; the hook holds its
-             * reserves as claims and burns them to pay out. */
-            ethCur.take(manager, address(this), amountIn, true);      // ETH in → our claim
+             * would find the manager empty (OutOfFunds). */
+            ethCur.take(manager, address(this), accepted, true);      // ETH in → our claim
             tokCur.settle(manager, address(this), tokensOut, true);   // burn token-claims → user
+            specified = int128(int256(accepted));                     // consume only `accepted`
             unspecified = -int128(int256(tokensOut));
-            emit Bought(c.token, tx.origin, amountIn, tokensOut, _lastFee);
-            /* A filled curve stops here; graduation (seeding the pool) is a
-             * separate call — see graduate() — so no liquidity op runs inside
-             * a swap. */
+            emit Bought(c.token, sender, accepted, tokensOut, fee);
         } else {
             // SELL: tokens in, ETH out
-            uint256 ethOut = _sell(c, amountIn);
-            tokCur.take(manager, address(this), amountIn, true);      // claims=true
-            ethCur.settle(manager, address(this), ethOut, true);      // burn ETH claims → user
+            (uint256 ethOut, uint256 fee) = _sell(c, amountIn);
+            tokCur.take(manager, address(this), amountIn, true);      // tokens in → our claim
+            ethCur.settle(manager, address(this), ethOut, true);      // burn ETH-claims → user
+            specified = int128(int256(amountIn));                     // whole input consumed
             unspecified = -int128(int256(ethOut));
-            emit Sold(c.token, tx.origin, amountIn, ethOut, _lastFee);
+            emit Sold(c.token, sender, amountIn, ethOut, fee);
         }
 
-        // -amountSpecified consumes the whole specified (input) side; `unspecified`
-        // provides the output side. This no-ops the concentrated-liquidity swap.
-        BeforeSwapDelta delta = toBeforeSwapDelta(int128(-params.amountSpecified), unspecified);
+        // `specified` consumes the input the curve took; `unspecified` provides
+        // the output. This no-ops the concentrated-liquidity swap.
+        BeforeSwapDelta delta = toBeforeSwapDelta(specified, unspecified);
         return (IHooks.beforeSwap.selector, delta, 0);
     }
 
-    /* Scratch for the event only — set inside _buy/_sell, read right after. */
-    uint256 private _lastFee;
-
     // ──────────────────────────────────────────────────────── curve math
-    /* Ported verbatim from WavesCurve._buy. Returns tokens out, mutates the
-     * curve, accrues the fee. `amountIn` is the ETH the user is paying (fee
-     * included, as on the standalone curve). */
-    function _buy(Curve storage c, uint256 value) private returns (uint256 out) {
+    /* Ported from WavesCurve._buy. Returns (tokens out, ETH accepted, fee).
+     * `accepted` <= value on the boundary buy: the excess is never taken, so the
+     * swapper keeps it — the V4 form of the standalone curve's refund. */
+    function _buy(Curve storage c, uint256 value)
+        private
+        returns (uint256 out, uint256 accepted, uint256 fee)
+    {
         uint256 room = c.raised >= graduationEth ? 0 : graduationEth - c.raised;
         if (room == 0) revert CurveComplete();
 
-        uint256 accepted = value;
-        uint256 fee = (accepted * c.feeBps) / 10_000;
+        accepted = value;
+        fee = (accepted * c.feeBps) / 10_000;
         uint256 inAfterFee = accepted - fee;
         if (inAfterFee > room) {
+            // clamp to exactly what fills the curve; charge the same rate on it
             inAfterFee = room;
             fee = (room * c.feeBps) / (10_000 - c.feeBps);
-            accepted = room + fee;
-            /* NOTE (v1 vs standalone): the standalone curve refunds `value -
-             * accepted`. Under exact-input V4 the swap's input is fixed, so a
-             * refund path has to hand ETH back to the swapper here. Left for the
-             * audited version; until then a buy that would overfill reverts via
-             * the room clamp on the *next* wei rather than partially filling.
-             * ⚠️ AUDIT: decide refund-vs-revert for the boundary buy. */
+            accepted = room + fee;  // < value; the difference is the swapper's refund
         }
 
         uint256 sold = curveSupply - c.tokensLeft;
@@ -409,13 +414,13 @@ contract WavesCurveHook is IHooks {
 
         c.raised += uint96(inAfterFee);
         c.tokensLeft = uint96(uint256(c.tokensLeft) - out);
+        if (c.raised >= graduationEth) c.full = true;  // latch (M2)
         _accrue(c, accepted, fee);
-        _lastFee = fee;
     }
 
-    /* Ported verbatim from WavesCurve.sell. `amountIn` is tokens in; returns net
-     * ETH out to the seller (fee already removed). */
-    function _sell(Curve storage c, uint256 amount) private returns (uint256 net) {
+    /* Ported from WavesCurve.sell. `amount` is tokens in; returns (net ETH out to
+     * the seller with fee removed, fee). */
+    function _sell(Curve storage c, uint256 amount) private returns (uint256 net, uint256 fee) {
         uint256 sold = curveSupply - c.tokensLeft;
         uint256 x = virtualEth + c.raised;
         uint256 y = virtualTokens - sold;
@@ -424,13 +429,12 @@ contract WavesCurveHook is IHooks {
         uint256 gross = back >= x ? 0 : x - back;
         if (gross > c.raised) gross = c.raised;
 
-        uint256 fee = (gross * c.feeBps) / 10_000;
+        fee = (gross * c.feeBps) / 10_000;
         net = gross - fee;
 
         c.raised -= uint96(gross);
         c.tokensLeft = uint96(uint256(c.tokensLeft) + amount);
         _accrue(c, gross, fee);
-        _lastFee = fee;
     }
 
     /* Ported verbatim from WavesCurve._accrue. */
@@ -450,35 +454,25 @@ contract WavesCurveHook is IHooks {
     }
 
     // ───────────────────────────────────────────────────────── graduation
-    /* When the curve fills, the token leaves the curve and its accumulated
-     * ETH + leftover tokens become real, locked V4 liquidity in this same pool —
-     * the pool address never changes, so every chart and aggregator entry
-     * carries straight through.
-     *
-     * ⚠️ AUDIT / NOT IMPLEMENTED: minting full-range liquidity via
-     * manager.modifyLiquidity inside a lock, computing the liquidity amount from
-     * the two reserves at the curve's final price, and locking/burning the LP
-     * position, is the money-critical half of this contract and is deliberately
-     * left as an explicit revert rather than hand-waved. Graduation must be built
-     * and fork-tested against RH's PoolManager before mainnet. Flipping
-     * `graduated` without seeding liquidity would strand the reserves, so we do
-     * neither here — a filled curve simply stops accepting buys (CurveComplete)
-     * until this is finished. */
     /* Once the curve is full, anyone may finish it: the accumulated ETH and the
      * tokens the curve left behind become one full-range V4 position, owned by
      * this hook forever (there is no path in this contract that removes it), so
-     * the launch's liquidity is permanently locked. After this the pool trades
-     * as an ordinary AMM and beforeSwap steps aside.
+     * the launch's liquidity is permanently locked, and the pool then trades as
+     * an ordinary AMM (beforeSwap steps aside).
+     *
+     * Gated on the LATCHED `full` flag, not the live `raised`: once the curve
+     * first reaches the target it is frozen (beforeSwap blocks both directions),
+     * so nobody can un-fill it with a sell to grief graduation (M2).
      *
      * Permissionless because there is nothing to steal: the amounts and the
-     * position are fixed by the curve's final state, and the LP goes to the
-     * hook regardless of who calls. */
+     * position are fixed by the curve's final state, and the LP goes to the hook
+     * regardless of who calls. */
     function graduate(address token) external {
         PoolId id = poolOf[token];
         Curve storage c = curves[id];
         if (c.creator == address(0)) revert UnknownToken();
         if (c.graduated) revert AlreadyGraduated();
-        if (c.raised < graduationEth) revert CurveComplete(); // not full yet
+        if (!c.full) revert CurveComplete(); // not full yet
         c.graduated = true;
         emit Graduated(token, c.raised, c.tokensLeft);
         manager.unlock(abi.encode(uint8(2), token, uint256(0)));
@@ -494,10 +488,34 @@ contract WavesCurveHook is IHooks {
         Curve storage c = curves[id];
         PoolKey memory key = _key(token);
 
-        int24 lower = (TickMath.MIN_TICK / TICK_SPACING) * TICK_SPACING;
-        int24 upper = (TickMath.MAX_TICK / TICK_SPACING) * TICK_SPACING;
-
+        /* Read the pool's ACTUAL current price, not a recomputed one: initialize
+         * snapped the opening price to a tick, so getLiquidityForAmounts must
+         * price against what the pool really stores or the position comes out
+         * single-sided and the settle over-draws the reserves. */
+        /* The pool's stored price is meaningless here: with no liquidity, every
+         * curve-phase swap slid it to that swap's price limit (buys drove it to
+         * MIN). Reset it to the reserves' ratio — the price the graduation
+         * liquidity must sit at — with a zero-liquidity swap to that exact
+         * limit, which moves the price and trades nothing. graduated is already
+         * true, so beforeSwap passes this swap straight through. */
         uint160 sqrtP = _openingSqrtPrice();
+        (uint160 cur,,,) = manager.getSlot0(id);
+        if (cur != sqrtP) {
+            manager.swap(
+                key,
+                SwapParams({zeroForOne: cur > sqrtP, amountSpecified: 1, sqrtPriceLimitX96: sqrtP}),
+                ""
+            );
+        }
+        int24 curTick = TickMath.getTickAtSqrtPrice(sqrtP);
+        /* A very wide band around the price rather than the absolute MIN/MAX
+         * ticks: a true full-range position overflows a uint128 intermediate in
+         * the pool's amount math when the price sits far from centre. ±300k
+         * ticks is a price span of ~1e13x either way — effectively full-range
+         * for a meme token, clamped to the usable bounds. */
+        int24 lower = _alignTick(curTick - 300_000, true);
+        int24 upper = _alignTick(curTick + 300_000, false);
+
         uint128 liq = LiquidityAmounts.getLiquidityForAmounts(
             sqrtP,
             TickMath.getSqrtPriceAtTick(lower),
@@ -516,8 +534,38 @@ contract WavesCurveHook is IHooks {
          * by burning the reserves it holds as claims. */
         int128 owe0 = delta.amount0();
         int128 owe1 = delta.amount1();
-        if (owe0 < 0) key.currency0.settle(manager, address(this), uint256(uint128(-owe0)), true);
-        if (owe1 < 0) key.currency1.settle(manager, address(this), uint256(uint128(-owe1)), true);
+        uint256 used0 = owe0 < 0 ? uint256(uint128(-owe0)) : 0;
+        uint256 used1 = owe1 < 0 ? uint256(uint128(-owe1)) : 0;
+        if (used0 > 0) key.currency0.settle(manager, address(this), used0, true);
+        if (used1 > 0) key.currency1.settle(manager, address(this), used1, true);
+
+        /* Sweep any reserve the full-range position could not absorb (M1).
+         * getLiquidityForAmounts takes the limiting side, so a wei or two of
+         * rounding can leave a residual claim with no owner otherwise. The ETH
+         * residual goes to the platform as a fee; the token residual (dust) is
+         * burned to the dead address so it can never re-enter supply. */
+        uint256 ethResidual = uint256(c.raised) > used0 ? uint256(c.raised) - used0 : 0;
+        if (ethResidual > 0) owed[platform] += ethResidual; // stays an ETH-claim, claimable
+        uint256 tokResidual = uint256(c.tokensLeft) > used1 ? uint256(c.tokensLeft) - used1 : 0;
+        if (tokResidual > 0) {
+            manager.burn(address(this), key.currency1.toId(), tokResidual);
+            manager.take(key.currency1, address(0xdEaD), tokResidual);
+        }
+    }
+
+    /* Snap a tick to TICK_SPACING and into the usable range. `down` rounds
+     * toward MIN (for the lower tick), else toward MAX. */
+    function _alignTick(int256 t, bool down) internal pure returns (int24) {
+        int256 minU = (int256(TickMath.MIN_TICK) / TICK_SPACING) * TICK_SPACING;
+        int256 maxU = (int256(TickMath.MAX_TICK) / TICK_SPACING) * TICK_SPACING;
+        if (t < minU) t = minU;
+        if (t > maxU) t = maxU;
+        int256 snapped = (t / TICK_SPACING) * TICK_SPACING;
+        if (down && snapped > t) snapped -= TICK_SPACING;
+        if (!down && snapped < t) snapped += TICK_SPACING;
+        if (snapped < minU) snapped = minU;
+        if (snapped > maxU) snapped = maxU;
+        return int24(snapped);
     }
 
     // ─────────────────────────────────────────────────────────── helpers
@@ -541,7 +589,10 @@ contract WavesCurveHook is IHooks {
     function _openingSqrtPrice() internal view returns (uint160) {
         uint256 yAtGrad = (virtualEth * virtualTokens) / (virtualEth + graduationEth);
         uint256 tokensLeftAtGrad = curveSupply - (virtualTokens - yAtGrad);
-        uint256 ratioX192 = (tokensLeftAtGrad << 192) / graduationEth; // token/ETH
+        /* token/ETH, scaled by 2^192. tokensLeftAtGrad·2^192 needs ~280 bits, so
+         * a plain shift silently truncates (H2). FullMath.mulDiv does the full
+         * 512-bit multiply then the divide, keeping every bit. */
+        uint256 ratioX192 = FullMath.mulDiv(tokensLeftAtGrad, uint256(1) << 192, graduationEth);
         uint160 p = uint160(_sqrt(ratioX192));
         // clamp into the valid V4 range, just in case of extreme params
         if (p <= MIN_SQRT_PRICE) return MIN_SQRT_PRICE + 1;
