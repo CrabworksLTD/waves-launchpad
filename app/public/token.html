@@ -464,7 +464,12 @@ input:focus{outline:none;border-color:var(--accent)}
     if (!empty) return false;
     healed = true;
     try {
-      await fetch("/api/indexer?mint=" + encodeURIComponent(MINT));
+      /* Ask the right indexer. The Solana one does not know this chain, so a
+       * fresh Robinhood token asked a service that would never have it and
+       * concluded there was nothing to draw. */
+      await fetch(IS_EVM
+        ? "/api/rh-indexer?token=" + encodeURIComponent(MINT)
+        : "/api/indexer?mint=" + encodeURIComponent(MINT));
       return true;
     } catch (e) { return false; }
   }
@@ -1092,6 +1097,10 @@ input:focus{outline:none;border-color:var(--accent)}
     if ($("s-trades").textContent === "") $("s-trades").textContent = "0 trades";
     /* Indexed history if we have it, the chain if we do not — a token launched
      * between cron runs still shows its trades. */
+    /* Both chains take the indexed path now. loadTrades() is the fallback for a
+     * token the indexer has not reached yet — on Robinhood that used to be the
+     * ONLY path, which is why the chart was fifteen live trades and the
+     * timeframe buttons did nothing. */
     loadStats().then(function (ok) { if (!ok) loadTrades(); });
     // the Solana indexer feeds loadStats(); Robinhood has its own holder table
     if (IS_EVM) loadEvmHolders();

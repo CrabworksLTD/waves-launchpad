@@ -36,6 +36,10 @@ const POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951";
 // keccak("Transfer(address,address,uint256)")
 const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
+// Bought(address,address,uint256,uint256,uint256) / Sold(...)
+const BOUGHT = "0x7ce543d1780f3bdc3dac42da06c95da802653cd1b212b8d74ec3e3c33ad7095c";
+const SOLD   = "0x9be8a5ca22b7e6e81f04b5879f0248227bb770114291bd47dfaee4c3a82ad60e";
+
 const CHUNK = 50000n;            // the widest window this chain will answer
 const MAX_CHUNKS = 12;           // per token per run — keeps a run inside its timeout
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -183,6 +187,118 @@ async function indexToken(db, rec, curveAddr) {
   return { token, moved, upTo: Number(cursor), done: cursor >= latest };
 }
 
+const word = (d, i) => BigInt("0x" + String(d).replace(/^0x/, "").slice(i * 64, i * 64 + 64));
+
+let termsCache = null;
+async function curveTerms(curveAddr) {
+  if (termsCache) return termsCache;
+  const [ve, vt, cs] = await Promise.all([
+    rpc("eth_call", [{ to: curveAddr, data: "0x4bd387e1" }, "latest"]),
+    rpc("eth_call", [{ to: curveAddr, data: "0x1d3dad09" }, "latest"]),
+    rpc("eth_call", [{ to: curveAddr, data: "0x2138a4c0" }, "latest"])
+  ]);
+  termsCache = { virtualEth: BigInt(ve), virtualTokens: BigInt(vt), curveSupply: BigInt(cs) };
+  return termsCache;
+}
+
+/**
+ * The price history a chart needs, in the shape api/stats.js already serves.
+ *
+ * ⚠️ Robinhood had no chart at all, and not because the data was missing.
+ * api/stats.js rejects anything that is not base58, so an 0x token never
+ * reached the indexed path — the page fell back to drawing whatever handful of
+ * trades it could read live, and the 1H/6H/1D/7D buttons did nothing, because
+ * every one of them asks the indexer.
+ *
+ * The curve's own accounting reconstructs price exactly, with no archive node:
+ *
+ *     Bought  raised += ethIn - fee    tokensLeft -= tokensOut
+ *     Sold    raised -= ethOut + fee   tokensLeft += tokensIn
+ *
+ * and price is the virtual reserves, which is what the contract charges. So a
+ * replay of the log gives the same {at, price, quote} records the Solana
+ * indexer writes, and the same chart code draws them.
+ */
+async function indexTrades(db, rec, curveAddr, latest) {
+  const token = String(rec.mint).toLowerCase();
+  const t = await curveTerms(curveAddr);
+  const topic = "0x" + "0".repeat(24) + token.slice(2);
+
+  /* Replayed from launch every run rather than resumed from a cursor. The
+   * running total IS the price, so a resumed cursor would have to persist
+   * reserves as well, and any drift between the two would bend the chart
+   * silently. A curve's whole log is small — a token busy enough for this to
+   * hurt has graduated and left. */
+  let raised = 0n, tokensLeft = t.curveSupply;
+  const trades = [];
+  const stampOf = new Map();
+
+  const head = await rpc("eth_getBlockByNumber", ["0x" + latest.toString(16), false]);
+  const headTs = Number(BigInt(head.timestamp)) * 1000;
+
+  const start = BigInt(rec.block || 0);
+  if (start <= 0n) return null;
+
+  for (let from = start; from <= latest; from += CHUNK) {
+    const to = from + CHUNK > latest ? latest : from + CHUNK;
+    let logs;
+    try {
+      logs = await rpc("eth_getLogs", [{
+        address: curveAddr, fromBlock: "0x" + from.toString(16),
+        toBlock: "0x" + to.toString(16), topics: [[BOUGHT, SOLD], topic]
+      }]);
+    } catch (e) { break; }
+
+    for (const lg of logs) {
+      const buy = String(lg.topics[0]).toLowerCase() === BOUGHT;
+      const a = word(lg.data, 0), b = word(lg.data, 1), fee = word(lg.data, 2);
+      if (buy) { raised += a - fee; tokensLeft -= b; }
+      else { raised -= b + fee; tokensLeft += a; }
+
+      const x = t.virtualEth + raised;
+      const y = t.virtualTokens - (t.curveSupply - tokensLeft);
+      const price = y > 0n ? Number(x) / Number(y) : 0;
+
+      /* Interpolated from the head block, never fetched per trade. One block
+       * read per trade is what made the Solana chart hammer its node into rate
+       * limiting, and at ~0.104s a block the drift is invisible on a chart. */
+      const blk = Number(BigInt(lg.blockNumber));
+      if (!stampOf.has(blk)) {
+        stampOf.set(blk, headTs - (Number(latest) - blk) * 104);
+      }
+      trades.push({
+        at: stampOf.get(blk),
+        price,
+        quote: Number(buy ? a : b) / 1e18,     // the ETH side, which is the volume
+        side: buy ? "buy" : "sell"
+      });
+    }
+    if (to >= latest) break;
+  }
+
+  if (!trades.length) return { token, trades: 0 };
+
+  const last = trades[trades.length - 1];
+  const supply = Number(t.curveSupply) / 1e18;
+  let ath = 0, athAt = 0;
+  for (const x of trades) if (x.price > ath) { ath = x.price; athAt = x.at; }
+
+  const holders = Object.keys(
+    (await db.hgetall("rhix:" + token + ":h").catch(() => null)) || {}).length;
+
+  await db.set("ix:" + token + ":trades", JSON.stringify(trades.slice(-600)));
+  await db.set("ix:" + token + ":stats", JSON.stringify({
+    price: last.price,
+    supply,
+    mcap: last.price * supply,
+    holders,
+    ath, athAt,
+    quote: "ETH",
+    at: Date.now()
+  }));
+  return { token, trades: trades.length, price: last.price };
+}
+
 export default async function handler(req, res) {
   /* Reading the table is not indexing it.
    *
@@ -264,7 +380,14 @@ export default async function handler(req, res) {
     const out = [];
     for (const t of toks.slice(0, 8)) {
       try {
-        out.push(await indexToken(db, t, curveAddr));
+        const r = await indexToken(db, t, curveAddr);
+        /* Holders first: the price history reports the holder count, so it
+         * wants the table this run just refreshed rather than last run's. */
+        try {
+          const s = await indexTrades(db, t, curveAddr, BigInt(await rpc("eth_blockNumber", [])));
+          if (s) r.priced = s.trades;
+        } catch (e) { r.pricedError = String(e.message || e).slice(0, 90); }
+        out.push(r);
       } catch (e) {
         out.push({ token: t.mint, error: String(e.message || e).slice(0, 140) });
       }

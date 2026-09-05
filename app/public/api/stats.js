@@ -138,7 +138,13 @@ export default async function handler(req, res) {
   }
 
   const mint = (req.query && req.query.mint) || "";
-  if (!B58.test(mint)) return res.status(400).json({ error: "bad mint" });
+  /* ⚠️ Base58 OR 0x. This accepted only base58, so every Robinhood token was
+   * turned away with "bad mint" before anything was looked up — which is why
+   * that chain had no chart and dead timeframe buttons. The data was not
+   * missing; the door was shut. api/rh-indexer.js writes the same ix:<mint>
+   * keys, so everything past this line already works for both. */
+  const isEvm = /^0x[0-9a-fA-F]{40}$/.test(mint);
+  if (!B58.test(mint) && !isEvm) return res.status(400).json({ error: "bad mint" });
   const tf = (req.query && req.query.tf) || "all";
   const win = Object.prototype.hasOwnProperty.call(WINDOWS, tf) ? WINDOWS[tf] : null;
 
