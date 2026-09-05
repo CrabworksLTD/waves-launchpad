@@ -231,6 +231,7 @@ async function indexTrades(db, rec, curveAddr, latest) {
    * hurt has graduated and left. */
   let raised = 0n, tokensLeft = t.curveSupply;
   const trades = [];
+  const rawTrades = [];
   const stampOf = new Map();
 
   const head = await rpc("eth_getBlockByNumber", ["0x" + latest.toString(16), false]);
@@ -272,6 +273,8 @@ async function indexTrades(db, rec, curveAddr, latest) {
         quote: Number(buy ? a : b) / 1e18,     // the ETH side, which is the volume
         side: buy ? "buy" : "sell"
       });
+      // kept as integers alongside, for the reward arithmetic below
+      rawTrades.push({ block: blk, volume: buy ? a : b, fee });
     }
     if (to >= latest) break;
   }
@@ -285,6 +288,52 @@ async function indexTrades(db, rec, curveAddr, latest) {
 
   const holders = Object.keys(
     (await db.hgetall("rhix:" + token + ":h").catch(() => null)) || {}).length;
+
+  /* What holders have earned and what they have actually been sent.
+   *
+   * Earned is in ETH because that is what the curve accrues; sent is in the
+   * reward asset because that is what the keeper swapped it into and what
+   * landed in a wallet. Reporting both in one currency would mean inventing an
+   * exchange rate for money that moved at a different one.
+   *
+   * Pending is everything after the keeper's cursor — the fees a token has
+   * earned for holders but not yet been paid out, which is most of what a
+   * holder wants to know between hourly runs. */
+  let rewards = null;
+  try {
+    const paidWei = BigInt((await db.get("rhk:" + token + ":paidWei")) || "0");
+    const paidAsset = BigInt((await db.get("rhk:" + token + ":paidAsset")) || "0");
+    const assetAddr = await db.get("rhk:" + token + ":paidAssetAddr");
+    const cursor = BigInt((await db.get("rhk:" + token + ":cursor")) || rec.block || 0);
+
+    const c = await rpc("eth_call", [{
+      to: curveAddr, data: "0x2cc3dc6e" + "0".repeat(24) + token.slice(2)
+    }, "latest"]);
+    const feeBps = Number(word(c, 1));
+    const rewardsBps = Number(word(c, 2));
+    const platBps = { 100: 40, 200: 50, 300: 60, 400: 70, 500: 80, 1000: 90 }[feeBps] ?? 40;
+
+    /* Only trades the keeper has not settled yet. Its cursor is in blocks and
+     * these records are in milliseconds, so the split is done on the raw log
+     * during the same pass rather than guessed from timestamps. */
+    let pending = 0n;
+    if (rewardsBps > 0) {
+      for (const r of rawTrades) {
+        if (BigInt(r.block) <= cursor) continue;
+        let toPlatform = (r.volume * BigInt(platBps)) / 10000n;
+        if (toPlatform > r.fee) toPlatform = r.fee;
+        pending += ((r.fee - toPlatform) * BigInt(rewardsBps)) / 10000n;
+      }
+    }
+    rewards = {
+      earnedWei: (paidWei + pending).toString(),
+      pendingWei: pending.toString(),
+      paidWei: paidWei.toString(),
+      paidAsset: paidAsset.toString(),
+      assetAddr: assetAddr || null,
+      rewardsBps
+    };
+  } catch (e) { /* the chart does not depend on these */ }
 
   /* Dollars, because a card shows dollars. The Solana indexer stores these on
    * the same blob and the bulk endpoint hands them straight to the grid — an
@@ -312,6 +361,7 @@ async function indexTrades(db, rec, curveAddr, latest) {
     trades24h: day.length,
     holders,
     ath, athAt,
+    rewards,
     quote: "ETH",
     at: Date.now()
   }));

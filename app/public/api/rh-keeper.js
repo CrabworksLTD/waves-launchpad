@@ -935,6 +935,35 @@ async function payOut(db, planKey, plan) {
   }
 
   if (sent >= plan.payments.length) {
+    /* What each token actually paid its holders, kept per token.
+     *
+     * The keeper knew this all along and threw it away — rhkeeperlog records
+     * the run, not the token — so a token page had no way to say what its
+     * holders have received. Both figures are kept: the ETH the token earned
+     * for them, and the asset units that actually landed, because those are
+     * different currencies and only the second is what anyone was paid. */
+    try {
+      const perToken = {};
+      for (const p of plan.payments) {
+        const k = p.mint;
+        if (!perToken[k]) perToken[k] = { asset: p.asset || null, units: 0n };
+        perToken[k].units += BigInt(p.wei);
+      }
+      for (const sl of plan.slices || []) {
+        const t = perToken[sl.mint];
+        if (!t) continue;
+        const wei = await db.get("rhk:" + sl.mint + ":paidWei").catch(() => null);
+        await db.set("rhk:" + sl.mint + ":paidWei",
+          (BigInt(wei || "0") + BigInt(sl.wei)).toString());
+        if (t.asset) {
+          const a = await db.get("rhk:" + sl.mint + ":paidAsset").catch(() => null);
+          await db.set("rhk:" + sl.mint + ":paidAsset",
+            (BigInt(a || "0") + t.units).toString());
+          await db.set("rhk:" + sl.mint + ":paidAssetAddr", t.asset);
+        }
+      }
+    } catch (e) { /* a bookkeeping failure must not undo a completed payout */ }
+
     /* Only now: the cursors move once the money is actually out. Advancing them
      * earlier would mean a failed run forgot earnings it never paid. */
     for (const c of plan.cursors || []) {

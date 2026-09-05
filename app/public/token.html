@@ -764,6 +764,7 @@ input:focus{outline:none;border-color:var(--accent)}
    * asset is the creator's choice; when nothing trades it yet, holders are
    * paid the quote currency until it can be sold, and saying so here is the
    * same honesty the launch window owes the creator. */
+  var rewardTicker = null;
   async function drawRewards(rec) {
     var pct = rec && rec.feeSharePct;
 
@@ -872,6 +873,7 @@ input:focus{outline:none;border-color:var(--accent)}
           if (!hit || String(asset).toLowerCase() === "0x0000000000000000000000000000000000000000") {
             return paint(null, true);
           }
+          rewardTicker = hit.symbol;
           paint(hit.symbol, hit.liquid !== false);
         }).catch(function () { paint(null, true); });
     }
@@ -889,6 +891,34 @@ input:focus{outline:none;border-color:var(--accent)}
    * Distributed = the holder pot actually paid out (sentRaw). Returns formatted
    * strings, or null when the pool's quote/decimals can't be read. */
   async function fetchRewardFees(rec) {
+    /* ⚠️ Robinhood took a different route to the same two numbers.
+     *
+     * This returned null outright for EVM, so the figures under the rewards
+     * badge simply never rendered on that chain. There is no per-pool fee
+     * account to read there — the curve accrues to the keeper's single balance
+     * — so api/rh-indexer.js works them out during its trade replay and puts
+     * them on the stats blob this page already fetches.
+     *
+     * Earned is in ETH because that is what the curve accrues; sent is in the
+     * reward asset because that is what the keeper swapped it into and what
+     * actually landed. Showing both in one currency would mean inventing a rate
+     * for money that moved at a different one. */
+    if (IS_EVM) {
+      var d = await fetch("/api/stats?mint=" + encodeURIComponent(rec.mint) + "&tf=all")
+        .then(function (r) { return r.json(); }).catch(function () { return null; });
+      var rw = d && d.stats && d.stats.rewards;
+      if (!rw) return null;
+      var earned = Number(rw.earnedWei) / 1e18;
+      var sent = Number(rw.paidAsset) / 1e18;
+      var sym = rewardTicker || "";
+      return {
+        accrued: UI.fmt(earned, 5) + " ETH",
+        distributed: sent > 0 ? UI.fmt(sent, 5) + (sym ? " " + sym : "")
+          /* Nothing sent yet is the normal state between hourly runs, and
+           * "0" alone reads like a failure rather than a schedule. */
+          : (Number(rw.pendingWei) > 0 ? "next run" : "—")
+      };
+    }
     var res = await Promise.all([
       fetch("/api/payouts?mint=" + encodeURIComponent(rec.mint))
         .then(function (r) { return r.json(); })
