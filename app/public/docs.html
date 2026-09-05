@@ -194,8 +194,7 @@ td b{color:var(--ink)}
     <ul>
       <li><b>Supply</b> is fixed: 1,000,000,000 per token, no exceptions, metadata
       immutable — nobody can rename or re-image a token after launch.</li>
-      <li><b>Priced in</b> SOL, USDC, or a real-world asset (a tokenised stock or
-      commodity) where a curve config exists for it.</li>
+      <li><b>Priced in</b> SOL or USDC.</li>
       <li><b>Your first buy</b> can ride in the same transaction that creates the
       pool, so a sniper cannot get in front of your own launch.</li>
       <li><b>Graduation</b> — when the curve raises its target, liquidity migrates
@@ -212,8 +211,8 @@ td b{color:var(--ink)}
     <p>A <b>pair</b> is a collection and a token launched together. The point is the
     fee loop: the token's trading generates fees, the creator's share of those
     fees can pay straight to a reward vault, and that vault funds rewards for
-    the collection's holders — in SOL, USDC, or real-world assets like
-    tokenised stocks and gold, chosen from a verified list of <span class="ch-sol">700+</span><span class="ch-rh">180+</span> at launch.</p>
+    the collection's holders — in SOL, USDC, or tokenised stocks,
+    chosen from a verified list of <span class="ch-sol">700+</span><span class="ch-rh">180+</span> at launch.</p>
     <p>The staking side — holders burning the token to activate their NFTs and
     claim rewards — is in development and will say so on every screen until it
     is live and audited. Nothing on this site pretends otherwise.</p>
@@ -249,9 +248,10 @@ td b{color:var(--ink)}
     it cannot be changed for a token afterwards, by the creator or by us.</p>
 
     <h3>Holder rewards</h3>
-    <p>A creator can pass any share of their side to the people holding the
+    <p>A creator sends their whole share of the fees to the people holding the
     token — a dividend paid pro-rata every hour, with nothing for holders to
-    claim, or a buyback that takes the token off the market and burns it.</p>
+    claim, or a buyback that takes the token off the market and burns it. It is
+    all or nothing, chosen at launch: keep your fees, or reward your holders.</p>
 
     <p><b>This is switched on after the launch, not during it.</b> The creator
     opens the fee page and activates it in one signature, which hands the pool's
@@ -265,8 +265,8 @@ td b{color:var(--ink)}
     on sight — correctly, since it is also what a drainer looks like. Splitting
     it in two costs one extra signature and removes the ambiguity.</p>
 
-    <p>Creators also choose the asset holders are paid in — a tokenised stock or
-    commodity rather than the currency the token trades against. The keeper buys
+    <p>Creators also choose the asset holders are paid in — a tokenised stock
+    rather than the currency the token trades against. The keeper buys
     it before distributing, and pays the trading currency instead whenever that
     would not serve holders: nothing trades the asset yet, the payout would be
     large enough to move its price, or the cost of creating token accounts would
