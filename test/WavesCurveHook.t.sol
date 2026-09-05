@@ -150,6 +150,45 @@ contract WavesCurveHookTest is Test {
         assertEq(hook.owed(platform), 0, "owed not cleared");
     }
 
+    function test_graduation_seeds_locked_liquidity_and_amm_trades() public {
+        (address token, PoolKey memory key) = _launch();
+
+        // fill the curve: buy the whole graduation target (the clamp caps it)
+        _buy(key, GRAD + 1 ether);
+        (,,,,, uint96 raised,, bool gradBefore) = hook.curves(key.toId());
+        assertEq(uint256(raised), GRAD, "curve did not fill to the target");
+        assertFalse(gradBefore);
+
+        // the next buy is refused — the curve is complete until it graduates
+        vm.deal(buyer, 0.1 ether);
+        vm.prank(buyer);
+        vm.expectRevert();
+        swapRouter.swap{value: 0.1 ether}(
+            key,
+            SwapParams({zeroForOne: true, amountSpecified: -0.1 ether, sqrtPriceLimitX96: MIN_SQRT + 1}),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            ""
+        );
+
+        // anyone graduates it
+        hook.graduate(token);
+        (,,,,,,, bool grad) = hook.curves(key.toId());
+        assertTrue(grad, "not graduated");
+
+        // real, locked liquidity is now in the pool — a normal AMM buy works and
+        // the hook no longer overrides (a fresh buyer gets tokens from the AMM)
+        address late = address(0xDA7E);
+        vm.deal(late, 0.2 ether);
+        vm.prank(late);
+        swapRouter.swap{value: 0.2 ether}(
+            key,
+            SwapParams({zeroForOne: true, amountSpecified: -0.2 ether, sqrtPriceLimitX96: MIN_SQRT + 1}),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            ""
+        );
+        assertGt(WavesToken(token).balanceOf(late), 0, "AMM swap post-graduation gave nothing");
+    }
+
     function test_outside_liquidity_is_blocked() public {
         (, PoolKey memory key) = _launch();
         vm.expectRevert();

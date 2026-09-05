@@ -24,10 +24,12 @@ import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
-import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
+import {BalanceDelta, BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {SwapParams, ModifyLiquidityParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {CurrencySettler} from "./v4lib/CurrencySettler.sol";
+import {LiquidityAmounts} from "./v4lib/LiquidityAmounts.sol";
 import {WavesToken} from "./WavesToken.sol";
 
 /**
@@ -55,21 +57,31 @@ import {WavesToken} from "./WavesToken.sol";
  * curve; graduation seeds the pool from the supply the virtual reserve leaves
  * behind. Every comment on those invariants in WavesCurve.sol applies here.
  *
- * ⚠️ RESERVE MODEL: the hook now holds its ETH as ERC-6909 CLAIMS in the
- * PoolManager (buys mint the claim; sells/fees burn it). claim() below
- * still pays real ETH via call{value} — it must first burn the hook's ETH
- * claims back to native ETH inside a manager unlock. That conversion, and
- * the sell path's claim burn, are validated for the BUY path only so far;
- * claim()/sell need their own fork tests. FOLLOW-UP before any mainnet use.
+ * ── Reserve model ───────────────────────────────────────────────────────────
+ * Reserves (the whole token supply, and the ETH the curve takes) are held as
+ * ERC-6909 CLAIMS in the PoolManager, never as real balances — a native take at
+ * beforeSwap, before the swapper has settled, would find the manager empty.
+ * Launch deposits the supply as a claim; a buy mints ETH-claims and burns
+ * token-claims, a sell does the reverse, claim() burns ETH-claims back to native
+ * ETH, and graduation burns both to seed the pool.
  *
- * ⚠️ AUDIT STATUS: the `_beforeSwap` delta accounting and `_graduate` liquidity
- * provision move other people's money and have NOT been audited. This is a
- * first implementation for fork-testing and review — do not point mainnet
- * launches at it until both are audited. Same gate as the staking program.
+ * ── Lifecycle ───────────────────────────────────────────────────────────────
+ * launch → live pool (supply as claims) → curve trading (beforeSwap prices every
+ * swap) → curve fills → graduate() seeds one full-range, hook-owned (=locked)
+ * position and flips the pool to an ordinary AMM (beforeSwap steps aside). The
+ * locked LP also clears the "Burnt/Locked LP" risk flag aggregators raise.
+ *
+ * ⚠️ AUDIT STATUS: validated on a local PoolManager (6/6: launch, buy, sell,
+ * fee-claim, graduation, LP-block). Still owed before any mainnet launch: fork
+ * tests against RH's real PoolManager, a hook-address mining/deploy tool, and a
+ * full audit — this moves other people's money. Same gate as the staking
+ * program. Exact-output swaps and a bundled launch-buy are intentionally out of
+ * scope for v1.
  */
 contract WavesCurveHook is IHooks {
     using PoolIdLibrary for PoolKey;
     using CurrencySettler for Currency;
+    using BalanceDeltaLibrary for BalanceDelta;
 
     // ─────────────────────────────────────────────────────────── immutables
     IPoolManager public immutable manager;
@@ -228,11 +240,15 @@ contract WavesCurveHook is IHooks {
             WavesToken(token).transfer(address(manager), amount); // real tokens in
             manager.settle();
             manager.mint(address(this), tok.toId(), amount);      // ← as our claim
-        } else {
+        } else if (op == 1) {
             (, address to, uint256 amount) = abi.decode(data, (uint8, address, uint256));
             Currency eth = Currency.wrap(address(0));
             manager.burn(address(this), eth.toId(), amount);      // burn ETH-claims
             manager.take(eth, to, amount);                        // → native ETH out
+        } else {
+            // op == 2: seed the graduated pool with the reserves as locked liquidity
+            (, address token,) = abi.decode(data, (uint8, address, uint256));
+            _seedGraduation(token);
         }
         return "";
     }
@@ -315,13 +331,15 @@ contract WavesCurveHook is IHooks {
         onlyManager
         returns (bytes4, BeforeSwapDelta, uint24)
     {
-        if (params.amountSpecified > 0) revert ExactOutputUnsupported();
-
         PoolId id = key.toId();
         Curve storage c = curves[id];
         if (c.creator == address(0)) revert UnknownToken();
-        if (c.graduated) revert AlreadyGraduated();
+        /* Once graduated, the pool trades as an ordinary V4 AMM against the
+         * locked liquidity — the hook steps aside and lets the swap through
+         * with a zero delta. */
+        if (c.graduated) return (IHooks.beforeSwap.selector, toBeforeSwapDelta(0, 0), 0);
 
+        if (params.amountSpecified > 0) revert ExactOutputUnsupported();
         uint256 amountIn = uint256(-params.amountSpecified);
         Currency ethCur = key.currency0;   // native ETH, always currency0
         Currency tokCur = key.currency1;
@@ -339,7 +357,9 @@ contract WavesCurveHook is IHooks {
             tokCur.settle(manager, address(this), tokensOut, true);   // burn token-claims → user
             unspecified = -int128(int256(tokensOut));
             emit Bought(c.token, tx.origin, amountIn, tokensOut, _lastFee);
-            if (c.raised >= graduationEth) _graduate(id, c, key);
+            /* A filled curve stops here; graduation (seeding the pool) is a
+             * separate call — see graduate() — so no liquidity op runs inside
+             * a swap. */
         } else {
             // SELL: tokens in, ETH out
             uint256 ethOut = _sell(c, amountIn);
@@ -444,11 +464,60 @@ contract WavesCurveHook is IHooks {
      * `graduated` without seeding liquidity would strand the reserves, so we do
      * neither here — a filled curve simply stops accepting buys (CurveComplete)
      * until this is finished. */
-    function _graduate(PoolId id, Curve storage c, PoolKey calldata /*key*/) private {
-        emit Graduated(c.token, c.raised, c.tokensLeft);
-        // c.graduated = true;  // enabled only once liquidity provision below exists
-        // TODO(audit): unlock → modifyLiquidity(full range) → lock LP → set graduated
-        revert("GRADUATION_NOT_IMPLEMENTED");
+    /* Once the curve is full, anyone may finish it: the accumulated ETH and the
+     * tokens the curve left behind become one full-range V4 position, owned by
+     * this hook forever (there is no path in this contract that removes it), so
+     * the launch's liquidity is permanently locked. After this the pool trades
+     * as an ordinary AMM and beforeSwap steps aside.
+     *
+     * Permissionless because there is nothing to steal: the amounts and the
+     * position are fixed by the curve's final state, and the LP goes to the
+     * hook regardless of who calls. */
+    function graduate(address token) external {
+        PoolId id = poolOf[token];
+        Curve storage c = curves[id];
+        if (c.creator == address(0)) revert UnknownToken();
+        if (c.graduated) revert AlreadyGraduated();
+        if (c.raised < graduationEth) revert CurveComplete(); // not full yet
+        c.graduated = true;
+        emit Graduated(token, c.raised, c.tokensLeft);
+        manager.unlock(abi.encode(uint8(2), token, uint256(0)));
+    }
+
+    /* The graduation add-liquidity, run inside the unlock. The pool's stored
+     * price already equals the reserves' ratio (see _openingSqrtPrice), so a
+     * full-range position deploys both the raised ETH and the leftover tokens.
+     * The hook owes those two amounts to the pool afterwards and pays them by
+     * burning the claims it has been holding all along. */
+    function _seedGraduation(address token) private {
+        PoolId id = poolOf[token];
+        Curve storage c = curves[id];
+        PoolKey memory key = _key(token);
+
+        int24 lower = (TickMath.MIN_TICK / TICK_SPACING) * TICK_SPACING;
+        int24 upper = (TickMath.MAX_TICK / TICK_SPACING) * TICK_SPACING;
+
+        uint160 sqrtP = _openingSqrtPrice();
+        uint128 liq = LiquidityAmounts.getLiquidityForAmounts(
+            sqrtP,
+            TickMath.getSqrtPriceAtTick(lower),
+            TickMath.getSqrtPriceAtTick(upper),
+            uint256(c.raised),      // amount0 = ETH
+            uint256(c.tokensLeft)   // amount1 = token
+        );
+
+        (BalanceDelta delta, ) = manager.modifyLiquidity(
+            key,
+            ModifyLiquidityParams({tickLower: lower, tickUpper: upper, liquidityDelta: int256(uint256(liq)), salt: 0}),
+            ""
+        );
+
+        /* delta is what the hook owes the pool (negative on each side). Pay both
+         * by burning the reserves it holds as claims. */
+        int128 owe0 = delta.amount0();
+        int128 owe1 = delta.amount1();
+        if (owe0 < 0) key.currency0.settle(manager, address(this), uint256(uint128(-owe0)), true);
+        if (owe1 < 0) key.currency1.settle(manager, address(this), uint256(uint128(-owe1)), true);
     }
 
     // ─────────────────────────────────────────────────────────── helpers
@@ -462,13 +531,26 @@ contract WavesCurveHook is IHooks {
         });
     }
 
-    /* sqrt(virtualEth / virtualTokens) * 2^96, the curve's opening price. Uses a
-     * simple integer sqrt; the hook re-prices every swap, so this only has to be
-     * a valid, correctly-scaled starting tick. */
+    /* The pool's stored price is the price the curve GRADUATES at — the ratio of
+     * the reserves it hands the pool (tokensLeftAtGrad tokens : graduationEth
+     * ETH). During the curve phase the hook overrides every swap, so this stored
+     * price is dormant; at graduation the full-range position deploys both
+     * reserves cleanly because the price already matches them. Aggregators chart
+     * the curve phase from Swap events, not this value. Price is currency1/
+     * currency0 = token/ETH. */
     function _openingSqrtPrice() internal view returns (uint160) {
-        uint256 ratioX192 = (virtualEth << 192) / virtualTokens;
-        return uint160(_sqrt(ratioX192));
+        uint256 yAtGrad = (virtualEth * virtualTokens) / (virtualEth + graduationEth);
+        uint256 tokensLeftAtGrad = curveSupply - (virtualTokens - yAtGrad);
+        uint256 ratioX192 = (tokensLeftAtGrad << 192) / graduationEth; // token/ETH
+        uint160 p = uint160(_sqrt(ratioX192));
+        // clamp into the valid V4 range, just in case of extreme params
+        if (p <= MIN_SQRT_PRICE) return MIN_SQRT_PRICE + 1;
+        if (p >= MAX_SQRT_PRICE) return MAX_SQRT_PRICE - 1;
+        return p;
     }
+
+    uint160 internal constant MIN_SQRT_PRICE = 4295128739;
+    uint160 internal constant MAX_SQRT_PRICE = 1461446703485210103287273052203988822378723970342;
 
     function _sqrt(uint256 x) internal pure returns (uint256 y) {
         if (x == 0) return 0;
