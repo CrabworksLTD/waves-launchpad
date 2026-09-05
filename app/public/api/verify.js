@@ -50,7 +50,14 @@ async function explorer(path, init) {
 
 async function isVerified(address) {
   const r = await explorer("/api/v2/smart-contracts/" + address);
-  return !!(r.json && r.json.is_verified);
+  /* Reported, not just believed. If the check silently answers "no" — a
+   * challenge page, a rate limit, a shape change — every run resubmits every
+   * token forever, which works but is noise nobody would ever notice. */
+  return {
+    verified: !!(r.json && r.json.is_verified),
+    saw: r.json ? (r.json.is_verified === undefined ? "no is_verified field" : "ok")
+               : "no json (" + r.status + ")"
+  };
 }
 
 let inputCache = null;
@@ -116,7 +123,8 @@ export default async function handler(req, res) {
     const out = [];
     for (const a of addresses.slice(0, 12)) {
       try {
-        if (await isVerified(a)) { out.push({ token: a, already: true }); continue; }
+        const chk = await isVerified(a);
+        if (chk.verified) { out.push({ token: a, already: true }); continue; }
         const r = await submit(a, spec);
         /* A 200 means the job was ACCEPTED, not that it succeeded — Blockscout
          * queues it. The next run reports whether it stuck, which is why this
@@ -124,6 +132,7 @@ export default async function handler(req, res) {
         out.push({
           token: a,
           submitted: r.status,
+          check: chk.saw,
           note: (r.json && r.json.message) || r.text || null
         });
       } catch (e) {
