@@ -353,6 +353,10 @@ async function indexTrades(db, rec, curveAddr, latest) {
       paidWei: paidWei.toString(),
       paidAsset: paidAsset.toString(),
       assetAddr: assetAddr || null,
+      /* What the fallback had to work with. Guessing why this came out null
+       * cost two deploys; the record's own field is one string and reporting it
+       * makes the next answer immediate. */
+      fromRecord: rec.rewardMint || null,
       rewardsBps
     };
   } catch (e) { /* the chart does not depend on these */ }
