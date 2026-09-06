@@ -477,8 +477,16 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
             });
           });
         }, Promise.resolve())
-        .then(function () { draw(mine(r[0], "collections"), [], r[2]); })
-        .catch(function () { draw([], [], r[2]); });
+        /* ⚠️ Tokens were passed as [] here, so the Robinhood homepage could
+         * never show one — no error, no empty API, just a hardcoded empty list
+         * where the Solana branch passes mine(r[1], "tokens").
+         *
+         * The extra scripts this branch waits for are the COLLECTION readers;
+         * tokens do not need them, which is why the catch below still passes
+         * them. A launch should not vanish from the homepage because a
+         * collection reader failed to load. */
+        .then(function () { draw(mine(r[0], "collections"), mine(r[1], "tokens"), r[2]); })
+        .catch(function () { draw([], mine(r[1], "tokens"), r[2]); });
     }
     draw(mine(r[0], "collections"), mine(r[1], "tokens"), r[2]);
   });
