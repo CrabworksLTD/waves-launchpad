@@ -189,10 +189,12 @@ window.MOONPAD_CHAINS = [
      * (see `v4Router`, still null) — without it, buy/sell from the UI can't route.
      * Do a throwaway test launch on the hook to prove initialize() before flip. */
     hook: "0xA02AAaCb311F49e7f55c4dF5b40b3cFCe0D76888",
-    // Public V4 swap router for hook buy/sell. Null until one exists on this
-    // chain — the existing WavesSwapRouter is keeper-only. evm-hook.js buy()/
-    // sell() throw a clear message while this is unset.
-    v4Router: null,
+    // Public V4 swap router for hook buy/sell (contracts/WavesHookRouter.sol).
+    // Deployed + on-chain-verified 2026-09-05 (tx 0xc5ae079e…ee24bd7e); its
+    // manager()/hook() immutables confirmed pointing at the PoolManager above and
+    // the `hook` here. Ownerless, holds no funds. evm-hook.js buy()/sell() route
+    // through it. Plain CREATE, so this address is specific to that deploy.
+    v4Router: "0x29b0638dd7fcd8f829fed7cd2a10830a6c1faa27",
 
     /* Who receives a creator's pledged share, and pays it out to holders.
      *
