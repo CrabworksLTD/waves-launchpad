@@ -761,7 +761,7 @@ export default async function handler(req, res) {
 
     const done = await payOut(db, planKey, record);
     return res.status(200).json({
-      ok: true, keeper, claimHash, swaps: record.swaps,
+      ok: true, keeper, claimHash, swaps: record.swaps, burns: record.burns,
       carriedToNextRun: record.carried || 0, ...done, log
     });
   } catch (e) {
