@@ -292,7 +292,7 @@ input:focus{outline:none;border-color:var(--accent)}
       </div>
       <canvas id="curve"></canvas>
       <div class="bar"><i id="bar"></i></div>
-      <div class="barlb"><span id="pct">—</span><span>graduation → Meteora DAMM v2, LP locked</span></div>
+      <div class="barlb"><span id="pct">—</span><span id="grad-dest">graduation → Meteora DAMM v2, LP locked</span></div>
       <p class="desc" id="desc"></p>
     </div>
 
@@ -489,6 +489,9 @@ input:focus{outline:none;border-color:var(--accent)}
    * paints well before that read returns, so a Robinhood token announced "SOL
    * rewards are active" and wore $TICKER/SOL next to its name. */
   var QUOTE = IS_EVM ? "ETH" : "SOL";
+  // Robinhood curves graduate into a locked Uniswap V4 position (the hook), not
+  // Meteora — that label is Solana's.
+  if (IS_EVM) { var gd = $("grad-dest"); if (gd) gd.textContent = "graduation → Uniswap V4, LP locked"; }
   var USD = null;                       // quote asset in dollars, from the indexer
 
   /* Money, written the way people read it.
@@ -1471,7 +1474,9 @@ input:focus{outline:none;border-color:var(--accent)}
       /* Index this trade before reloading, so the chart, volume and feed show
        * it now rather than at the next ten-minute cron. A person who just
        * bought and sees nothing change assumes the page is broken. */
-      fetch("/api/indexer?mint=" + encodeURIComponent(MINT))
+      fetch(IS_EVM
+        ? "/api/rh-indexer?token=" + encodeURIComponent(MINT)
+        : "/api/indexer?mint=" + encodeURIComponent(MINT))
         .catch(function () {})
         .then(function () { load(); });
     } catch (e) {
