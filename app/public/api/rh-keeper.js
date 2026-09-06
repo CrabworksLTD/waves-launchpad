@@ -58,6 +58,12 @@ const SOLD   = "0x9be8a5ca22b7e6e81f04b5879f0248227bb770114291bd47dfaee4c3a82ad6
  * until it is deployed, and absent means "pay ETH" — the behaviour before this
  * existed, which is honest rather than broken. */
 const SWAP_ROUTER = process.env.RH_SWAP_ROUTER || null;
+/* Buyback-and-burn buys the token on its own curve through the public
+ * WavesHookRouter and delivers it straight to the dead address. buy() takes a
+ * recipient, so no separate burn tx is needed. */
+const HOOK_ROUTER = process.env.RH_HOOK_ROUTER || "0x29b0638dd7fcd8f829fed7cd2a10830a6c1faa27";
+const DEAD = "0x000000000000000000000000000000000000dEaD";
+const ROUTER_BUY = "0xb3ffb760"; // buy(address,uint256,address,uint256)
 
 // WavesSwapRouter.swap((address,address,uint24,int24,address),uint256,address)
 const SEL_SWAP = "0x4ea88ad7";
@@ -91,6 +97,7 @@ const GAS_SWAP = 400000n;
 // two swaps in one lock, so roughly twice the work plus the second settlement
 const GAS_SWAP2 = 700000n;
 const GAS_CLAIM = 80000n;
+const GAS_BURN = 600000n;   // one router.buy that opens/settles a curve position
 
 /* How much worse than the quote a fill is allowed to be. The keeper is the only
  * thing trading these pools at this size, but the mempool is public and an
@@ -625,13 +632,20 @@ export default async function handler(req, res) {
     // ── 2. attribute the pot across the tokens that earned it ────────────────
     const shares = [];
     const assets = {};
+    const burns = {}; // mint -> true when the creator chose buyback-and-burn
     let attributed = 0n;
     for (const t of toks) {
       const mint = String(t.mint).toLowerCase();
       /* What the creator chose to pay holders in. Null, missing or ETH itself
        * all mean the same thing: no swap, pay the native coin. */
       const rm = t.rewardMint && String(t.rewardMint).toLowerCase();
-      assets[mint] = rm && rm !== ZERO_ADDR && /^0x[0-9a-f]{40}$/.test(rm) ? rm : null;
+      /* Buyback-and-burn: no asset is paid to holders. The keeper buys the token
+       * ITSELF with the accrued ETH and sends it to 0xdEaD — the same thing the
+       * Solana side does (destroy rather than distribute), and what a burn on the
+       * benchmark launchpad does too. So it takes no asset and no holders. */
+      const isBurn = t.rewardMode === "burn";
+      burns[mint] = isBurn;
+      assets[mint] = (!isBurn && rm && rm !== ZERO_ADDR && /^0x[0-9a-f]{40}$/.test(rm)) ? rm : null;
       /* The hook keys its Curve by PoolId: poolOf(mint) -> curves(poolId).
        * curves(address) on the hook returns a zero struct (rewardsBps 0), so the
        * keeper would skip every token as "no rewards". Layout: token(0)
@@ -646,7 +660,7 @@ export default async function handler(req, res) {
       const rewardsBps = Number(word(curve, 3));
       if (!rewardsBps) continue;
       const a = await accrued(db, mint, feeBps, rewardsBps, t.block, latest);
-      if (a.wei > 0n) { shares.push({ mint, wei: a.wei, upTo: a.upTo }); attributed += a.wei; }
+      if (a.wei > 0n) { shares.push({ mint, wei: a.wei, upTo: a.upTo, burn: isBurn }); attributed += a.wei; }
       else log.push({ mint, earned: "0" });
     }
     if (!attributed) return res.status(200).json({ ok: true, keeper, note: "no attributable earnings", log });
@@ -657,20 +671,28 @@ export default async function handler(req, res) {
     let holderCount = 0;
     const tables = {};
     for (const s of shares) {
+      if (s.burn) continue;              // a burn destroys supply, it pays no holder
       const h = (await db.hgetall("rhix:" + s.mint + ":h").catch(() => null)) || {};
       tables[s.mint] = h;
       holderCount += Object.keys(h).length;
     }
-    if (!holderCount) return res.status(200).json({ ok: true, keeper, note: "no holders indexed yet" });
+    /* A launch nobody holds yet can still burn — only the DIVIDEND path needs a
+     * holder table to pay into. Refuse for no holders only if there is one. */
+    const dividendShares = shares.filter((s) => !s.burn).length;
+    if (dividendShares > 0 && !holderCount) {
+      return res.status(200).json({ ok: true, keeper, note: "no holders indexed yet" });
+    }
 
     /* Budget for the dearer path. A token paying an asset costs a swap plus an
      * ERC20 transfer per holder, and a run that priced itself as ETH sends
      * would pass the worth-it test and then strand halfway through, holding
      * money it had already claimed. */
     const swapping = shares.filter((s) => assets[s.mint] && SWAP_ROUTER).length;
+    const burning = shares.filter((s) => s.burn).length;
     const perHolder = swapping ? GAS_PER_ERC20 : GAS_PER_TRANSFER;
-    // budget the dearer of the two routes; which one wins is not known until quoted
-    const gasCost = (GAS_CLAIM + GAS_SWAP2 * BigInt(swapping) +
+    // budget the dearer of the two routes; which one wins is not known until quoted.
+    // a burn is one router.buy, no per-holder tail.
+    const gasCost = (GAS_CLAIM + GAS_SWAP2 * BigInt(swapping) + GAS_BURN * BigInt(burning) +
       perHolder * BigInt(holderCount)) * gasPrice;
     /* An explicit, authenticated override for testing the path end to end.
      *
@@ -711,15 +733,17 @@ export default async function handler(req, res) {
       slices: shares.map((s) => ({
         mint: s.mint,
         wei: ((pot * s.wei) / attributed).toString(),
-        asset: assets[s.mint] || null
+        asset: assets[s.mint] || null,
+        burn: !!s.burn
       })),
-      swaps: {}, payments: null, sent: 0,
+      swaps: {}, burns: {}, payments: null, sent: 0,
       // what a transfer costs, so the dust threshold survives into a resumed run
       gasPriceWei: gasPrice.toString()
     };
     await db.set(planKey, JSON.stringify(record));
 
     await runSwaps(db, planKey, record, keeper);
+    await runBurns(db, planKey, record, keeper);
     await buildPayments(db, record, tables);
     await db.set(planKey, JSON.stringify(record));
 
@@ -845,6 +869,63 @@ async function runSwaps(db, planKey, plan, keeper) {
  * swept into the next run rather than being sent as a transfer that costs more
  * gas than it moves.
  */
+/* Buyback-and-burn. For each burn slice, buy the token on its own curve through
+ * the WavesHookRouter with the accrued ETH and deliver it straight to 0xdEaD.
+ * Crash-recoverable like runSwaps: the tx is signed and written into the plan
+ * BEFORE broadcast, and the amount burned is the dead-address balance DELTA, so
+ * a resume — or two runs — can never double-count. The cumulative burn per token
+ * is persisted for the token page's "tokens burnt" counter. */
+async function runBurns(db, planKey, plan, keeper) {
+  for (const sl of plan.slices || []) {
+    if (!sl.burn) continue;
+    plan.burns = plan.burns || {};
+    if (plan.burns[sl.mint] && plan.burns[sl.mint].done) continue;
+
+    const amountIn = BigInt(sl.wei);
+    if (amountIn <= 0n) { plan.burns[sl.mint] = { skipped: "nothing accrued", done: true }; continue; }
+
+    try {
+      let pending = plan.burns[sl.mint];
+      if (!pending) {
+        // dead-address balance BEFORE, so the burn is measured as a delta
+        const beforeHex = await rpc("eth_call", [
+          { to: sl.mint, data: SEL_BALANCE_OF + encAddr(DEAD) }, "latest"]);
+        // buy(token, minOut=0, to=DEAD, deadline). Any overfill near graduation is
+        // refunded by the router to the keeper and carried as its own balance.
+        const deadline = Math.floor(Date.now() / 1000) + 1200;
+        const data = ROUTER_BUY + encAddr(sl.mint) + pad(0n) + encAddr(DEAD) + pad(deadline);
+        const { raw, hash } = await signKeeperTx(HOOK_ROUTER, data, amountIn, GAS_BURN);
+        pending = { hash, raw, before: BigInt(beforeHex || "0x0").toString(), done: false };
+        plan.burns[sl.mint] = pending;
+        await db.set(planKey, JSON.stringify(plan));
+      }
+
+      let receipt = await rpc("eth_getTransactionReceipt", [pending.hash]).catch(() => null);
+      if (!receipt) {
+        try { await rpc("eth_sendRawTransaction", [pending.raw]); } catch (e) { /* may already be pooled */ }
+        receipt = await mined(pending.hash);
+      }
+      if (receipt && receipt.status === "0x1") {
+        const afterHex = await rpc("eth_call", [
+          { to: sl.mint, data: SEL_BALANCE_OF + encAddr(DEAD) }, "latest"]);
+        const burnt = BigInt(afterHex || "0x0") - BigInt(pending.before);
+        pending.done = true; pending.burnt = burnt.toString();
+        await db.set(planKey, JSON.stringify(plan));
+        const prevTok = BigInt((await db.get("rhk:" + sl.mint + ":burnt")) || "0");
+        await db.set("rhk:" + sl.mint + ":burnt", (prevTok + burnt).toString());
+        const prevEth = BigInt((await db.get("rhk:" + sl.mint + ":burnEthWei")) || "0");
+        await db.set("rhk:" + sl.mint + ":burnEthWei", (prevEth + amountIn).toString());
+      } else {
+        pending.error = "burn tx did not succeed";
+        await db.set(planKey, JSON.stringify(plan));
+      }
+    } catch (e) {
+      plan.burns[sl.mint] = { ...(plan.burns[sl.mint] || {}), error: String(e.message || e).slice(0, 140) };
+      await db.set(planKey, JSON.stringify(plan));
+    }
+  }
+}
+
 async function buildPayments(db, plan, tables) {
   const payments = [];
 
@@ -868,6 +949,7 @@ async function buildPayments(db, plan, tables) {
   const gasPrice = BigInt(plan.gasPriceWei || "0");
 
   for (const sl of plan.slices || []) {
+    if (sl.burn) continue;                 // burns pay no holders — handled in runBurns
     const table = tables[sl.mint] || {};
     const supply = Object.values(table).reduce((a, b) => a + BigInt(b), 0n);
     if (supply === 0n) continue;

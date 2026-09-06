@@ -854,8 +854,8 @@ input:focus{outline:none;border-color:var(--accent)}
           ? "<span>Paid in " + esc(QUOTE) + " until " + esc(sym) + " is tradeable.</span>"
           : "") +
         '<div class="rfees" hidden>' +
-          '<div><span>Fees accrued</span><b class="rf-accrued">—</b></div>' +
-          '<div><span>Distributed</span><b class="rf-dist">—</b></div>' +
+          '<div><span>' + (burn ? "ETH accrued" : "Fees accrued") + '</span><b class="rf-accrued">—</b></div>' +
+          '<div><span>' + (burn ? "Tokens burnt" : "Distributed") + '</span><b class="rf-dist">—</b></div>' +
         "</div>";
       box.hidden = false;
       // the ticker carries it too, so it is visible without scrolling
@@ -920,6 +920,19 @@ input:focus{outline:none;border-color:var(--accent)}
       var rw = d && d.stats && d.stats.rewards;
       if (!rw) return null;
       var earned = Number(rw.earnedWei) / 1e18;
+      /* Buyback-and-burn: no asset is paid to holders. Accrued is the ETH the
+       * fees earned (spent buying back + still pending); the right-hand figure is
+       * the tokens bought back and sent to the dead address. */
+      if (rw.burn) {
+        var burnt = Number(rw.burntTokens || "0") / 1e18;
+        return {
+          accrued: UI.fmt(earned, 5) + " ETH",
+          accruedTitle: UI.fmt(earned, 6) + " ETH of fees toward buyback & burn",
+          distributed: burnt > 0 ? UI.fmt(burnt, 2) : (Number(rw.pendingWei) > 0 ? "pending" : "—"),
+          distributedTitle: burnt > 0 ? UI.fmt(burnt, 4) + " tokens burnt" :
+            "Fees accrue; the keeper buys the token back and burns it on the first hourly run worth the gas."
+        };
+      }
       var sent = Number(rw.paidAsset) / 1e18;
       var sym = rewardTicker || "";
       /* Accrued in the same asset as distributed, so the two are directly

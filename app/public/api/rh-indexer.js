@@ -380,10 +380,21 @@ async function indexTrades(db, rec, curveAddr, latest) {
       }
     } catch (e) { /* the ETH figure still stands on its own */ }
 
+    /* Buyback-and-burn: the keeper spends the accrued ETH buying the token and
+     * sending it to 0xdEaD, so there is no reward asset and no "paid" — the two
+     * numbers a holder wants are ETH accrued (spent + still pending) and tokens
+     * burnt. Both are persisted by the keeper per run. */
+    const isBurn = rec.rewardMode === "burn";
+    const burnEthWei = BigInt((await db.get("rhk:" + token + ":burnEthWei")) || "0");
+    const burntTokens = (await db.get("rhk:" + token + ":burnt")) || "0";
+
     rewards = {
-      earnedWei: (paidWei + pending).toString(),
-      earnedAsset,
+      earnedWei: (isBurn ? (burnEthWei + pending) : (paidWei + pending)).toString(),
+      earnedAsset: isBurn ? null : earnedAsset,
       pendingWei: pending.toString(),
+      burn: isBurn,
+      burntTokens,
+      burnEthWei: burnEthWei.toString(),
       paidWei: paidWei.toString(),
       paidAsset: paidAsset.toString(),
       assetAddr: assetAddr || null,
