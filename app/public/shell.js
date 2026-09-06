@@ -833,7 +833,33 @@
     if (currentChain() === "robinhood") {
       return ensureEvmStack()
         .then(function () { return window.MoonpadWallet.connect(); })
-        .then(function () { return (window.MoonpadWallet && window.MoonpadWallet.account) || null; })
+        .then(function () {
+          var mw = window.MoonpadWallet;
+          if (mw && mw.account) return mw.account;
+          /* Multiple injected providers open the EIP-6963 picker, and connect()
+           * resolves BEFORE the user picks one — so the account is not set yet.
+           * Wait for it to arrive via the "moonpad-wallet" event (fired when a
+           * wallet is adopted), so callers that re-render on the returned account
+           * (the launch confirm) actually see the connection. Times out so a
+           * closed picker does not hang the promise. */
+          return new Promise(function (res) {
+            var done = false;
+            function finish(v) {
+              if (done) return; done = true;
+              window.removeEventListener("moonpad-wallet", onW);
+              clearTimeout(t);
+              res(v || null);
+            }
+            function onW() {
+              var a = window.MoonpadWallet && window.MoonpadWallet.account;
+              if (a) finish(a);
+            }
+            window.addEventListener("moonpad-wallet", onW);
+            var t = setTimeout(function () {
+              finish(window.MoonpadWallet && window.MoonpadWallet.account);
+            }, 180000);
+          });
+        })
         .catch(function () { return null; });
     }
     return connectModal();

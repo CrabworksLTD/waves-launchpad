@@ -1729,9 +1729,20 @@
     /* Rewards are switched on after launch, from the claim page. A launch that
      * named our keeper as the pool's creator put an unknown third signer into
      * the transaction, which is what Phantom blocked as a possible drainer —
-     * isolated 2026-09-02 across four launches. */
-    flow.feeSharePct = 0;
-    flow.feeShare = "keep";
+     * isolated 2026-09-02 across four launches.
+     *
+     * But DON'T clobber a mode the creator already picked: this window rendering
+     * again (a back/forward, an asset change) must not silently reset a chosen
+     * Dividend/Burn to "keep" while the tab still shows it selected — which read
+     * on the confirm as "You keep everything" over a highlighted Dividend. Seed
+     * the share from the existing mode so the two stay in step. */
+    if (flow.rewardMode === "dividend" || flow.rewardMode === "burn") {
+      flow.feeShare = "holders";
+      if (!(flow.feeSharePct > 0)) flow.feeSharePct = 100;
+    } else {
+      flow.feeSharePct = 0;
+      flow.feeShare = "keep";
+    }
     var quotes = window.Token.quotes();
     var rwas = window.Token.rwaQuotes();
     var qLabel = isEvm() ? "ETH"
