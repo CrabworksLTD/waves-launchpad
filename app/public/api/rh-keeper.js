@@ -43,7 +43,12 @@ import { kv } from "./_guard.js";
 export const config = { runtime: "nodejs" };
 
 const RPC = process.env.RH_RPC || "https://rpc.mainnet.chain.robinhood.com";
-const CURVE = process.env.RH_CURVE || "0x87c04ca8633a56c30e68919566c605fd970196d3";
+/* Robinhood launches now trade on the V4-hook singleton
+ * (contracts/WavesCurveHook.sol). Its owed[] mapping, claim(), platformVolumeBps,
+ * terms getters and Bought/Sold events are identical to the retired standalone
+ * curve, so the keeper's claim + fee-walk work against it unchanged — only the
+ * address moves. RH_CURVE is ignored: it named the retired curve. */
+const CURVE = process.env.RH_HOOK || "0xA02AAaCb311F49e7f55c4dF5b40b3cFCe0D76888";
 
 // Bought(address,address,uint256,uint256,uint256) / Sold(...)
 const BOUGHT = "0x7ce543d1780f3bdc3dac42da06c95da802653cd1b212b8d74ec3e3c33ad7095c";

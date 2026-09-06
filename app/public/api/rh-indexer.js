@@ -535,7 +535,14 @@ export default async function handler(req, res) {
      * holders it cannot name. */
     // (no filter: the sweep is capped at 8 tokens per run either way)
 
-    const curveAddr = process.env.RH_CURVE || "0x87c04ca8633a56c30e68919566c605fd970196d3";
+    /* The curve a Robinhood launch trades on is now the V4-hook singleton
+     * (contracts/WavesCurveHook.sol). It emits the SAME Bought/Sold and Launched
+     * events as the retired standalone curve and exposes the same terms getters
+     * (virtualEth/virtualTokens/curveSupply), so the whole replay below works
+     * against it unchanged — only the address moves. The unsold supply sits in
+     * the PoolManager (already skipped as a holder). RH_CURVE is ignored: it
+     * named the retired curve. */
+    const curveAddr = process.env.RH_HOOK || "0xA02AAaCb311F49e7f55c4dF5b40b3cFCe0D76888";
 
     const out = [];
     for (const t of toks.slice(0, 8)) {
