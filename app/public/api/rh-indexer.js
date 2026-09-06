@@ -36,9 +36,15 @@ const POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951";
 // keccak("Transfer(address,address,uint256)")
 const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
-// Bought(address,address,uint256,uint256,uint256) / Sold(...)
+// Bought(address,address,uint256,uint256,uint256) / Sold(...) — the hook's own
+// events carry the price/amount data, but their "sender" is the ROUTER, not the
+// trader. The real wallet is the router's Buy/Sell `payer`, correlated by tx hash.
 const BOUGHT = "0x7ce543d1780f3bdc3dac42da06c95da802653cd1b212b8d74ec3e3c33ad7095c";
 const SOLD   = "0x9be8a5ca22b7e6e81f04b5879f0248227bb770114291bd47dfaee4c3a82ad60e";
+// WavesHookRouter Buy/Sell(address token, address payer, address to, uint,uint)
+const R_BUY  = "0xbab4aa6b2d5c0935e0e2937d1f73655848f670d43bf6f0c7e9e11e635bb5d86f";
+const R_SELL = "0xbbc79dc7d11fb8ae8de963e009943172807faa4a90c3620ef772f4783e76355f";
+const HOOK_ROUTER = process.env.RH_HOOK_ROUTER || "0x29b0638dd7fcd8f829fed7cd2a10830a6c1faa27";
 
 const CHUNK = 50000n;            // the widest window this chain will answer
 const MAX_CHUNKS = 12;           // per token per run — keeps a run inside its timeout
@@ -266,6 +272,23 @@ async function indexTrades(db, rec, curveAddr, latest) {
       }]);
     } catch (e) { break; }
 
+    /* The trader's wallet, from the router's Buy/Sell `payer` (the hook only
+     * knows the router as the sender). Best-effort: if this window's router
+     * query is refused, the trades still record with who=null rather than
+     * failing the whole run — the wallet is a nice-to-have next to the amounts. */
+    let routerLogs = [];
+    try {
+      routerLogs = await rpc("eth_getLogs", [{
+        address: HOOK_ROUTER, fromBlock: "0x" + from.toString(16),
+        toBlock: "0x" + to.toString(16), topics: [[R_BUY, R_SELL], topic]
+      }]);
+    } catch (e) { routerLogs = []; }
+    const payerByTx = {};
+    for (const rl of routerLogs || []) {
+      payerByTx[String(rl.transactionHash).toLowerCase()] =
+        "0x" + String(rl.topics[2]).replace(/^0x/, "").slice(24);
+    }
+
     for (const lg of logs) {
       const buy = String(lg.topics[0]).toLowerCase() === BOUGHT;
       const a = word(lg.data, 0), b = word(lg.data, 1), fee = word(lg.data, 2);
@@ -287,7 +310,10 @@ async function indexTrades(db, rec, curveAddr, latest) {
         at: stampOf.get(blk),
         price,
         quote: Number(buy ? a : b) / 1e18,     // the ETH side, which is the volume
-        side: buy ? "buy" : "sell"
+        tokens: Number(buy ? b : a) / 1e18,    // token amount: out on a buy, in on a sell
+        side: buy ? "buy" : "sell",
+        who: payerByTx[String(lg.transactionHash).toLowerCase()] || null,
+        sig: lg.transactionHash
       });
       // kept as integers alongside, for the reward arithmetic below
       rawTrades.push({ block: blk, volume: buy ? a : b, fee });
