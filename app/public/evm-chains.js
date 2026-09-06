@@ -177,6 +177,23 @@ window.MOONPAD_CHAINS = [
      * unreachable — anything launched on them ends up somewhere nobody looks. */
     curve: "0x87c04ca8633a56c30e68919566c605fd970196d3",
 
+    /* The singleton WavesCurveHook (contracts/WavesCurveHook.sol) — a token
+     * launched through it is a live Uniswap V4 pool from block zero, so GMGN /
+     * DexScreener index it natively. Deployed + on-chain-verified 2026-09-05
+     * (tx 0xffc3ecd3…df0f95f, block 55547961, status success → the RH
+     * PoolManager accepts the 0x2888 hook bits).
+     *
+     * ⚠️ Recorded, NOT yet the active launch path. No page loads evm-hook.js
+     * yet, so launches still go through `curve` above. Flipping to the hook is a
+     * deliberate later step and is gated on a PUBLIC V4 swap router on this chain
+     * (see `v4Router`, still null) — without it, buy/sell from the UI can't route.
+     * Do a throwaway test launch on the hook to prove initialize() before flip. */
+    hook: "0xA02AAaCb311F49e7f55c4dF5b40b3cFCe0D76888",
+    // Public V4 swap router for hook buy/sell. Null until one exists on this
+    // chain — the existing WavesSwapRouter is keeper-only. evm-hook.js buy()/
+    // sell() throw a clear message while this is unset.
+    v4Router: null,
+
     /* Who receives a creator's pledged share, and pays it out to holders.
      *
      * Null until a keeper wallet exists for this chain. pledgeToHolders() is
