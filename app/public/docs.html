@@ -108,7 +108,8 @@ td b{color:var(--ink)}
       menu.</span><span class="ch-rh"> that deploys your collection to
       <b>Robinhood Chain</b> as its own <b>ERC-721</b> drop contract — price,
       supply, per-wallet cap and royalties live in the contract you own.
-      Allowlist waves and token launches are Solana-only for now.</span></li>
+      Tokens launch on our own <b>bonding curve</b> from the same Launch menu.
+      Allowlist waves are Solana-only for now.</span></li>
       <li><b>A marketplace</b> that lists what launched here. Supply, minted and
       price are read from the chain when the page loads — there is no listing
       fee, no approval queue and no database of numbers we could edit.</li>
@@ -185,21 +186,29 @@ td b{color:var(--ink)}
 
     <h2 id="tokens">Tokens</h2>
     <p class="ch-rh"><b>On Robinhood Chain, token launches are not open yet.</b>
-    We are building our own bonding-curve launchpad for this chain rather than
-    routing through anyone else's, and it will open when it has been audited.
-    What follows describes the Solana side.</p>
-    <p>A token launches on a <b>bonding curve</b> — Meteora's Dynamic Bonding
-    Curve. There is no liquidity pool to create and no LP to manage: the curve
-    itself is the liquidity, buys push the price up it, sells push it down.</p>
+    We built our own bonding-curve launchpad for this chain rather than routing
+    through anyone else's. It is live.</p>
+    <p class="ch-sol">A token launches on a <b>bonding curve</b> — Meteora's Dynamic
+    Bonding Curve. There is no liquidity pool to create and no LP to manage: the
+    curve itself is the liquidity, buys push the price up it, sells push it down.</p>
+    <p class="ch-rh">A token launches on a <b>bonding curve</b> of our own, built as a
+    <b>Uniswap V4 hook</b>. There is no liquidity pool to create and no LP to
+    manage: the curve itself is the liquidity, buys push the price up it, sells
+    push it down. Because it is a V4 hook, the pool exists and is indexable from
+    the moment the token is created.</p>
     <ul>
       <li><b>Supply</b> is fixed: 1,000,000,000 per token, no exceptions, metadata
       immutable — nobody can rename or re-image a token after launch.</li>
-      <li><b>Priced in</b> SOL or USDC.</li>
+      <li><b>Priced in</b> <span class="ch-sol">SOL or USDC</span><span class="ch-rh">ETH</span>.</li>
       <li><b>Your first buy</b> can ride in the same transaction that creates the
       pool, so a sniper cannot get in front of your own launch.</li>
-      <li><b>Graduation</b> — when the curve raises its target, liquidity migrates
-      automatically to a Meteora DAMM v2 pool and the LP is permanently locked.
-      Trading continues on Jupiter and every major aggregator.</li>
+      <li class="ch-sol"><b>Graduation</b> — when the curve raises its target, liquidity
+      migrates automatically to a Meteora DAMM v2 pool and the LP is permanently
+      locked. Trading continues on Jupiter and every major aggregator.</li>
+      <li class="ch-rh"><b>Graduation</b> — when the curve raises its target, its
+      proceeds seed a <b>Uniswap V4</b> pool and the LP is permanently locked.
+      Nobody can withdraw it, including us. Trading continues on every
+      aggregator that indexes the chain.</li>
     </ul>
     <p>Curve targets are locked in the launchpad's config — identical for every
     launch, so nobody negotiates a better curve than you. The launch window
@@ -211,7 +220,7 @@ td b{color:var(--ink)}
     <p>A <b>pair</b> is a collection and a token launched together. The point is the
     fee loop: the token's trading generates fees, the creator's share of those
     fees can pay straight to a reward vault, and that vault funds rewards for
-    the collection's holders — in SOL, USDC, or tokenised stocks,
+    the collection's holders — in <span class="ch-sol">SOL, USDC</span><span class="ch-rh">ETH, USDG</span>, or tokenised stocks,
     chosen from a verified list of <span class="ch-sol">700+</span><span class="ch-rh">180+</span> at launch.</p>
     <p>The staking side — holders burning the token to activate their NFTs and
     claim rewards — is in development and will say so on every screen until it
@@ -227,13 +236,18 @@ td b{color:var(--ink)}
       <tr><td>Minting</td><td>The creator's mint price + network fee</td></tr>
       <tr><td>Trading a token</td><td><b>1% to 10%</b> — the creator's choice at launch</td></tr>
     </table>
-    <p>The creator picks the trading fee at launch, from <b>1%</b> to <b>10%</b>.
-    Meteora takes a fixed fifth of whatever it is, and the rest is divided
-    between the platform and the creator. Our share rises a tenth of a percent
-    per step and stops there, so a creator who sets a high fee is raising it for
-    their token, not for us:</p>
+    <p class="ch-sol">The creator picks the trading fee at launch, from <b>1%</b> to
+    <b>10%</b>. Meteora takes a fixed fifth of whatever it is, and the rest is
+    divided between the platform and the creator. Our share rises a tenth of a
+    percent per step and stops there, so a creator who sets a high fee is raising
+    it for their token, not for us:</p>
+    <p class="ch-rh">The creator picks the trading fee at launch, from <b>1%</b> to
+    <b>10%</b>. There is no third party on this chain — the curve is ours — so the
+    fee splits two ways and the creator keeps more than the same rung pays on
+    Solana. Our share rises a tenth of a percent per step and stops there, so a
+    creator who sets a high fee is raising it for their token, not for us:</p>
 
-    <table class="fees">
+    <table class="fees ch-sol">
       <tr><th>Trading fee</th><th>Meteora</th><th>Platform</th><th>Creator</th></tr>
       <tr><td>1%</td><td>0.2%</td><td>0.4%</td><td>0.4%</td></tr>
       <tr><td>2%</td><td>0.4%</td><td>0.5%</td><td>1.1%</td></tr>
@@ -241,6 +255,18 @@ td b{color:var(--ink)}
       <tr><td>4%</td><td>0.8%</td><td>0.7%</td><td>2.5%</td></tr>
       <tr><td>5%</td><td>1.0%</td><td>0.8%</td><td>3.2%</td></tr>
       <tr><td>10%</td><td>2.0%</td><td>0.9%</td><td>7.1%</td></tr>
+    </table>
+    <!-- Robinhood: two ways, no third party. Platform figures are
+         platformVolumeBps() in WavesCurveHook.sol — 40/50/60/70/80/90 bps of
+         volume by rung; the creator takes the rest of the fee. -->
+    <table class="fees ch-rh">
+      <tr><th>Trading fee</th><th>Platform</th><th>Creator</th></tr>
+      <tr><td>1%</td><td>0.4%</td><td>0.6%</td></tr>
+      <tr><td>2%</td><td>0.5%</td><td>1.5%</td></tr>
+      <tr><td>3%</td><td>0.6%</td><td>2.4%</td></tr>
+      <tr><td>4%</td><td>0.7%</td><td>3.3%</td></tr>
+      <tr><td>5%</td><td>0.8%</td><td>4.2%</td></tr>
+      <tr><td>10%</td><td>0.9%</td><td>9.1%</td></tr>
     </table>
     <p class="tiny">Figures are of trading volume, rounded to a tenth, and apply
     on the curve and — after graduation — from the locked LP forever. The exact

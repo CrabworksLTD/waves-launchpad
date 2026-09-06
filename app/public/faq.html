@@ -131,11 +131,14 @@ details[open] summary::after{transform:rotate(45deg);color:var(--accent)}
   </details>
   <details>
     <summary>What are the trading fees on tokens?</summary>
-    <div class="a"><p>The floor is a <b>1% swap fee</b>, split <b>40% to you, 40% to
-    the platform, 20% to Meteora</b> (whose tech runs the curve). You can set a
-    higher fee at launch — up to 10% — and almost all of the extra goes to your
-    side, not ours. If you're the creator, your share can pay straight into
-    rewards for your holders.</p></div>
+    <div class="a"><p><span class="ch-sol">The floor is a <b>1% swap fee</b>, split
+    <b>40% to you, 40% to the platform, 20% to Meteora</b> (whose tech runs the
+    curve).</span><span class="ch-rh">The floor is a <b>1% swap fee</b>, split
+    <b>60% to you, 40% to the platform</b> — the curve is ours, so there is no
+    third party taking a cut and you keep more than the same fee pays on
+    Solana.</span> You can set a higher fee at launch — up to 10% — and almost
+    all of the extra goes to your side, not ours. If you're the creator, your
+    share can pay straight into rewards for your holders.</p></div>
   </details>
 
   <h2>Tokens</h2>
@@ -149,13 +152,18 @@ details[open] summary::after{transform:rotate(45deg);color:var(--accent)}
     <summary>What does "graduation" mean?</summary>
     <div class="a"><p>When a token raises enough on its curve, it automatically
     moves into a real trading pool with the liquidity <b>locked forever</b>. After
-    that it trades on Jupiter like any other Solana token.</p></div>
+    that it trades <span class="ch-sol">on Jupiter like any other Solana
+    token</span><span class="ch-rh">as an ordinary <b>Uniswap V4</b> pool, and every
+    aggregator that indexes the chain picks it up</span>.</p></div>
   </details>
   <details>
     <summary>Can a token launch be sniped?</summary>
-    <div class="a"><p>Your own first buy can ride in the same transaction that
-    creates the token — so the first purchase at the lowest price is yours, not
-    a bot's.</p></div>
+    <div class="a"><p><span class="ch-sol">Your own first buy can ride in the same
+    transaction that creates the token — so the first purchase at the lowest
+    price is yours, not a bot's.</span><span class="ch-rh">Your first buy is a
+    normal swap immediately after the launch transaction. Bundling it into the
+    launch itself is coming; until then a determined bot could get in front of
+    it, and we would rather say so than imply otherwise.</span></p></div>
   </details>
   <details>
     <summary>What can tokens be priced in?</summary>
