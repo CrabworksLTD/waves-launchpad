@@ -2809,6 +2809,11 @@
       mark("curve", "done");
 
       recordEvmToken(flow, res, meta);
+      /* Verify on Sourcify right away, before any aggregator indexes the token —
+       * a token GMGN meets while still unverified gets a "Unknown Contract" flag
+       * it may cache for good. Fire-and-forget: the done screen must not wait on
+       * it, and the hourly /api/verify cron is the backstop if this misses. */
+      try { fetch("/api/verify?token=" + encodeURIComponent(res.token)).catch(function () {}); } catch (e) {}
       busy = false;
       evmTokenDone(flow, res);
     } catch (e) {
