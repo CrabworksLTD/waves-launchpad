@@ -2884,7 +2884,7 @@
             : "Every trading fee gets paid to holders in ETH, hourly.";
         })()}
         One transaction, whenever you like.</span>
-        <a class="go" href="/fees?activate=${encodeURIComponent(res.token)}">Activate holder rewards →</a>
+        <a class="go" style="color:var(--accent-ink,#0b0f0c)" href="/fees?activate=${encodeURIComponent(res.token)}">Activate holder rewards →</a>
       </div>
       ${raw(caRow("Token CA", res.token))}
       <label>Token page</label>

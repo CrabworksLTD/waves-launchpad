@@ -841,13 +841,16 @@ input:focus{outline:none;border-color:var(--accent)}
      * what matters is that holding this pays you, in what, and how much it has
      * paid so far. */
     function paint(sym, tradeable) {
+      var burn = rec.rewardMode === "burn";
       var a = sym || QUOTE;
       /* "TSLA rewards are active · sent hourly". The cadence is the part a
        * holder cares about and it was nowhere on the page — both chains pay on
-       * the hour, and saying so is the difference between a claim and a
-       * schedule. */
-      box.innerHTML = "<b>" + esc(a) + " rewards are active · sent hourly</b>" +
-        (sym && !tradeable
+       * the hour. A buyback-and-burn token pays holders NO asset: the fees buy
+       * the token back and burn it, so it says exactly that instead. */
+      box.innerHTML = "<b>" + (burn
+          ? "Buyback &amp; burn active · hourly"
+          : esc(a) + " rewards are active · sent hourly") + "</b>" +
+        (!burn && sym && !tradeable
           ? "<span>Paid in " + esc(QUOTE) + " until " + esc(sym) + " is tradeable.</span>"
           : "") +
         '<div class="rfees" hidden>' +
@@ -857,7 +860,11 @@ input:focus{outline:none;border-color:var(--accent)}
       box.hidden = false;
       // the ticker carries it too, so it is visible without scrolling
       var slash = $("rsym");
-      if (slash) { slash.textContent = "/" + a; slash.hidden = false; }
+      // A burn token pays holders no asset — no "/SYM" suffix on the ticker.
+      if (slash) {
+        if (burn) { slash.hidden = true; }
+        else { slash.textContent = "/" + a; slash.hidden = false; }
+      }
       renderFees();          // the numbers may have resolved before this paint
     }
 

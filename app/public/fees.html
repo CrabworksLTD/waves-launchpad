@@ -173,10 +173,11 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
   /* "TSLA AUTO-SHARED HOURLY". The share is named only when it is NOT all of
    * it — 100% is the only option on Robinhood and the common one on Solana, so
    * printing it on every badge was noise that crowded out the useful part. */
-  function sharedBadge(pct, title) {
+  function sharedBadge(pct, title, burn) {
     return '<span class="shared"' + (title ? ' title="' + esc(title) + '"' : "") + ">" +
       (pct && pct < 100 ? pct + "% " : "") +
-      '<span class="rsym"></span>AUTO-SHARED HOURLY</span>';
+      (burn ? "BUYBACK &amp; BURN HOURLY"
+            : '<span class="rsym"></span>AUTO-SHARED HOURLY') + "</span>";
   }
 
   function row(t, kind, amt) {
@@ -196,9 +197,11 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
         "<span>accrued</span></span>") +
       '<a class="goto" href="/token/' + esc(t.mint) + '">Go to token</a>' +
       (shared
-        ? sharedBadge(pct, "The keeper claims this pool hourly and pays " + pct +
-            "% to holders automatically; your " + (100 - pct) +
-            "% arrives at your fee wallet in the same run.")
+        ? sharedBadge(pct, t.rewardMode === "burn"
+            ? "The keeper claims this pool hourly and uses it to buy the token back and burn it."
+            : "The keeper claims this pool hourly and pays " + pct +
+              "% to holders automatically; your " + (100 - pct) +
+              "% arrives at your fee wallet in the same run.", t.rewardMode === "burn")
         : '<button class="cl" disabled>Claim</button>' +
           (kind === "creator"
             ? '<button class="act">Activate holder rewards</button>' : "")) +
@@ -448,10 +451,12 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
            * bps is fixed at 10000 on this chain, so printing it said nothing
            * and pushed out the part that does — what holders actually get. */
           var pct = c.rewardsBps / 100;
-          act.outerHTML = sharedBadge(pct,
-            "The keeper claims these fees hourly, converts them and pays holders " +
-            "automatically. Nothing for them to claim.");
-          nameRewardAsset(el, rec.rewardMint, true);
+          var burn = rec.rewardMode === "burn";
+          act.outerHTML = sharedBadge(pct, burn
+            ? "The keeper claims these fees hourly and uses them to buy the token back and burn it."
+            : "The keeper claims these fees hourly, converts them and pays holders " +
+              "automatically. Nothing for them to claim.", burn);
+          if (!burn) nameRewardAsset(el, rec.rewardMint, true);
           return;
         }
         act.disabled = false;
