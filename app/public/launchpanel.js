@@ -75,7 +75,10 @@
       ".lp button{flex:1;font:inherit;font-weight:600;font-size:13px;cursor:pointer;",
       "  border-radius:6px;padding:12px 16px;border:1px solid var(--line2);",
       "  background:var(--panel2);color:var(--ink)}",
-      ".lp button.go{color:var(--accent-ink);border-color:transparent;",
+      /* .go (not button.go): the done-screen CTAs are <a class=go> anchors, which
+         missed the dark accent-ink and rendered light text on the lime gradient —
+         an invisible button. Target the class so buttons AND link-buttons match. */
+      ".lp .go{color:var(--accent-ink);border-color:transparent;",
       "  background-image:var(--grad);background-repeat:no-repeat;",
       "  background-size:calc(100% + 2px) 100%;background-position:-1px 0}",
       ".lp button:disabled{opacity:.4;cursor:default}",
