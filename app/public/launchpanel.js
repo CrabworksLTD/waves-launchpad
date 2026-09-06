@@ -2646,13 +2646,20 @@
         ? (flow.feeSharePct >= 100 ? "all to holders"
            : flow.feeSharePct + "% holders / " + (100 - flow.feeSharePct) + "% you")
         : "You keep everything"}</b></div>
-      ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Holder share</span><b>${
-        flow.rewardMode === "burn" ? "buyback & burn"
-          : "dividend, paid in " + (
-              (flow.reward && flow.reward.kind && flow.reward.kind !== "native" && flow.reward.symbol)
-                ? String(flow.reward.symbol).replace(/^\$/, "") +
-                  (flow.reward.liquid === false ? " (ETH until it has a market)" : "")
-                : "ETH")}</b></div>` : ""}
+      ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Holder share</span><b>${(function () {
+        if (flow.rewardMode === "burn") return "buyback & burn";
+        /* The picker stores { mint, symbol, name, liquidity } — the native
+         * default is the zero-address "ETH". Show the chosen asset unless it IS
+         * ETH; a not-yet-tradeable asset (liquidity < 1000) pays ETH until it has
+         * a market. (My earlier fix checked kind/liquid, which the picker never
+         * sets, so it always fell back to ETH.) */
+        var r = flow.reward || {};
+        var sym = r.symbol ? String(r.symbol).replace(/^\$/, "") : "ETH";
+        var native = !r.mint || /^0x0+$/.test(String(r.mint)) || sym.toUpperCase() === "ETH";
+        if (native) return "dividend, paid in ETH";
+        var dry = r.liquidity !== undefined && r.liquidity < 1000;
+        return "dividend, paid in " + sym + (dry ? " (ETH until it has a market)" : "");
+      })()}</b></div>` : ""}
       ${flow.feeWallet ? H`<div class="row"><span class="k">Fees claim to</span><b>${
         shortAddr(flow.feeWallet)}</b></div>` : ""}
       ${sp ? H`<p class="note">Of every ${sp.total}% traded, ${sp.creator}% is yours and
