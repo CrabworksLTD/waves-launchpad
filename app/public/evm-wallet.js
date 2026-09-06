@@ -199,6 +199,14 @@
           tag.textContent = "Confirm in " + (entry.info.name || "your wallet") + "…";
           var a = await entry.provider.request({ method: "eth_requestAccounts" })
             .catch(function () { return null; });
+          /* MetaMask can resolve eth_requestAccounts with [] — on a Blockaid-
+           * flagged site, or just the first call — while the wallet is in fact
+           * authorised for this origin. eth_accounts then returns the account
+           * with no prompt, so try it before declaring the connect failed. */
+          if (!(a && a.length)) {
+            a = await entry.provider.request({ method: "eth_accounts" })
+              .catch(function () { return null; });
+          }
           if (a && a.length) {
             adopt(entry, a[0], true);
             closeModal();
@@ -316,6 +324,12 @@
       if (!entry) return openModal();
       var a = await entry.provider.request({ method: "eth_requestAccounts" })
         .catch(function () { return null; });
+      // See the picker handler: eth_requestAccounts can come back empty while the
+      // wallet is authorised; eth_accounts returns it with no prompt.
+      if (!(a && a.length)) {
+        a = await entry.provider.request({ method: "eth_accounts" })
+          .catch(function () { return null; });
+      }
       if (a && a.length) adopt(entry, a[0], !!entry.info);
     }
 
