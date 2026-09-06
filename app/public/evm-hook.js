@@ -11,16 +11,20 @@
    *   ✅ launch()      — fully wired; the hook's launch(string,string,uint16,
    *                      string,string,string) is ABI-verified below.
    *   ✅ reads         — curves(poolId), poolOf(token), owed() are wired.
-   *   ⏳ buy() / sell() — V4 swaps go through a swap ROUTER, not a direct call.
-   *                      Blocked on: (1) the hook deployed (chain.hook), and
-   *                      (2) a V4 swap router on RH (chain.v4Router). Both are
-   *                      null until on-chain; the functions throw a clear
-   *                      message until then rather than encode a swap against an
-   *                      address that does not exist.
+   *   ✅ buy() / sell() — routed through WavesHookRouter (chain.v4Router):
+   *                      buy sends ETH and takes the curve amount to the buyer
+   *                      (boundary overfill refunded in-tx); sell approves the
+   *                      router if needed then swaps tokens->ETH. Both throw a
+   *                      clear message while `chain.v4Router` is unset rather
+   *                      than encoding against a nonexistent address.
+   *   ✅ hook deployed  — 0xA02A…6888 on RH, recorded as chain.hook.
+   *   ⏳ router         — deploy script/DeployWavesHookRouter.s.sol and set
+   *                      chain.v4Router; until then buy/sell stay gated.
    *
    * This module is inert unless `chain.hook` is set — index/launch pages choose
    * the hook path over the curve path only when a hook address exists, so
-   * shipping it changes nothing until the audited hook is deployed and recorded.
+   * shipping it changes nothing until it is deployed and recorded (it is) AND a
+   * page actually loads this file (none does yet).
    */
 
   function chain() {
@@ -50,7 +54,13 @@
     claim: "4e71d92d",    // claim()
     curves: "66903e80",   // curves(bytes32)
     poolOf: "988b1fa7",   // poolOf(address)
-    owed: "df18e047"      // owed(address)
+    owed: "df18e047",     // owed(address)
+    // WavesHookRouter (chain.v4Router) — cast-verified selectors
+    buy: "b3ffb760",      // buy(address,uint256,address,uint256)
+    sell: "883c18b3",     // sell(address,uint256,uint256,address,uint256)
+    // ERC20 on WavesToken, for the sell approval
+    approve: "095ea7b3",  // approve(address,uint256)
+    allowance: "dd62ed3e" // allowance(address,address)
   };
 
   // Pool params the hook opens every pool with — MUST match WavesCurveHook.sol.
@@ -187,17 +197,73 @@
     return p.request({ method: "eth_sendTransaction", params: [tx] });
   }
 
-  // ── buy / sell — gated on the V4 router (see header) ──────────────────
+  // ── buy / sell through WavesHookRouter (chain.v4Router) ───────────────
   function requireRouter() {
     var r = chain().v4Router || null;
     if (!r) throw new Error(
-      "Trading the hook needs a V4 swap router on " + chain().name +
+      "Trading the hook needs the WavesHookRouter on " + chain().name +
       ", which is not deployed/recorded yet (chain.v4Router). Launch works; " +
-      "buy/sell wait on the router + audit.");
+      "deploy script/DeployWavesHookRouter.s.sol and set `v4Router`.");
     return r;
   }
-  async function buy() { requireRouter(); throw new Error("hook buy(): router swap not wired — see evm-hook.js header"); }
-  async function sell() { requireRouter(); throw new Error("hook sell(): router swap not wired — see evm-hook.js header"); }
+
+  function defaultDeadline() { return Math.floor(Date.now() / 1000) + 1200; } // +20 min
+
+  // Poll for a mined receipt (used to sequence approve -> sell).
+  async function waitReceipt(hash) {
+    for (var i = 0; i < 60; i++) {
+      var r = await window.MoonpadRPC.send(chain().rpc, "eth_getTransactionReceipt", [hash]);
+      if (r && r.blockNumber) {
+        if (r.status && BigInt(r.status) === 0n) throw new Error("tx reverted: " + hash);
+        return r;
+      }
+      await new Promise(function (res) { return setTimeout(res, 2000); });
+    }
+    throw new Error("timed out waiting for " + hash);
+  }
+
+  /* Buy `token` with `ethWei` of ETH (BigInt/decimal string). opts.minTokensOut
+   * is slippage protection (default 0 = none — the UI should pass a real min).
+   * opts.to defaults to the sender. The router refunds any boundary-buy overfill
+   * to the sender in the same tx. */
+  async function buy(opts) {
+    var router = requireRouter();
+    var from = opts.from || await window.MoonpadLaunch.connect();
+    await window.MoonpadLaunch.switchChain(chain().id);
+    var to = opts.to || from;
+    var deadline = opts.deadline || defaultDeadline();
+    var data = "0x" + SEL.buy + addr32(opts.token) + hex32(BigInt(opts.minTokensOut || 0)) +
+      addr32(to) + hex32(BigInt(deadline));
+    var value = "0x" + BigInt(opts.ethWei).toString(16);
+    return send(from, { to: router, data: data, value: value });
+  }
+
+  /* Sell `tokensIn` (BigInt/decimal string) of `token` for ETH. Ensures the
+   * router is approved for the amount first (one approve tx, only if the current
+   * allowance is short), then the sell. opts.minEthOut is slippage (default 0).
+   * opts.to defaults to the sender. Returns the sell tx hash. */
+  async function sell(opts) {
+    var router = requireRouter();
+    var from = opts.from || await window.MoonpadLaunch.connect();
+    await window.MoonpadLaunch.switchChain(chain().id);
+    var to = opts.to || from;
+    var amt = BigInt(opts.tokensIn);
+    var deadline = opts.deadline || defaultDeadline();
+
+    // allowance(from, router) — approve only if short
+    var allowHex = await read(
+      "0x" + SEL.allowance + addr32(from) + addr32(router), opts.token);
+    var allowance = allowHex && allowHex !== "0x" ? BigInt(allowHex) : 0n;
+    if (allowance < amt) {
+      var approveData = "0x" + SEL.approve + addr32(router) + hex32(amt);
+      var ah = await send(from, { to: opts.token, data: approveData, value: "0x0" });
+      await waitReceipt(ah); // sell's gas estimate needs the allowance in place
+    }
+
+    var data = "0x" + SEL.sell + addr32(opts.token) + hex32(amt) +
+      hex32(BigInt(opts.minEthOut || 0)) + addr32(to) + hex32(BigInt(deadline));
+    return send(from, { to: router, data: data, value: "0x0" });
+  }
 
   window.WavesHook = {
     enabled: enabled,
