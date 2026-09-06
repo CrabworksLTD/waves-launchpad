@@ -2868,35 +2868,30 @@
 
   function evmTokenDone(flow, res) {
     var page = location.origin + "/token/" + res.token;
+    /* The third button reads the launch's own choice: a pledged dividend or burn
+     * gets ACTIVATED on the fee page, a keep-everything token just CLAIMS there. */
+    var pledged = (flow.feeSharePct || 0) > 0;
+    var isBurn = flow.rewardMode === "burn";
+    var actLabel = pledged ? (isBurn ? "Activate buyback" : "Activate rewards") : "Claim fees";
+    var actHref = pledged ? "/fees?activate=" + encodeURIComponent(res.token) : "/fees";
     var box = shell(H`
       <h2>Live</h2>
       <p class="sub">$${flow.tsym} is trading on Robinhood Chain.</p>
-      <div class="row"><span class="k">Trading fees</span><b>yours to claim</b></div>
-      <div class="tip">
-        <b>Want your holders to earn from every trade?</b>
-        <span>${(function () {
-          /* Name what they picked. rewardLabel() is a whole phrase for the
-           * summary rows; here only the ticker belongs in the sentence. */
-          var sym = flow && flow.reward && flow.reward.symbol;
-          sym = sym ? String(sym).replace(/^\$/, "") : null;
-          return sym && sym !== "ETH"
-            ? "Every trading fee gets converted to " + sym + " and paid to holders, hourly."
-            : "Every trading fee gets paid to holders in ETH, hourly.";
-        })()}
-        One transaction, whenever you like.</span>
-        <a class="go" style="color:var(--accent-ink,#0b0f0c)" href="/fees?activate=${encodeURIComponent(res.token)}">Activate holder rewards →</a>
-      </div>
       ${raw(caRow("Token CA", res.token))}
       <label>Token page</label>
       <input readonly value="${page}" onclick="this.select()">
       <p class="note">Share this — it is where people buy. The token moves to a
       Uniswap pool automatically once the curve fills, and the liquidity is locked
       there permanently.</p>
-      <div class="acts"><button id="lp-done3">Close</button>
-      <button class="go" id="lp-token3">Open token page</button></div>
+      <div class="acts">
+        <button id="lp-done3">Close</button>
+        <button class="go" id="lp-reward3">${actLabel}</button>
+        <button id="lp-token3">Token page</button>
+      </div>
     `);
     bindCopy(box);
     box.querySelector("#lp-done3").onclick = close;
+    box.querySelector("#lp-reward3").onclick = function () { location.href = actHref; };
     box.querySelector("#lp-token3").onclick = function () { location.href = page; };
   }
 
