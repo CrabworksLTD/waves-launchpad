@@ -322,8 +322,15 @@ async function indexTrades(db, rec, curveAddr, latest) {
    * simply refused. Two calls for one fact is how a run runs out of budget. */
   let curveState = null;
   try {
+    /* The hook keys its Curve by PoolId, not token address (curves(bytes32),
+     * not the standalone curve's curves(address)). poolOf(token) -> curves(poolId).
+     * Reading curves(address) on the hook returns a zero struct, which read as
+     * rewardsBps 0 and silently zeroed every holder's earnings. */
+    const poolId = await rpc("eth_call", [{
+      to: curveAddr, data: "0x988b1fa7" + "0".repeat(24) + token.slice(2)
+    }, "latest"]);
     curveState = await rpc("eth_call", [{
-      to: curveAddr, data: "0x2cc3dc6e" + "0".repeat(24) + token.slice(2)
+      to: curveAddr, data: "0x66903e80" + String(poolId).replace(/^0x/, "")
     }, "latest"]);
   } catch (e) { /* both blocks below degrade on their own */ }
 
@@ -339,8 +346,9 @@ async function indexTrades(db, rec, curveAddr, latest) {
       (rec.rewardMint ? String(rec.rewardMint).toLowerCase() : null);
     const cursor = BigInt((await db.get("rhk:" + token + ":cursor")) || rec.block || 0);
 
-    const feeBps = Number(word(curveState, 1));
-    const rewardsBps = Number(word(curveState, 2));
+    // hook Curve layout: token(0) creator(1) feeBps(2) rewardsBps(3) ...
+    const feeBps = Number(word(curveState, 2));
+    const rewardsBps = Number(word(curveState, 3));
     const platBps = { 100: 40, 200: 50, 300: 60, 400: 70, 500: 80, 1000: 90 }[feeBps] ?? 40;
 
     /* Only trades the keeper has not settled yet. Its cursor is in blocks and
@@ -435,7 +443,7 @@ async function indexTrades(db, rec, curveAddr, latest) {
   let synced = null, syncError = null;
   try {
     if (!curveState) throw new Error("could not read the curve");
-    const bps = Number(word(curveState, 2));
+    const bps = Number(word(curveState, 3)); // rewardsBps, hook layout
     synced = "bps=" + bps + " listed=" + (rec.feeSharePct || 0);
     if (bps > 0 && (rec.feeSharePct || 0) !== bps / 100) {
       const raw = await db.lrange("tokens", 0, 199);

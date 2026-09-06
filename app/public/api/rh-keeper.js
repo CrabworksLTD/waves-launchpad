@@ -632,11 +632,18 @@ export default async function handler(req, res) {
        * all mean the same thing: no swap, pay the native coin. */
       const rm = t.rewardMint && String(t.rewardMint).toLowerCase();
       assets[mint] = rm && rm !== ZERO_ADDR && /^0x[0-9a-f]{40}$/.test(rm) ? rm : null;
-      const curve = await rpc("eth_call", [{
-        to: CURVE, data: "0x2cc3dc6e" + "0".repeat(24) + mint.slice(2)
+      /* The hook keys its Curve by PoolId: poolOf(mint) -> curves(poolId).
+       * curves(address) on the hook returns a zero struct (rewardsBps 0), so the
+       * keeper would skip every token as "no rewards". Layout: token(0)
+       * creator(1) feeBps(2) rewardsBps(3) ... */
+      const poolId = await rpc("eth_call", [{
+        to: CURVE, data: "0x988b1fa7" + "0".repeat(24) + mint.slice(2)
       }, "latest"]);
-      const feeBps = Number(word(curve, 1));
-      const rewardsBps = Number(word(curve, 2));
+      const curve = await rpc("eth_call", [{
+        to: CURVE, data: "0x66903e80" + String(poolId).replace(/^0x/, "")
+      }, "latest"]);
+      const feeBps = Number(word(curve, 2));
+      const rewardsBps = Number(word(curve, 3));
       if (!rewardsBps) continue;
       const a = await accrued(db, mint, feeBps, rewardsBps, t.block, latest);
       if (a.wei > 0n) { shares.push({ mint, wei: a.wei, upTo: a.upTo }); attributed += a.wei; }
