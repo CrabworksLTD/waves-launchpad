@@ -111,7 +111,7 @@
     { id: "explore", label: "Explore", menu: [
       { label: "Tokens",      href: "/tokens" },
       { label: "Collections", href: "/collections" },
-      { label: "Staking",     href: "/stake" },
+      { label: "Staking",     soon: true },
       { label: "Claim fees",   href: "/fees" },
       { label: "Editor",      href: "/app" }
     ]},
