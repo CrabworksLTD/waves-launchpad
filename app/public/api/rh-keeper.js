@@ -733,6 +733,20 @@ export default async function handler(req, res) {
     const claimHash = await keeperTx(CURVE, "0x4e71d92d", 0n, GAS_CLAIM);
     await mined(claimHash);
 
+    /* ── Self-funding ────────────────────────────────────────────────────────
+     * Keep this run's gas OUT of the pot so the keeper's ETH balance stays flat
+     * run after run, instead of bleeding down until someone tops it up by hand —
+     * which at any real volume is not viable. The claim just took the whole pot
+     * into the keeper's balance; distributing (pot - gasReserve) leaves exactly
+     * the gas behind to pay for the swaps/burns/transfers below. gasCost is
+     * already the worst-case (dearer-path) budget and the worth-it gate promised
+     * the pot is several times it, so this is a small slice; 1.3x guards a gas
+     * price bump between estimate and execution, so the keeper trends slightly
+     * positive and builds its own buffer. The bootstrap balance is spent once and
+     * then self-replenishes. */
+    const gasReserve = (gasCost * 13n) / 10n;
+    const distributablePot = pot > gasReserve ? pot - gasReserve : 0n;
+
     /* The plan exists the moment the money does.
      *
      * Written before any of it is spent, and before the swaps, because from
@@ -741,10 +755,12 @@ export default async function handler(req, res) {
      * and the payment stage turns them into transfers. */
     const record = {
       at: Date.now(), claimHash, potWei: pot.toString(),
+      gasReserveWei: gasReserve.toString(), distributableWei: distributablePot.toString(),
       cursors: shares.map((s) => ({ mint: s.mint, upTo: s.upTo.toString() })),
+      // slices are pro-rata of the DISTRIBUTABLE pot (pot minus the gas reserve)
       slices: shares.map((s) => ({
         mint: s.mint,
-        wei: ((pot * s.wei) / attributed).toString(),
+        wei: ((distributablePot * s.wei) / attributed).toString(),
         asset: assets[s.mint] || null,
         burn: !!s.burn
       })),
@@ -762,6 +778,7 @@ export default async function handler(req, res) {
     const done = await payOut(db, planKey, record);
     return res.status(200).json({
       ok: true, keeper, claimHash, swaps: record.swaps, burns: record.burns,
+      gasReserveWei: record.gasReserveWei, distributableWei: record.distributableWei,
       carriedToNextRun: record.carried || 0, ...done, log
     });
   } catch (e) {
