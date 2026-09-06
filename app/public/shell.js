@@ -819,7 +819,27 @@
     return evmLaunchP;
   }
 
-  window.Shell = { mount: mount, connect: connectModal,
+  /* Connect the right wallet for the current chain. Robinhood is EVM, so it must
+   * open the EIP-6963 picker (MetaMask, Rabby, Coinbase, …) via MoonpadWallet —
+   * NOT the Solana Wallet-Standard modal. This matters now that MetaMask
+   * registers as a Solana wallet too: it shows up in the Solana picker, and a
+   * click there routes an EVM launch through the Solana connect, which returns
+   * "no account returned". The exported connect used to be connectModal (Solana
+   * only), so a Robinhood launch that connected from the panel got the wrong
+   * picker. Solana keeps connectModal unchanged. Returns a truthy value (the EVM
+   * account, or the Solana wallet) on success, null on failure — every caller
+   * only checks truthiness. */
+  function connectAny() {
+    if (currentChain() === "robinhood") {
+      return ensureEvmStack()
+        .then(function () { return window.MoonpadWallet.connect(); })
+        .then(function () { return (window.MoonpadWallet && window.MoonpadWallet.account) || null; })
+        .catch(function () { return null; });
+    }
+    return connectModal();
+  }
+
+  window.Shell = { mount: mount, connect: connectAny,
     ensureLaunchStack: ensureLaunchStack, ensureEvmStack: ensureEvmStack,
     ensureEvmLaunch: ensureEvmLaunch, chain: currentChain };
 })();
