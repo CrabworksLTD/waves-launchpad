@@ -530,12 +530,16 @@ input:focus{outline:none;border-color:var(--accent)}
   }
 
   function loadStats() {
-    return fetch("/api/stats?mint=" + encodeURIComponent(MINT) + "&tf=" + tf)
+    /* Cache-bust: /api/stats is cache-control:public, so a reload right after a
+     * trade could get the pre-trade copy from the browser cache and the chart /
+     * feed would look stuck. A per-call nonce forces the fresh figures. */
+    var bust = "&_=" + Date.now();
+    return fetch("/api/stats?mint=" + encodeURIComponent(MINT) + "&tf=" + tf + bust)
       .then(function (r) { return r.json(); })
       .then(async function (d) {
         // a token launched moments ago has nothing yet — ask for a run, once
         if (await healIfEmpty(d)) {
-          d = await fetch("/api/stats?mint=" + encodeURIComponent(MINT) + "&tf=" + tf)
+          d = await fetch("/api/stats?mint=" + encodeURIComponent(MINT) + "&tf=" + tf + "&_=" + Date.now())
             .then(function (r) { return r.json(); }).catch(function () { return d; });
         }
         if (!d.indexed || !d.stats) return false;
