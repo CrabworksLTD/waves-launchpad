@@ -789,19 +789,23 @@
   }
 
   /* The deploy half of the EVM stack: the drop contract's ABI + bytecode
-   * (45KB), the launch primitives, and the bonding curve a token launches on.
+   * (45KB), the launch primitives, and the curve a token launches on.
    * Loaded only when someone actually launches, not for browsing.
    *
-   * evm-token.js must come after evm-wavescurve.js — it reads its selectors out
-   * of that artifact rather than pasting four-byte constants, so a signature
-   * change cannot leave a stale selector quietly calling the wrong function. */
+   * evm-hook.js is the live launch/trade path — a token launches on the WAVES
+   * V4-hook curve (a live Uniswap v4 pool from block zero, so GMGN indexes it
+   * natively) and trades through its router. It provides window.MoonpadToken,
+   * the same surface the standalone curve's evm-token.js did, so the launch,
+   * token and fee pages are unchanged. The old standalone-curve modules
+   * (evm-wavescurve.js + evm-token.js) are retired from the live path and stay
+   * only for the admin deploy pages that load them directly. */
   var evmLaunchP = null;
   function ensureEvmLaunch() {
     if (window.MoonpadLaunch && window.MoonpadToken) return Promise.resolve();
     if (evmLaunchP) return evmLaunchP;
     evmLaunchP = ensureEvmStack().then(function () {
       return ["/evm-contract.js", "/evm-launch.js",
-              "/evm-wavescurve.js", "/evm-token.js"].reduce(function (p, src) {
+              "/evm-hook.js"].reduce(function (p, src) {
         return p.then(function () {
           return new Promise(function (res, rej) {
             var el = document.createElement("script");
