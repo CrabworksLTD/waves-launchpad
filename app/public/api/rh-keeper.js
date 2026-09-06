@@ -126,16 +126,28 @@ const WORTH_IT = 5n;
 
 let rpcId = 0;
 async function rpc(method, params) {
-  const r = await fetch(RPC, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }),
-    signal: AbortSignal.timeout(25000)
-  });
-  if (!r.ok) throw new Error("rpc " + r.status);
-  const j = await r.json();
-  if (j.error) throw new Error(j.error.message || "rpc error");
-  return j.result;
+  /* ⚠️ Retried, like the indexer. Robinhood's public node throttles a burst
+   * hard (429), and a keeper run makes many calls — without backoff the whole
+   * run died on the first refusal ("rpc 429"). A run is heavier than an index
+   * sweep, so this backs off a little longer and a little more often. RH_RPC can
+   * point at a private endpoint to avoid this entirely. */
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      const r = await fetch(RPC, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }),
+        signal: AbortSignal.timeout(25000)
+      });
+      if (!r.ok) throw new Error("rpc " + r.status);
+      const j = await r.json();
+      if (j.error) throw new Error(j.error.message || "rpc error");
+      return j.result;
+    } catch (e) {
+      if (attempt === 5) throw e;
+      await new Promise((s) => setTimeout(s, 700 * Math.pow(2, attempt))); // ~22s total
+    }
+  }
 }
 
 const addrOf = (t) => "0x" + String(t).slice(-40).toLowerCase();
