@@ -2644,7 +2644,12 @@
            : flow.feeSharePct + "% holders / " + (100 - flow.feeSharePct) + "% you")
         : "You keep everything"}</b></div>
       ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Holder share</span><b>${
-        flow.rewardMode === "burn" ? "buyback & burn" : "dividend, paid in ETH"}</b></div>` : ""}
+        flow.rewardMode === "burn" ? "buyback & burn"
+          : "dividend, paid in " + (
+              (flow.reward && flow.reward.kind && flow.reward.kind !== "native" && flow.reward.symbol)
+                ? String(flow.reward.symbol).replace(/^\$/, "") +
+                  (flow.reward.liquid === false ? " (ETH until it has a market)" : "")
+                : "ETH")}</b></div>` : ""}
       ${flow.feeWallet ? H`<div class="row"><span class="k">Fees claim to</span><b>${
         shortAddr(flow.feeWallet)}</b></div>` : ""}
       ${sp ? H`<p class="note">Of every ${sp.total}% traded, ${sp.creator}% is yours and
