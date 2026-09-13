@@ -1,13 +1,12 @@
 /* WavesStake — browser client for the waves-staking program.
  *
- * ⚠️ SCAFFOLD, UNTESTED against a live program. The program
- * (jt5JegTBVPZP8V6a48fnKYPFKTbpcTfkz91Pemur82H) is devnet-only and unaudited
- * as of 2026-09-02, so there is nothing on mainnet to read or sign against, and
- * the pending-reward math below — though copied line-for-line from the program's
- * settle()/sync() — has NOT been checked end to end. Nothing is trusted until it
- * is rehearsed on a local validator the way tools/feeshare-smoke.js proved the
- * keeper. stake.html stays a parked preview and does not call the action methods
- * yet; this file exists so the wiring is ready the day the program deploys.
+ * The program (jt5JegTBVPZP8V6a48fnKYPFKTbpcTfkz91Pemur82H) is AUDITED (C-1 fixed,
+ * M-1 resolved, 8/8 tests) and DEPLOYED IMMUTABLE on mainnet 2026-09-13. The PDA
+ * seeds, account layouts and discriminators here match the audited src/lib.rs —
+ * in particular Position now carries a `pool` field and the position PDA is
+ * seeded [b"pos", pool, asset]. ⚠️ still to prove before pairing opens: an
+ * end-to-end stake → sync → claim on mainnet, and the keeper fee→vault deposit
+ * path. stake.html stays gated on PAIRING_LIVE until both are done.
  *
  * The port target: Moonpad's stake.js (EVM). Same page shape — earned/claim-all,
  * staked/weight/burned, per-asset rows — but wired to Anchor instructions and
@@ -53,9 +52,12 @@
       [enc("pool"), pk(X, tokenMint).toBuffer(), pk(X, collection).toBuffer()],
       pk(X, PROGRAM_ID))[0];
   }
-  function positionPda(X, asset) {
+  function positionPda(X, pool, asset) {
+    // C-1 (audited): the position PDA is bound to (pool, asset), not the asset
+    // alone — so one asset's position can't be shared across pools to drain a
+    // foreign vault. Must match program seeds = [b"pos", pool, asset].
     return X.PublicKey.findProgramAddressSync(
-      [enc("pos"), pk(X, asset).toBuffer()], pk(X, PROGRAM_ID))[0];
+      [enc("pos"), pk(X, pool).toBuffer(), pk(X, asset).toBuffer()], pk(X, PROGRAM_ID))[0];
   }
   // The reward vault is the pool PDA's associated token account for the reward
   // mint (DESIGN.md: "a token account owned by the pool PDA"). The pool is off
@@ -100,14 +102,18 @@
       vaultLast: u64(buf, 160)
     };
   }
-  // Position: 8 disc | asset 32 | weight u64 | debt u128 | pending_credit u64 | bump u8
+  // Position (audited C-1 layout): 8 disc | pool 32 | asset 32 | weight u64 |
+  //   debt u128 | pending_credit u64 | bump u8. The `pool` field was ADDED by the
+  //   C-1 fix, shifting every field below it by 32 bytes — reading the old offsets
+  //   returned garbage weights/debt.
   function decodePosition(buf, X) {
     if (!buf) return null;
     return {
-      asset: new X.PublicKey(buf.slice(8, 40)).toBase58(),
-      weight: u64(buf, 40),
-      debt: u128(buf, 48),
-      pendingCredit: u64(buf, 64)
+      pool: new X.PublicKey(buf.slice(8, 40)).toBase58(),
+      asset: new X.PublicKey(buf.slice(40, 72)).toBase58(),
+      weight: u64(buf, 72),
+      debt: u128(buf, 80),
+      pendingCredit: u64(buf, 96)
     };
   }
   // SPL token account amount lives at byte 64 (u64). Used for the live vault
@@ -228,7 +234,7 @@
     var positions = [];
     var earned = 0n, yourWeight = 0n, staked = 0;
     for (var i = 0; i < assets.length; i++) {
-      var posPk = positionPda(X, assets[i]);
+      var posPk = positionPda(X, pool, assets[i]);
       var pos = decodePosition(await accountBytes(c, posPk), X);
       var w = pos ? pos.weight : 0n;
       var p = pos ? pending(poolAcc, pos, vaultBal) : 0n;
@@ -326,7 +332,7 @@
     var X = await mx();
     var w = window.Wallet.current(); var owner = pk(X, w.publicKey.toBase58 ? w.publicKey.toBase58() : w.publicKey);
     var pool = poolPda(X, pair.tokenMint, pair.collection);
-    var pos = positionPda(X, asset);
+    var pos = positionPda(X, pool, asset);
     var stakerTokens = ownerAta(X, pk(X, pair.tokenMint), owner);
     return signSend([ixStake(X, {
       pool: pool, position: pos, asset: pk(X, asset), tokenMint: pk(X, pair.tokenMint),
@@ -348,7 +354,7 @@
       [pool.toBuffer(), pk(X, tp).toBuffer(), rewardMint.toBuffer()], pk(X, ATA_PROGRAM))[0];
     var dest = X.PublicKey.findProgramAddressSync(
       [owner.toBuffer(), pk(X, tp).toBuffer(), rewardMint.toBuffer()], pk(X, ATA_PROGRAM))[0];
-    var pos = positionPda(X, asset);
+    var pos = positionPda(X, pool, asset);
     var ixs = [
       ixCreateAtaIdem(X, owner, dest, owner, rewardMint, tp),
       ixSync(X, { pool: pool, vault: vault }),
@@ -378,7 +384,7 @@
       return {
         pool: pool.toBase58(),
         vault: vaultAta(X, pair.rewardMint, pool).toBase58(),
-        position: asset ? positionPda(X, asset).toBase58() : null
+        position: asset ? positionPda(X, pool, asset).toBase58() : null
       };
     },
     // instruction builders — assemble into a Transaction and sign via the wallet
