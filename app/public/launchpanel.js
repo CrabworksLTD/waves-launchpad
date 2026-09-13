@@ -25,27 +25,15 @@
    * and audited, launching a pair would strand fees in a vault nobody can claim.
    * So the panel is built and wired behind this flag; flip it the day the
    * program lands. Local testing: set true in the console or here. */
-  // Public gate: devnet-only for now. The staking program IS deployed immutable on
-  // mainnet (jt5Je…), but pairing stays locked for everyone until the keeper's
-  // vault-deposit path is audited, stake.js is audited, and a real mainnet
-  // stake→claim has been run. Until then, an OPERATOR can unlock pairing for their
-  // OWN browser only — visit with ?pairtest=1 — to launch a real pair and rehearse
-  // the loop (tools/staking-rehearse.js). This never changes the public gate; the
-  // keeper stays inert, so a test pair's fees accrue but aren't distributed until
-  // the real flip. Clear it with ?pairtest=0.
-  function pairTestOverride() {
-    try {
-      var u = new URLSearchParams(window.location.search);
-      if (u.get("pairtest") === "1") { try { localStorage.setItem("wavesPairTest", "1"); } catch (e) {} return true; }
-      if (u.get("pairtest") === "0") { try { localStorage.removeItem("wavesPairTest"); } catch (e) {} return false; }
-      return localStorage.getItem("wavesPairTest") === "1";
-    } catch (e) { return false; }
-  }
+  // PUBLIC on Solana as of 2026-09-13 — pairing + burn-to-stake are open to
+  // everyone (defers to Shell.pairUnlocked, the single source of truth). ⚠️ The
+  // reward keeper is not yet live, so a pair's fees accrue but aren't auto-
+  // distributed until it ships. Robinhood keeps its own gate (isEvm → false).
   function PAIRING_LIVE() {
     try {
       if (isEvm()) return false;
-      var onDevnet = window.Launch && window.Launch.cluster && window.Launch.cluster() === "devnet";
-      return !!(onDevnet || pairTestOverride());
+      if (window.Shell && window.Shell.pairUnlocked) return !!window.Shell.pairUnlocked();
+      return true;   // Solana default: open
     } catch (e) { return false; }
   }
 

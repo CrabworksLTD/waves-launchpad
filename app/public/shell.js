@@ -44,20 +44,17 @@
   }
   var shellPaintWallet = null;   // set by mount(); repainted on chain switch
 
-  /* THE single source of truth for "is pairing unlocked here". Pairing is "soon"
-   * for the public on mainnet, but an operator can unlock it for their OWN browser
-   * with ?pairtest=1 (persisted) to launch a pair and rehearse the staking loop —
-   * every pairing gate (nav item, launch card, launch panel) reads this so there
-   * is one switch, not five. ?pairtest=0 clears it. Also on for devnet. */
+  /* THE single source of truth for "is pairing unlocked here" — every pairing gate
+   * (nav item, launch card, footer link, launch panel, staking page) reads this so
+   * there is one switch, not five.
+   *
+   * PUBLIC on Solana as of 2026-09-13: pairing + burn-to-stake are open to
+   * everyone. ⚠️ The reward-distribution keeper is not yet live, so a pair's fees
+   * accrue but are not auto-distributed until it ships — opened by explicit
+   * decision. The Robinhood side keeps its own gate. (?pairtest left as a harmless
+   * no-op so old operator links still resolve.) */
   function pairUnlocked() {
-    try {
-      var u = new URLSearchParams(location.search);
-      if (u.get("pairtest") === "1") { try { localStorage.setItem("wavesPairTest", "1"); } catch (e) {} return true; }
-      if (u.get("pairtest") === "0") { try { localStorage.removeItem("wavesPairTest"); } catch (e) {} return false; }
-      if (localStorage.getItem("wavesPairTest") === "1") return true;
-    } catch (e) {}
-    try { if (window.Launch && window.Launch.cluster && window.Launch.cluster() === "devnet") return true; } catch (e) {}
-    return false;
+    try { return currentChain() !== "robinhood"; } catch (e) { return true; }
   }
   /* Chains are applied by loading the page, not by re-skinning it in place —
      see the network selector below for why. Boot reads the persisted choice. */
