@@ -40,7 +40,8 @@ const TIERS = [
   { key: "t3",  pct: 3,  feeRate: 22500, wavesKeepBps: 6000 },
   { key: "t4",  pct: 4,  feeRate: 32500, wavesKeepBps: 7000 },
   { key: "t5",  pct: 5,  feeRate: 42500, wavesKeepBps: 8000 },
-  { key: "t10", pct: 10, feeRate: 92500, wavesKeepBps: 9000 },
+  // NOTE: 10% is impossible — the program caps platform feeRate at ~5% (50000 OK,
+  // 60000 reverts Custom:6002). The ladder tops out at 5% total.
 ];
 const CREATOR_FEE = 5000; // 0.50% on-chain cap
 

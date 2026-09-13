@@ -26,7 +26,11 @@ platform fee to the creator.
 | t3   | 3%    | 0.25%   | 2.25% (22500)    | 0.50%            | 0.60%       | 2.15%                         |
 | t4   | 4%    | 0.25%   | 3.25% (32500)    | 0.50%            | 0.70%       | 3.05%                         |
 | t5   | 5%    | 0.25%   | 4.25% (42500)    | 0.50%            | 0.80%       | 3.95%                         |
-| t10  | 10%   | 0.25%   | 9.25% (92500)    | 0.50%            | 0.90%       | 8.85%                         |
+
+> **Cap:** the program limits platform `feeRate` to ~5% (`50000` OK, `60000`
+> reverts `Custom:6002`), so the ladder tops out at **5% total** — a 10% tier is
+> impossible on LaunchLab. Configs t2/t3/t4/t5 are live on-chain (created
+> 2026-09-13, claim wallet = keeper escrow EFFY1LjZ…).
 
 Platform IDs + admin keypairs: `tools/create-launchlab-tiers.js` (admins in
 `~/waves-keys/launchlab-tier-*-admin.json`; claim wallet is always feeOwner).

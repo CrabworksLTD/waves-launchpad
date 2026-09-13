@@ -176,7 +176,9 @@
           t3:  { platformId: "Dcd5CnsLZkmzGa298XNBqiB7aQLmR6AC6c4LP4ELmuik", pct: 3,  feeRate: 22500, creatorFeeRate: 5000, wavesKeepBps: 6000 },
           t4:  { platformId: "AoiEDaYTFVeLCaBtMToNWe2BEq4LiFAfzvjCetxuG1ux", pct: 4,  feeRate: 32500, creatorFeeRate: 5000, wavesKeepBps: 7000 },
           t5:  { platformId: "3J6A7dtV2rS7GP7khzQBfRnpKrBjz5Srfjj51zTGefaT", pct: 5,  feeRate: 42500, creatorFeeRate: 5000, wavesKeepBps: 8000 },
-          t10: { platformId: "Ck3Mho7o21x7JmDcB4kE5fXuoyMxmeNNTzPkTF91eFxF", pct: 10, feeRate: 92500, creatorFeeRate: 5000, wavesKeepBps: 9000 },
+          // 10% is NOT possible — LaunchLab caps the platform feeRate at ~5%
+          // (feeRate 50000 OK, 60000 reverts Custom:6002), so the ladder tops out
+          // at 5% total. All 4 configs above are live on-chain (claim = keeper).
         },
         // Quote currencies, all with a live Raydium LaunchLab config (config-gated
         // — added only when Raydium has created the config; configId is derived at
