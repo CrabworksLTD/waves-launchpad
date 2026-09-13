@@ -2532,18 +2532,46 @@
       if (t.mint === "usdc") return "stablecoin";
       return shortAddr(t.mint);
     }
+    // one-time styles for the per-row copy control
+    if (!document.getElementById("qcopy-style")) {
+      var st = document.createElement("style");
+      st.id = "qcopy-style";
+      st.textContent =
+        "#lp-qlist .prow i.addr{display:inline-flex;align-items:center;gap:6px}" +
+        "#lp-qlist .qcopy{display:inline-flex;align-items:center;justify-content:center;padding:3px;margin:-3px;border-radius:5px;cursor:pointer;color:inherit;opacity:.5;transition:opacity .12s,color .12s,background .12s}" +
+        "#lp-qlist .qcopy:hover{opacity:1;background:rgba(127,127,127,.16)}" +
+        "#lp-qlist .qcopy.copied{color:#3fb950;opacity:1}" +
+        "#lp-qlist .qcopy svg{display:block}";
+      document.head.appendChild(st);
+    }
+    var COPY_ICON = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5H3A1.5 1.5 0 0 1 1.5 9V3A1.5 1.5 0 0 1 3 1.5h6A1.5 1.5 0 0 1 10.5 3v.5"/></svg>';
     function draw() {
       var items = list.filter(function (t) { return (t.cat || "stock") === tab; });
       var sel = currentSel();
       box.querySelector("#lp-qlist").innerHTML = items.length
         ? items.map(function (t) {
+            var isMint = t.mint !== "sol" && t.mint !== "usdc";
+            var right = isMint
+              ? '<i class="addr"><span>' + esc(shortAddr(t.mint)) + '</span>' +
+                '<span class="qcopy" role="button" tabindex="0" data-copy="' + esc(t.mint) +
+                '" title="Copy address" aria-label="Copy address">' + COPY_ICON + '</span></i>'
+              : '<i>' + esc(rightLabel(t)) + '</i>';
             return '<button class="prow' + (t.mint === sel ? " on" : "") + '" data-mint="' + esc(t.mint) + '">' +
               "<b>" + esc(t.symbol) + "</b><span>" + esc(t.label || t.symbol) + "</span>" +
-              "<i>" + esc(rightLabel(t)) + "</i></button>";
+              right + "</button>";
           }).join("")
         : '<p class="note" style="padding:12px">None yet.</p>';
       box.querySelectorAll("#lp-qlist .prow").forEach(function (b) {
-        b.onclick = function () {
+        b.onclick = function (ev) {
+          // copy the full address without selecting the row
+          var cp = ev.target.closest && ev.target.closest("[data-copy]");
+          if (cp) {
+            ev.preventDefault(); ev.stopPropagation();
+            try { navigator.clipboard.writeText(cp.getAttribute("data-copy")); } catch (e) {}
+            cp.classList.add("copied");
+            setTimeout(function () { cp.classList.remove("copied"); }, 1000);
+            return;
+          }
           var t = list.find(function (x) { return x.mint === b.dataset.mint; });
           if (reward) {
             var real = t.mint === "sol" ? WSOL_MINT : t.mint === "usdc" ? USDC_MINT : t.mint;
