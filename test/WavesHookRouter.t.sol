@@ -45,7 +45,7 @@ contract WavesHookRouterTest is Test {
 
     function _launch() internal returns (address token) {
         vm.prank(creator);
-        token = hook.launch("Wave Test", "WTEST", 100, "logo", "desc", "socials");
+        token = hook.launch("Wave Test", "WTEST", 100, "logo", "desc", "socials", address(0), 0);
     }
 
     function _curve(address token) internal view returns (uint96 raised, uint96 left, bool full) {
@@ -53,7 +53,7 @@ contract WavesHookRouterTest is Test {
             currency0: Currency.wrap(address(0)), currency1: Currency.wrap(token),
             fee: 0, tickSpacing: 60, hooks: IHooks(address(hook))
         });
-        (,,,,, raised, left, full, ) = hook.curves(key.toId());
+        (,,,,, raised, left, full, ,,,,) = hook.curves(key.toId());
     }
 
     // ── buy ───────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ contract WavesHookRouterTest is Test {
 
         vm.deal(user, 1 ether);
         vm.prank(user);
-        uint256 out = router.buy{value: ethIn}(token, 0, recip, block.timestamp);
+        uint256 out = router.buy{value: ethIn}(token, address(0), 0, 0, recip, block.timestamp);
 
         assertEq(out, expOut, "returned amount != curve");
         assertEq(WavesToken(token).balanceOf(recip), expOut, "recipient did not get the tokens");
@@ -84,7 +84,7 @@ contract WavesHookRouterTest is Test {
         uint256 sent = GRAD + 1 ether; // far more than the curve can accept
         vm.deal(user, sent);
         vm.prank(user);
-        router.buy{value: sent}(token, 0, recip, block.timestamp);
+        router.buy{value: sent}(token, address(0), 0, 0, recip, block.timestamp);
 
         (uint96 raised,, bool full) = _curve(token);
         assertTrue(full, "curve should latch full");
@@ -102,7 +102,7 @@ contract WavesHookRouterTest is Test {
         vm.deal(user, 1 ether);
         vm.prank(user);
         vm.expectRevert(WavesHookRouter.TooLittleReceived.selector);
-        router.buy{value: 0.1 ether}(token, type(uint256).max, recip, block.timestamp);
+        router.buy{value: 0.1 ether}(token, address(0), 0, type(uint256).max, recip, block.timestamp);
     }
 
     function test_buy_deadline_reverts() public {
@@ -111,7 +111,7 @@ contract WavesHookRouterTest is Test {
         vm.warp(1000);
         vm.prank(user);
         vm.expectRevert(WavesHookRouter.Expired.selector);
-        router.buy{value: 0.1 ether}(token, 0, recip, 999);
+        router.buy{value: 0.1 ether}(token, address(0), 0, 0, recip, 999);
     }
 
     // ── sell ──────────────────────────────────────────────────────────
@@ -120,12 +120,12 @@ contract WavesHookRouterTest is Test {
         // user buys first (to itself), then sells
         vm.deal(user, 1 ether);
         vm.prank(user);
-        uint256 bought = router.buy{value: 0.5 ether}(token, 0, user, block.timestamp);
+        uint256 bought = router.buy{value: 0.5 ether}(token, address(0), 0, 0, user, block.timestamp);
 
         uint256 recipEthBefore = recip.balance;
         vm.startPrank(user);
         WavesToken(token).approve(address(router), bought);
-        uint256 ethOut = router.sell(token, bought, 0, recip, block.timestamp);
+        uint256 ethOut = router.sell(token, address(0), bought, 0, recip, block.timestamp);
         vm.stopPrank();
 
         assertGt(ethOut, 0, "no eth out");
@@ -139,11 +139,11 @@ contract WavesHookRouterTest is Test {
         address token = _launch();
         vm.deal(user, 1 ether);
         vm.prank(user);
-        uint256 bought = router.buy{value: 0.5 ether}(token, 0, user, block.timestamp);
+        uint256 bought = router.buy{value: 0.5 ether}(token, address(0), 0, 0, user, block.timestamp);
         vm.startPrank(user);
         WavesToken(token).approve(address(router), bought);
         vm.expectRevert(WavesHookRouter.TooLittleReceived.selector);
-        router.sell(token, bought, type(uint256).max, recip, block.timestamp);
+        router.sell(token, address(0), bought, type(uint256).max, recip, block.timestamp);
         vm.stopPrank();
     }
 
@@ -157,6 +157,6 @@ contract WavesHookRouterTest is Test {
         address token = _launch();
         vm.prank(user);
         vm.expectRevert(WavesHookRouter.ZeroAmount.selector);
-        router.buy{value: 0}(token, 0, recip, block.timestamp);
+        router.buy{value: 0}(token, address(0), 0, 0, recip, block.timestamp);
     }
 }

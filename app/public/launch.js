@@ -221,13 +221,21 @@
 
     var waveMs = (opts.waves.minutes || 0) * 60000;
     var groups = opts.waves.phases.map(function (p, i) {
-      return {
-        label: p.label.slice(0, 6),
-        guards: {
-          allowList: mx.some({ merkleRoot: mx.getMerkleRoot(p.wallets) }),
-          startDate: mx.some({ date: mx.dateTime(new Date(openAt.getTime() + i * waveMs)) })
-        }
-      };
+      var startDate = mx.some({ date: mx.dateTime(new Date(openAt.getTime() + i * waveMs)) });
+      var guards;
+      if (p.kind === "nft") {
+        /* Hold ≥1 NFT from the collection. Metaplex nftGate is membership-only,
+         * so a collection's `min` above 1 is not enforceable here — a holder is
+         * a holder. (The signer-gated EVM path honours min exactly.) */
+        guards = { nftGate: mx.some({ requiredCollection: mx.publicKey(p.address) }), startDate: startDate };
+      } else if (p.kind === "coin") {
+        /* Hold ≥ `amountBase` of the token, in the mint's base units — computed
+         * from the mint's real decimals in deploy() before this runs. */
+        guards = { tokenGate: mx.some({ mint: mx.publicKey(p.address), amount: p.amountBase }), startDate: startDate };
+      } else {
+        guards = { allowList: mx.some({ merkleRoot: mx.getMerkleRoot(p.wallets) }), startDate: startDate };
+      }
+      return { label: p.label.slice(0, 6), guards: guards };
     });
     groups.push({
       label: "pub",
@@ -302,6 +310,19 @@
 
     var collection = mx.generateSigner(umi);
     var candyMachine = mx.generateSigner(umi);
+    /* Token gates need the threshold in the mint's own base units, so read each
+     * token's real decimals from the chain rather than assuming 18/9. Done here,
+     * before buildGuards (which is sync), and cached on the phase. */
+    if (opts.waves && opts.waves.phases) {
+      for (var pIdx = 0; pIdx < opts.waves.phases.length; pIdx++) {
+        var ph = opts.waves.phases[pIdx];
+        if (ph.kind === "coin" && ph.amountBase == null) {
+          var sup = await rpcCall("getTokenSupply", [String(ph.address)]).catch(function () { return null; });
+          var dec = Number((sup && sup.value && sup.value.decimals) || 0);
+          ph.amountBase = BigInt(Math.round(Number(ph.min) * Math.pow(10, dec)));
+        }
+      }
+    }
     var built = buildGuards(mx, opts);
     var candyGuard = mx.findCandyGuardPda(umi, { base: candyMachine.publicKey });
     var devMints = (opts.devMints || []).filter(function (d) { return d.count > 0; });
@@ -474,6 +495,18 @@
       mintArgs.allowList = mx.some({ merkleRoot: allow.merkleRoot });
     }
 
+    /* Token gate — the minter's ATA for `mint` is derived by the program, so the
+     * only arg is the mint itself. */
+    var tokg = guardVal("tokenGate");
+    if (tokg) mintArgs.tokenGate = mx.some({ mint: tokg.mint });
+    /* NFT gate — the minter must present a specific NFT they hold from the
+     * required collection; the page finds a qualifying one and passes it. */
+    var nftg = guardVal("nftGate");
+    if (nftg) {
+      if (!opts.gateNft) throw new Error("This phase is for a collection's holders — a qualifying NFT is required.");
+      mintArgs.nftGate = mx.some({ mint: mx.publicKey(opts.gateNft) });
+    }
+
     var asset = mx.generateSigner(umi);
     var builder = await mx.mintV1(umi, {
       candyMachine: cm.publicKey,
@@ -589,6 +622,14 @@
       mintArgs.allowList = mx.some({ merkleRoot: allow.merkleRoot });
     }
 
+    var tokgM = guardVal("tokenGate");
+    if (tokgM) mintArgs.tokenGate = mx.some({ mint: tokgM.mint });
+    var nftgM = guardVal("nftGate");
+    if (nftgM) {
+      if (!opts.gateNft) throw new Error("This phase is for a collection's holders — a qualifying NFT is required.");
+      mintArgs.nftGate = mx.some({ mint: mx.publicKey(opts.gateNft) });
+    }
+
     for (var i = 0; i < qty; i++) {
       var asset = mx.generateSigner(umi);
       var b = await mx.mintV1(umi, {
@@ -661,6 +702,15 @@
     var price = pay ? Number(pay.lamports.basisPoints) / 1e9 : null;
     var open = optVal(guard.guards, "startDate");
 
+    // The metadata directory, straight from the machine's config. Prefix
+    // compression stores the base uri once here (prefixUri) rather than in each
+    // item, so cm.items[i].uri is not a reliable full URL to strip a dir from.
+    // This is the authoritative source for where _allowlist.json / _collection
+    // .json live; the mint page reads it before falling back to an item uri.
+    var cls = cm.data && cm.data.configLineSettings;
+    var prefixUri = cls && cls.__option === "Some" ? cls.value.prefixUri
+      : (cls && cls.prefixUri) || null;
+
     // Phases, for grouped machines: each wave is a group with an allowlist
     // and an opening time; "pub" is the ungated tail. The wallet lists behind
     // the merkle roots are pinned as _allowlist.json next to the metadata.
@@ -668,7 +718,10 @@
       var gp = optVal(g.guards, "solPayment");
       var sd = optVal(g.guards, "startDate");
       return {
-        label: g.label,
+        // Candy-guard labels are a fixed 6-byte field; umi reads them back
+        // null-padded ("w1\0\0\0\0"), which never == the pinned "w1" and would
+        // break every wave->phase match. Strip the padding so labels are clean.
+        label: String(g.label == null ? "" : g.label).replace(/[\u0000\s]+$/g, ""),
         opensAt: sd ? Number(sd.date) * 1000 : null,
         priceSol: gp ? Number(gp.lamports.basisPoints) / 1e9 : price,
         allowlisted: !!optVal(g.guards, "allowList")
@@ -684,9 +737,51 @@
       opensAt: open ? Number(open.date) * 1000 : null,
       groups: groups,
       firstItemUri: (cm.items && cm.items[0] && cm.items[0].uri) || null,
+      prefixUri: prefixUri,
       collection: cm.collectionMint ? String(cm.collectionMint) : null,
       authority: String(cm.authority)
     };
+  }
+
+  /* ── holdership, for collection/token allowlist waves ────────────────────────
+   * A gated wave lets holders of a collection or token mint. The guard enforces
+   * it on-chain, but the mint page still has to know whether YOU qualify (to pick
+   * your wave) and, for an NFT gate, WHICH asset to present. Both read through
+   * the same /api/rpc passthrough the rest of the launcher uses. */
+  function rpcUrl() { return (CLUSTERS[cluster] || CLUSTERS["mainnet-beta"]).rpc; }
+  async function rpcCall(method, params) {
+    var r = await fetch(rpcUrl(), {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: method, params: params })
+    });
+    var j = await r.json();
+    if (j.error) throw new Error(j.error.message || "rpc error");
+    return j.result;
+  }
+  // ≥ minHuman of an SPL mint, summed across the owner's accounts, in its decimals.
+  async function holdsToken(owner, mint, minHuman) {
+    var res = await rpcCall("getTokenAccountsByOwner",
+      [String(owner), { mint: String(mint) }, { encoding: "jsonParsed" }]).catch(function () { return null; });
+    if (!res || !res.value) return false;
+    var total = 0n, dec = 0;
+    res.value.forEach(function (a) {
+      var ta = a.account.data.parsed.info.tokenAmount;
+      dec = ta.decimals; total += BigInt(ta.amount);
+    });
+    return total >= BigInt(Math.round(Number(minHuman || 1) * Math.pow(10, dec)));
+  }
+  // An asset the owner holds from `collection` (Core/DAS grouping), or null. Used
+  // both to qualify the wave and as the nftGate `mint` to present.
+  async function heldFromCollection(owner, collection, minCount) {
+    var res = await rpcCall("getAssetsByOwner",
+      [{ ownerAddress: String(owner), page: 1, limit: 1000 }]).catch(function () { return null; });
+    if (!res || !res.items) return null;
+    var mine = res.items.filter(function (it) {
+      return (it.grouping || []).some(function (g) {
+        return g.group_key === "collection" && g.group_value === String(collection);
+      });
+    });
+    return mine.length >= (minCount || 1) ? mine[0].id : null;
   }
 
   window.Launch = {
@@ -700,6 +795,8 @@
     deploy: deploy,
     mintOne: mintOne,
     mintMany: mintMany,
+    holdsToken: holdsToken,
+    heldFromCollection: heldFromCollection,
     readMachine: readMachine,
     cluster: function (name) { if (name) cluster = name; return cluster; },
     clusters: CLUSTERS

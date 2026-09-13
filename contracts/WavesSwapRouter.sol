@@ -70,8 +70,6 @@ pragma solidity ^0.8.28;
  * privileged caller to impersonate. That is deliberate: a keeper-only router
  * would be a contract whose failure mode is "the keeper's money is stuck in
  * it", and this way there is never any money in it to be stuck.
- *
- * ⚠️ NOT AUDITED.
  */
 
 type Currency is address;

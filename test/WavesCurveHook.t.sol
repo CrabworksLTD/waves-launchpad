@@ -53,7 +53,7 @@ contract WavesCurveHookTest is Test {
 
     function _launch() internal returns (address token, PoolKey memory key) {
         vm.prank(creator);
-        token = hook.launch("Wave Test", "WTEST", 100, "logo", "desc", "socials");
+        token = hook.launch("Wave Test", "WTEST", 100, "logo", "desc", "socials", address(0), 0);
         key = PoolKey({
             currency0: Currency.wrap(address(0)),
             currency1: Currency.wrap(token),
@@ -65,7 +65,7 @@ contract WavesCurveHookTest is Test {
 
     function test_launch_opens_a_live_pool() public {
         (address token, PoolKey memory key) = _launch();
-        (address t, address c,,,, uint96 raised, uint96 left,, bool grad) = hook.curves(key.toId());
+        (address t, address c,,,, uint96 raised, uint96 left,, bool grad,,,,) = hook.curves(key.toId());
         assertEq(t, token);
         assertEq(c, creator);
         assertEq(raised, 0);
@@ -95,11 +95,11 @@ contract WavesCurveHookTest is Test {
         );
 
         assertEq(WavesToken(token).balanceOf(buyer), expOut, "buyer got the wrong token amount");
-        (,,,,, uint96 raised, uint96 left,,) = hook.curves(key.toId());
+        (,,,,, uint96 raised, uint96 left,,,,,,) = hook.curves(key.toId());
         assertEq(uint256(raised), inAfterFee, "raised != net eth in");
         assertEq(uint256(left), SUPPLY - expOut, "tokensLeft wrong");
         // platform earned its volume cut (40 bps of accepted, capped at fee)
-        assertGt(hook.owed(platform), 0, "platform earned nothing");
+        assertGt(hook.owed(platform, address(0)), 0, "platform earned nothing");
     }
 
     function _buy(PoolKey memory key, uint256 ethIn) internal {
@@ -134,7 +134,7 @@ contract WavesCurveHookTest is Test {
         vm.stopPrank();
 
         assertGt(buyer.balance, ethBefore, "seller received no ETH");
-        (,,,,, uint96 raised, uint96 left,,) = hook.curves(key.toId());
+        (,,,,, uint96 raised, uint96 left,,,,,,) = hook.curves(key.toId());
         assertGt(uint256(left), SUPPLY - held, "tokensLeft did not grow on sell");
         assertLt(uint256(raised), 0.5 ether, "raised did not fall on sell");
     }
@@ -143,13 +143,13 @@ contract WavesCurveHookTest is Test {
         (, PoolKey memory key) = _launch();
         _buy(key, 1 ether);
 
-        uint256 owed = hook.owed(platform);
+        uint256 owed = hook.owed(platform, address(0));
         assertGt(owed, 0, "platform earned nothing");
         uint256 before = platform.balance;
         vm.prank(platform);
-        hook.claim();
+        hook.claim(address(0));
         assertEq(platform.balance, before + owed, "claim paid the wrong amount");
-        assertEq(hook.owed(platform), 0, "owed not cleared");
+        assertEq(hook.owed(platform, address(0)), 0, "owed not cleared");
     }
 
     function test_graduation_seeds_locked_liquidity_and_amm_trades() public {
@@ -166,7 +166,7 @@ contract WavesCurveHookTest is Test {
             PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
             ""
         );
-        (,,,,, uint96 raised,, bool full, bool gradBefore) = hook.curves(key.toId());
+        (,,,,, uint96 raised,, bool full, bool gradBefore,,,,) = hook.curves(key.toId());
         assertEq(uint256(raised), GRAD, "curve did not fill to the target");
         assertTrue(full, "full not latched");
         assertFalse(gradBefore);
@@ -191,7 +191,7 @@ contract WavesCurveHookTest is Test {
 
         // anyone graduates it
         hook.graduate(token);
-        (,,,,,,,, bool grad) = hook.curves(key.toId());
+        (,,,,,,,, bool grad,,,,) = hook.curves(key.toId());
         assertTrue(grad, "not graduated");
 
         // H2/M1: both reserves were deployed at the correct price — the hook's
@@ -233,7 +233,7 @@ contract WavesCurveHookTest is Test {
         (address token, PoolKey memory key) = _launch();
         // fill it
         _buy(key, GRAD + 1 ether);
-        (,,,,,,, bool full,) = hook.curves(key.toId());
+        (,,,,,,, bool full,,,,,) = hook.curves(key.toId());
         assertTrue(full, "full not latched");
 
         // M2: once full, a sell is refused (the pool is frozen), so nobody can
@@ -249,7 +249,7 @@ contract WavesCurveHookTest is Test {
         );
         vm.stopPrank();
         hook.graduate(token); // still graduates
-        (,,,,,,,, bool grad) = hook.curves(key.toId());
+        (,,,,,,,, bool grad,,,,) = hook.curves(key.toId());
         assertTrue(grad);
     }
 
@@ -263,7 +263,7 @@ contract WavesCurveHookTest is Test {
 
         vm.deal(creator, 1 ether);
         vm.prank(creator);
-        address token = hook.launch{value: firstBuy}("Snipe Me", "SNIPE", 100, "l", "d", "s");
+        address token = hook.launch{value: firstBuy}("Snipe Me", "SNIPE", 100, "l", "d", "s", address(0), 0);
 
         PoolKey memory key = PoolKey({
             currency0: Currency.wrap(address(0)),
@@ -272,15 +272,15 @@ contract WavesCurveHookTest is Test {
         });
         // the creator already holds their curve tokens from the same tx
         assertEq(WavesToken(token).balanceOf(creator), expOut, "atomic first buy gave the wrong amount");
-        (,,,,, uint96 raised, uint96 left,,) = hook.curves(key.toId());
+        (,,,,, uint96 raised, uint96 left,,,,,,) = hook.curves(key.toId());
         assertEq(uint256(raised), inAfterFee, "first-buy ETH not on the curve");
         assertEq(uint256(left), SUPPLY - expOut, "tokensLeft wrong after first buy");
-        assertGt(hook.owed(platform), 0, "platform earned nothing on the first buy");
+        assertGt(hook.owed(platform, address(0)), 0, "platform earned nothing on the first buy");
     }
 
     function test_launch_without_value_still_works() public {
         (address token, PoolKey memory key) = _launch(); // msg.value 0
-        (,,,,, uint96 raised, uint96 left,,) = hook.curves(key.toId());
+        (,,,,, uint96 raised, uint96 left,,,,,,) = hook.curves(key.toId());
         assertEq(raised, 0);
         assertEq(uint256(left), SUPPLY);
         assertEq(WavesToken(token).balanceOf(creator), 0);
@@ -322,15 +322,15 @@ contract WavesCurveHookTest is Test {
      * plus all accrued fees — so it's checked against the sum, not one curve. If
      * either drifts, money was created or destroyed. */
     function _assertTokenConserved(address token, PoolKey memory key) internal {
-        (,,,,, , uint96 left,,) = hook.curves(key.toId());
+        (,,,,, , uint96 left,,,,,,) = hook.curves(key.toId());
         assertEq(manager.balanceOf(address(hook), uint256(uint160(token))), uint256(left), "token claim != tokensLeft");
     }
 
     // single-curve convenience: with one curve, global ETH == this curve's books
     function _assertConserved(address token, PoolKey memory key) internal {
         _assertTokenConserved(token, key);
-        (,,,,, uint96 raised,,,) = hook.curves(key.toId());
-        uint256 totalOwed = hook.owed(platform) + hook.owed(creator);
+        (,,,,, uint96 raised,,,,,,,) = hook.curves(key.toId());
+        uint256 totalOwed = hook.owed(platform, address(0)) + hook.owed(creator, address(0));
         assertEq(manager.balanceOf(address(hook), 0), uint256(raised) + totalOwed, "ETH claim != raised + owed");
     }
 
@@ -361,7 +361,7 @@ contract WavesCurveHookTest is Test {
     function test_bad_fee_rung_reverts() public {
         vm.prank(creator);
         vm.expectRevert(WavesCurveHook.BadFee.selector);
-        hook.launch("X", "X", 250, "", "", ""); // 250 is not a rung
+        hook.launch("X", "X", 250, "", "", "", address(0), 0); // 250 is not a rung
     }
 
     function test_exact_output_reverts() public {
@@ -394,7 +394,7 @@ contract WavesCurveHookTest is Test {
     function test_claim_with_nothing_owed_is_a_noop() public {
         uint256 before = address(0xF00D).balance;
         vm.prank(address(0xF00D));
-        hook.claim();
+        hook.claim(address(0));
         assertEq(address(0xF00D).balance, before);
     }
 
@@ -414,9 +414,9 @@ contract WavesCurveHookTest is Test {
         hook.pledge(token, keeper, 10_000); // 100% of the creator side to holders
         _buy(key, 1 ether);
         // platform still earns; keeper now earns the whole creator side; creator ~0
-        assertGt(hook.owed(platform), 0, "platform got nothing");
-        assertGt(hook.owed(keeper), 0, "keeper (holders) got nothing");
-        assertEq(hook.owed(creator), 0, "creator kept a pledged-away share");
+        assertGt(hook.owed(platform, address(0)), 0, "platform got nothing");
+        assertGt(hook.owed(keeper, address(0)), 0, "keeper (holders) got nothing");
+        assertEq(hook.owed(creator, address(0)), 0, "creator kept a pledged-away share");
     }
 
     function test_pledge_only_creator_and_once() public {
@@ -435,20 +435,20 @@ contract WavesCurveHookTest is Test {
     function test_two_tokens_do_not_interfere() public {
         (address a, PoolKey memory ka) = _launch();
         vm.prank(address(0xDEAD));
-        address b = hook.launch("B", "B", 200, "", "", "");
+        address b = hook.launch("B", "B", 200, "", "", "", address(0), 0);
         PoolKey memory kb = _key(b);
 
         _buy(ka, 0.5 ether);
         // B's curve is untouched by a buy on A
-        (,,,,, uint96 rb, uint96 lb,,) = hook.curves(kb.toId());
+        (,,,,, uint96 rb, uint96 lb,,,,,,) = hook.curves(kb.toId());
         assertEq(rb, 0, "buying A moved B's raised");
         assertEq(uint256(lb), SUPPLY, "buying A moved B's tokensLeft");
         // token claims are per-token and must each match their own books
         _assertTokenConserved(a, ka);
         _assertTokenConserved(b, kb);
         // ETH claim is global: it equals both curves' raised plus all fees owed
-        (,,,,, uint96 ra,,,) = hook.curves(ka.toId());
-        uint256 totalOwed = hook.owed(platform) + hook.owed(creator) + hook.owed(address(0xDEAD));
+        (,,,,, uint96 ra,,,,,,,) = hook.curves(ka.toId());
+        uint256 totalOwed = hook.owed(platform, address(0)) + hook.owed(creator, address(0)) + hook.owed(address(0xDEAD), address(0));
         assertEq(
             manager.balanceOf(address(hook), 0),
             uint256(ra) + uint256(rb) + totalOwed,
@@ -478,7 +478,7 @@ contract WavesCurveHookTest is Test {
             ""
         );
         _assertConserved(token, key);
-        (,,,,, uint96 raised, uint96 left,,) = hook.curves(key.toId());
+        (,,,,, uint96 raised, uint96 left,,,,,,) = hook.curves(key.toId());
         assertLe(uint256(raised), GRAD, "raised exceeded the graduation target");
         assertLe(uint256(left), SUPPLY, "tokensLeft exceeded supply");
     }

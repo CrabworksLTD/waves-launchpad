@@ -48,19 +48,51 @@ platform configs on mainnet. Reviewable, reversible-by-ignoring.
 the tiers on LaunchLab; the launch attaches `tiers[flow.tier].platformId`;
 `launchToken` passes it. Still inert until the flag flips.
 
-**Phase 3 — the keeper (FUND-MOVING, AUDIT-GATED):** the real work.
-- Claim the platform fee (`claimPlatformFee` → feeOwner) + the creator's 0.5%
-  (`claimCreatorFee`).
-- **Forward** the creator's tier share out of the platform fee to their fee wallet
-  (keep `wavesKeepBps`).
-- **Distribute** holder rewards: harvest the Token-2022 transfer fee (dividend),
-  split it pro-rata, and pay holders; run buyback+burn; handle the 50/50 split.
-- Reuse the hardened patterns from the Meteora `keeper.js` (snapshot → gas → claim
-  → persist real `pays` → execute; fail-closed auth; destination from record).
+**Phase 3 — the keeper (FUND-MOVING, AUDIT-GATED): BUILT, awaiting audit.**
+`api/launchlab-keeper.js` — inert (no cron, `keeper.js` still excludes
+`backend:"launchlab"`, both flags false). What it does:
+- **Fee ladder** — `claimPlatformFee` to the keeper escrow, forward the creator's
+  tier share to their fee wallet, sweep `wavesKeepBps` to the treasury. Uses the
+  DELTA the claim adds (the quote mint is shared across SOL-quoted launches, so the
+  whole-balance shortcut would rob a sibling).
+- **Holder rewards** — harvest the Token-2022 transfer fee (the pot, in the launched
+  mint, so whole-balance IS crash-safe); dividend pays holders pro-rata after a
+  Jupiter swap into the reward asset; burn destroys it; split does half each; **pair**
+  deposits into the staking pool's reward-mint ATA + calls `sync` (holders CLAIM).
+- Reuses `keeper.js`'s crash-safe primitive verbatim: `payOnce` records the sig
+  BEFORE broadcast, persists the plan the instant a non-idempotent step (Raydium
+  claim, Jupiter swap) lands, resumes each batch at `plan.done`. Fail-closed auth;
+  destination always from the token record, never the request.
+- **The two boundaries for the auditor to focus on** are the only non-`payOnce`
+  steps: the Raydium `claimPlatformFee` execute and the Jupiter swap. Both persist
+  immediately on landing; the residual crash window leaves funds in the keeper's OWN
+  escrow (recoverable), never a third-party loss — documented at each call site.
+- Verified against the deployed staking program: pool PDA seeds `["pool", tokenMint,
+  collection]`, sync accounts `[pool(w), vault(r)]`, vault = pool's reward-mint ATA —
+  all match `stake.js` and `program/src/lib.rs`.
+
+**Record fields the keeper reads (WIRED 2026-09-13):** the keeper services jobs
+off the token record, so `launchlab.js` now persists `tier`, `rewardMode`, and
+`pairedCollection` on launch (they were dropped before — the keeper would have
+seen zero jobs), and `api/tokens.js` stores them chain-aware (`pairedCollection`
+validated base58 for Solana, not EVM-only). Without this the ladder + rewards are
+invisible to the keeper regardless of the flag.
+
+**Pair-launch orchestration (ALREADY WIRED):** `launchpanel.js` calls
+`WavesStake.initPool({tokenMint, collection, rewardMint})` on a pair launch
+(best-effort — the token already launched), creating the staking pool + reward
+vault. The keeper then *feeds* that vault; it does not create it.
+
+**Preflight (READ-ONLY):** `tools/launchlab-keeper-preflight.js` validates every
+serviceable job's invariants without moving funds — tier config exists, mint is
+Token-2022 with the keeper as withdraw authority, pair pool + vault exist, keeper
+gas. Run it against live KV before any real keeper run and hand it to the auditor.
 
 **Phase 4 — audit + go live:** hand Phase 3 to the auditor (same as the last
-round), deploy, then flip `launchlabLadderLive` mainnet:true. The ladder and the
-rewards turn on together.
+round), rehearse one dividend payout on mainnet with a tiny pot (Jupiter has no
+devnet, so the swap path can only be proven with real liquidity), deploy, then
+flip `launchlabLadderLive` mainnet:true. The ladder and the rewards turn on
+together.
 
 ## Do NOT flip the ladder before Phase 3 ships
 Higher tiers would charge the creator more and pay them only the 0.5% on-chain cap

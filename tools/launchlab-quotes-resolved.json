@@ -1,0 +1,4646 @@
+[
+  {
+    "mint": "XsP7xzNPvEHS1m6qfanPUGjNmdnmsLKEoNAnHjdxxyZ",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "MSTRx",
+    "name": "MicroStrategy xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "NVDAx",
+    "name": "NVIDIA xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "Xsf9mBktVB9BSU5kf4nHxPq5hCBJ2j2ui3ecFGxPRGc",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "GMEx",
+    "name": "Gamestop xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "Xs78JED6PFZxWc2wCEPspZW9kL3Se5J7L5TChKgsidH",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "STRCx",
+    "name": "Strategy PP Variable xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "XsvNBAYkrDRNhA7wPHQfX3ZUXZyZLdnCQDfHZ56bzpg",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "HOODx",
+    "name": "Robinhood xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "XshPgPdXFRWB8tP1j82rebb2Q9rPgGX37RuqzohmArM",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "INTCx",
+    "name": "Intel xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "XsCPL9dNWBMvFtTmwcCA5v3xWPSMEBCszbQdiLLq6aN",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "GOOGLx",
+    "name": "Alphabet xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "Xs7ZdzSHLU9ftNJsii5fCeJhoRWSC32SQGzGQtePxNu",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "COINx",
+    "name": "Coinbase xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "Xs2yquAgsHByNzx68WJC55WHjHBvG9JsMB7CWjTLyPy",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "DFDVx",
+    "name": "DFDV xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "XsqE9cRRpzxcGKDXj1BJ7Xmg4GRhZoyY1KpmGSxAWT2",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "MCDx",
+    "name": "McDonald's xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "XsfCC9VL4DamVGNgdJpfLXB3sBVa158Gbx8sh7NzmTk",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "VIDAx",
+    "name": "Vida Global xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "Xs8S1uUs1zvS2p7iwtsG3b6fkhpvmwz4GYU3gWAmWHZ",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "QQQx",
+    "name": "Nasdaq xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "AAPLx",
+    "name": "Apple xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "SPCXx",
+    "name": "SpaceX xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "SPYx",
+    "name": "SP500 xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "Xs6B6zawENwAbWVi7w92rjazLuAr5Az59qgWKcNb45x",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "BRK.Bx",
+    "name": "Berkshire Hathaway xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "XsueG8BtpquVJX9LVLLEGuViXUungE6WmK5YZ3p3bd1",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "CRCLx",
+    "name": "Circle xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "Xsv9hRk1z5ystj9MhnA7Lq4vjSsLwzL2nxrwmwtD3re",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "GLDx",
+    "name": "Gold xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "Xs3eBt7uRfJX8QUs4suhyU8p2M6DoUDrJyWBa8LLZsg",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "AMZNx",
+    "name": "Amazon.com xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "TSLAx",
+    "name": "Tesla xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "Xsa62P5mvPszXL1krVUnU5ar38bBSVcWAB6fmPCo5Zu",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "METAx",
+    "name": "Meta xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "XspzcW1PRtgf6Wj92HCiZdjzKCyFekVD8P5Ueh3dRMX",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "MSFTx",
+    "name": "Microsoft xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "XsaBXg8dU5cPM6ehmVctMkVqoiRG2ZjMo1cyBJ3AykQ",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "KOx",
+    "name": "Coca-Cola xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "XsoBhf2ufR8fTyNSjqfU71DYGaE6Z3SUGAidpzriAA4",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 8,
+    "symbol": "PLTRx",
+    "name": "Palantir xStock",
+    "t2022": true,
+    "stocky": true
+  },
+  {
+    "mint": "88SpBWrpbQ6MCdukVbtDBwRYYZAkv4KU4PYdG86ipump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BULLWHALE",
+    "name": "BULLWHALE",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "3ThcFQSZqtBVZXVnBjVu8QLdtcMtadD1jFKEWvNSpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BOT",
+    "name": "Bot",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "4az7oyuUFco8GedLkWYzopurgadkSz8n64xCEXNYpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "Agartha",
+    "name": "Agartha",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "2wzVMXhLypmP92mXNCq4fuFcd9TCC972AbMfuiH3pump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "AISLOP",
+    "name": "AI SLOP",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "MRVLSjkR2ceUBukujaD3xCyHP1H3B2SzpsNTZF546jo",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "MRVL",
+    "name": "Marvell Technology - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "QUBTAD8C9bMU9LvmMNgKPhrmBGbHvxpu6vfWQtThxxw",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "QUBT",
+    "name": "Quantum Computing - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "7XJiwLDrjzxDYdZipnJXzpr1iDTmK55XixSFAa7JgNEL",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "MLG",
+    "name": "360noscope420blazeit",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "Ge87EtsjwRQbHaqQmKRno69RFTwh9bfSsm99XNxTpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Jimothy",
+    "name": "Jimothy The Raccoon",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "DNUTsCvKbKwu2RM72cUuW3TD9YpzArzACcqYQssjPLSk",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "DNUT",
+    "name": "Krispy Kreme, Inc. Common Stock - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "FtateF34Xzawa91bpbVNdX72hZYo9cymRDYqBreHHbJi",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "PANTS",
+    "name": "dogwifpants",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "C2omVhcvt3DDY77S2KZzawFJQeETZofgZ4eNWWkXpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "BULLISH",
+    "name": "Bullish Degen",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "HtTYHz1Kf3rrQo6AqDLmss7gq5WrkWAaXn3tupUZbonk",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "KORI",
+    "name": "Kori The Pom",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "EpXtn6xGoZ4Y45vRjiDUHSCGbBoJD5FaEqZbF98YswH1",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "MADE",
+    "name": "SelfMade by SP3ND",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "gPXGrQHtF1jFrWb4fvqhvrip3vG3EETWhGcT7Rxpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TNOS",
+    "name": "TNOS",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "AVBN6kXdaw27ySuvMevKYzNTL8d39b7sGQFDCmsvpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "PINK",
+    "name": "PINK COIN",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "TTWofwAge91oFhZs7kpQdyrVRkmevgM88xijGvQFbKo",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TTWO",
+    "name": "Take-Two Interactive Software - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Hos282xmdMJHwMjhni91fNqdjDsgWjgSckxuGc1Bpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Token",
+    "name": "Webcade",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "H74CYmXgMkYHYuSRsZt6RJb4NYp2u72Vw8BS5huApump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "LMAO!",
+    "name": "LMAO!",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "uniHfuPhEQSrtpzXpJZDCSq53yaejKKpNhFUiKoHKHV",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "UNI",
+    "name": "Uniswap",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "BKXtSJWJk8s6DGEv71a3HohqHMhzn1iXLAzxMm6ZXjmy",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "GPRO",
+    "name": "GPRO",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "GwD4C9dWrfEKMcKeF8NgdZAvn5BN8XduwU3R1eDpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "NTFS",
+    "name": "National Trust Fund System",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "SV151D5pjygAKA8aJJcKzm4wFnRX5G92Fye94jQJk7g",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "SV151",
+    "name": "Scarlet & Violet 151",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "9WPTUkh8fKuCnepRWoPYLH3aK9gSjPHFDenBq2X1Czdp",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "SELFIE",
+    "name": "SelfieDogCoin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "kq11hXndwPidqGoEk1g5pp43FAwD324oY7qMmwPpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "CATE",
+    "name": "Catecoin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Ga5ErptAQ5oHwB7G195UEq9FeJ5UNDoV9SCRCpebFeG7",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "REDACTED",
+    "name": "████████",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "TROLL",
+    "name": "TROLL",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "Aigf5pKPyZW8nzxCrHEisE4tZMiUhFpKie8mYE7cmj6c",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "NVDGE",
+    "name": "NVDA Doge",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "ANSEM",
+    "name": "The Black Bull",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "J6pQQ3FAcJQeWPPGppWRb4nM8jU3wLyYbRrLh7feMfvd",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "2Z",
+    "name": "DoubleZero",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "4TyZGqRLG3VcHTGMcLBoPUmqYitMVojXinAmkL8xpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "testicle",
+    "name": "testicle",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "GJ9LEQZgoxW487LRaRnajr6DWzouswd29EruRqwZBAGS",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "NIKITA",
+    "name": "NIKITA BOAR",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "Eu8qFQrtyRdTLmjn42vnuVCY26fsZPSbkbyVo31t4xFJ",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "RICKROLL",
+    "name": "RICKROLL",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "ACtfUWtgvaXrQGNMiohTusi5jcx5RJf5zwu9aAxkpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "unc",
+    "name": "unc",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "HukaK2eHhbTyiuUwuKMntjPJP4aGdD4VwiExsNmyT8WJ",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BOT",
+    "name": "Grok Bot",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "DmGvYx7R4ZJnSocMauain4LXh3oA8kuDYavLoDLYpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Ram",
+    "name": "2 Sticks of Ram",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "9jVRLpzqYQBBhVejgtvCrBnivng62fjWrHxePh79pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "KLEF",
+    "name": "Klef",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "DtR4D9FtVoTX2569gaL837ZgrB6wNjj6tkmnX9Rdk9B2",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "aura",
+    "name": "aura",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "ADJFAKVQkAba53ufV7quSkvkSPpoM8DsgxFYvB7pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "NVIDIA",
+    "name": "NVIDIA MEME Token",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "MNDEFzGvMt87ueuHvVU9VcTqsAP5b3fTGPsHuuPA5ey",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "MNDE",
+    "name": "Marinade",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "2q68mqEbjwmnMjs1o3KZDNZVyMv6RZKkHcm64iinpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "RETARD",
+    "name": "Retard Coin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "FuFwp8DaheiM4xBHGNJsXpPDPcZwP33BGdhC49LF1nPj",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "MONKE",
+    "name": "MonkeBrokers",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "GvUCjmWSXA5hrTh9smmNA1AU55YCtP9mDLQcrKA1pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "WSOLP",
+    "name": "WSOP Fantasy Poker",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "68fn2tLABKmS7VA9Eaz3n6RfoXM3iBWUACckT9dwpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "HAPPY",
+    "name": "Happy Merchant",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "CPLTbYbtDMKZtHBaPqdDmHjxNwESCEB14gm6VuoDpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "DTV",
+    "name": "DraperTV",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "TRUEq13uwehY57S1Y62iTxas7ahpFgohc8kScbGNu1h",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "STACY",
+    "name": "Stacy",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "J7tYmq2JnQPvxyhcXpCDrvJnc9R5ts8rv7tgVHDPsw7U",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "FLOYDAI",
+    "name": "George Droyd",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "4kjruqGHDsSqkMdFfCjV7Vb62HPFhtXyWc2t6JpQzDnz",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "GTA6",
+    "name": "GTA VI",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "GodL6KZ9uuUoQwELggtVzQkKmU1LfqmDokPibPeDKkhF",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 11,
+    "symbol": "GODL",
+    "name": "GODL",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "JDq1j3nvTVzqX2vqVRndiDWVsUSUANikK1hiAY23oGEw",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "APEX",
+    "name": "Apex",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "HeeBovJNKd27tQ6xkeP1dfSyTr8LyLwhJz9wfFTbPLEX",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "HEEBOO",
+    "name": "HEEBOO",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "suifhC9gU1VbJAPYPTBkHJyyyStKGLLYPVDTmPoqbvA",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "SUI",
+    "name": "Sui",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "AMUgSjmdFsS8Y3JeL32u7A45Fpt8YF9xKaiwW5uGHdXk",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "CMNS",
+    "name": "Commons by Virtuals",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "9GyRGm8GGmRZyyQ2hEnazDvCSV8mXiMAHmjKwVHMvVpo",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "YES",
+    "name": "Will This Coin Go Up?",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "NBiSF3UaVUFtRzHwAfxyHsBCAZWGEKnMpewAE4oh7BG",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "NBIS",
+    "name": "Nebius Group N.V. - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "FXcRRoYiAhi12NjqrXVmseZfabFSkesuT9ru6Smupump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "NVIDIA",
+    "name": "NVIDIA MEME Token",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "69G8CpUVZAxbPMiEBrfCCCH445NwFxH6PzVL693Xpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "xavier",
+    "name": "Xavier: Renegade Angel",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "2dJniDEAGCG7zWKseCkyrML3W23WLjDf1CGxpNv3pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TURTLE",
+    "name": "TheMisterTurtle",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "6kDhQghfw5GLUVx6uK6tA5zs9jTwACE17d7ahh6ZVsqu",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "dolan",
+    "name": "dolan",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "PENGU",
+    "name": "Pudgy Penguins",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "USELESS",
+    "name": "USELESS COIN",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "ATBR4i19gcQ31Rfr7ymA2XvkCQEAkNFGBtVKTmdqpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Machi",
+    "name": "Machi Big Brother",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Hh3oTaqDCKKfdBgsQEvxp9sUwyNf8x9qmKqEMLBWpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "HODL",
+    "name": "HODL",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "he1iusmfkpAdwvxLNGV8Y1iSbj4rUy6yMhEA3fotn9A",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "hSOL",
+    "name": "Helius Staked SOL",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "GWTP6M5bxhaJ1k2Kxvf8hhYaHE6jZMhh4cKzFuCpnc83",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "USEFUL",
+    "name": "USEFUL COIN",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "33LZGLLvtRDx3uAfJ1CcBSC7pNFqdiCBAvwPsVkBpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BILL",
+    "name": "billboard guy",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "73jj6SFe9FKn6qqpaGwbSd7TL1sHheh3HqDo9RwA7BHB",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "Pork",
+    "name": "John Pork",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "RBLXDGRD64AtRamHMFVcjqne3Ar7NLWtFtYNtsrf1cE",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "RBLX",
+    "name": "Roblox - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "61V8vBaqAGMpgDQi4JcAwo1dmBGHsyhzodcPqnEVpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "arc",
+    "name": "AI Rig Complex",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "bioJ9JTqW62MLz7UKHU69gtKhPpGi1BQhccj2kmSvUJ",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "BIO",
+    "name": "BIO",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "FLWSojG1gB5VStYR3Sb4nQFRt43UBYkqih1j2CpVLqgd",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "FLWS",
+    "name": "1-800-FLOWERS.COM - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "SiLVFMgD3eD2rgK628NbTBq9MnuJF5FW2CRaVyTB35L",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SILV",
+    "name": "Dominion Silver",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "5XZw2LKTyrfvfiskJ78AMpackRjPcyCif1WhUsPDuVqQ",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "WBTC",
+    "name": "Wrapped BTC",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "AZsHEMXd36Bj1EMNXhowJajpUXzrKcK57wW4ZGXVa7yR",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 5,
+    "symbol": "GUAC",
+    "name": "Guacamole",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "8XtRWb4uAAJFMP4QQhoYYCWR6XXb7ybcCdiqPwz9s5WS",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "ALON",
+    "name": "alon",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "8K5X85PAJHAAVSvYaAzgVPPAPsqqHmvx16ZyBiscYF8L",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "CTO",
+    "name": "Vida Global CTO",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "E5ZVeBMazQAYq4UEiSNRLxfMeRds9SKL31yPan7j5GJK",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "LDZ",
+    "name": "Voodoo",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "A8C3xuqscfmyLrte3VmTqrAq8kgMASius9AFNANwpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "FWOG",
+    "name": "FWOG",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "GoLDppdjB1vDTPSGxyMJFqdnj134yH6Prg9eqsGDiw6A",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "GOLD",
+    "name": "GOLD",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "hf34pZHnV4entu9bdp4pFEmeKpivEUeSUhASgWopump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "MUMU",
+    "name": "Mumu the Bull",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "F3f4dFiFTx5bcMnqADBBG2Gydy3MMxgagbTxXEJwpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "EDP445",
+    "name": "The Sick Mind of EDP445",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "GQs5tCr2Pe9v2UMW4MEpaqq1ztts1aVH7NdRtUGBpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BOT",
+    "name": "Bot",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "4S2qS8P17LSPosME8grirgfUE4p6kW2kZfMSzgmDpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "DOT",
+    "name": "dot",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Dfh5DzRgSvvCFDoYc2ciTkMrbDfRKybA4SoFbPmApump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "pippin",
+    "name": "Pippin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "7TKRV4SneC6xLRaAt21a6d1kheAzXHGKP9WDzri9aD2e",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SHINJUKU",
+    "name": "ShinAI",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "3WPep4ufaToK1aS5s8BL9inzeUrt4DYaQCiic6ZkkC1U",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "GIKO",
+    "name": "Giko Cat",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "GzrN3MUCcfP4s3HfiYXrkFsQgvuSzbQ7326tU3fTfwZd",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Benny",
+    "name": "Benny",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "CATE",
+    "name": "Catecoin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "4FdojUmXeaFMBG6yUaoufAC5Bz7u9AwnSAMizkx5pump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "core",
+    "name": "core",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "8RVBk8vxLiUHueLUW1f4izFVqN3nWippLhkohKg6EGkS",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "KNOTS",
+    "name": "KNOTS",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "HYPE",
+    "name": "HYPE",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "CaWZeUM4FvX9dPkjGc2xHS6tSN3qJfTWyvaG77aM5o7h",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "AGI",
+    "name": "artificial gooner intelligence",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "5SVG3T9CNQsm2kEwzbRq6hASqh1oGfjqTtLXYUibpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "SIGMA",
+    "name": "SIGMA",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "SPX",
+    "name": "SPX6900 (Wormhole)",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "7MYegHoqDGhWdvrnxeuiAEndgG6qcs1N3W5v6SXspump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Buddy",
+    "name": "The First Crypto Dog",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "9AvytnUKsLxPxFHFqS6VLxaxt5p6BhYNr53SD2Chpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "67",
+    "name": "The Official 67 Coin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "EVULoNF4DeMBN4dGiZiDfpiiTfNZgoCvXWWgaV3epump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TOKEN",
+    "name": "Token",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "BOME",
+    "name": "BOOK OF MEME",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "8pLyFWpU6S88DgDgncti9ngarR7suHH3iUevA9vspump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SOLVERZ",
+    "name": "The Problem Solverz",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "HeLp6NuQkmYB4pYWo2zYs22mESHXPQYzXbB8n4V98jwC",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "ai16z",
+    "name": "ai16z",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "3sSbDu4q4rfKirh7k1gTNteMJaDQYWUSbgJ5dTXXpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Tony",
+    "name": "Tony",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "72FkeF1cpBMtbordhTVNVbBGdaN5DfHcchstHwPWpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "PUMPVILLE",
+    "name": "PUMPVILLE",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "Vn58LjN8kLJMFnQZ1S1BUeEGtwfcgRYKcoAX3kMBLNK",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BSZN",
+    "name": "Builder SZN",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "HfMbPyDdZH6QMaDDUokjYCkHxzjoGBMpgaUvpLWGbF5p",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "PBTC",
+    "name": "Purple Bitcoin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "GPRR2u6NS5yBQHWGauoJ9HXgjrTH8dDsrBfTV5zAYvDH",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "GPRO",
+    "name": "GoPro - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "FKNfAwb8TmjYkj11V4NiTz4TgrLWTWgm2NRwAD9epump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "TASSHUB",
+    "name": "TASS HUB",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "7M9KJcPNC65ShLDmJmTNhVFcuY95Y1VMeYngKgt67D1t",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "r/snoofi",
+    "name": "reddit dog",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "XSTuo1fV7HHMhs4BYiwtrWSLsMCJNrooH2AssWTYZqP",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "XST",
+    "name": "XST",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "ucBaqBtYRuxKciy91wGx4iJtHvCwxU48ehwRDxFpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "UOTF",
+    "name": "UOTF",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "STONK",
+    "name": "STONK",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "4hfye6h74Nrm2HMEhQxWyBwWJZHJHRNTEf9vnbfwpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TOILET",
+    "name": "The Million Dollar Toilet",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "8rWNVQoFyhWgKfBQGo1o7va5imP9rYT9jNroDqN4pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "OFFICIAL",
+    "name": "Official Official Coin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "3o3Jt5CTXieGjYnhVEMuGpX765mn6FNGo2cNb9SFpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SHITCOIN",
+    "name": "Shitcoin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "EbT2jpoeRJVFNWAFJE97EGfQF3iwHsEY8sh17fGbL5ER",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "ZDOG",
+    "name": "Anonymous Dog",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "EW7cWbNmTgL7PLQNiJ6tBVC62SJzJXa2pFYJjDPPpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SOBAT",
+    "name": "Bad At Trading",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "9GGGhze1NnQwcABTzxdxx89BEFLFtDueHhkwh6japump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "CatGPT",
+    "name": "CatGPT",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "4978aTN9W3CDuUREGxAQaBYqhPXt8142N4o4Sfgzpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "YOMOGI",
+    "name": "Yomogicoin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "7V6Sk63y8Rr1MvcN5mYNp61wgFhy4EeQg5gUASk9pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "HBULL",
+    "name": "Hyper Bull",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "21nnfR4TkbZNLwvRrqEseAbz7P3kxKjaV7KuboLJpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "weedcoin",
+    "name": "weedcoin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "EjAuFtMEP6LQDgLb11JU9bkcskhFYbgd9Q5NRXJppump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Doge2",
+    "name": "Caesar",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "8PzFWyLpCVEmbZmVJcaRTU5r69XKJx1rd7YGpWvnpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "Percolator",
+    "name": "Percolator",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "EY43xThsa2Gkb9fQDrHUPFCCpFJEeB1Qm2hxjupFpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "MCX",
+    "name": "MetaCortex",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "8uFpKxenGXbnb5Jxjh3sPdKKTVM2F4EfQZYhjZEfpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BOT",
+    "name": "Grok Bot",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "461C1ngHZtzTvMWT8gL7C2JLaYg2VQvaYj8aDFqhEni1",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Link",
+    "name": "Link Coin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "43VWkd99HjqkhFTZbWBpMpRhjG469nWa7x7uEsgSH7We",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "STNK",
+    "name": "Stonks",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "HzwqbKZw8HxMN6bF2yFZNrht3c2iXXzpKcFu7uBEDKtr",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "EURC",
+    "name": "EURC",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "FKAgTQJYgaLDRH3Fa78DeA69B9CdfFQ67oepzaK1pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Apu",
+    "name": "Apu Apustaja",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "GtDZKAqvMZMnti46ZewMiXCa4oXF4bZxwQPoKzXPFxZn",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "nub",
+    "name": "nubcat",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "sKHpzxmTSger1HtFVnQBNSfeMcgtNjxVsrcSCsZpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Victor",
+    "name": "Victor",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "68GYUJW31GSJwLz44HGGQYaGXpG5iiWwYGiWxZ6apump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "chrome",
+    "name": "chrome",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "EeB76LHyVZPMRvTpLcxJqqfSz4gg9f9XgsUmFybcpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "sling",
+    "name": "The retarded bull",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "HCuVcM4Q3GxQhme8EYd3QX8cvqz1j13oB43Wv3LAwESh",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "MCSQUASH",
+    "name": "Mitch McSquash",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "3gzVghdiQkpaFrYTtcrLDq9mV4tWBixPuXP5JsWRpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BoysClub",
+    "name": "Boy’s Club",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "GHichsGq8aPnqJyz6Jp1ASTK4PNLpB5KrD6XrfDjpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "$1",
+    "name": "just buy $1 worth of this coin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "H3EKcm3BayFEXgBo1njpg3v6FhSUr1FRyQRfuJVYpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "stonkbot",
+    "name": "stonkbot",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "a3W4qutoEJA4232T2gwZUfgYJTetr96pU4SJMwppump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "WhiteWhale",
+    "name": "The White Whale",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "CcLd8HTAKLWtQHatqPwBQjtuCA72FNB9E1ckRTEzpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "ALTSZN",
+    "name": "ALTSEASON",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "2qEHjDLDLbuBgRYvsxhc5D6uDWAivNFZGan56P1tpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "Pnut",
+    "name": "Peanut the Squirrel",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "EkcTa8n14fXcHdfvZqCg72cTCutJnnKb19vcHwKTpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Qenis",
+    "name": "Qenis",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "eqQZhyLCkw4Ca5sRJKwZ9TLBS5j3Mg43zdZj68xpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "DeepSeek",
+    "name": "deepseek_ai",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "FfJ6PPxbDHJHbRWE2zXTRqKu2PhahpxXnhuKxiXEpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "USCR",
+    "name": "United States Crypto Reserve",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "92G6qAymyDNQe4kaBoB9h2fz6mzsYJrEV3T5BetZpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TIT",
+    "name": "Titcoin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "EdhTCqUxXRWQcUd5Fonyz9rapHAB6mABAuVkmPrtpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "UNITY",
+    "name": "UNITY",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "SKR",
+    "name": "Seeker",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "fRfKGCriduzDwSudCwpL7ySCEiboNuryhZDVJtr1a1C",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "DUPE",
+    "name": "Dupe",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "SNAPcESrvnH8yUdgeMF6xm1hym9b6hW6s8YeqeHdZFz",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SNAP",
+    "name": "Snap - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "zj1jpp7QMveWHLs61vL9KMZf254KvW7j4AAmBF8ry2k",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "BULLSHIT",
+    "name": "Bullshit Coin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "GKxZ4ocpcdq2WGvRjLzPv8T9vQ8g38DDDYUoghmCpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Chonketha",
+    "name": "Chonketha",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "DJTu7vi8norVzdVAffgvb39VP7wjKeTsgaMBJrzfxvoF",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "DJT",
+    "name": "Trump Media & Technology Group Corp. Common Stock - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "JUP",
+    "name": "Jupiter",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "BRZ5aeJCDuruA42V1CntqKvofa2G7DS3yyxx1pZEpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "moonkey",
+    "name": "moonkey",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "GJAFwWjJ3vnTsrQVabjBVK2TYB1YtRCQXRDfDgUnpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "ACT",
+    "name": "Act I : The AI Prophecy",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "CAGtwKrcnwgLABdg5o16oMczxUV6i1pj973K9XWQpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Gringott",
+    "name": "Gringott",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "B8RHrVBxSjBGKqAbn1tXo6CWjvt5jFkkqjbCZtuDpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "DUSD",
+    "name": "Deflationary USD",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "AMBAHqGPjjtJaHPPSuvPu2mPCJdkGZpmhHQa5pkXbxrM",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "AMBA",
+    "name": "Ambarella, Inc. Ordinary Shares - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "F7pB3ZdfBnyFw2LRHydWEn9BmhEa5XihXLjhySFRpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "NOTHING",
+    "name": "You’ll own nothing & be happy",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "H8xQ6poBjB9DTPMDTKWzWPrnxu4bDEhybxiouF8Ppump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "Tokabu",
+    "name": "The Spirit of Gambling",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "AzeNfRi7DX5HndH7dUgCxMD5sQPV7FPFH1cwDkoqpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "KNIGHT",
+    "name": "Knight Core",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "moJA7YR7ZfCsfAnjQwR94zjmn886ik9KchMjBnrpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Monero",
+    "name": "XMR",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "DC6HP2A7SUy49WeazfeWgbwxVpzKdEPuB46mtb7XBzWx",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "STONKS",
+    "name": "STONKS",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "PresTj4Yc2bAR197Er7wz4UUKSfqt6FryBEdAriBoQB",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "ANDURIL",
+    "name": "Anduril PreStocks",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "7XSmrerjGbVi9uVW8qVHfp7SN1GU1vnxHguzUEt1pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "ALON",
+    "name": "The PumpFun Father",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "degod39zqQWzpG6h4b7SJLLTCFE6FeZnZD8BwHBFxaN",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "DEGOD",
+    "name": "DEGOD",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "BSqMUYb6ePwKsby85zrXaDa4SNf6AgZ9YfA2c4mZpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "LOOK",
+    "name": "Look bro...",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "POPCAT",
+    "name": "POPCAT",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "2zCo6bUowJMvr89ajxuWsPadAqJ2F9akCkxumNsSdgsL",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "xBTC",
+    "name": "Hylo 3x Leveraged BTC",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "GDPtXowyiXHjsHXgkwM1erpFufPEeNvqK8iGq71Bpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Niles",
+    "name": "Niles The Croc",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "BABANGA4JE7Kkam4nTrALAwAVgsNJUuFJnnkF7S16BZp",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BABA",
+    "name": "Alibaba Group Holding - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "8J69rbLTzWWgUJziFY8jeu5tDwEPBwUz4pKBMr5rpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "WOJAK",
+    "name": "Wojak",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "So11111111111111111111111111111111111111112",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "SOL",
+    "name": "Wrapped SOL",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "2mzZ7MTcNM4TE8wVuEEoRKd2uS2EHwJts1mmSBRUpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "牛来",
+    "name": "Niu Lai",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "FyWirVeSzuM1mBxED7VtW5DHXapzPu3mjGfCC5wYhde5",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "XMR",
+    "name": "Monero",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "PreweJYECqtQwBtpxHL171nL2K6umo692gTm7Q3rpgF",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "OPENAI",
+    "name": "OpenAI PreStocks",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "9McvH6w97oewLmPxqQEoHUAv3u5iYMyQ9AeZZhguYf1T",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "Anon",
+    "name": "HeyAnon",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "7BgBvyjrZX1YKz4oh9mjb8ZScatkkwb8DzFx7LoiVkM3",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "Old Slerf",
+    "name": "Unmigrated Slerf",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "DitHyRMQiSDhn5cnKMJV2CDDt6sVct96YrECiM49pump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "House",
+    "name": "Housecoin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "4CmYEygEusR76TpjxUbTjSLjyDbCMjxKhRKNozkrpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BOB",
+    "name": "Bob the Builder",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "7tWFogvm3EyPmHsGMrQBiw1wBpXxdF88dZW5HkeTL4tH",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "JALAPEÑO",
+    "name": "JALAPEÑO",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "6NwarBvDkXhByqVp2Qkq5i9XbtA2B3Bwe8SWGu9vpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "Cupsey",
+    "name": "Cupsey",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "FkBF9u1upwEMUPxnXjcydxxVSxgr8f3k1YXbz7G7bmtA",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "glorp",
+    "name": "glorp",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "FDEF2U9geiWS7sdGPCUo2r1wGswkJr2mmVTECiH6pump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "MITCH",
+    "name": "idrawline",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "CmQJNJ185pjzQoebPbcqZu1kTykHxJbn4gER1Af7pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "REX",
+    "name": "rex.fun",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "9BEcn9aPEmhSPbPQeFGjidRiEKki46fVQDyPpSQXPA2D",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "jlUSDC",
+    "name": "jupiter lend USDC",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 5,
+    "symbol": "Bonk",
+    "name": "Bonk",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "5nRGHJZ93pMKJo2ayCBxvKqWCsZKCbzQBrBave5xpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "FROGOS",
+    "name": "FROG.OS",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "A48KeWUuiDSdRQBqAFssgyYATDuBv7cer54V2JSDpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "CALLOOOR",
+    "name": "The Callooor",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "67iVaRRQkNnZvN29rG75kt71nVdhkc5imwYDTivApump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": ".exe",
+    "name": "cashcow",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "7NmbCaQpjpTcze5bmvWWJPjiaXMjHnLNYj9vJBG5pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BOBAOPPA",
+    "name": "BOBAOPPA",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "EEpng77ZPn9FbgbT4xsRjwuxNCcMBYq3HTwEscyTpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "HeeHaw",
+    "name": "Justice for HeeHaw",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "oreoU2P8bN6jkk3jbaiVxYnG1dCXcYxwhwyK9jSybcp",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 11,
+    "symbol": "ORE",
+    "name": "ORE",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "SNDKbwMUQvZhnLnxLduradgLHG5KrPuKwpnrkkGRhfH",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SNDK",
+    "name": "Sandisk - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "6UpQcMAb5xMzxc7ZfPaVMgx3KqsvKZdT5U718BzD5We2",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "wXRP",
+    "name": "Wrapped XRP",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "6zjLjqd483pWwrowtKdyhie8tqEvkWwRcrR4btkVpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "expensive",
+    "name": "You can’t afford this coin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "5dpN5wMH8j8au29Rp91qn4WfNq6t6xJfcjQNcFeDJ8Ct",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "SANA",
+    "name": "Sanafi Onchain",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "5eyib4qghYGHNh7VvxSFGYLFJSanjq9hug9fR52kksnm",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "PSG",
+    "name": "Paris Saint-Germain",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "PUMP",
+    "name": "Pump",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "991L48va9rMiysu3fCpeg5p9bN4NLzhujojzmFtkgacE",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "spurdo",
+    "name": "Spurdo",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "CTg3ZgYx79zrE1MteDVkmkcGniiFrK1hJ6yiabropump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "NEIRO",
+    "name": "Neiro",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "6cFXKWPP2ckXppCBFZoPaJLBQf87UeVh8ryS9xYypump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TOAD",
+    "name": "The Toad Pepe",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "CARDS",
+    "name": "Collector Crypt",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "aGLFVtcp5jArtthKCaaJWj9xGXZHQAMv27rsCDvpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TOAD",
+    "name": "The Toad Pepe",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "AMC1qwR9KhiyrQBRPrxnfo4JfMeMZqEBvt5tgTytNNoc",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "AMC",
+    "name": "AMC Entertainment - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "4oWhtcmBBsMG1bLZCLKusmq4t9fxdVVfbyJLevsYg5Ct",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "CRIMECAT",
+    "name": "Crime Cat",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "OTC",
+    "name": "OTC",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "SH55hfaipFAbwT42nQYhRoM5o5t61QpkmJ6p62vXB3m",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SHOP",
+    "name": "Shopify - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "9zqre5sRRdFvKqyTyvEd1jcKDRF4g47s7mZSGUnQpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "boob",
+    "name": "boob",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "FZqdw6oSDCbHtKYxmhnfbi97SnyVy8jaYpdCoMrrjKa2",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Pistacio",
+    "name": "Pistacio",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "B5WTLaRwaUQpKk7ir1wniNB6m5o8GgMrimhKMYan2R6B",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "Pepe",
+    "name": "Pepe",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "9VAcKumz5qQsKHPremKwgcvkArUKdDQUPq5426hApump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BLACKSHEEP",
+    "name": "The Black Sheep",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "BP",
+    "name": "Backpack",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "NKEda5nHhNGgjrE9nDdMvaEmkmJ96qqxzBVZEcKmjSg",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "NKE",
+    "name": "NIKE - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "6oGuFDbEeaSzTcvrmmd2MqfNYwHKXFoN7regcR22pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "NEEGY",
+    "name": "Neegy",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "GCa9TZMK9Q3VUSkhZgX76YAQBjqQd1dPxkBnZojFpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Plumber",
+    "name": "Plumber",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "4sWNB8zGWHkh6UnmwiEtzNxL4XrN7uK9tosbESbJFfVs",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "xSOL",
+    "name": "Hylo 3x Leveraged SOL",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "biketyson",
+    "name": "BIKE TYSON",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "CX2v7JSHJQDcNooubzzvZG8TPaDwbaPgfzcXRSWJpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "MARIO64",
+    "name": "Mario64",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "DELL2aRKQz7DMq5DrKLtkn47ZCnbxXPZXrSGbkmd13wy",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "DELL",
+    "name": "Dell Technologies - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "BoTx8y9ynfdxf5ZjWtCoBVkff52qKA82ysaLU8ZM6d8T",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BOT",
+    "name": "RoboStrategy - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "CZEB3WNZuF2Yz1z2H81RcCk8T7fsw82KB33zqamASVsg",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "COST",
+    "name": "Costco Wholesale - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Pb9xCuCGr5BGLj1c4uJZs2in8rn7GZV6sQVoWhjpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TikTok",
+    "name": "TikTok",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "7HgfXftRBBqsYtAEYcqjGLQrNJLL6Tww9ek4rE3Apump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "RKC",
+    "name": "Red Kitten Crew",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "EmcxFTNVDqyLHp11NvwvLZ4D7LKGbG9i7B8RF7dwpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "ZERO",
+    "name": "c0mpute",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "9jaZhJM6nMHTo4hY9DGabQ1HNuUWhJtm7js1fmKMVpkN",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "AMC",
+    "name": "AMC",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "CGeWjfSF51opxZJbrqCtbmxRXKNsjsNwJmNW7k84pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "JIRONIN",
+    "name": "Jimothy The Ronin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "WBTC",
+    "name": "Wrapped BTC (Wormhole)",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "USDC",
+    "name": "USD Coin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "3MTaDF66xZJULFPdfkffe2khfAmcoaJR1KnCKbqu3hXW",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "BULL",
+    "name": "The Delusional Bull",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "2zcgjEptFV8crPbj5j2ZDHgxhKsQX5MHuKZQxUwNqtjE",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "GPRO",
+    "name": "GoPro Inc",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "VaxZxmFXV8tmsd72hUn22ex6GFzZ5uq9DVJ5wA5pump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "OIIAOIIA",
+    "name": "spinning cat",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "pepo1CFNU2RXf7yXX7HNXazXwxsq8WrPvDHpHriwoLY",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "PEPO",
+    "name": "PEPO",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "FEpeZgApzGs4AmzN5JeGqGuNoafpAKXSkn86nrLrpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Telegram",
+    "name": "Telegram Coin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "4ikwYoNvoGEwtMbziUyYBTz1zRM6nmxspsfw9G7Bpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "crypto",
+    "name": "Cryptocurrency Coin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "FMpbX9EBjGUgjeUZMmvzTMuu8ZViZJMNsAwQBKGXpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BUSINESS",
+    "name": "Business",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "FeDrozMMWvy1MjV7Y5pcgssxiN42TR1fV3GqYmohqA6W",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "KETCHUP",
+    "name": "Ketchup",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "6AJcP7wuLwmRYLBNbi825wgguaPsWzPBEHcHndpRpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "VINE",
+    "name": "Vine Coin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "2GXmB95pGD3pHV4mzNq7YsmyiEmVYWQLptbwYqgdpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "WNTV",
+    "name": "Winternomics TV",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "8wXtPeU6557ETkp9WHFY1n1EcU6NxDvbAggHGsMYiHsB",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "GME",
+    "name": "GameStop",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "LLYuwZ33keFihgwoxXsBawy31AiRFLFSva32TYq5TvD",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "LLY",
+    "name": "Eli Lilly and Company - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "neet",
+    "name": "NotInEmploymentEducationTraining",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "4TC5nT1B7p3YpYUqiJcGSFjgLoASiH1Upxi1h1Jdpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "fomo",
+    "name": "fomo",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "6yUr61zspt6cftb8LAQ4xqf9cZDQqfz2xa2H4bENpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TNOS",
+    "name": "TNOS",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "USDT",
+    "name": "USDT",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "WETH",
+    "name": "Wrapped Ether (Wormhole)",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "H5b4iYiZYycr7fmQ1dMj7hdfLGAEPcDH261K4hugpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "MONEROCHAN",
+    "name": "Monero-Chan",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "3B5wuUrMEi5yATD7on46hKfej3pfmd7t1RKgrsN3pump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "BILLY",
+    "name": "BILLY",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "5zCETicUCJqJ5Z3wbfFPZqtSpHPYqnggs1wX7ZRpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "SPARK",
+    "name": "Illusion of Life",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "2ASwAoHBbdBUbNTqDxiaGpvmkJRWTFQcxbB6S73dpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "utility",
+    "name": "utility token",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "5Yy9JAGfh7ZN2ihRNYqkd3um929XJM1WR3CD2THsiWTG",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "BONKGUY",
+    "name": "UNIPCS",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "9BVn3Y8tPghbnGuuuxoj2mGekqgSQV1M7nALF7brpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "NYAN",
+    "name": "Nyan Cat",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "PrekqLJvJ3qVdXmBGDiexvwUTF4rLFDa6HWS4HJbw9S",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "NEURALINK",
+    "name": "Neuralink PreStocks",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "GPzpoXpD74E2C4CJNayuoyBqPQJEsPtdse3nhntrpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "LOOKSMAX",
+    "name": "looksmax.org",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "B4iCqVsAZv9dBiBVv58GJiBxWGmwkwbtPTn4sUQTpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Polycat",
+    "name": "LowPoly Cat",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "5BQpi43RtPxsw7jw3dpeE7duQAXcNYhw9MD6KUxGpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Chibi",
+    "name": "Chibi Neko",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "CashcatZMRn4Jv8sPQZUSsbTLi2PcPe1ssqbHcnaJqSS",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "CASHCAT",
+    "name": "Cash Cat",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "4vqind26DsicHecdGyrjYc4yhQN9HtyfzJ3d1ouppump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "dildo",
+    "name": "green dildo",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Bb4jR951QtVjeFAYFLBYXDSMKjbTDroCLPbFLdd7pump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "memecoin",
+    "name": "just a memecoin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "EfPoo4wWgxKVToit7yX5VtXXBrhao4G8L7vrbKy6pump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "DEXTER",
+    "name": "Dexter AI",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "GvQH1VGGbrjeRSbsCreptYN4GUcZ9w7vMFJ5ic8ypump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "wiener",
+    "name": "wiener",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "CdAH7BSRD7qNeZFA2Rbm4KATL45ko793hPxxAixUpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "pep",
+    "name": "Smol Pep",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "9gwTegFJJErDpWJKjPfLr2g2zrE3nL1v5zpwbtsk3c6P",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "USEDCAR",
+    "name": "A Gently Used 2001 Honda Civic",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "Hyauszv6z27sFLFkara1br2dQ4ZVJx7gkppv9pi3pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "GEOM",
+    "name": "GEOM",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "3BgwJ8b7b9hHX4sgfZ2KJhv9496CoVfsMK2YePevsBRw",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "EPIK",
+    "name": "TEH EPIK DUCK",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "GUmbtfjSZkybSFgPibBcvwExEBdXwewJHR5PkTjzpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Morty",
+    "name": "Gucci Morty",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "AjdE84dGqhbqDYhh8Pm8oCRMCTpUGQ4oDaRBF5vwpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "GPRO",
+    "name": "GoPro - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "7M3gDRgozcumFsiTeXwjB8cYxpg7Q9R7rH7rkw2Fpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "CRIME",
+    "name": "Crime onchain",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "JNJg1znKdF712Phe7L7z52AATAvEjEytBdN2w8Lnh1Y",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "JNJ",
+    "name": "Johnson & Johnson - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "AMjzRn1TBQwQfNAjHFeBb7uGbbqbJB7FzXAnGgdFPk6K",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "SOLCEX",
+    "name": "SolCex",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "DsrbidPN1vEHMTZ5xytoxyCmkXQKmZmaAUyiADFpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "CZ4",
+    "name": "CZ4",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "AhSkPctV3gYxkEvPm4fxvieYgYyQA8p8xqXviP4mpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "CALL",
+    "name": "One Call Can Change Your Life",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "fone",
+    "name": "apeonfone",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "zGh48JtNHVBb5evgoZLXwgPD2Qu4MhkWdJLGDAupump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "retire",
+    "name": "The Last Play",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "cbBTC",
+    "name": "Coinbase Wrapped BTC",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "61Wj56QgGyyB966T7YsMzEAKRLcMvJpDbPzjkrCZc4Bi",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "COPPERINU",
+    "name": "copper inu",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "GvV7sFu6FHJsSVXfpG7xqFnWar3c7YkcC74rqe7Bpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "RAGEGUY",
+    "name": "Rage Guy",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "7nLukVng5teXze14rum9v57juXLjUp7JJnCveko1pump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "Martians",
+    "name": "Martians",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "BcHEaaTCvycPwwsJ9yQTXdHP9X2gCLkznDbZ8VySpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Jotchua",
+    "name": "Jotchua",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "69kdRLyP5DTRkpHraaSZAQbWmAwzF9guKjZfzMXzcbAs",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "USA",
+    "name": "American Coin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "JTO",
+    "name": "JITO",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "5DQwhyBRkjSyEZDCRqsvfA1n8BnDcJAHpxy6EokQjcra",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "MRNA",
+    "name": "Moderna Inc.",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "2hXHY3DnN7HUGySZEmBsLFKSqLB8nj3aE8wwq44wpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "LIZARD",
+    "name": "Tom Lizard",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "uuxWwFL6G9UjiYRZvWxJrSB18V1oKBgYrmueamREK57",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "HONTER",
+    "name": "honter boden",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "RcZmt84VMJv9bDhKqmw1uWDahYrUT468VwAChTnfD8p",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "RIVN",
+    "name": "Rivian Automotive - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "4xMegMRMd2TFQEXxv39vtMP1r5fFVuA7VcaSmAhLpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "GUNICORN",
+    "name": "Gunicorn",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "GhuEi5AWtZaWuAda4ysJwMTzU8oMdjiL1bz6eziptT2p",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "FROGE",
+    "name": "Froge",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "5gR8NcXCmtLUss6P1Lz1aGdZpSVHfpV29LvR8zMEpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Telegram",
+    "name": "Telegram Coin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "aTUfRuPj3tp7FEpzAXLjs4VnQgAFbExD5JHGTyvpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SFM",
+    "name": "SAFEMOON",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Am8iBffqgaedfdK5XhtorbcRrKzwH9nyL3ySikQfpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Kimchi",
+    "name": "Aura Final Boss",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "8NoNPSYcFq4jdYTqX4rMLpQR3GoBe6XvPYkRDERwpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BOT",
+    "name": "Launch On Bot",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "85cQsFgbi8mBZxiPppbpPXuV7j1hA8tBwhjF4gKW6mHg",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "Rizzmas",
+    "name": "Rizzmas",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "Fch1oixTPri8zxBnmdCEADoJW2toyFHxqDZacQkwdvSP",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "HARAMBE",
+    "name": "HARAMBE",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "B6f27ETGcjgGNB1fqULJbXVmw9FnL8HgBp7R83hmpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "drooling",
+    "name": "drooling cat",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "METAwkXcqyXKy1AtsSgJ8JiUHwGCafnZL38n3vYmeta",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "META",
+    "name": "MetaDAO",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "ECcsXjJpdhB1pdX3SK9yc6k5a2UrScaY3LKc7q6Tpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "pixeldog",
+    "name": "pixeldog",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "FK7nFZyuRELUsgWHCCpJASvoiu8Jub7iTd7o8Xxvpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "FUN",
+    "name": "Fun",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "A13oRB9FFaiUjfi6LdCg6p9ka1u8SfGkUFs4SKvPpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TOAD",
+    "name": "The Toad Pepe",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "kXZidARCFKAtSvAd6zvjivEp8FobxKhgSNuDnx4pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SpaceX",
+    "name": "SpaceX",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Pren1FvFX6J3E4kXhJuCiAD5aDmGEb7qJRncwA8Lkhw",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "ANTHROPIC",
+    "name": "Anthropic PreStocks",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "ED5nyyWEzpPPiWimP8vYm7sD7TD3LAt3Q3gRTWHzPJBY",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "MOODENG",
+    "name": "Moo Deng",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "3psH1Mj1f7yUfaD5gh6Zj7epE8hhrMkMETgv5TshQA4o",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "boden",
+    "name": "jeo boden",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "9oMa91M32dG8pCWuyvZuMNxtMj7xBjxAuMXex9ZTpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TripleP",
+    "name": "Pickle Pickle Pickle Sahur",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "4EUgZ8JkA5McE2p3gKX7862dQzR97rPGzfrUSQHapump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "AIRDROP",
+    "name": "AIRDROP",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "RDDTGbhHwVXfyCvQMXzzowKjf5qrYBZAnehoXW83ooh",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "RDDT",
+    "name": "Reddit - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "6ogzHhzdrQr9Pgv6hZ2MNze7UrzBMAFyBBWUYp1Fhitx",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "RETARDIO",
+    "name": "RETARDIO",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "FtXH4AAgR8KMBR8zDfTfHnYdSStw2Am3iwq8TpoHpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Intismeran",
+    "name": "The Cancer Vaccine",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "GnwoFdLNPZw9etvTAxPstSvQNHA5msqiQLNU9U78pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "RADON",
+    "name": "RADON",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Fa7ZE9nCEYnrHsnoeHuhEExJpchtrBtKXnWe6CgHpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "$MAD",
+    "name": "Mad Coin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "86KR6eG2VuNntLBi23SAYFW1cXkiYcwxGJd746rqcUAG",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "MIM",
+    "name": "Memes Into Money",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "6D7NaB2xsLd7cauWu1wKk6KBsJohJmP2qZH9GEfVi5Ui",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "SC",
+    "name": "Shark Cat",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "k4ZxEVP9pdty78FrDzW7ipogiHXgHvxKTbKMUrMpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Messi",
+    "name": "RIP Jorge Messi",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "463SK47VkB7uE7XenTHKiVcMtxRsfNE2X4Q9wByaURVA",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "TSUKI",
+    "name": "Tsuki",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "Dwm6hJL8ax8jttdj1TFFnLSuPo474FEdV3c14Vnnh2Yi",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "prescience",
+    "name": "delusion",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "HoNA5xEiNAdC1pxP1u3KtQ93yDyXmZFhaS6tYycmpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Cap",
+    "name": "The Fomo Cap",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "7m2TUkpPZCScBhPJnGjWjbh75KkDNnwAdd7i74m8awad",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "Ww3",
+    "name": "World War 3",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "AywAYdNJnSLSXwKWYxDciPjqGRnwp4iZdQptuuQTpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "MICHI",
+    "name": "michi",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "BfFAisgK8Np12kxZj73rnw1srMjXtBK3B1PeYJ1ppump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "CHROME",
+    "name": "Chrome Cat",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "4Hcm1TfA1MvVhCQHvJCcKL7ymUhJZAV7P439H5ZHnKRh",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "test",
+    "name": "test",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "5Jr9hGmJgxBRjjF8XGcGgQzXUdsbpZNNMpigEv8Wpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "MUSHU",
+    "name": "Mushu",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "7hGgx1VtNTj193fFXXuMEkp1MRV6JbWYgMBhHRYxaxu2",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "FRIES",
+    "name": "Fries",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "nFECuAbErpG1xn7yxQtfCMUNAbCfTmkfFWyzgCrpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TOAD",
+    "name": "The Toad Pepe",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Dst93spXQEXxFzwYbFrQRnFYBYpw7AzB2QyALEeP4NGQ",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "AFC",
+    "name": "Arsenal FC",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "DKNGQFNGQmoBdXSRGKJ8tTu7uPDasw5JDcfMmWniNfow",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "DKNG",
+    "name": "DraftKings - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "TRUMP",
+    "name": "OFFICIAL TRUMP",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "C4j7kPx9PqDnfvxe2uycJQRTAeyGwmU4DyGf21Xgpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "MD",
+    "name": "Market Dominance",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "LMT3i1BHgixFqPUgcyteJhnEz2dpy9i3cYy4pi9BoeV",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "LMT",
+    "name": "Lockheed Martin - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Qirqk4cXB3txQmdqwB7R9o5KVkNzj5ZCT9BHsuLpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "STONK",
+    "name": "STONK",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "38PgzpJYu2HkiYvV8qePFakB8tuobPdGm2FFEn7Dpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "gork",
+    "name": "New XAI gork",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "ARBzQTYDCW2KnVEjs1Mc81LekB1ibVFZKbSVmorkoT9d",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "ARB",
+    "name": "Arbitrum",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "ATt5EDCyQj8XQ3qx9f75hwcuQqBqyHA4vuRcWyiYpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Remus",
+    "name": "Official Fomo Mascot",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "KjtqAySqDkgu2hM1R29tkoFC2PsoPqoL6pH71jypump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SAOF",
+    "name": "SAOF",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "WENAZ2WyPbmgvUcKfQ8hyMDfBQP9bZ65hsZ5KTFrRGZ",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "WEN",
+    "name": "The Wendy's Company - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "FvDKebt6RTUVGdGeaM83avXeyM3aDxF6FANmDpJLpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "REMUTOAD",
+    "name": "REMUTOAD",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Dx68jydZnXJkp6Xngku8FbjFFovp9tZmXT66jrLXpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TEB",
+    "name": "The Earn Bull",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "CtzPWv73Sn1dMGVU3ZtLv9yWSyUAanBni19YWDaznnkn",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "xBTC",
+    "name": "OKX Wrapped BTC",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "3ZLekZYq2qkZiSpnSvabjit34tUkjSwD1JFuW9as9wBG",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "NEAR",
+    "name": "NEAR",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "CzLSujWBLFsSjncfkh59rUFqvafWcY5tzedWJSuypump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "GOAT",
+    "name": "Goatseus Maximus",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "9Pfync3ejPC9eHqVzq3nYQJAhyhjqpnB9UsaSfLxpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "KET",
+    "name": "KET",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "BArimz1PcKZr8PcPh3tcZ2dg4S7FJLk3cw6R5F8GsHKg",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BA",
+    "name": "The Boeing Company - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "MUxEsUKSMACyw5fZf68wxf5FLnZVhtU9CwH8uNNGay1",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "MU",
+    "name": "Micron Technology - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "2fUFhZyd47Mapv9wcfXh5gnQwFXtqcYu9xAN4THBpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "RNT",
+    "name": "REAL NIGGER TATE",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "3d1qHSAkQhoN7kN1C6tvpAArCkXWxwYdBng6taXCDM6u",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "RTM",
+    "name": "RETURN TO MEMES",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "8m5hzX9hprtWwPuVZL4daCZfggWYKc6fhSJDDpiqpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Kirkslop",
+    "name": "Kirkslop",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "CreiuhfwdWCN5mJbMJtA9bBpYQrQF2tCBuZwSPWfpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "PYTHIA",
+    "name": "PYTHIA",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "METvsvVRapdj9cFLzq4Tr43xK4tAjQfwX76z3n6mWQL",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "MET",
+    "name": "Meteora",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "AavE1kKKnesPw4MuRJmJ9jZs9QzEE8CPxQ3ViczUDfc1",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "AAVE",
+    "name": "Aave",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "HgBRWfYxEfvPhtqkaeymCQtHCrKE46qQ43pKe8HCpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "Bert",
+    "name": "Bertram The Pomeranian",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "CDBdbNqmrLu1PcgjrFG52yxg71QnFhBZcUE6PSFdbonk",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "LetsBONK",
+    "name": "Let's BONK",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "y1AZt42vceCmStjW4zetK3VoNarC1VxJ5iDjpiupump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "FARTBOY",
+    "name": "FARTBOY",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "DMUzXdincSucnKTMLtVFBCBcAwuNehoqyrmbYi5hpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "happyseb",
+    "name": "happyseb",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "UKbXwN3ySC2jP5p9TyQ91yXYXmnnDsjiZQ55QCqpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "KASPA",
+    "name": "KASPA",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "CgypxZcmmZMVQMERA6D59hkh8maPEnj31pYRKM9cpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "DICKBUTT",
+    "name": "DICKBUTT",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "35M9BcmFRQ86TnmoFMfUmteZrQrmUm2n7ZiV5gacpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "trumponfone",
+    "name": "trumponfone",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "3S8qX1MsMqRbiwKg2cQyx7nis1oHMgaCuc9c4VfvVdPN",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "MOTHER",
+    "name": "MOTHER IGGY",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "qLQoAzrMPtZFzpas97ii9iYVXTejVGVChxNMXRopump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "PATE",
+    "name": "PATE",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "7Y7V1a4m2nWK7BMgbka5B4vR1pDvCK7yva3Hnrqkraze",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Nasduck",
+    "name": "Nasduck",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "x9341kuS6VLduD5TU7LvyMujsKazXUA2NwyGXVspump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "XST",
+    "name": "XST (XSolut)",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "Fartcoin",
+    "name": "Fartcoin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "Df6yfrKC8kZE3KNkrHERKzAetSxbrWeniQfyJY4Jpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "CHILLGUY",
+    "name": "Just a chill guy",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "4BGQv1YJSDas6NjAkQoLGCFyZBBDtUb9Xg2V8c1Hpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "ANSEM",
+    "name": "The Black Bull",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "RNrjv3M2hBciaNyYTZD6xKRKivgoZJLQ9Hs9nd8pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "AMC",
+    "name": "A Meme Coin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "8ncucXv6U6epZKHPbgaEBcEK399TpHGKCquSt4RnmX4f",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "TRENCHER",
+    "name": "trencher",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "BD81TKATxfYcCK1rw1uZBSWC9Yk3nJEFiRsnHpi6pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "GOLDDIGGER",
+    "name": "The Gold Digger",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "HcRLc9VDgjLeK154xDawfb1dmVJ98DoSqcwTHGqiDeJR",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "ZCAT",
+    "name": "Anonymous Cat",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "CrJPSvj625TnPdWS42aG5ybMcHeFvnNqq5AExVespump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Momota",
+    "name": "モモ太",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "GMvCfcZg8YvkkQmwDaAzCtHDrrEtgE74nQpQ7xNabonk",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "1",
+    "name": "1 coin can change your life",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "taoC6xyv2v8tDLcev4uaGUgV4vdQsWJrGft2kcBRrBY",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "TAO",
+    "name": "Bittensor",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "ApZuxdpzMrbEYTGEzeY9afh5pj9d6qPRJCTgQYiipbKg",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "CYBERLEEK",
+    "name": "CyberLeek",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "SKHYhSjuRWHgikq8eRKbtBbpABgJSkd7ytQV14i9EQ3",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SKHY",
+    "name": "SK Hynix - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "FzJ1Cm4kwEjiPmfna8WXWwjC7i41KnB9oi9wz3nHpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Frug",
+    "name": "Frug",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "J8PSdNP3QewKq2Z1JJJFDMaqF7KcaiJhR7gbr5KZpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TripleT",
+    "name": "Tung Tung Tung Sahur",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "oPAiAikWTaFj9RYoRFD35ccfwhnMcB3ThgBZRHSkjTZ",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "tOpenAI",
+    "name": "T-OpenAI",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "39fNg98hhpyiRTGD8Gf8y5MwFVgJJZEnDyTMKdDZpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SEYONGPARK",
+    "name": "Se Yong Park",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "3iQL8BFS2vE7mww4ehAqQHAsbmRNCrPxizWAT2Zfyr9y",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "VIRTUAL",
+    "name": "Virtual Protocol",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "AkchGAUdXXRGHt3HXaHbTvw3JLGUwtJRmYnkG66wpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "looong",
+    "name": "looong",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "DRAMjSWR7HRfJKjRkvQWYL2bcaejaVhuxEcjf4pAY4Cw",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "DRAM",
+    "name": "Roundhill Memory ETF - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "$WIF",
+    "name": "dogwifhat",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "ZEC",
+    "name": "Zcash",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "9sfCHMLWSVy6MD6zr7pR1gD3qbT7C6K1E3dMf2ZBpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "LAYOOO",
+    "name": "LAYOOO",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "DoGEV7LASBkQbibMc5k5vKnTZoMg423GpJ5QtJEGfm7R",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "DOGE",
+    "name": "Dogecoin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "eL5fUxj2J4CiQsmW85k5FG9DvuQjjUoBHoQBi2Kpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "UFD",
+    "name": "Unicorn Fart Dust",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "GYKmdfcUmZVrqfcH1g579BGjuzSRijj3LBuwv79rpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "wDOG",
+    "name": "wrapped dog",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "vAddewUHuYgRDrL6n3kXtBXMT635evJz8K93j6Wm1Ba",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "ASH",
+    "name": "Unc Ash",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "RmtMAYVTTFv2iK9muMrXEoAnSSsZPPgRPbqZCKwNDYk",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "EYE",
+    "name": "BULLS'S EYE",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "EeSHyt1ahSvm91CSa8ASqvenmxxQn2WU5VeNhdmepump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "GYM",
+    "name": "Gym Showdown",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "5PwsE1yXAvANamqbYwM6zoWrYkNw8RZ74TZSsxnGu4vq",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "black",
+    "name": "Blackjack",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "GkyPYa7NnCFbduLknCfBfP7p8564X1VZhwZYJ6CZpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "CHILLHOUSE",
+    "name": "Chill House",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "32CdQdBUxbCsLy5AUHWmyidfwhgGUr9N573NBUrDpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "maxxing",
+    "name": "maxxing",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "13i7SfDDzg3t4MQnfZNtFKptHpv8HR2eaGRMfetSpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "熊猫",
+    "name": "Ping Ping and Fu Shuang",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "D8kgv5BRyfxUgTJGhkPJcw1Neo1eaneENC5XxC99pump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "RZLR",
+    "name": "RIZZLER",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "Dx2bQe2UPv4k3BmcW8G2KhaL5oKsxduM5XxLSV3Sbonk",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "Hosico",
+    "name": "Hosico",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "USD1",
+    "name": "World Liberty Financial USD",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "HiMSSzzwkZkrXJ4PGVJRdtfLaANeAztjjcgk5Dxe7Lwx",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "HIMS",
+    "name": "Hims & Hers Health - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "HFZCndQW9Keyhm3JaB5HtsyeThEjMcgt1yskghympump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TOAD",
+    "name": "The Toad Pepe",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "MGMuubtUEirmkhfEQdmGUh4pr7HuUdMWcZXFtpPbVJD",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "MGM",
+    "name": "MGM Resorts International - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "DWrrbYP65oo33Fk83iaQVHQhytntFM1uooyJHjaxpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "CEZ",
+    "name": "Collective Evidence of Zero-Days",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "BMKdM4yUxX12moFqVk195k7coMbaybd4RUKCUdm7D1Sk",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "IBM",
+    "name": "International Business Machines - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "B1oEzGes1QxVZoxR3abiwAyL4jcPRF2s2ok5Yerrpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "rasmr",
+    "name": "rasmr",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "ONyc",
+    "name": "OnRe Tokenized Reinsurance",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "BCdwQBAn8dYB5YjTsoB6TdHAWokxv28k2oZUodERpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "MANIFEST",
+    "name": "Manifesting",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "BDdzUjksj1J4bSnMveQ5tV9Up8A9c6YS1tHrxNw3pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "FOMO",
+    "name": "Fearless Of Missing Out",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "7ssJZGFT3twGqeYA1kvpoMWwZYvMZvrMEbjRaWgg46BL",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "BUTTHOLE",
+    "name": "BUTTHOLE",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "HmjCoarLh5duURfJ333DwfFiPyTCgFT35pRSAoP8pump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "TOS",
+    "name": "TokenOS AI",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "22PQLzLuYSr4DCFKszEA36rkPXRxeHrZ9pFUv5hHpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "COG",
+    "name": "Cog",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "BiYu1Lx12rQjNsvo4zeg85cuWJG5RvkL63AqZSGnTtu",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "DIP",
+    "name": "the white bull",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "MRNAzXzhNcaEXJPibHEn8cd4vyekCDiivTyEwswLUCT",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "MRNA",
+    "name": "Moderna - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "yWbxNoqhAx9vmygWBXmvMhyT7dEYAfKGyXAAMT2pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "XST",
+    "name": "XST",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "DpVwnrMsa33SFKcZEg42rhWfcV65sAAikndoG7Bppump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "james",
+    "name": "james",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "GRNDYDpqwpCm6jVxpbh4xT5AM4r3p391qYsKTHqgaET2",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "GRND",
+    "name": "Grindr - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "tSEakxwRz3Y3BpjDttokygCgScgLnui19NJGrR4pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Lucifer",
+    "name": "Hellcat",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "BAQPhMtf6UaXMdEwZLu1BVTSxRz9AYZkkb8FQXncpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "CALICO",
+    "name": "Calico Cat",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "RAY",
+    "name": "Raydium",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "7LA4wwjoXU4hAdwX1eT5ouuSsMrHq9wHQBfAyPfJK1eQ",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "CLANKER",
+    "name": "Clanker",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "H2c31USxu35MDkBrGph8pUDUnmzo2e4Rf4hnvL2Upump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "Shoggoth",
+    "name": "Shoggoth",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "3oY5NnNAbnRK4eNzPWZFmtAWVW4RNumpni4XtGarpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Mobi",
+    "name": "Mobi The Gorilla",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "5XyKkFaJpAmsH4Tf2EFj3S61W3hC5cJhxNZQQ5h1pump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "Luigi",
+    "name": "Luigi Mangione",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "8fZL148nnC168RAVCZh4PkjvMZmxMEfMLDhoziWVPnqf",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "NiggaButt",
+    "name": "Nigga Butt Token",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "PEAQjk7SRS6rXHVFFmpRr7zrC4g5ZuEebpwTxvaLr3b",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "PEAQ",
+    "name": "peaq",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "2wMTr4ZttVr5tmS4wLStee59wi8f9QQfMtT2Hoispump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "GTA",
+    "name": "Grand Theft Auto",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "62YE1d4sRArBQzR5bdbxsx2k9LV3MdPV4xMC4Di2pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BIF",
+    "name": "bullwifhat",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "D65Jr6jUe5swtbBdfZvieNqsunEBGRwzGpHJPBZ1111",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "1",
+    "name": "1",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "53fpLgNq1dMpFEEq9sRDc3t6DRhzyJGXnTqD6Rcp9NjV",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "LTC",
+    "name": "Litecoin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "4N4DnNo3qpPks9aQCkcWkzoir8tnvT6diS4TnnZibonk",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "KITTY",
+    "name": "Hello Kitty",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "PFER6ENqP8r8NF3CqVt4mFowxsin3V5MLidBNQFCC3x",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "PFE",
+    "name": "Pfizer - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "ANM35KbUcfKdEVBXzSjZBoT6ceSwYRs3fuc79fp7kRqP",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Pumpcat",
+    "name": "Pump Cat",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "6yjNqPzTSanBWSa6dxVEgTjePXBrZ2FoHLDQwYwEsyM6",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "Chud",
+    "name": "Chudjak",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "PreLWGkkeqG1s4HEfFZSy9moCrJ7btsHuUtfcCeoRua",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "KALSHI",
+    "name": "Kalshi PreStocks",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "PreZad18qfPtbxNpMtMuAuX2zVpvkEU8DnJx56faCWd",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "FIGUREAI",
+    "name": "Figure AI PreStocks",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "EicWvteVi2fWepEzS3FYWsnuPoP6caZfjnKqNvydLjCH",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "LIT",
+    "name": "Lighter",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "CFD9c4SYrvyoroeH4eKRskmNYwGfd9kopErh74Rupump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "TOAD",
+    "name": "The Toad Pepe",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "5Aj71LCyvYuRv5yLy9TAMpdXMRT5ScPn8kLcw7gcpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "PUMP",
+    "name": "God, Coins, Family, Vagina",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "HQKhWkrPtdLyRxWGVZAajfxoja2y8FMJeckKqZEFpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "OPTIMUS",
+    "name": "Tesla Optimus",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "HJvNXZ64yZeB2aZWyFEP7D35W8eRLfLDcbfUKRyHpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "CASHAPP",
+    "name": "CashApp Coin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "CAKRPCtdgRfQWjTCX1TnBbSfCeQXrH7RLWdpvhKpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "UOTF",
+    "name": "United Oil Trust Fund",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "x95HN3DWvbfCBtTjGm587z8suK3ec6cwQwgZNLbWKyp",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 4,
+    "symbol": "$HACHI",
+    "name": "Hachiko",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "BULL151gUXcFV5wXEUqu9Am2L7Qt4bTJRLRuAUjkcspC",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BULL",
+    "name": "Webull Corporation Class A Ordinary Shares - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "F8YVYJkmm4fRNUuRXM4sc7TyoKdbaRs4tXU4fX3Npump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "FF",
+    "name": "Fantasy Fomo",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "CKfatsPMUf8SkiURsDXs7eK6GWb4Jsd6UDbs7twMCWxo",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 5,
+    "symbol": "",
+    "name": "",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "UPSqUeMHcWbkdg784XuBUEF9DtySSnW9ur5LAVdcuB9",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "UPS",
+    "name": "United Parcel Service - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "LULUmT9VMttkfAJE236LXJcYJ2tTP7nunrSWR5G1BdS",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "LULU",
+    "name": "lululemon athletica inc. - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "3fqify4QnaKFsvmFVqmLMUHaRKdiPki6w2H3GyDmpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Bark",
+    "name": "Bark for me",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "CrAr4RRJMBVwRsZtT62pEhfA9H5utymC2mVx8e7FreP2",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "MON",
+    "name": "Monad",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "6UGNg119LV6YjSCQ5K6Z6jsLLLetpMJ1vPdhiU8qpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "CURB",
+    "name": "The Solana Bull",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "9gP2kCy3wA1ctvYWQk75guqXuHfrEomqydHLtcTCqiLa",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "WBNB",
+    "name": "Wrapped BNB (Wormhole)",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "WXMRyRZhsa19ety5erZhHg4N3xj3EVN92u94422teJp",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 12,
+    "symbol": "XMR",
+    "name": "Monero",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "HTZsLG4zqaNvWMwXSLHH3GG5KyJpKwpBRsKVdMG6hvzP",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "HTZ",
+    "name": "Hertz Global Holdings, Inc Common Stock - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "3DV5zVYWVkmJrdi2t7uziUuo4ybdtaLxxFPSNs1fXUjp",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SNP500",
+    "name": "Sock And Pussy 500",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "8G5ayEsJF4Q7FEWEGeF4jtnUWZBEKCqhySTFQf9Ppump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "HeavyPulp",
+    "name": "HeavyPulp",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "FhwV2wZicstWLnULi7dXZYaCRRv17AtQ9RcmJSngpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Stickman",
+    "name": "Stickman",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "KMnDBXcPXoz6oMJW5XG4tXdwSWpmWEP2RQM1Uujpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "FIGHT",
+    "name": "FIGHT",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "poNSfquKq512ApeYjVghwViSun4x1MhCqHVH2Paq4jN",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 8,
+    "symbol": "PONS",
+    "name": "Pons",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "32eFDwQXfnj5ULY2b71cLuy5HJuhsRHSYTw3qCcKpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "1",
+    "name": "1 memecoin can change your life",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "EkgbQHYmZ4Az4Ek8dwnqA2NGeqfakktmoENwJh7FvY6h",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "ROCK",
+    "name": "just a rock",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "CB9dDufT3ZuQXqqSfa1c5kY935TEreyBw9XJXxHKpump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "USDUC",
+    "name": "unstable coin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "9CzNGAEutxKHJ5CwYC5Lk8X8YzgYrQnvKChP2BFEpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "MEMES",
+    "name": "You Cant Stop The Memes",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "EnA53NmMzfsAs7p44dATdvT55HHUACxpEbC9AKY3pump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "HTZ",
+    "name": "Hertz Global Holdings Inc",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "HyZLwid1NYTyjRaKQJKmxnhATBPff67aTdy1gnwQuEAz",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "CHARIZARD",
+    "name": "CHARIZARD",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "AbpWkswGpFNYHatQG3eRTjpQLBoi5EYhbJQ7EspcR23R",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "DripCat",
+    "name": "Drippy Cat",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "PENGTDQeQSXEjKcYw3CTQi9qznxcTHXAA7LMfUNrxLV",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "PENG",
+    "name": "Penguin Solutions - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "AMnRhMEt4QzoKACHuN8nTykxYthscAFyX9fhDNVpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "STONK",
+    "name": "STONK",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "FeR8VBqNRSUD5NtXAj2n3j1dAHkZHfyDktKuLXD4pump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "jellyjelly",
+    "name": "jelly-my-jelly",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "GiG7Hr61RVm4CSUxJmgiCoySFQtdiwxtqf64MsRppump",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "SCF",
+    "name": "Smoking Chicken Fish",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "35QsR6Spp224b3ksCL8gDqJGnD7qAzTYnh9MufHupump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "USUR",
+    "name": "USUR",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "2nXcvq7h3jXCiug17V8hW4dfqwChtem4tMYmrDYUpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "HOPE",
+    "name": "Hopecoin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "zYgEJWRBGyANWqSRSEcoGsaj27M9pzaAfHCFpHfpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "AORP",
+    "name": "AORP",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "8x5VqbHA8D7NkD52uNuS5nnt3PwA8pLD34ymskeSo2Wn",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "ZEREBRO",
+    "name": "zerebro",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "7n8kRipxAQBfpGQtcGA2AbkM2HASSVCzqZ5F3QEopump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Zoe",
+    "name": "Zoe",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "8wxkvAfEns76yBzu4MnbV7VnXWjg3iDPA9uwAQ6cpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SOLANGELES",
+    "name": "SolAngeles",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "3vgopg7xm3EWkXfxmWPUpcf7g939hecfqg18sLuXDzVt",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 5,
+    "symbol": "HAROLD",
+    "name": "Harold",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "HBrfYZgeLKdSvBBGnGkvAK4563pq8oBGpgNFAaespump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "OnlyMarms",
+    "name": "OnlyMarms",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "H3f4jYE3tEY8JWve2tRJYzqZpAHEHPihJkGQA5BCqqkn",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "FOMO",
+    "name": "FOMO Pump Coin",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "6hxu7BY4mRChLovDjc1ML3wpizv86dP3fA7Jn5wDZ4SS",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "HOBBES",
+    "name": "Ansem’s Cat",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "6mLmo53cpNy8PkSXt1XTVTF8CvJj466ea3bbhZqMpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "se",
+    "name": "seyong",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "AGkj8qQZJMBcpjcERqLuopmp6UPPYhzvavPdRHypump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "PATE",
+    "name": "PATE",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "9UUcuXzVehYGsdHctwqqBN3G6oiybaxQzbPC7Uropump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "wallet",
+    "name": "wallet",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "i6VGc5CF25BQn3tmVqUPFYcDNeHKDUtyigQhPf9pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "XST",
+    "name": "XST",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "SPHRp8cZaSQBTp1KMNP4V1X821SXhXWt4Q2yLdyHzju",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "SPHR",
+    "name": "Sphere Entertainment Co. - Backpack Securities",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "FMqh9mqR6drPZqqW6wPqLHxX4rqNDWGhYLaMfoaJpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "world",
+    "name": "world.xyz",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 5,
+    "symbol": "GIGA",
+    "name": "GIGACHAD",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "DTGWeDVPAvr7TdY7sdbfjz2bi4QihVMMn9KhyKH1pump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "WOFL",
+    "name": "WOFL",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "6Rwcmkz9yiYVM5EzyMcr4JsQPGEAWhcUvLvfBperYnUt",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "KWIF",
+    "name": "Kitten Wif Hat",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "E3HSQRoXC34RVPWYYDuxm4cNBspwBaVRSqBnRdEFpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "PUGCOIN",
+    "name": "PUGCOIN",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Cm6fNnMk7NfzStP9CZpsQA2v3jjzbcYGAxdJySmHpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "Buttcoin",
+    "name": "Buttcoin",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "5mbK36SZ7J19An8jFochhQS4of8g6BwUjbeCSxBSoWdp",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 6,
+    "symbol": "$michi",
+    "name": "michi",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "GRehQKv9E3fVuNJGQTwAAjYpcixRCYKkzAXAb5kGpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "BOIÚNA",
+    "name": "Boiúna",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "EUB1eZBt4m3X4FbperWnKGJdvLsuLMu2YmJix5yjpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "K-HOME",
+    "name": "bus house",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "Pre8AREmFPtoJFT8mQSXQLh56cwJmM7CFDRuoGBZiUP",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "POLYMARKET",
+    "name": "Polymarket PreStocks",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "gAshQBpVGDRAtL9y6C5fJvVkA5cMWVR6c58w4XWpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "RAMEN",
+    "name": "Ramen Plan",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "4pnj9L8C1uJDhECSTHkToKHPmjLRfdSunENs2xtKpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "inuzard",
+    "name": "inuzard",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "TKLSidmLVt3cqGaaodG8tyRzoANfQwoh67AccjmubeZ",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 9,
+    "symbol": "tKalshi",
+    "name": "T-Kalshi",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "9999FVbjHioTcoJpoBiSjpxHW6xEn3witVuXKqBh2RFQ",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "SLERF",
+    "name": "SLERF",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "Gka1TQEevBbVw4W9K15ER96ZzKByMTb6TBMQzWFEpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "MINER",
+    "name": "Never Give Up",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "2jvsWRkT17ofmv9pkW7ofqAFWSCNyJYdykJ7kPKbmoon",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "AIR3",
+    "name": "AIR3 Agent by AIRewardrop",
+    "t2022": false,
+    "stocky": false
+  },
+  {
+    "mint": "EjD5Y9NVhXmtEqU7wYvAyZvDWZFQeEuHXFatJmTbpump",
+    "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "decimals": 6,
+    "symbol": "lickingcat",
+    "name": "world licking cat",
+    "t2022": true,
+    "stocky": false
+  },
+  {
+    "mint": "HxQhDGYqyjorgogMJx7YbBHADEDxuHhLnMMmr6VYpyn",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "decimals": 9,
+    "symbol": "MANLET",
+    "name": "MANLET",
+    "t2022": false,
+    "stocky": false
+  }
+]

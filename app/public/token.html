@@ -370,6 +370,7 @@ input:focus{outline:none;border-color:var(--accent)}
       ? "/api/mirror?u=" + encodeURIComponent(u) : u;
   }
   var side = "buy", market = null, lastQuote = null, quoteSeq = 0, poolHint = null;
+  var SOL_PAY = false;   // buy box spends SOL via an atomic hop (non-SOL/USDC quote)
 
   function say(k, h) { var m = $("msg"); m.className = "msg " + k; m.innerHTML = h; }
 
@@ -1241,6 +1242,15 @@ input:focus{outline:none;border-color:var(--accent)}
      * one — keep whatever the indexer stats already resolved rather than resetting
      * to ETH, so a paired pool shows its real quote symbol. */
     QUOTE = market.quote || QUOTE || (IS_EVM ? "ETH" : "SOL");
+    /* SOL-pay mode: a LaunchLab curve only accepts its quote mint, so a token
+     * priced in a stock/token would need the buyer to already hold that asset.
+     * When the quote is neither SOL nor USDC we switch the BUY box to spend SOL
+     * and route through the atomic SOL→quote hop (buyWithSol). Sells still return
+     * the quote asset (buy-only for now). */
+    SOL_PAY = !IS_EVM && BACKEND === "launchlab" && market.quoteMint
+      && market.quoteMint !== "So11111111111111111111111111111111111111112"
+      && market.quoteMint !== "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    if ($("t-buy")) setSide(side);
     $("s-price").textContent = market.price ? market.price.toFixed(9) : "—";
     $("s-raised").textContent = UI.fmt(market.raised, 2) + " " + QUOTE;
     $("s-grad").textContent = UI.fmt(market.gradMcap!=null?market.gradMcap:market.threshold, 0) + " " + QUOTE;
@@ -1506,6 +1516,8 @@ input:focus{outline:none;border-color:var(--accent)}
     side = s;
     $("t-buy").className = s === "buy" ? "on buy" : "buy";
     $("t-sell").className = s === "sell" ? "on sell" : "sell";
+    // buy is always priced in SOL/ETH (SOL_PAY hops SOL→quote under the hood);
+    // sell returns tokens' worth of the quote asset.
     $("amt-label").textContent = s === "buy"
       ? (IS_EVM ? "Amount (ETH)" : "Amount (SOL)") : "Amount (tokens)";
     $("chips").innerHTML = s === "buy"
@@ -1523,11 +1535,21 @@ input:focus{outline:none;border-color:var(--accent)}
       var seq = ++quoteSeq;
       try {
         await tkReady;
-        var q = await tk.getQuote(MINT, amt, side, poolHint);
+        var q;
+        if (SOL_PAY && side === "buy") {
+          // spend SOL: estimate via SOL→quote then the curve, and remember the
+          // lamports so trade() can run the atomic hop.
+          q = await tk.estimateBuyWithSol(MINT, Math.floor(amt * 1e9), poolHint);
+          q.solLamports = Math.floor(amt * 1e9);
+        } else {
+          q = await tk.getQuote(MINT, amt, side, poolHint);
+        }
         if (seq !== quoteSeq) return;              // a newer quote superseded this one
         lastQuote = q;
+        // sell returns the quote asset (its real symbol), not SOL, for stock/token quotes
+        var sellUnit = IS_EVM ? " ETH" : (" " + (QUOTE || "SOL"));
         $("est").textContent = UI.fmt(q.out, side === "buy" ? 0 : 4) +
-          (side === "buy" ? " tokens" : (IS_EVM ? " ETH" : " SOL"));
+          (side === "buy" ? " tokens" : sellUnit);
       } catch (e) {
         if (seq !== quoteSeq) return;
         lastQuote = null; $("est").textContent = "—";
@@ -1568,7 +1590,9 @@ input:focus{outline:none;border-color:var(--accent)}
     say("", "");
     try {
       await tkReady;
-      var sig = await tk.swap(MINT, side, lastQuote.amountIn, lastQuote.minOut, poolHint);
+      var sig = (SOL_PAY && side === "buy")
+        ? await tk.buyWithSol(MINT, lastQuote.solLamports, poolHint)
+        : await tk.swap(MINT, side, lastQuote.amountIn, lastQuote.minOut, poolHint);
       var txUrl = IS_EVM ? tk.txUrl(sig) : "https://explorer.solana.com/tx/" + sig;
       say("ok", (side === "buy" ? "Bought." : "Sold.") +
         ' <a href="' + esc(txUrl) + '" target="_blank" rel="noopener">View tx ↗</a>');

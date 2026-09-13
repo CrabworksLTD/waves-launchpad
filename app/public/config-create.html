@@ -80,6 +80,19 @@ h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;marg
 (function () {
   "use strict";
   var esc = UI.esc;
+  /* This is a Solana-only DBC signing page. The shared shell remembers the last
+   * chain in localStorage and a ?chain=rh link pins Robinhood — but signing uses
+   * the SOLANA wallet (window.Wallet); an EVM wallet can't sign it. Force Solana
+   * before the shell reads the chain, and drop only a stale ?chain param (keep
+   * ?cluster/?quote/?mint/?fee). */
+  try { localStorage.setItem("shl-chain", "solana"); } catch (e) {}
+  try {
+    var _u = new URL(location.href);
+    if (_u.searchParams.has("chain")) {
+      _u.searchParams.delete("chain");
+      history.replaceState(null, "", _u.pathname + (_u.search || ""));
+    }
+  } catch (e) {}
   Shell.mount({ search: false });
 
   var qs = new URLSearchParams(location.search);

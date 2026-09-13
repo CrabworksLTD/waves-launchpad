@@ -98,7 +98,11 @@ export default async function handler(req, res) {
         banner: okArt(banner, req.headers.host),
         // the launch's own share card, pinned beside its art
         card: okArt(body.card, req.headers.host),
-        tokenMint: (tokenMint && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(tokenMint)) ? tokenMint : null,
+        // base58 on Solana, 0x on Robinhood (a paired EVM launch links its token)
+        tokenMint: (tokenMint && (B58.test(tokenMint) || EVM.test(tokenMint))) ? tokenMint : null,
+        // the paired token's NFT-reward vault, so the mint page can offer a
+        // claim link straight from the collection record (EVM only)
+        vault: (body.vault && EVM.test(body.vault)) ? String(body.vault).toLowerCase() : null,
         creator: (creator && (B58.test(creator) || EVM.test(creator))) ? creator : null,
         at: Date.now()
       };

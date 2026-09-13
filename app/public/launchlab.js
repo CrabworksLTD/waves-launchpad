@@ -334,6 +334,15 @@
       pool: String(poolPk), config: String(configId),
       feeShare: opts.feeShare || "keep", feeSharePct: opts.feeSharePct || 0,
       quote: opts.quote || "sol", feeWallet: opts.feeWallet || null,
+      // the keeper services jobs by these fields — without them a fee tier or a
+      // holder-reward launch is invisible to it. tier drives the ladder claim,
+      // rewardMode drives dividend/burn/split, pairedCollection routes a pair's
+      // reward into the staking vault (set only when the collection is a reward
+      // pair, i.e. feeShare "vault", never for a plain minted-with collection).
+      tier: opts.tier || "standard",
+      rewardMode: opts.rewardMode || "none",
+      pairedCollection: (opts.feeShare === "vault" ? (opts.collection || null) : null),
+      burn: opts.burn || null,                       // per-NFT burn-to-activate (pairs)
       backend: "launchlab",
       chain: (window.Shell && window.Shell.chain) ? window.Shell.chain() : "solana",
       cluster: cluster()
@@ -391,6 +400,169 @@
       ? await c.raydium.launchpad.buyToken(Object.assign({ buyAmount: new c.R.BN(String(amountInRaw)) }, common))
       : await c.raydium.launchpad.sellToken(Object.assign({ sellAmount: new c.R.BN(String(amountInRaw)) }, common));
     return sendBuilt(c, built);
+  }
+
+  /* ---- pay-in-SOL for a token priced in a stock/token quote ----
+   *
+   * A LaunchLab curve only accepts its QUOTE mint, so a token priced in e.g. NVDAx
+   * can only be bought by someone holding NVDAx. This lets anyone buy with SOL: one
+   * atomic transaction that swaps SOL→quote on Jupiter and then buys on the curve,
+   * signed once. The two are composed into a single v0 tx so the buy can never land
+   * without the swap that funds it (and vice-versa) — no stranded quote dust from a
+   * half-done hop, no second approval.
+   *
+   * `solLamports` is how much SOL the buyer spends. The curve buy uses Jupiter's
+   * GUARANTEED minimum output (otherAmountThreshold) as its buyAmount, so the quote
+   * ATA is certain to hold enough when the buy instruction runs; any surplus from a
+   * better-than-worst-case fill stays in the buyer's quote ATA (≤ the slippage
+   * band). Buy-only — selling still returns the quote asset.
+   *
+   * ⚠️ NOT yet exercised in-browser against a real non-SOL pool. The composition is
+   * correct by construction (buy instructions come from the SDK, not hand-derived),
+   * but the one hard constraint is TRANSACTION SIZE: a Jupiter route with many hops
+   * plus the curve buy's 18 accounts can exceed the 1232-byte limit. maxAccounts is
+   * pinned low to keep routes simple; a route that still doesn't fit throws cleanly
+   * ("route too large") rather than sending a broken tx. */
+  async function buyWithSol(baseMint, solLamports, poolHint) {
+    var c = await client();
+    var mintA = new c.X.PublicKey(baseMint);
+    var poolId = poolHint ? new c.X.PublicKey(poolHint)
+      : c.R.getPdaLaunchpadPoolId(c.prog, mintA, new c.X.PublicKey(WSOL)).publicKey;
+    var pAcc = await c.conn.getAccountInfo(poolId);
+    if (!pAcc) throw new Error("pool not found");
+    var poolInfo = c.R.LaunchpadPool.decode(pAcc.data);
+    var mintB = poolInfo.mintB.toBase58();
+    // already SOL-quoted → no hop needed, take the normal buy path
+    if (mintB === WSOL) return swap(baseMint, "buy", String(solLamports), "0", poolId.toBase58());
+    var configInfo = c.R.LaunchpadConfig.decode((await c.conn.getAccountInfo(poolInfo.configId)).data);
+    var mintBProgram = await quoteProgram(c.conn, c.X, mintB);
+
+    // 1) Jupiter quote SOL → quote (ExactIn). maxAccounts keeps the route small so
+    // the composed tx fits; restrictIntermediateTokens avoids exotic multi-hops.
+    var jq = await (await fetch("https://lite-api.jup.ag/swap/v1/quote?inputMint=" + WSOL +
+      "&outputMint=" + mintB + "&amount=" + String(solLamports) +
+      "&slippageBps=100&restrictIntermediateTokens=true&maxAccounts=20")).json();
+    if (!jq || !jq.outAmount) throw new Error("No route from SOL to the quote token");
+    var minQuote = jq.otherAmountThreshold || jq.outAmount;   // guaranteed minimum received
+
+    // 2) Jupiter swap-INSTRUCTIONS (so we compose, not send its own tx)
+    var si = await (await fetch("https://lite-api.jup.ag/swap/v1/swap-instructions", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ quoteResponse: jq, userPublicKey: c.owner.toBase58(),
+        wrapAndUnwrapSol: true, dynamicComputeUnitLimit: false }),
+    })).json();
+    if (!si || !si.swapInstruction) throw new Error("Jupiter did not return swap instructions");
+
+    // 3) the curve buy, sized to the GUARANTEED quote output. SDK-built so the 18
+    // accounts are derived correctly, then we take ONLY the LaunchLab program
+    // instruction (buyExactIn) and create the base ATA ourselves — that way none of
+    // the SDK's own ATA-setup instructions can clash with Jupiter's (both create
+    // the quote ATA; a non-idempotent create would fail "already exists").
+    var baseProgram = new c.X.PublicKey(poolInfo.mintProgramFlag === 1 ? TOKEN2022 : TOKENKEG);
+    var built = await c.raydium.launchpad.buyToken({
+      programId: c.prog, mintA: mintA, mintB: poolInfo.mintB, poolInfo: poolInfo, configInfo: configInfo,
+      mintAProgram: baseProgram, mintBProgram: new c.X.PublicKey(mintBProgram),
+      buyAmount: new c.R.BN(String(minQuote)), slippage: new c.R.BN(100), txVersion: c.R.TxVersion.LEGACY,
+    });
+    var progStr = c.prog.toBase58();
+    var buyIx = built.transaction.instructions.filter(function (ix) { return ix.programId.toBase58() === progStr; })[0];
+    if (!buyIx) throw new Error("could not build the curve buy instruction");
+
+    // 4) assemble: our own compute budget (Jupiter's is sized for the swap alone,
+    // the buy needs more), then Jupiter setup + swap + cleanup, then create the base
+    // ATA idempotently, then the buy.
+    function deIx(x) {
+      return new c.X.TransactionInstruction({
+        programId: new c.X.PublicKey(x.programId),
+        keys: (x.accounts || []).map(function (k) {
+          return { pubkey: new c.X.PublicKey(k.pubkey), isSigner: k.isSigner, isWritable: k.isWritable };
+        }),
+        data: b64ToBytes(x.data),
+      });
+    }
+    var ixs = [c.X.ComputeBudgetProgram.setComputeUnitLimit({ units: 600000 })];
+    (si.setupInstructions || []).forEach(function (x) { ixs.push(deIx(x)); });
+    ixs.push(deIx(si.swapInstruction));
+    if (si.cleanupInstruction) ixs.push(deIx(si.cleanupInstruction));
+    ixs.push(ataIdempotentIx(c.X, c.owner, mintA, baseProgram));   // user's base-token ATA
+    ixs.push(buyIx);
+
+    // 5) resolve Jupiter's address lookup tables + build one v0 tx
+    var alts = [];
+    var altAddrs = si.addressLookupTableAddresses || [];
+    for (var i = 0; i < altAddrs.length; i++) {
+      var got = await c.conn.getAddressLookupTable(new c.X.PublicKey(altAddrs[i])).then(function (x) { return x.value; }).catch(function () { return null; });
+      if (got) alts.push(got);
+    }
+    var bh = (await c.conn.getLatestBlockhash("confirmed")).blockhash;
+    var msg;
+    try {
+      msg = new c.X.TransactionMessage({ payerKey: c.owner, recentBlockhash: bh, instructions: ixs }).compileToV0Message(alts);
+    } catch (e) {
+      throw new Error("route too large — try a smaller amount or buy with the quote token directly");
+    }
+    var vtx = new c.X.VersionedTransaction(msg);
+    var signed = await c.wallet.signTransaction(vtx);
+    var raw = signed.serialize();
+    if (raw.length > 1232) throw new Error("route too large — try a smaller amount or buy with the quote token directly");
+    var sig = await c.conn.sendRawTransaction(raw, { skipPreflight: false });
+
+    // confirm by polling + rebroadcast (public nodes lie about confirmation)
+    for (var w8 = 0; w8 < 60; w8++) {
+      var st = await c.conn.getSignatureStatus(sig, { searchTransactionHistory: true }).catch(function () { return null; });
+      var v = st && st.value;
+      if (v && v.err) throw new Error("The buy failed on chain (the swap or the curve buy reverted).");
+      if (v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized")) return sig;
+      if (w8 % 5 === 4) c.conn.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 5 }).catch(function () {});
+      await new Promise(function (r) { setTimeout(r, 1000); });
+    }
+    throw new Error("Sent, but not confirmed within 60s — signature: " + sig);
+  }
+
+  /* Build a create-associated-token-account-IDEMPOTENT instruction by hand (the
+   * browser bundle doesn't ship @solana/spl-token). ATA program ix 1 = idempotent;
+   * accounts: payer(signer,writable), ata(writable), owner, mint, systemProgram,
+   * tokenProgram. The ATA address is the standard PDA [owner, tokenProgram, mint]. */
+  function ataIdempotentIx(X, owner, mint, tokenProgram) {
+    var ATA = new X.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+    var SYS = new X.PublicKey("11111111111111111111111111111111");
+    var ata = X.PublicKey.findProgramAddressSync(
+      [owner.toBuffer(), tokenProgram.toBuffer(), mint.toBuffer()], ATA)[0];
+    return new X.TransactionInstruction({
+      programId: ATA,
+      keys: [
+        { pubkey: owner, isSigner: true, isWritable: true },
+        { pubkey: ata, isSigner: false, isWritable: true },
+        { pubkey: owner, isSigner: false, isWritable: false },
+        { pubkey: mint, isSigner: false, isWritable: false },
+        { pubkey: SYS, isSigner: false, isWritable: false },
+        { pubkey: tokenProgram, isSigner: false, isWritable: false },
+      ],
+      data: new Uint8Array([1]),
+    });
+  }
+
+  // base64 → Uint8Array, without a global Buffer (not polyfilled in the browser).
+  function b64ToBytes(b64) {
+    var bin = atob(b64);
+    var u = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return u;
+  }
+
+  /* Estimate the tokens a SOL-funded buy would yield: SOL→quote on Jupiter, then
+   * the curve's spot price. Display figure only (the real buy is slippage-protected
+   * on both legs). Returns { out: tokens, quoteOut: humanQuote } or nulls on no route. */
+  async function estimateBuyWithSol(baseMint, solLamports, poolHint) {
+    var m = await readMarket(baseMint, poolHint);
+    if (!m || !m.price || !m.quoteMint) return { out: 0, quoteOut: 0 };
+    if (m.quoteMint === WSOL) return getQuote(baseMint, solLamports / 1e9, "buy", poolHint);
+    var jq = await (await fetch("https://lite-api.jup.ag/swap/v1/quote?inputMint=" + WSOL +
+      "&outputMint=" + m.quoteMint + "&amount=" + String(solLamports) +
+      "&slippageBps=100&restrictIntermediateTokens=true&maxAccounts=20")).json();
+    if (!jq || !jq.outAmount) return { out: 0, quoteOut: 0 };
+    var quoteHuman = Number(jq.outAmount) / Math.pow(10, m.quoteDec || 8);
+    return { out: quoteHuman / m.price, quoteOut: quoteHuman };
   }
 
   /* ---- read-only market state (no wallet) ---- */
@@ -476,6 +648,8 @@
       // units) — what "graduates at" should show, not the USD value of the raise.
       gradMcap: (endPrice != null) ? endPrice * supply : null,
       quote: quoteSymForMint(p.mintB.toBase58()),
+      quoteMint: p.mintB.toBase58(),         // for the SOL-pay hop (buyWithSol)
+      quoteDec: decB,
       creator: p.creator.toBase58()
     };
   }
@@ -738,6 +912,8 @@
     rwaQuotes: rwaQuotes,
     // trade / read
     swap: swap,
+    buyWithSol: buyWithSol,        // atomic SOL→quote hop + curve buy (non-SOL quotes)
+    estimateBuyWithSol: estimateBuyWithSol,
     getQuote: getQuote,
     balanceOf: balanceOf,
     readPool: readPool,

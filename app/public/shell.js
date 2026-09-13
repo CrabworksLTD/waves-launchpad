@@ -43,6 +43,22 @@
     return CHAINS[c] ? c : "solana";
   }
   var shellPaintWallet = null;   // set by mount(); repainted on chain switch
+
+  /* THE single source of truth for "is pairing unlocked here". Pairing is "soon"
+   * for the public on mainnet, but an operator can unlock it for their OWN browser
+   * with ?pairtest=1 (persisted) to launch a pair and rehearse the staking loop —
+   * every pairing gate (nav item, launch card, launch panel) reads this so there
+   * is one switch, not five. ?pairtest=0 clears it. Also on for devnet. */
+  function pairUnlocked() {
+    try {
+      var u = new URLSearchParams(location.search);
+      if (u.get("pairtest") === "1") { try { localStorage.setItem("wavesPairTest", "1"); } catch (e) {} return true; }
+      if (u.get("pairtest") === "0") { try { localStorage.removeItem("wavesPairTest"); } catch (e) {} return false; }
+      if (localStorage.getItem("wavesPairTest") === "1") return true;
+    } catch (e) {}
+    try { if (window.Launch && window.Launch.cluster && window.Launch.cluster() === "devnet") return true; } catch (e) {}
+    return false;
+  }
   /* Chains are applied by loading the page, not by re-skinning it in place —
      see the network selector below for why. Boot reads the persisted choice. */
   /* Which password, if any, stands in front of a chain — and whether this
@@ -391,9 +407,13 @@
               '<button aria-haspopup="true" aria-expanded="false">' +
               window.UI.esc(n.label) + " <i>▾</i></button><div class=\"menu\">" +
               n.menu.map(function (m) {
+                // the Pair item is "soon" for the public, but an operator running
+                // ?pairtest=1 (or on devnet) has pairing unlocked — drop the badge
+                // and make it a real link so they can launch a pair to rehearse.
+                var soon = m.soon && !(m.mode === "pair" && pairUnlocked());
                 return m.href
                   ? '<a href="' + m.href + '">' + window.UI.esc(m.label) + "</a>"
-                  : m.soon
+                  : soon
                     ? '<a class="soon" aria-disabled="true">' + window.UI.esc(m.label) +
                       "<i>soon</i></a>"
                     : '<a href="/app?launch=' + m.mode + '" data-mode="' + m.mode + '">' +
@@ -871,5 +891,5 @@
 
   window.Shell = { mount: mount, connect: connectAny,
     ensureLaunchStack: ensureLaunchStack, ensureEvmStack: ensureEvmStack,
-    ensureEvmLaunch: ensureEvmLaunch, chain: currentChain };
+    ensureEvmLaunch: ensureEvmLaunch, chain: currentChain, pairUnlocked: pairUnlocked };
 })();

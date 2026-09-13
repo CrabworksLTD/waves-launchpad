@@ -49,6 +49,76 @@ const HOOK_ROUTER = process.env.RH_HOOK_ROUTER || "0x29b0638dd7fcd8f829fed7cd2a1
 const CHUNK = 50000n;            // the widest window this chain will answer
 const MAX_CHUNKS = 12;           // per token per run — keeps a run inside its timeout
 const ZERO = "0x0000000000000000000000000000000000000000";
+const USDG_ADDR = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
+const isEthQuote = (a) => !a || /^0x0+$/i.test(String(a));
+
+/* Decimals of a pool's quote asset — 18 for native ETH, else read from the
+ * ERC-20 (6 for USDG, 8 for the tokenised stocks). Cached; falls back to 18. */
+const _decCache = {};
+async function decimalsOf(addr) {
+  if (isEthQuote(addr)) return 18;
+  const k = String(addr).toLowerCase();
+  if (_decCache[k] !== undefined) return _decCache[k];
+  let d = 18;
+  try { d = Number(BigInt(await rpc("eth_call", [{ to: addr, data: "0x313ce567" }, "latest"]) || "0x12")) || 18; } catch (e) {}
+  _decCache[k] = d;
+  return d;
+}
+
+/* A stock quote's USD price, so the token page can show dollars instead of raw
+ * "F"/"AAPL" units. USDG ≈ $1; for a tokenised stock we read the spot price off
+ * its deepest USDG pool (the same slot0 math the quote-approval targets used).
+ * Returns null on any doubt so the page falls back to native units. */
+let _rhAssets = null;
+async function loadRhAssets() {
+  if (_rhAssets) return _rhAssets;
+  try {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    _rhAssets = JSON.parse(await fs.readFile(path.join(process.cwd(), "public", "rh-assets.json"), "utf8")).tokens || [];
+  } catch (e) {
+    try {
+      const base = process.env.VERCEL_URL ? "https://" + process.env.VERCEL_URL : "";
+      _rhAssets = ((await (await fetch(base + "/rh-assets.json")).json()).tokens) || [];
+    } catch (e2) { _rhAssets = []; }
+  }
+  return _rhAssets;
+}
+const _p32 = (v) => { let s = BigInt(v).toString(16); return "0".repeat(64 - s.length) + s; };
+const _a32 = (a) => "0".repeat(24) + String(a).replace(/^0x/, "").toLowerCase();
+const _usdCache = {};
+async function quoteUsdPrice(quoteAddr) {
+  if (isEthQuote(quoteAddr)) return null;
+  const key = String(quoteAddr).toLowerCase();
+  if (key === USDG_ADDR) return 1;
+  if (_usdCache[key] !== undefined) return _usdCache[key];
+  let usd = null;
+  try {
+    const { keccak256 } = await import("viem");
+    const assets = await loadRhAssets();
+    const t = assets.find((a) => String(a.address).toLowerCase() === key);
+    const dec = t ? (t.decimals || 18) : 18;
+    for (const k of ((t && t.usdgPools) || []).slice(0, 3)) {
+      const id = keccak256("0x" + _a32(k.currency0) + _a32(k.currency1) + _p32(k.fee) + _p32(k.tickSpacing) + _a32(k.hooks));
+      const slot = keccak256("0x" + id.slice(2) + _p32(6));
+      const wd = await rpc("eth_call", [{ to: POOL_MANAGER, data: "0x1e2eaeaf" + slot.slice(2) }, "latest"]);
+      const sp = BigInt(wd || "0x0") & ((1n << 160n) - 1n);
+      if (sp === 0n) continue;
+      const num = sp * sp, den = 1n << 192n;
+      const usdgIsC0 = String(k.currency0).toLowerCase() === USDG_ADDR;
+      const rawStockPerUsdg = usdgIsC0 ? Number(num) / Number(den) : Number(den) / Number(num);
+      const p = (1 / rawStockPerUsdg) * Math.pow(10, dec) / 1e6;   // USDG (≈USD) per whole stock
+      if (p > 0 && isFinite(p)) { usd = p; break; }
+    }
+  } catch (e) {}
+  /* Only cache a real price. Caching a transient null — an RPC throttle during a
+   * busy indexer run — with no TTL pinned a live asset to "no USD" for the life
+   * of the warm instance: exactly how CRDO showed every stat in the raw quote
+   * (CRDO) while GLD/SLV, first read at calmer moments, cached a price and
+   * showed USD. A null now stays uncached, so the next request recomputes. */
+  if (usd != null) _usdCache[key] = usd;
+  return usd;
+}
 
 let rpcId = 0;
 async function rpc(method, params) {
@@ -246,6 +316,24 @@ async function indexTrades(db, rec, curveAddr, latest) {
   const t = await curveTerms(curveAddr);
   const topic = "0x" + "0".repeat(24) + token.slice(2);
 
+  /* The pool's quote asset and its PER-CURVE virtual reserve. Fees, volume and
+   * the price are denominated in the quote (ETH, USDG or a stock) — not always
+   * ETH — so they must be normalised by the quote's decimals. Read the curve
+   * ONCE here and reuse it for the rewards + pledge-sync below (curves is keyed
+   * by PoolId: poolOf(token) -> curves(poolId)). */
+  let curveState = null;
+  try {
+    const poolId = await rpc("eth_call", [{ to: curveAddr, data: "0x988b1fa7" + "0".repeat(24) + token.slice(2) }, "latest"]);
+    curveState = await rpc("eth_call", [{ to: curveAddr, data: "0x66903e80" + String(poolId).replace(/^0x/, "") }, "latest"]);
+  } catch (e) { /* the blocks below degrade on their own */ }
+  const csHex = curveState ? String(curveState).replace(/^0x/, "") : "";
+  const quoteAddr = csHex.length >= 10 * 64 ? ("0x" + csHex.slice(9 * 64 + 24, 10 * 64)).toLowerCase() : ZERO;
+  const ethQuote = isEthQuote(quoteAddr);
+  // curve word 12 = virtualQuote; fall back to the global ETH template if short
+  const vQuote = csHex.length >= 13 * 64 ? word(curveState, 12) : t.virtualEth;
+  const qDec = await decimalsOf(quoteAddr);
+  const qUnit = Math.pow(10, qDec);
+
   /* Replayed from launch every run rather than resumed from a cursor. The
    * running total IS the price, so a resumed cursor would have to persist
    * reserves as well, and any drift between the two would bend the chart
@@ -295,9 +383,11 @@ async function indexTrades(db, rec, curveAddr, latest) {
       if (buy) { raised += a - fee; tokensLeft -= b; }
       else { raised -= b + fee; tokensLeft += a; }
 
-      const x = t.virtualEth + raised;
+      const x = vQuote + raised;
       const y = t.virtualTokens - (t.curveSupply - tokensLeft);
-      const price = y > 0n ? Number(x) / Number(y) : 0;
+      // price is quote-per-token; normalise each side by its own decimals so a
+      // 6-dec USDG or 8-dec stock pool is not off by orders of magnitude
+      const price = y > 0n ? (Number(x) / qUnit) / (Number(y) / 1e18) : 0;
 
       /* Interpolated from the head block, never fetched per trade. One block
        * read per trade is what made the Solana chart hammer its node into rate
@@ -309,7 +399,7 @@ async function indexTrades(db, rec, curveAddr, latest) {
       trades.push({
         at: stampOf.get(blk),
         price,
-        quote: Number(buy ? a : b) / 1e18,     // the ETH side, which is the volume
+        quote: Number(buy ? a : b) / qUnit,    // the quote side (the volume), in quote units
         tokens: Number(buy ? b : a) / 1e18,    // token amount: out on a buy, in on a sell
         side: buy ? "buy" : "sell",
         who: payerByTx[String(lg.transactionHash).toLowerCase()] || null,
@@ -341,25 +431,9 @@ async function indexTrades(db, rec, curveAddr, latest) {
    * Pending is everything after the keeper's cursor — the fees a token has
    * earned for holders but not yet been paid out, which is most of what a
    * holder wants to know between hourly runs. */
-  /* One read of the curve for both the reward figures and the pledge sync.
-   *
-   * They each called curves(token) separately, in the same run, for the same
-   * answer — and on a chain that throttles this readily the second one was
-   * simply refused. Two calls for one fact is how a run runs out of budget. */
-  let curveState = null;
-  try {
-    /* The hook keys its Curve by PoolId, not token address (curves(bytes32),
-     * not the standalone curve's curves(address)). poolOf(token) -> curves(poolId).
-     * Reading curves(address) on the hook returns a zero struct, which read as
-     * rewardsBps 0 and silently zeroed every holder's earnings. */
-    const poolId = await rpc("eth_call", [{
-      to: curveAddr, data: "0x988b1fa7" + "0".repeat(24) + token.slice(2)
-    }, "latest"]);
-    curveState = await rpc("eth_call", [{
-      to: curveAddr, data: "0x66903e80" + String(poolId).replace(/^0x/, "")
-    }, "latest"]);
-  } catch (e) { /* both blocks below degrade on their own */ }
-
+  /* curveState was read once at the top of this function (for the quote asset)
+   * and is reused here for the reward figures and the pledge sync — one read for
+   * three facts, which matters on a chain that throttles reads readily. */
   let rewards = null;
   try {
     if (!curveState) throw new Error("could not read the curve");
@@ -368,8 +442,12 @@ async function indexTrades(db, rec, curveAddr, latest) {
     /* Whichever we know: what the keeper last paid in, or — before any payout
      * has happened — what the creator chose at launch. Without the fallback a
      * token that has never had a run could not name its own reward asset. */
-    const assetAddr = (await db.get("rhk:" + token + ":paidAssetAddr")) ||
-      (rec.rewardMint ? String(rec.rewardMint).toLowerCase() : null);
+    /* A QUOTED pool's reward IS its quote (fees accrue in it, paid directly), so
+     * the reward asset is the quote itself. An ETH pool uses the keeper's last
+     * paid asset, or the creator's launch choice. */
+    const assetAddr = !ethQuote ? quoteAddr
+      : ((await db.get("rhk:" + token + ":paidAssetAddr")) ||
+         (rec.rewardMint ? String(rec.rewardMint).toLowerCase() : null));
     const cursor = BigInt((await db.get("rhk:" + token + ":cursor")) || rec.block || 0);
 
     // hook Curve layout: token(0) creator(1) feeBps(2) rewardsBps(3) ...
@@ -399,34 +477,40 @@ async function indexTrades(db, rec, curveAddr, latest) {
     let earnedAsset = null;
     try {
       const earned = paidWei + pending;
-      if (earned > 0n && assetAddr) {
-        const { bestRoute } = await import("./rh-keeper.js");
-        const r = await bestRoute(assetAddr, earned);
-        if (r && r.out > 0n) earnedAsset = r.out.toString();
+      if (earned > 0n) {
+        if (!ethQuote) {
+          // reward IS the quote — the earned figure is already in it, no route
+          earnedAsset = earned.toString();
+        } else if (assetAddr) {
+          const { bestRoute } = await import("./rh-keeper.js");
+          const r = await bestRoute(assetAddr, earned);
+          if (r && r.out > 0n) earnedAsset = r.out.toString();
+        }
       }
-    } catch (e) { /* the ETH figure still stands on its own */ }
+    } catch (e) { /* the native figure still stands on its own */ }
 
-    /* Buyback-and-burn: the keeper spends the accrued ETH buying the token and
-     * sending it to 0xdEaD, so there is no reward asset and no "paid" — the two
-     * numbers a holder wants are ETH accrued (spent + still pending) and tokens
-     * burnt. Both are persisted by the keeper per run. */
+    /* Buyback-and-burn spends the accrued quote buying the token to 0xdEaD, so
+     * there is no reward asset — a holder wants quote accrued + tokens burnt.
+     * A SPLIT does both: half a dividend, half a burn. Values persisted per run. */
     const isBurn = rec.rewardMode === "burn";
+    const isSplit = rec.rewardMode === "split";
     const burnEthWei = BigInt((await db.get("rhk:" + token + ":burnEthWei")) || "0");
     const burntTokens = (await db.get("rhk:" + token + ":burnt")) || "0";
 
     rewards = {
+      // earnedWei is in the QUOTE asset's units (ETH wei for an ETH pool)
       earnedWei: (isBurn ? (burnEthWei + pending) : (paidWei + pending)).toString(),
       earnedAsset: isBurn ? null : earnedAsset,
       pendingWei: pending.toString(),
       burn: isBurn,
+      split: isSplit,
       burntTokens,
       burnEthWei: burnEthWei.toString(),
       paidWei: paidWei.toString(),
       paidAsset: paidAsset.toString(),
       assetAddr: assetAddr || null,
-      /* What the fallback had to work with. Guessing why this came out null
-       * cost two deploys; the record's own field is one string and reporting it
-       * makes the next answer immediate. */
+      quoteAddr,
+      quoteDecimals: qDec,
       fromRecord: rec.rewardMint || null,
       rewardsBps
     };
@@ -438,15 +522,19 @@ async function indexTrades(db, rec, curveAddr, latest) {
     rewards = { error: String(e && e.message || e).slice(0, 160) };
   }
 
-  /* Dollars, because a card shows dollars. The Solana indexer stores these on
-   * the same blob and the bulk endpoint hands them straight to the grid — an
-   * EVM token without them priced as a dash no matter what the chain said. */
+  /* Dollars, because a card shows dollars. price/mcap are in the QUOTE asset, so
+   * the USD factor is the QUOTE's price: ETH spot for an ETH pool, ~$1 for USDG.
+   * A stock quote has no simple feed here, so its USD figures are left null and
+   * the token page resolves them (the native quote-denominated price still
+   * shows, along with the quote symbol). */
   let ethUsd = 0;
   try {
     ethUsd = await fetch("https://api.coinbase.com/v2/prices/ETH-USD/spot",
       { signal: AbortSignal.timeout(6000) })
       .then((r) => r.json()).then((j) => Number(j.data.amount)) || 0;
   } catch (e) { /* the native figures still stand */ }
+  const quoteUsd = ethQuote ? (ethUsd || null) : (await quoteUsdPrice(quoteAddr));
+  const quoteSym = rec.quoteSym || (ethQuote ? "ETH" : (String(quoteAddr).toLowerCase() === USDG_ADDR ? "USDG" : null));
 
   const dayAgo = Date.now() - 86400000;
   const day = trades.filter((x) => x.at >= dayAgo);
@@ -455,17 +543,20 @@ async function indexTrades(db, rec, curveAddr, latest) {
   await db.set("ix:" + token + ":trades", JSON.stringify(trades.slice(-600)));
   await db.set("ix:" + token + ":stats", JSON.stringify({
     price: last.price,
-    priceUsd: ethUsd ? last.price * ethUsd : null,
+    priceUsd: quoteUsd ? last.price * quoteUsd : null,
     supply,
     mcap: last.price * supply,
-    mcapUsd: ethUsd ? last.price * supply * ethUsd : null,
-    quoteUsd: ethUsd || null,
+    mcapUsd: quoteUsd ? last.price * supply * quoteUsd : null,
+    quoteUsd: quoteUsd || null,
     vol24h,
+    vol24hUsd: quoteUsd ? vol24h * quoteUsd : null,
     trades24h: day.length,
     holders,
     ath, athAt,
     rewards,
-    quote: "ETH",
+    quote: quoteSym || "ETH",
+    quoteAddr,
+    quoteDecimals: qDec,
     at: Date.now()
   }));
 
@@ -555,6 +646,29 @@ export default async function handler(req, res) {
     } catch (e) {
       return res.status(200).json({ ok: false, error: String(e.message || e).slice(0, 140) });
     }
+  }
+
+  /* ?quoteeth=<addr> — ETH per one unit of a quote asset, so the token page can
+   * show a sell that returns ETH (via the sell router) in ETH rather than the
+   * quote. Reads the quote's USD (ETH spot / $1 USDG / a stock from its own pool
+   * slot0) and ETH spot; no auth (a price, like /api/stats?usd=), short-cached.
+   * Open like the single-token read below. */
+  const qeth = (req.query && req.query.quoteeth) || null;
+  if (qeth) {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(qeth)) return res.status(400).json({ error: "bad quote" });
+    const ql = qeth.toLowerCase();
+    const isEth = /^0x0+$/.test(ql);
+    let ethUsd = 0;
+    try {
+      ethUsd = await fetch("https://api.coinbase.com/v2/prices/ETH-USD/spot",
+        { signal: AbortSignal.timeout(6000) })
+        .then((r) => r.json()).then((j) => Number(j.data.amount)) || 0;
+    } catch (e) { /* leave null below */ }
+    let quoteUsd = null;
+    try { quoteUsd = isEth ? (ethUsd || null) : (await quoteUsdPrice(ql)); } catch (e) {}
+    const ethPerQuote = (ethUsd && quoteUsd) ? Number(quoteUsd) / Number(ethUsd) : null;
+    res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+    return res.status(200).json({ quoteUsd: quoteUsd || null, ethUsd: ethUsd || null, ethPerQuote });
   }
 
   const secret = process.env.CRON_SECRET;

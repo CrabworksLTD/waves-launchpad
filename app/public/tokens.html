@@ -186,6 +186,7 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
 <script src="/shell.js"></script>
 <script src="/launch.js"></script>
 <script src="/token.js"></script>
+<script src="/launchlab.js"></script>
 <script>
 (function () {
   "use strict";
@@ -268,7 +269,10 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
       }).catch(function () {});
 
     state.forEach(function (row) {
-      window.Token.readMarket(row.rec.mint).then(function (m) {
+      // route each card's market read to the backend that launched it; pass the
+      // recorded pool so LaunchLab (non-SOL quotes) resolves without a scan
+      var be = (row.rec.backend === "launchlab" && window.LaunchLab) ? window.LaunchLab : window.Token;
+      be.readMarket(row.rec.mint, row.rec.pool || undefined).then(function (m) {
         row.mkt = m; draw();
       }).catch(function () {});
     });
@@ -348,7 +352,7 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
           (r.icon ? '<img alt="" loading="lazy" src="' + esc(art(r.icon)) + '">'
                   : '<span class="ltr">' + esc(sym.slice(0, 1) || "$") + "</span>") +
           ((r.feeSharePct || 0) > 0
-            ? '<span class="tag reward">' + (r.rewardMode === "burn" ? "BUYBACK" : "DIVIDEND") + "</span>"
+            ? '<span class="tag reward">' + (r.rewardMode === "burn" ? "BUYBACK" : r.rewardMode === "split" ? "DIVIDEND/BUYBACK" : "DIVIDEND") + "</span>"
             : "") +
         "</span>" +
         '<span class="body">' +

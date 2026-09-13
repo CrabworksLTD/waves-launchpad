@@ -1,0 +1,14 @@
+# Source integrity (v3 — post-audit-fix + constructor floor) — SHA-256 of fixed sources
+# solc 0.8.26, cancun, optimizer_runs=200, via-IR (foundry.toml [profile.v4])
+
+bea6dc3914c7602c5b98472d14bc55fab1db42c04460069b789ee7fc585439d2  contracts/WavesCurveHook.sol
+ca9839738db91d275b2df3b10bb4900a3988e1283dd6b09c6601a6dec4a2d854  contracts/WavesHookRouter.sol
+81ff25540d070556a7a0459a0c80285147c2d250b9416c40ffaded830227be2a  contracts/WavesQuoteAggregator.sol
+590f3175936b77877a1b75a7534d14ab99023983087abb7ceba2d6d03308beec  contracts/WavesSellRouter.sol
+8d5e7e6c9a6c88d874be3cef0a1732574d05d20b9a2bdaef4314f713eca015a6  contracts/WavesToken.sol
+126175c683abb4adf85e60647c24d620278b0c7b8c530b9d24fc96476b8a90ab  contracts/WavesSwapRouter.sol
+19d65c1cc9aa5dde3cfa86d08ca195d50fa4615fb3eee3f22664f0f2d317acfa  contracts/v4lib/CurrencySettler.sol
+
+# CurrencySettler.sol is byte-identical to lib/v4-core/test/utils/CurrencySettler.sol
+# apart from import paths (verified round 1). Deployed runtime-bytecode keccaks are
+# regenerated at the post-fix redeploy for deployed-vs-source verification.

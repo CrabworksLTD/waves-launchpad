@@ -125,10 +125,38 @@ export default async function handler(req, res) {
     } catch (e) { /* try the next gateway */ }
   }
 
-  /* No trailing mirror check: it now runs before the gateways, which is the
-   * whole point — it was the fast path being used as the slow one.
-   *
-   */
+  /* Path route fell through on every gateway. In a fresh ANS-104 bundle the
+   * gateways can serve individual data items by their own txid before their
+   * manifest path-index resolves `<manifest>/<file>` — so `/1.json` works while
+   * `/_allowlist.json` 404s even though both bytes are present. Resolve it
+   * ourselves: read the manifest, map the file to its data-item id, fetch that
+   * id directly. A bare-txid 200 is content-addressed, so it needs no
+   * content-type sniffing (unlike the path route, which can 200 a 404 page). */
+  try {
+    for (const gw of GATEWAYS) {
+      let mani;
+      try {
+        mani = await fetch(gw + "/raw/" + id, { signal: AbortSignal.timeout(8000) })
+          .then((r) => (r.ok ? r.json() : null));
+      } catch (e) { continue; }
+      const entry = mani && mani.paths && mani.paths[file];
+      if (!entry || !entry.id) continue;
+      for (const g2 of GATEWAYS) {
+        try {
+          const r = await fetch(g2 + "/" + entry.id, { signal: AbortSignal.timeout(8000), redirect: "follow" });
+          if (!r.ok) continue;
+          const buf = Buffer.from(await r.arrayBuffer());
+          if (!buf.length) continue;
+          res.setHeader("Content-Type", type);
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          return res.status(200).send(buf);
+        } catch (e) { /* try the next gateway */ }
+      }
+      break;   // had the manifest; no point refetching it from another gateway
+    }
+  } catch (e) { /* fall through to the miss */ }
+
   /* Short cache on a miss, so a caller that arrives during the gap is not told
    * "gone" for a year by its own cache. */
   res.setHeader("Cache-Control", "public, max-age=30");

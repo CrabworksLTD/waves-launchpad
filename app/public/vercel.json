@@ -96,6 +96,10 @@
     {
       "path": "/api/rh-keeper",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/rh-keeper-nft",
+      "schedule": "0 * * * *"
     }
   ]
 }

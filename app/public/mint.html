@@ -171,7 +171,6 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
       <div class="msg" id="msg"></div>
       <a class="pairlink" id="pairlink" hidden></a>
       <a class="pairlink" id="stakelink" hidden></a>
-      <p class="foot">Runs on Metaplex Core. Nothing custom in the middle.</p>
     </div>
   </div>
 </header>
@@ -362,13 +361,30 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
    * an allowlist you cannot audit is not an allowlist. */
   function loadLists() {
     if (!metaDir) return Promise.resolve(null);
-    return fetch(metaDir + "_allowlist.json").then(function (r) { return r.ok ? r.json() : null; })
-      .catch(function () { return null; });
+    // A just-launched collection can 404 on Arweave for a few seconds while the
+    // gateway indexes the bundle. Retry a handful of times before giving up, so
+    // a mint page opened right after launch still finds the waves.
+    var url = metaDir + "_allowlist.json";
+    return (function attempt(n) {
+      return fetch(url).then(function (r) {
+        if (r.ok) return r.json();
+        if (r.status === 404 && n > 0) {
+          return new Promise(function (res) { setTimeout(res, 1500); }).then(function () { return attempt(n - 1); });
+        }
+        return null;
+      }).catch(function () {
+        return n > 0 ? new Promise(function (res) { setTimeout(res, 1500); }).then(function () { return attempt(n - 1); }) : null;
+      });
+    })(4);
   }
 
+  var gateQual = {};                               // label -> {ok, gateNft} for collection/token waves
+
   /* Which phase can THIS wallet mint through right now?
-   * The earliest-opened wave that lists the wallet wins (waves stay open once
-   * started); the public group works for anyone once it opens. */
+   * The earliest-opened wave the wallet qualifies for wins (waves stay open once
+   * started); the public group works for anyone once it opens. Wallet waves check
+   * list membership; collection/token waves use holdership resolved by
+   * checkGates() — the guard enforces it on-chain either way. */
   function resolvePhase() {
     myPhase = null;
     var w = window.Wallet.current();
@@ -376,17 +392,51 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
     for (var i = 0; i < state.groups.length; i++) {
       var g = state.groups[i];
       if (g.opensAt && g.opensAt > now) continue;
-      if (!g.allowlisted) { myPhase = { group: g.label }; break; }
-      if (!w || !lists) continue;
-      var ph = (lists.phases || []).find(function (p) { return p.label === g.label; });
-      if (ph && ph.wallets && ph.wallets.indexOf(w.publicKey) >= 0) {
-        myPhase = { group: g.label, wallets: ph.wallets };
-        break;
+      var ph = lists && (lists.phases || []).find(function (p) { return p.label === g.label; });
+      if (!ph) {
+        // no pinned phase → a public/open group; an allowList group with no list
+        // can't be proven, so skip it
+        if (!g.allowlisted) { myPhase = { group: g.label }; break; }
+        continue;
+      }
+      var kind = ph.kind || (ph.wallets ? "wallets" : null);
+      if (kind === "wallets") {
+        if (w && ph.wallets && ph.wallets.indexOf(w.publicKey) >= 0) { myPhase = { group: g.label, wallets: ph.wallets }; break; }
+      } else if (kind === "coin") {
+        if (gateQual[g.label] && gateQual[g.label].ok) { myPhase = { group: g.label }; break; }
+      } else if (kind === "nft") {
+        var q = gateQual[g.label];
+        if (q && q.ok) { myPhase = { group: g.label, gateNft: q.gateNft }; break; }
       }
     }
   }
 
+  /* Resolve collection/token holdership once per wallet, then re-pick + re-paint.
+   * Fire-and-forget from the wallet/list hooks; the on-chain guard is the real
+   * check, this only decides which wave the page offers you. */
+  async function checkGates() {
+    var w = window.Wallet.current();
+    if (!w || !lists) return;
+    var phs = lists.phases || [];
+    for (var i = 0; i < phs.length; i++) {
+      var ph = phs[i];
+      if (ph.kind !== "coin" && ph.kind !== "nft") continue;
+      if (gateQual[ph.label]) continue;            // cached for this wallet
+      try {
+        if (ph.kind === "coin") {
+          gateQual[ph.label] = { ok: await window.Launch.holdsToken(w.publicKey, ph.address, ph.min) };
+        } else {
+          var nft = await window.Launch.heldFromCollection(w.publicKey, ph.address, Number(ph.min || 1));
+          gateQual[ph.label] = { ok: !!nft, gateNft: nft };
+        }
+      } catch (e) { gateQual[ph.label] = { ok: false }; }
+    }
+    resolvePhase(); renderPhases();
+  }
+
   function phaseName(label) {
+    var ph = lists && (lists.phases || []).find(function (p) { return p.label === label; });
+    if (ph && ph.name) return ph.name;
     if (label === "pub") return "Public";
     var m = label.match(/^w(\d+)$/);
     return m ? "Wave " + m[1] : label;
@@ -407,16 +457,28 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
     box.innerHTML = state.groups.map(function (g) {
       var open = !g.opensAt || g.opensAt <= now;
       var mine = myPhase && myPhase.group === g.label;
-      var onList = null;
-      if (g.allowlisted && w && lists) {
-        var ph = (lists.phases || []).find(function (p) { return p.label === g.label; });
-        onList = !!(ph && ph.wallets && ph.wallets.indexOf(w.publicKey) >= 0);
+      // The gate that decides who mints comes from the pinned phase (its kind),
+      // NOT from g.allowlisted — that flag is only set for the wallet-merkle
+      // guard, so a token/collection wave would otherwise read as "everyone".
+      var ph = lists && (lists.phases || []).find(function (p) { return p.label === g.label; });
+      var who;
+      if (!ph) {
+        who = "everyone";
+      } else if (ph.kind === "wallets") {
+        var onList = w ? (ph.wallets || []).indexOf(w.publicKey) >= 0 : null;
+        who = onList === null ? "wallet allowlist"
+          : onList ? "you're on this list" : "not on this list";
+      } else if (ph.kind === "coin") {
+        var qc = gateQual[g.label];
+        who = "token holders" + (qc ? (qc.ok ? " · you qualify" : " · you don't hold enough") : "");
+      } else if (ph.kind === "nft") {
+        var qn = gateQual[g.label];
+        who = "collection holders" + (qn ? (qn.ok ? " · you qualify" : " · you don't hold it") : "");
+      } else {
+        who = "allowlist";
       }
       var status = open ? "open" : "opens " + new Date(g.opensAt).toLocaleTimeString(
         [], { hour: "numeric", minute: "2-digit" });
-      var who = g.allowlisted
-        ? (onList === null ? "allowlist" : onList ? "you're on this list" : "not on this list")
-        : "everyone";
       return '<div class="ph' + (open ? " open" : "") + (mine ? " mine" : "") + '">' +
         "<b>" + phaseName(g.label) + "</b><span>" + who +
         (g.priceSol != null ? " · " + (g.priceSol === 0 ? "free" : g.priceSol + " SOL") : "") +
@@ -489,8 +551,22 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
                  "It may be on a different network.");
       return;
     }
-    if (state.firstItemUri && /^https?:/.test(state.firstItemUri)) {
-      metaDir = state.firstItemUri.replace(/[^/]+$/, "");
+    // Authoritative: the machine's own prefixUri (the metadata dir). Fall back
+    // to stripping the filename off the first item's uri only if that is absent.
+    var rawDir = null;
+    if (state.prefixUri && /^https?:/.test(state.prefixUri)) {
+      rawDir = state.prefixUri.replace(/[^/]*$/, "");   // keep it ending in "/"
+    } else if (state.firstItemUri && /^https?:/.test(state.firstItemUri)) {
+      rawDir = state.firstItemUri.replace(/[^/]+$/, "");
+    }
+    // Read through our /m/ proxy, not a raw arweave.net hop: a fresh bundle
+    // 404s on arweave.net (and it caches that 404), while the proxy falls back
+    // across gateways and resolves the bundle manifest by data-item id — the
+    // difference between a mint page that finds its waves right after launch
+    // and one that shows "everyone" until the gateway catches up.
+    if (rawDir) {
+      var mm = /arweave\.net\/([\w-]{43})\//.exec(rawDir);
+      metaDir = mm ? location.origin + "/m/" + mm[1] + "/" : rawDir;
     }
     if (!nameSet) $("name").textContent = "Mint";
     $("creator").textContent = shortAddr(state.authority, 5);
@@ -502,6 +578,7 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
     render();
     renderPieces();
     arm();
+    checkGates();                                   // resolve collection/token waves, then re-pick
     // countdowns and phase openings resolve themselves without a reload
     setInterval(function () {
       resolvePhase(); renderPhases();
@@ -641,7 +718,7 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
 
   async function connect() {
     var w = await (window.Shell ? Shell.connect() : Promise.resolve(null));
-    if (w) { resolvePhase(); renderPhases(); arm(); }
+    if (w) { gateQual = {}; resolvePhase(); renderPhases(); arm(); checkGates(); }
   }
 
   /* The wallet can arrive without anyone clicking Connect: the shell restores
@@ -652,7 +729,8 @@ main{max-width:1400px;margin:0 auto;padding:34px 24px 90px}
    * switching accounts in their extension. */
   if (window.Wallet) {
     window.Wallet.on("change", function () {
-      resolvePhase(); renderPhases(); arm();
+      gateQual = {};                               // holdership is per wallet
+      resolvePhase(); renderPhases(); arm(); checkGates();
     });
   }
 

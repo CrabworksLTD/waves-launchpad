@@ -1,12 +1,20 @@
 /* WavesStake — browser client for the waves-staking program.
  *
- * The program (jt5JegTBVPZP8V6a48fnKYPFKTbpcTfkz91Pemur82H) is AUDITED (C-1 fixed,
- * M-1 resolved, 8/8 tests) and DEPLOYED IMMUTABLE on mainnet 2026-09-13. The PDA
- * seeds, account layouts and discriminators here match the audited src/lib.rs —
- * in particular Position now carries a `pool` field and the position PDA is
- * seeded [b"pos", pool, asset]. ⚠️ still to prove before pairing opens: an
- * end-to-end stake → sync → claim on mainnet, and the keeper fee→vault deposit
- * path. stake.html stays gated on PAIRING_LIVE until both are done.
+ * The program (jt5JegTBVPZP8V6a48fnKYPFKTbpcTfkz91Pemur82H) has C-1 fixed, M-1
+ * resolved, and is DEPLOYED IMMUTABLE on mainnet (2026-09-13). VERIFIED BUILD: a
+ * fresh compile of the current src/lib.rs reproduces the on-chain bytecode
+ * byte-for-byte (sha256 d4bccc29…), so the immutable program IS this source. The
+ * PDA seeds, account layouts and discriminators here match it — Position carries a
+ * `pool` field and the position PDA is seeded [b"pos", pool, asset].
+ *
+ * SELF-AUDIT (2026-09-13, this client — the program was reviewed separately):
+ *   • the reward vault is now READ from the pool account (pool.vault), never
+ *     re-derived — deriving assumed the classic token program and returned the
+ *     WRONG account for a Token-2022 reward (every xStock), showing zero earned.
+ *   • the STAKED token's program is resolved from the mint, not hardcoded classic.
+ * ⚠️ still to prove before pairing opens: a real end-to-end stake → sync → claim
+ * on mainnet + the keeper fee→vault deposit path. stake.html stays gated on
+ * PAIRING_LIVE until both are done.
  *
  * The port target: Moonpad's stake.js (EVM). Same page shape — earned/claim-all,
  * staked/weight/burned, per-asset rows — but wired to Anchor instructions and
@@ -59,9 +67,10 @@
     return X.PublicKey.findProgramAddressSync(
       [enc("pos"), pk(X, pool).toBuffer(), pk(X, asset).toBuffer()], pk(X, PROGRAM_ID))[0];
   }
-  // The reward vault is the pool PDA's associated token account for the reward
-  // mint (DESIGN.md: "a token account owned by the pool PDA"). The pool is off
-  // the ed25519 curve, so this is the off-curve ATA.
+  // ⚠️ DEPRECATED — assumes the CLASSIC token program, so it returns the wrong
+  // address for a Token-2022 reward (every xStock). Callers now read the pool
+  // account's stored `vault` field instead (authoritative for any program). Kept
+  // only so an external caller passing a known-classic reward still resolves.
   function vaultAta(X, rewardMint, pool) {
     return X.PublicKey.findProgramAddressSync(
       [pool.toBuffer(), pk(X, TOKEN_PROGRAM).toBuffer(), pk(X, rewardMint).toBuffer()],
@@ -171,16 +180,24 @@
       data: data(IX.init_pool)
     };
   }
-  function ixStake(X, a) {   // a: {pool, position, asset, tokenMint, stakerTokens, owner, amount}
+  function ixStake(X, a) {   // a: {pool, position, asset, tokenMint, stakerTokens, owner, amount, tokenProgram}
     return {
       programId: pk(X, PROGRAM_ID),
       keys: [
         key(X, a.pool, 0, 1), key(X, a.position, 0, 1), key(X, a.asset, 0, 0),
         key(X, a.tokenMint, 0, 1), key(X, a.stakerTokens, 0, 1), key(X, a.owner, 1, 1),
-        key(X, TOKEN_PROGRAM, 0, 0), key(X, SYS_PROGRAM, 0, 0)
+        key(X, a.tokenProgram || TOKEN_PROGRAM, 0, 0), key(X, SYS_PROGRAM, 0, 0)
       ],
       data: data(IX.stake, u64bytes(a.amount))
     };
+  }
+  // ownerAta under a specific token program (classic default; Token-2022 when the
+  // mint is owned by it). The plain ownerAta() assumes classic — fine for a claim
+  // destination the caller controls, but the STAKED token must use its own program.
+  function ownerAtaFor(X, mint, owner, tokenProgram) {
+    return X.PublicKey.findProgramAddressSync(
+      [pk(X, owner).toBuffer(), pk(X, tokenProgram).toBuffer(), pk(X, mint).toBuffer()],
+      pk(X, ATA_PROGRAM))[0];
   }
   function ixSync(X, a) {    // a: {pool, vault}
     return {
@@ -227,7 +244,11 @@
     var pool = poolPda(X, pair.tokenMint, pair.collection);
     var poolAcc = decodePool(await accountBytes(c, pool), X);
     if (!poolAcc) return { live: false };            // pool not initialised on this cluster
-    var vault = vaultAta(X, poolAcc.rewardMint, pool);
+    // Read the REAL vault from the pool account, never re-derive it: the reward
+    // mint may be Token-2022 (every xStock is), whose ATA lives under a different
+    // program than the classic one vaultAta() assumes — deriving it would read a
+    // non-existent account and show zero earned. (Same lesson as the keeper's M-10.)
+    var vault = pk(X, poolAcc.vault);
     var vaultBal = tokenAmount(await accountBytes(c, vault));
 
     var assets = owner ? await myAssets(pair.collection, owner) : [];
@@ -275,7 +296,11 @@
     if (!w) throw new Error("connect a wallet first");
     var owner = pk(X, w.publicKey.toBase58 ? w.publicKey.toBase58() : w.publicKey);
     var tx = new X.Transaction();
-    ixs.forEach(function (i) { tx.add(new X.TransactionInstruction(i)); });
+    // add the duck-typed {programId, keys, data} instructions directly — Transaction
+    // .add accepts these ctor-fields and coerces them. (The metaplex bundle this
+    // page loads does NOT export TransactionInstruction, so `new X.TransactionInstruction`
+    // threw "not a constructor".)
+    ixs.forEach(function (i) { tx.add(i); });
     tx.feePayer = owner;
     tx.recentBlockhash = (await c.getLatestBlockhash("confirmed")).blockhash;
     if (extraSigners && extraSigners.length) tx.partialSign.apply(tx, extraSigners);
@@ -329,14 +354,18 @@
 
   /* Burn `amount` (base units of the paired token) to add weight to one NFT. */
   async function stakeAction(pair, asset, amount) {
-    var X = await mx();
+    var X = await mx(), c = conn(X);
     var w = window.Wallet.current(); var owner = pk(X, w.publicKey.toBase58 ? w.publicKey.toBase58() : w.publicKey);
     var pool = poolPda(X, pair.tokenMint, pair.collection);
     var pos = positionPda(X, pool, asset);
-    var stakerTokens = ownerAta(X, pk(X, pair.tokenMint), owner);
+    // resolve the paired token's own program — it is classic SPL today, but the
+    // burn + the staker ATA must both use whatever program actually owns the mint.
+    var info = await c.getAccountInfo(pk(X, pair.tokenMint), "confirmed");
+    var tp = (info && info.owner && info.owner.toBase58() === TOKEN22_PROGRAM) ? TOKEN22_PROGRAM : TOKEN_PROGRAM;
+    var stakerTokens = ownerAtaFor(X, pk(X, pair.tokenMint), owner, tp);
     return signSend([ixStake(X, {
       pool: pool, position: pos, asset: pk(X, asset), tokenMint: pk(X, pair.tokenMint),
-      stakerTokens: stakerTokens, owner: owner, amount: amount
+      stakerTokens: stakerTokens, owner: owner, amount: amount, tokenProgram: tp
     })]);
   }
 
@@ -350,8 +379,8 @@
     // reward mint's token program (classic or Token-2022 for xStocks)
     var info = await c.getAccountInfo(rewardMint, "confirmed");
     var tp = (info && info.owner && info.owner.toBase58() === TOKEN22_PROGRAM) ? TOKEN22_PROGRAM : TOKEN_PROGRAM;
-    var vault = X.PublicKey.findProgramAddressSync(
-      [pool.toBuffer(), pk(X, tp).toBuffer(), rewardMint.toBuffer()], pk(X, ATA_PROGRAM))[0];
+    // authoritative vault from the pool account (not re-derived — see summary)
+    var vault = pk(X, poolAcc.vault);
     var dest = X.PublicKey.findProgramAddressSync(
       [owner.toBuffer(), pk(X, tp).toBuffer(), rewardMint.toBuffer()], pk(X, ATA_PROGRAM))[0];
     var pos = positionPda(X, pool, asset);
@@ -379,11 +408,23 @@
     myAssets: myAssets,
     // pda helpers (async so callers do not need the bundle)
     pdas: async function (pair, asset) {
-      var X = await mx();
+      var X = await mx(), c = conn(X);
       var pool = poolPda(X, pair.tokenMint, pair.collection);
+      // prefer the pool's stored vault (correct for Token-2022 rewards); fall back
+      // to deriving with the reward mint's own program only before the pool exists.
+      var poolAcc = decodePool(await accountBytes(c, pool), X);
+      var vault;
+      if (poolAcc) {
+        vault = poolAcc.vault;
+      } else {
+        var info = await c.getAccountInfo(pk(X, pair.rewardMint), "confirmed").catch(function () { return null; });
+        var tp = (info && info.owner && info.owner.toBase58() === TOKEN22_PROGRAM) ? TOKEN22_PROGRAM : TOKEN_PROGRAM;
+        vault = X.PublicKey.findProgramAddressSync(
+          [pool.toBuffer(), pk(X, tp).toBuffer(), pk(X, pair.rewardMint).toBuffer()], pk(X, ATA_PROGRAM))[0].toBase58();
+      }
       return {
         pool: pool.toBase58(),
-        vault: vaultAta(X, pair.rewardMint, pool).toBase58(),
+        vault: vault,
         position: asset ? positionPda(X, pool, asset).toBase58() : null
       };
     },

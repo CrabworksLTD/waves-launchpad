@@ -72,7 +72,8 @@ export default async function handler(req, res) {
   const keeper = body.keeper || process.env.FEE_KEEPER || "";
   const pct = Math.max(0, Math.min(100, parseInt(body.feeSharePct, 10) || 0));
   if (pct <= 0) return res.status(400).json({ error: "nothing would be shared" });
-  const mode = body.rewardMode === "burn" ? "burn" : "dividend";
+  const mode = body.rewardMode === "burn" ? "burn"
+    : body.rewardMode === "split" ? "split" : "dividend";
   const rewardMint = B58.test(body.rewardMint || "") ? body.rewardMint : null;
 
   try {

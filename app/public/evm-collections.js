@@ -43,7 +43,16 @@
   ];
   var arw = function (u) { return u && u.indexOf("ar://") === 0 ? "https://arweave.net/" + u.slice(5) : u; };
   var cidPath = function (u) { return u && u.indexOf("ipfs://") === 0 ? u.slice(7) : null; };
-  var imageUrl = function (u) { u = arw(u); var p = cidPath(u); return p ? GATEWAYS[0] + p : u; };
+  var imageUrl = function (u) {
+    u = arw(u);
+    var p = cidPath(u);
+    if (p) return GATEWAYS[0] + p;
+    // Arweave images go through our /m/ proxy: a fresh bundle 404s on
+    // arweave.net directly (and it caches the 404), so the pfp/banner would
+    // never appear in the first minutes of a launch.
+    var am = /^https?:\/\/arweave\.net\/([\w-]{43})\/(.+)$/.exec(u || "");
+    return am ? location.origin + "/m/" + am[1] + "/" + am[2] : u;
+  };
 
   function retrying(make, tries) {
     return make().catch(function (e) {

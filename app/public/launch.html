@@ -105,18 +105,41 @@ svg .df{stroke:var(--accent);stroke-dasharray:3 4}
         waves, team splits, a mint page the moment it's live.</p>
         <span class="cta">Launch a collection →</span>
       </a>
-      <div class="opt soon">
+      <div class="opt soon" id="pair-opt">
         <span class="ic"><svg width="30" height="30" viewBox="0 0 24 24">
           <rect class="ac" x="3" y="8" width="8" height="8"/>
           <path class="ac" d="M13 16 Q 17 14 19 9 T 21 4"/>
           <circle fill="var(--accent)" cx="21" cy="4" r="2"/></svg></span>
-        <h2>Pair <span class="badge">soon</span></h2>
+        <h2>Pair <span class="badge" id="pair-badge">soon</span></h2>
         <p>Collection and token together, with the token's trading fees going
         to holders who stake their pieces. It arrives with staking —
         the program is written and tested, and stays off mainnet until it has
         been audited.</p>
-        <span class="cta">Not open yet</span>
+        <span class="cta" id="pair-cta">Not open yet</span>
       </div>
+      <script>
+        /* Pairing is "soon" for the public, but an operator running ?pairtest=1
+           (see Shell.pairUnlocked) has it unlocked — turn this card into a real,
+           clickable launch entry. Waits for shell.js to define the helper. */
+        (function () {
+          function tryUnlock() {
+            try {
+              if (!(window.Shell && window.Shell.pairUnlocked && window.Shell.pairUnlocked())) return false;
+              var card = document.getElementById("pair-opt");
+              if (!card) return true;
+              card.classList.remove("soon");
+              var b = document.getElementById("pair-badge"); if (b) b.remove();
+              var cta = document.getElementById("pair-cta"); if (cta) cta.textContent = "Launch a pair →";
+              card.style.cursor = "pointer";
+              card.addEventListener("click", function () { location.href = "/app?launch=pair"; });
+              return true;
+            } catch (e) { return false; }
+          }
+          if (!tryUnlock()) {
+            var n = 0, t = setInterval(function () { if (tryUnlock() || ++n > 40) clearInterval(t); }, 100);
+          }
+        })();
+      </script>
     </div>
     <p class="trust">Everything deploys from your own wallet. We never hold your
     art, your money or your collection.</p>

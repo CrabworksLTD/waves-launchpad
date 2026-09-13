@@ -1,5 +1,19 @@
 (function () {
   "use strict";
+
+  /* The site origin metadata URLs point at. Metadata is served through OUR /m/
+     path (api/meta.js), not arweave.net directly, so a fresh launch shows its art
+     in wallets IMMEDIATELY — /m/ answers from whichever gateway (incl. the Turbo
+     cache) actually has the bytes, while arweave.net can lag minutes-to-hours on a
+     fresh bundle. The bytes are still permanent on Arweave; this only changes which
+     door callers knock on. On localhost it must be the prod domain (a localhost URL
+     baked on-chain is fetchable by nobody). Same reasoning as the token side. */
+  function SITE_ORIGIN() {
+    return /^(localhost|127\.|\[::1\])/.test(window.location.hostname)
+      ? "https://www.waveslaunchpad.xyz" : window.location.origin;
+  }
+  function mUrl(cid, file) { return SITE_ORIGIN() + "/m/" + cid + "/" + file; }
+
   // Upload a generated collection to Arweave. The creator supplies nothing —
   // no account, no key, nothing pasted.
   //
@@ -265,7 +279,7 @@
   function repoint(metadata, imageCid) {
     return metadata.map(function (f) {
       var j = JSON.parse(f.text);
-      j.image = "https://arweave.net/" + imageCid + "/" + f.id + ".png";
+      j.image = mUrl(imageCid, f.id + ".png");
       if (j.properties && j.properties.files && j.properties.files[0]) {
         j.properties.files[0].uri = j.image;
       }
@@ -382,8 +396,8 @@
       if (opts.description) col.description = opts.description;
       // No uploaded picture does not mean no picture: the collection's own
       // first token stands in.
-      col.image = "https://arweave.net/" + imageCid + (opts.avatar ? "/_avatar.png" : "/1.png");
-      if (opts.banner) col.banner = "https://arweave.net/" + imageCid + "/_banner.png";
+      col.image = mUrl(imageCid, opts.avatar ? "_avatar.png" : "1.png");
+      if (opts.banner) col.banner = mUrl(imageCid, "_banner.png");
       if (opts.links && opts.links.website) col.external_url = opts.links.website;
       col.properties = {
         files: [{ uri: col.image, type: "image/png" }],
@@ -416,23 +430,22 @@
     var ret = {
       imageCid: imageCid,
       metadataCid: metaCid,
-      // Plain https, not ar://: wallets and marketplace indexers do not speak
-      // the ar scheme, and a blank image in a wallet is a real cost paid daily
-      // for a purity nobody sees. arweave.net is the canonical gateway.
-      baseUri: "https://arweave.net/" + metaCid + "/",
-      collectionUri: "https://arweave.net/" + metaCid + "/_collection.json",
-      preview: "https://arweave.net/" + metaCid + "/1.json",
-      index: "https://arweave.net/" + metaCid + "/_index.json",
-      // imageCid-based, so these are the SAME urls _collection.json writes for
-      // col.image / col.banner. That match matters: the mirror is keyed by the
-      // arweave path, so the copy stored here is found when a page asks for the
-      // exact url the metadata points at. (They used to be metaCid-based, which
-      // keyed the mirror somewhere no page ever requested — a silent miss.)
-      avatarUri: opts.avatar
-        ? "https://arweave.net/" + imageCid + "/_avatar.png"
-        : "https://arweave.net/" + imageCid + "/1.png",
-      bannerUri: opts.banner ? "https://arweave.net/" + imageCid + "/_banner.png" : null,
-      cardUri: opts.card ? "https://arweave.net/" + metaCid + "/_card.png" : null
+      // Served through OUR /m/ path (api/meta.js), not arweave.net — so wallets
+      // and aggregators that fetch a fresh launch's metadata get the art NOW
+      // (from whichever gateway/Turbo cache has it) instead of a blank while
+      // arweave.net catches up. The bytes stay permanent on Arweave; /m/ tries it
+      // first and this becomes a pass-through once it serves.
+      baseUri: mUrl(metaCid, ""),
+      collectionUri: mUrl(metaCid, "_collection.json"),
+      preview: mUrl(metaCid, "1.json"),
+      index: mUrl(metaCid, "_index.json"),
+      // imageCid-based, and the SAME urls _collection.json writes for col.image /
+      // col.banner (both mUrl now). That match matters: the mirror is keyed by the
+      // path, so the copy stored here is found when a page asks for the exact url
+      // the metadata points at.
+      avatarUri: opts.avatar ? mUrl(imageCid, "_avatar.png") : mUrl(imageCid, "1.png"),
+      bannerUri: opts.banner ? mUrl(imageCid, "_banner.png") : null,
+      cardUri: opts.card ? mUrl(metaCid, "_card.png") : null
     };
     mirror(ret.avatarUri, opts.avatar || (files[0] && files[0].bytes));
     mirror(ret.cardUri, opts.card);

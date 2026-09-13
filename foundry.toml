@@ -12,7 +12,7 @@ optimizer_runs = 44444444
 evm_version = "paris"
 # The V4-hook curve compiles only under [profile.v4] (solc 0.8.26 + cancun).
 # Skip it here so the standalone-curve pipeline is byte-identical to before.
-skip = ["contracts/WavesCurveHook.sol", "contracts/WavesHookRouter.sol", "contracts/v4lib/*", "test/WavesCurveHook.t.sol", "test/WavesHookRouter.t.sol", "script/DeployWavesCurveHook.s.sol", "script/DeployWavesHookRouter.s.sol"]
+skip = ["contracts/WavesCurveHook.sol", "contracts/WavesHookRouter.sol", "contracts/WavesSellRouter.sol", "contracts/v4lib/*", "test/WavesCurveHook.t.sol", "test/WavesHookRouter.t.sol", "test/WavesCurveHookQuote.t.sol", "test/WavesAudit.t.sol", "test/WavesQuoteAggregator.t.sol", "test/WavesCurveHookQuote.fork.t.sol", "test/WavesSellRouter.fork.t.sol", "script/DeployWavesCurveHook.s.sol", "script/DeployWavesHookRouter.s.sol", "script/RegisterWavesQuotes.s.sol", "script/DeployWavesSellRouter.s.sol"]
 # The launch path carries five strings now (name, symbol, logo, description,
 # socials) and the legacy pipeline runs out of stack slots. viaIR is the
 # supported answer and keeps launch() flat, which matters: the browser
@@ -48,5 +48,11 @@ out = "forge-out-v4"
 libs = ["lib"]
 evm_version = "cancun"
 optimizer = true
-optimizer_runs = 44444444
+# ⚠️ Low run count OPTIMISES FOR SIZE, not gas. The quote-asset hook's added
+# logic (registry, order-aware key + graduation) pushed the deployed bytecode
+# past EIP-170's 24,576-byte limit at 44,444,444 runs. A launchpad hook is
+# deployed once and called forever, so trading a little runtime gas for fitting
+# under the limit is the right trade. Re-mine the hook address after any change
+# here — the bytecode (and thus the CREATE2 address) moves with it.
+optimizer_runs = 200
 via_ir = true

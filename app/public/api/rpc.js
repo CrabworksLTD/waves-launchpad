@@ -45,12 +45,15 @@ const ALLOW = new Set([
   "getEpochInfo",
   "getVersion",
   "getGenesisHash",
-  "getProgramAccounts"
+  "getProgramAccounts",
+  // DAS (Helius) — the staking page lists a wallet's NFTs in a collection with
+  // searchAssets; getAsset*/getAssetsBy* already pass via the /^get[A-Z]/ class.
+  "searchAssets"
 ]);
 
 /* The calls that cost far more than an ordinary read: these scan or walk rather
  * than fetch one account, and are what a bill-running attack would reach for. */
-const HEAVY = new Set(["getProgramAccounts", "getSignaturesForAddress", "getBlock", "getBlocks"]);
+const HEAVY = new Set(["getProgramAccounts", "getSignaturesForAddress", "getBlock", "getBlocks", "searchAssets"]);
 
 /* Writes are named explicitly; reads are allowed as a class.
  *

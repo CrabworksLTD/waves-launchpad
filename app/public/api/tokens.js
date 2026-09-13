@@ -134,6 +134,13 @@ export default async function handler(req, res) {
          * launch window opens on — so falling through to "dividend" recorded
          * the opposite of what most launches chose. */
         rewardMode: ["burn", "keep", "none", "split"].includes(body.rewardMode) ? body.rewardMode : "dividend",
+        /* Solana LaunchLab fee tier. Drives which platform-config the keeper
+         * claims from (standard needs no keeper forward). EVM/Meteora records
+         * default to standard, which is correct — they have no ladder. */
+        tier: ["standard", "t2", "t3", "t4", "t5"].includes(body.tier) ? body.tier : "standard",
+        // per-NFT burn-to-activate amount (paired launches) — the staking page
+        // defaults its stake input to this. A positive number or null.
+        burn: (Number.isFinite(+body.burn) && +body.burn > 0) ? +body.burn : null,
         // only arweave art, never an arbitrary URL someone POSTs at us
         card: okArt(body.card),
         icon: okArt(icon), banner: okArt(banner),
@@ -163,9 +170,20 @@ export default async function handler(req, res) {
          * forwards fees into. rh-keeper-nft.js reads all three to know a token
          * is its to service; the claim page reads vault + pairedCollection. */
         keeper: body.keeper === "nft" ? "nft" : null,
-        pairedCollection: (body.pairedCollection && EVM.test(body.pairedCollection))
-          ? String(body.pairedCollection).toLowerCase() : null,
-        vault: (body.vault && EVM.test(body.vault)) ? String(body.vault).toLowerCase() : null,
+        /* An address is base58 (Solana) OR 0x (Robinhood), by chain — same split
+         * as mint/creator above. The Solana LaunchLab keeper reads pairedCollection
+         * to derive the staking pool PDA, so validating it EVM-only silently nulled
+         * every Solana pair (and lowercasing would corrupt a base58 pubkey). */
+        pairedCollection: body.pairedCollection
+          ? (isEvm
+              ? (EVM.test(body.pairedCollection) ? String(body.pairedCollection).toLowerCase() : null)
+              : (B58.test(body.pairedCollection) ? String(body.pairedCollection) : null))
+          : null,
+        vault: body.vault
+          ? (isEvm
+              ? (EVM.test(body.vault) ? String(body.vault).toLowerCase() : null)
+              : (B58.test(body.vault) ? String(body.vault) : null))
+          : null,
         at: Date.now()
       };
       /* Maintenance correction. Filling blanks is open to anyone (it cannot

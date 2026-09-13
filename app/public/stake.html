@@ -120,6 +120,11 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   holding your assets — and claim rewards in whatever the creator chose: SOL, USDC, or
   tokenized stocks and gold.</p>
 
+  <!-- Robinhood claim view: a specific paired vault (?vault=/?collection=/?token=
+       with a 0x address) renders its live activate/claim UI here, and the Solana
+       preview + directory below are hidden. See the loader script at the foot. -->
+  <div id="es-root" hidden></div>
+
   <div class="soon"><b>In development.</b>
     <span>The staking program is being built and will be audited before it touches real
     money. Everything below is the real interface, parked until then.</span>
@@ -128,13 +133,13 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
 
   <div class="how">
     <div class="step"><i>1</i><b>Burn to activate</b>
-      <p>Send the paired token to the program — it burns, permanently, and your NFT's
-      tier rises with the amount. Selling the NFT ends its activation.</p></div>
+      <p>Burn the amount the creator set to switch an NFT on. The token is gone for
+      good; your NFT stays in your wallet. Selling it ends its activation.</p></div>
     <div class="step"><i>2</i><b>Fees accrue</b>
-      <p>Every trade of the paired token pays its creator share into the reward vault.
-      The keeper converts it to the reward asset on a schedule.</p></div>
+      <p>Every trade of the paired token pays its creator share into the reward vault,
+      forwarded there by the keeper on a schedule.</p></div>
     <div class="step"><i>3</i><b>Claim</b>
-      <p>Rewards split across activated NFTs by tier weight. Claim whenever —
+      <p>Fees split equally across every activated NFT. Claim whenever —
       what you've earned is yours, tracked on chain.</p></div>
   </div>
 
@@ -145,8 +150,8 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
         <button class="go" disabled>Claim all</button>
       </div>
       <div class="statrow">
-        <div><span>Your staked</span><b>—</b></div>
-        <div><span>Your weight</span><b>—</b></div>
+        <div><span>NFTs held</span><b>—</b></div>
+        <div><span>Activated</span><b>—</b></div>
         <div><span>Your burned</span><b>—</b></div>
       </div>
     </div>
@@ -159,15 +164,17 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
     </div>
 
     <div class="card sfoot">
-      <span class="earn-lab">Stake all at once</span>
-      <button class="go" disabled>Stake all</button>
+      <span class="earn-lab">Activate all your NFTs at once</span>
+      <button class="go" disabled>Activate all</button>
     </div>
   </div>
 
   <section class="pairs">
     <h2 class="disp">Live pairs</h2>
-    <p class="sub">Collections launched with a paired token — these light up first
-    when staking ships.</p>
+    <p class="sub">Collections launched with a paired token — search by name, ticker
+    or collection address.</p>
+    <input id="pairsearch" type="text" placeholder="Search live pairs…" autocomplete="off"
+      style="width:100%;max-width:420px;margin:0 0 16px;padding:11px 14px;border-radius:10px;border:1px solid var(--line2);background:var(--panel2);color:var(--ink);font:400 14px Inter,sans-serif">
     <div id="pairs"></div>
   </section>
 </main>
@@ -176,6 +183,39 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
 <script src="/ui.js"></script>
 <script src="/wallet.js"></script>
 <script src="/shell.js"></script>
+<script>
+/* Robinhood claim view. A ?vault=/?collection=/?token= 0x target means a real
+ * paired vault to act on — load the EVM stack + evm-stake.js, render into
+ * #es-root, and stand down the Solana preview/directory (which the inline below
+ * skips when __EVM_STAKE is set). Solana (base58) params fall through untouched. */
+(function () {
+  var q = new URLSearchParams(location.search);
+  var t = q.get("vault") || q.get("collection") || q.get("token") || "";
+  if (!/^0x[0-9a-fA-F]{40}$/.test(t)) return;
+  window.__EVM_STAKE = 1;
+  function load(src) {
+    return new Promise(function (res, rej) {
+      var s = document.createElement("script");
+      s.src = src; s.onload = res; s.onerror = function () { rej(new Error("failed " + src)); };
+      document.head.appendChild(s);
+    });
+  }
+  window.addEventListener("DOMContentLoaded", function () {
+    ["soon", "how", "preview", "pairs"].forEach(function (c) {
+      var el = document.querySelector("." + c); if (el) el.hidden = true;
+    });
+    var root = document.getElementById("es-root"); if (root) root.hidden = false;
+    if (window.Shell) window.Shell.mount({ active: "explore", search: false });
+    (window.Shell ? window.Shell.ensureEvmStack() : Promise.resolve())
+      .then(function () {
+        return ["/evm-contract.js", "/evm-collections.js", "/vault.js", "/evm-stake.js"]
+          .reduce(function (p, s) { return p.then(function () { return load(s); }); }, Promise.resolve());
+      })
+      .then(function () { if (window.EvmStakePage) window.EvmStakePage.init(); })
+      .catch(function () {});
+  });
+})();
+</script>
 <!-- The staking client, loaded but dormant: this page stays a preview and does
      not call its action methods. window.WavesStake is available for read-only
      testing (WavesStake.live(), .summary(pair, owner)) once the program is on a
@@ -184,32 +224,191 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
 <script>
 (function () {
   "use strict";
+  if (window.__EVM_STAKE) return;   // the Robinhood claim view owns the page
   var esc = UI.esc, shortAddr = UI.shortAddr;
   Shell.mount({ active: "explore", search: false });
 
-  /* The one real dataset: launches that recorded a paired collection. */
-  fetch("/api/tokens").then(function (r) { return r.json(); })
-    .then(function (j) { return (j.tokens || []).filter(function (t) { return t.collection; }); })
-    .catch(function () { return []; })
-    .then(function (pairs) {
-      var box = document.getElementById("pairs");
-      if (!pairs.length) {
-        box.innerHTML = '<div class="none">No pairs launched yet — ' +
-          '<a href="/launch?mode=pair">launch the first</a> and its holders are ' +
-          "first in line.</div>";
-        return;
-      }
-      box.innerHTML = pairs.map(function (t) {
-        var sym = (t.symbol || "?").toUpperCase();
-        return '<a class="prow" href="/token/' + esc(t.mint) + '">' +
-          '<span class="coin">' + (t.icon
-            ? '<img alt="" src="' + esc(t.icon) + '">' : esc(sym.slice(0, 1))) + "</span>" +
-          '<span class="who"><b>$' + esc(sym) + " · " + esc(t.name) + "</b>" +
-          '<span>paired with collection <span class="mono">' +
-          esc(shortAddr(t.collection)) + "</span></span></span>" +
-          '<span class="st">STAKING SOON</span></a>';
-      }).join("");
+  var q = new URLSearchParams(location.search);
+  var B58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+  // a specific pair to stake against: ?token=<mint>&collection=<coll>[&reward=<mint>][&sym=]
+  var pair = (B58.test(q.get("token") || "") && B58.test(q.get("collection") || ""))
+    ? { tokenMint: q.get("token"), collection: q.get("collection"),
+        rewardMint: B58.test(q.get("reward") || "") ? q.get("reward") : null, sym: q.get("sym") || "" }
+    : null;
+
+  var DEC = 6; // demo tokens/reward are 6-dec; xStocks (8/T22) would format differently
+  function fmt(bi) {
+    var s = (bi || 0n).toString(); while (s.length <= DEC) s = "0" + s;
+    var i = s.slice(0, s.length - DEC), f = s.slice(s.length - DEC).replace(/0+$/, "");
+    return f ? i + "." + f : i;
+  }
+  function owner() {
+    var w = window.Wallet && window.Wallet.current && window.Wallet.current();
+    return w ? (w.publicKey.toBase58 ? w.publicKey.toBase58() : String(w.publicKey)) : null;
+  }
+
+  /* the parked directory — shown when the program isn't on this cluster or no
+   * pair is targeted. Real records from /api/tokens. */
+  var _allPairs = [];
+  function paintDirectory() {
+    var box = document.getElementById("pairs");
+    if (!box) return;
+    var qv = ((document.getElementById("pairsearch") || {}).value || "").trim().toLowerCase();
+    var pairs = !qv ? _allPairs : _allPairs.filter(function (t) {
+      return (String(t.symbol || "") + " " + String(t.name || "") + " " + String(t.collection || "") + " " + String(t.mint || "")).toLowerCase().indexOf(qv) >= 0;
     });
+    if (!_allPairs.length) {
+      box.innerHTML = '<div class="none">No pairs launched yet — ' +
+        '<a href="/launch?mode=pair">launch the first</a> and its holders are first in line.</div>';
+      return;
+    }
+    if (!pairs.length) { box.innerHTML = '<div class="none">No pairs match “' + esc(qv) + '”.</div>'; return; }
+    box.innerHTML = pairs.map(function (t) {
+      var sym = (t.symbol || "?").toUpperCase();
+      var href = "/stake?token=" + esc(t.mint) + "&collection=" + esc(t.collection) + "&sym=" + esc(sym);
+      return '<a class="prow" href="' + href + '">' +
+        '<span class="coin">' + (t.icon ? '<img alt="" src="' + esc(t.icon) + '">' : esc(sym.slice(0, 1))) + "</span>" +
+        '<span class="who"><b>$' + esc(sym) + " · " + esc(t.name) + "</b>" +
+        '<span>paired with collection <span class="mono">' + esc(shortAddr(t.collection)) + "</span></span></span>" +
+        '<span class="st">STAKE →</span></a>';
+    }).join("");
+  }
+  function directory() {
+    var si = document.getElementById("pairsearch");
+    if (si && !si._wired) { si._wired = 1; si.addEventListener("input", paintDirectory); }
+    fetch("/api/tokens").then(function (r) { return r.json(); })
+      .then(function (j) { return (j.tokens || []).filter(function (t) { return t.collection; }); })
+      .catch(function () { return []; })
+      .then(function (pairs) { _allPairs = pairs; paintDirectory(); });
+  }
+
+  function enable(btn) { if (btn) { btn.disabled = false; btn.style.cursor = "pointer"; btn.style.opacity = "1"; } }
+
+  // the pair's launch record (reward mint + creator's burn-to-activate), cached.
+  var _rec = null;
+  async function pairRecord() {
+    if (_rec) return _rec;
+    try {
+      var j = await fetch("/api/tokens").then(function (r) { return r.json(); });
+      _rec = (j.tokens || []).filter(function (t) { return t.mint === pair.tokenMint; })[0] || {};
+    } catch (e) { _rec = {}; }
+    return _rec;
+  }
+  async function recordedRewardMint() {
+    if (pair.rewardMint) return pair.rewardMint;
+    var rec = await pairRecord();
+    if (rec.rewardMint && B58.test(rec.rewardMint)) return rec.rewardMint;
+    return "So11111111111111111111111111111111111111112"; // WSOL default
+  }
+
+  async function render() {
+    var s;
+    try { s = await WavesStake.summary(pair, owner()); } catch (e) { s = { live: false }; }
+    if (!s.live) {
+      /* The pool doesn't exist yet — its creation at launch is best-effort, so a
+         missed second wallet prompt leaves the token live but the pool absent.
+         The creator (or anyone) can create it here; it's a one-time, permissionless
+         init that just needs a wallet to sign. */
+      var pv = document.querySelector(".preview");
+      pv.innerHTML =
+        '<div class="card"><div class="none">This pair has no staking pool yet.' +
+        '<div style="margin-top:14px"><button id="mkpool" class="sbtn" style="cursor:pointer">Create the reward pool</button></div>' +
+        '<div id="mkpool-msg" style="margin-top:10px;font-size:12px;color:var(--faint)"></div></div></div>';
+      var mk = document.getElementById("mkpool");
+      mk.onclick = async function () {
+        if (!window.Wallet || !window.Wallet.current || !window.Wallet.current()) { alert("Connect a wallet first (top right)."); return; }
+        mk.disabled = true; mk.textContent = "Confirm in your wallet…";
+        var msg = document.getElementById("mkpool-msg");
+        try {
+          var rewardMint = await recordedRewardMint();
+          var r = await WavesStake.initPool({ tokenMint: pair.tokenMint, collection: pair.collection, rewardMint: rewardMint });
+          if (msg) msg.textContent = "Pool created — vault " + shortAddr(r.vault) + ". Loading…";
+          await render();
+        } catch (e) {
+          mk.disabled = false; mk.textContent = "Create the reward pool";
+          if (msg) msg.textContent = "Failed: " + (e && e.message ? e.message : e);
+        }
+      };
+      return;
+    }
+    if (!pair.rewardMint) pair.rewardMint = s.rewardMint;
+
+    var earnB = document.querySelector(".earnrow b"); if (earnB) earnB.textContent = fmt(s.earned);
+    var stats = document.querySelectorAll(".statrow b");
+    if (stats[0]) stats[0].textContent = s.positions.length;
+    if (stats[1]) stats[1].textContent = s.staked;
+    if (stats[2]) stats[2].textContent = fmt(s.yourBurned);
+
+    var slist = document.querySelector(".slist");
+    if (!owner()) { slist.innerHTML = '<div class="none">Connect your wallet (top right) to stake your NFTs.</div>'; return; }
+    if (!s.positions.length) { slist.innerHTML = '<div class="none">You hold no NFTs from this collection.</div>'; return; }
+
+    // default the burn field to the amount the creator set at launch (recorded on
+    // the token). It's the "burn to activate" per NFT; falls back to 1000.
+    var rec = await pairRecord();
+    var burnDefault = (rec && Number(rec.burn) > 0) ? Number(rec.burn) : 100000;
+
+    slist.innerHTML = s.positions.map(function (p) {
+      var on = p.staked;
+      return '<div class="srow" data-asset="' + esc(p.asset) + '">' +
+        '<div class="sthumb">' + esc((pair.sym || "#").slice(0, 2)) + '</div>' +
+        '<div class="sname"><b>' + esc(shortAddr(p.asset)) + '</b>' +
+        '<span class="sstate' + (on ? ' on' : '') + '">' + (on ? 'ACTIVATED' : 'not activated') + '</span></div>' +
+        '<div class="sweight">' + fmt(p.pending) + '</div>' +
+        (on
+          ? '<button class="sbtn" data-act="claim">Claim</button>'
+          : '<span style="display:flex;gap:6px"><input class="samt" type="number" value="' + burnDefault + '" min="1" style="width:90px;padding:9px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);color:var(--ink)"><button class="sbtn" data-act="stake">Burn</button></span>') +
+        '</div>';
+    }).join("");
+
+    slist.querySelectorAll(".srow").forEach(function (row) {
+      var asset = row.getAttribute("data-asset");
+      var btn = row.querySelector(".sbtn"); enable(btn);
+      btn.onclick = async function () {
+        if (!window.Wallet.current()) { alert("Connect a wallet first."); return; }
+        var isStake = btn.getAttribute("data-act") === "stake";
+        var lbl = btn.textContent; btn.disabled = true; btn.textContent = "Confirm in wallet…";
+        try {
+          if (isStake) {
+            var v = Number(row.querySelector(".samt").value || 0);
+            if (!(v > 0)) throw new Error("enter an amount");
+            await WavesStake.stake(pair, asset, BigInt(Math.round(v * 1e6)));
+          } else {
+            await WavesStake.claim(pair, asset);
+          }
+          /* No manual refresh: the tx confirmed, but the RPC read can lag a beat, so
+             poll the pair until it reflects the change and repaint automatically.
+             Optimistically flip the row's label right away for instant feedback. */
+          var st = row.querySelector(".sstate");
+          if (isStake && st) { st.textContent = "ACTIVATED"; st.classList.add("on"); }
+          btn.textContent = isStake ? "Activating…" : "Updating…";
+          for (var i = 0; i < 12; i++) {
+            var s = null; try { s = await WavesStake.summary(pair, owner()); } catch (e) {}
+            var p = (s && s.positions) ? s.positions.filter(function (x) { return x.asset === asset; })[0] : null;
+            var reflected = isStake ? (p && p.staked) : (p && (!p.pending || p.pending === 0n));
+            if (reflected) { await render(); return; }
+            await new Promise(function (r) { setTimeout(r, 1000); });
+          }
+          await render();   // fallback once the poll window elapses
+        } catch (e) { alert("Failed: " + (e && e.message ? e.message : e)); btn.disabled = false; btn.textContent = lbl; }
+      };
+    });
+  }
+
+  (async function boot() {
+    // operators with pairing unlocked get the working page, not the "coming" banner
+    var unlocked = false;
+    try { unlocked = !!(window.Shell && window.Shell.pairUnlocked && window.Shell.pairUnlocked()); } catch (e) {}
+    if (unlocked) { var sn = document.querySelector(".soon"); if (sn) sn.hidden = true; }
+    var live = false;
+    try { live = await WavesStake.live(); } catch (e) {}
+    if (!live || !pair) { directory(); return; }        // preview + directory (e.g. mainnet)
+    var soon = document.querySelector(".soon"); if (soon) soon.hidden = true;
+    directory();                                        // still show other pairs below
+    await render();
+    // refresh when the wallet connects/changes
+    if (window.Wallet && window.Wallet.on) window.Wallet.on("change", function () { render(); });
+  })();
 })();
 </script>
 </body>

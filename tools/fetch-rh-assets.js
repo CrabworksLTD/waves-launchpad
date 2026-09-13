@@ -69,6 +69,28 @@ const COMMODITIES = new Set([
   "URA", "URNM"                           // uranium
 ]);
 
+/* Crypto assets, by TICKER — the same presentational allowlist as COMMODITIES,
+ * and gated the same way: an asset only reaches this test once it has already
+ * passed the "• Robinhood Token" identity check, so a spoofed ERC20 called
+ * "BTC" can never be tagged crypto here. It only RE-labels Robinhood-issued
+ * crypto (Zcash is on the chain today) so it lands under a Crypto tab instead
+ * of Stocks & ETFs.
+ *
+ * Tickers not yet on the chain are pre-listed — as the commodities are — so a
+ * later run picks them up the moment Robinhood tokenises them, no edit needed.
+ * The bet: a crypto bull market brings the majors on-chain, and WAVES should be
+ * ready to pair against them the day they list. */
+const CRYPTO = new Set([
+  "BTC", "WBTC", "CBBTC", "TBTC",          // bitcoin
+  "SOL", "WSOL", "MSOL", "JITOSOL",        // solana
+  "DOGE", "SHIB", "PEPE", "WIF", "BONK",   // memecoins
+  "XRP", "ADA", "AVAX", "DOT", "MATIC",    // majors
+  "LINK", "UNI", "AAVE", "LTC", "BCH",     // majors
+  "XLM", "ATOM", "NEAR", "APT", "SUI",     // majors
+  "ZEC", "XMR", "DASH",                    // privacy
+  "TRX", "TON", "ICP", "FIL", "HBAR"       // more majors
+]);
+
 const STABLES = {
   "0x5fc5360d0400a0fd4f2af552add042d716f1d168": "USDG"
 };
@@ -231,6 +253,7 @@ async function onChain(address) {
       pools: info.liquidity,
       // Robinhood's own tokenised equities say so in their name
       kind: !isReal ? "stable"
+          : CRYPTO.has(chain.symbol) ? "crypto"
           : COMMODITIES.has(chain.symbol) ? "commodity"
           : "equity"
     };
@@ -276,8 +299,8 @@ async function onChain(address) {
   }
 
   out.sort((a, b) => {
-    // native first, then stablecoins, then equities by how widely they trade
-    const rank = (t) => ({ native: 0, stable: 1, commodity: 2 }[t.kind] ?? 3);
+    // native first, then stablecoins, then crypto, commodities, then equities
+    const rank = (t) => ({ native: 0, stable: 1, crypto: 2, commodity: 3 }[t.kind] ?? 4);
     return rank(a) - rank(b) || b.pools - a.pools || a.symbol.localeCompare(b.symbol);
   });
   fs.writeFileSync(OUT, JSON.stringify({

@@ -132,7 +132,7 @@ window.MOONPAD_PONS_URL = function (token) {
     : "https://www.ponsfamily.com/launchpad";
 };
 
-window.MOONPAD_MINT_SIGNER = "0x544acca55fb1063280cb1937e8c145ad783788b4";
+window.MOONPAD_MINT_SIGNER = "0x09Bc41fdec65a38fbc38187961ede146E766EC90";
 
 window.MOONPAD_CHAINS = [
   {
@@ -183,18 +183,39 @@ window.MOONPAD_CHAINS = [
      * (tx 0xffc3ecd3…df0f95f, block 55547961, status success → the RH
      * PoolManager accepts the 0x2888 hook bits).
      *
-     * ⚠️ Recorded, NOT yet the active launch path. No page loads evm-hook.js
-     * yet, so launches still go through `curve` above. Flipping to the hook is a
-     * deliberate later step and is gated on a PUBLIC V4 swap router on this chain
-     * (see `v4Router`, still null) — without it, buy/sell from the UI can't route.
-     * Do a throwaway test launch on the hook to prove initialize() before flip. */
-    hook: "0xA02AAaCb311F49e7f55c4dF5b40b3cFCe0D76888",
+     * ✅ LIVE launch/trade path. shell.js loads evm-hook.js (window.MoonpadToken),
+     * so launches open a V4 pool on this hook and buy/sell route through
+     * `v4Router` below. Proven on mainnet: quoted pairs (e.g. $RWATEST/F,
+     * $USTEST/USDG) launched, traded and priced through it. The standalone
+     * `curve` above is retired from the live path (admin deploy pages only). */
+    hook: "0x2FB405448DfD5606c1d17f75E7e71BCEbE6b6888",
     // Public V4 swap router for hook buy/sell (contracts/WavesHookRouter.sol).
     // Deployed + on-chain-verified 2026-09-05 (tx 0xc5ae079e…ee24bd7e); its
     // manager()/hook() immutables confirmed pointing at the PoolManager above and
     // the `hook` here. Ownerless, holds no funds. evm-hook.js buy()/sell() route
     // through it. Plain CREATE, so this address is specific to that deploy.
-    v4Router: "0x29b0638dd7fcd8f829fed7cd2a10830a6c1faa27",
+    v4Router: "0x4b6902a85e30564571fb49173a938bec5ce1e3f3",
+
+    /* ✅ These `hook` + `v4Router` ARE the RWA-quote deploys (new ABI); quoted
+     * launches work against them (proven on mainnet). If the hook bytecode ever
+     * changes again it mines a new address and both must be re-updated here. */
+
+    /* ETH -> quote swap router (contracts/WavesSwapRouter.sol) — turns a buyer's
+     * or dev's ETH into the pool's quote asset so nobody has to hand-buy the
+     * stock first. ETH-in only, holds no funds. This is the SAME contract as the
+     * keeper's SWAP_ROUTER; set it to that deployed address (the keeper env has
+     * the full value). Null keeps quoted-pool ETH zaps disabled until then. */
+    v4Swap: "0x39add3410af091e4c6c254da0f861cb10a441361",
+    // WavesQuoteAggregator (contracts/WavesQuoteAggregator.sol) — one-tx ETH zap:
+    // ETH -> quote (via v4Swap) -> token (via v4Router). Null until deployed;
+    // evm-hook.js buy() falls back to an error for quoted pools while unset.
+    aggregator: "0xc2633cba520df9ae4ba715bfab41fc070622fc04",
+
+    // WavesSellRouter — sell a quote-paired token straight to ETH (token ->
+    // quote -> ETH). While unset, a non-ETH-quoted sell falls back to the hook
+    // router and returns the quote asset (safe, old behaviour). Deployed +
+    // on-chain-verified (manager + hookRouter immutables match).
+    sellRouter: "0x6f887ba9350eea7cab0ef7739ae19b7f6649a093",
 
     /* Who receives a creator's pledged share, and pays it out to holders.
      *
@@ -203,6 +224,14 @@ window.MOONPAD_CHAINS = [
      * permanent for every token that pledges to it — the fee page refuses to
      * offer the button while this is unset rather than guessing. */
     rewardsKeeper: "0xAcA1d1bE05f47090a6d8D918AB26d4543fD3Af81",
+
+    /* The SEPARATE keeper for NFT-pairing rewards. A paired launch pledges the
+     * token's fees to THIS address (not rewardsKeeper), and rh-keeper-nft.js
+     * claims that pot and forwards each token's slice into its collection's
+     * vault, which NFT holders then claim from. Same one-way pledge caveat as
+     * rewardsKeeper: wrong value here is permanent per token. Self-funds gas
+     * from the ETH pot exactly like the token keeper. */
+    nftKeeper: "0x527c31c6755213492bA40D71752ae34c7b42F9F9",
     // A $-token (coin) allowlist reads holder balances at the block the sale
     // opened on, for the whole wave. This RPC prunes that state after ~10 min
     // (measured live 2026-08-20), so a longer wave locks holders out — the gate

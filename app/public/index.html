@@ -309,7 +309,7 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
       <ul>
         <li><a href="/app?launch=token">Token</a></li>
         <li><a href="/launch?mode=collection">Collection</a></li>
-        <li><span style="color:var(--faint);opacity:.7">Pair · soon</span></li>
+        <li><span id="foot-pair" style="color:var(--faint);opacity:.7">Pair · soon</span></li>
       </ul>
     </div>
     <div>
@@ -317,7 +317,7 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
       <ul>
         <li><a href="/tokens">Tokens</a></li>
         <li><a href="/collections">Collections</a></li>
-        <li><a aria-disabled="true" style="color:var(--faint);cursor:default;pointer-events:none;opacity:.7">Staking · soon</a></li>
+        <li><a id="foot-staking" aria-disabled="true" style="color:var(--faint);cursor:default;pointer-events:none;opacity:.7">Staking · soon</a></li>
         <li><a href="/fees">Claim fees</a></li>
         <li><a href="/app">Editor</a></li>
       </ul>
@@ -911,6 +911,23 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
     });
   });
 })();
+</script>
+<script>
+  /* Footer Pair/Staking are "soon" for the public; unlock them for an operator
+     running ?pairtest=1 (Shell.pairUnlocked), same switch as the nav + cards. */
+  (function () {
+    function go() {
+      try {
+        if (!(window.Shell && window.Shell.pairUnlocked && window.Shell.pairUnlocked())) return false;
+        var p = document.getElementById("foot-pair");
+        if (p) { var a = document.createElement("a"); a.href = "/app?launch=pair"; a.textContent = "Pair"; p.replaceWith(a); }
+        var s = document.getElementById("foot-staking");
+        if (s) { s.textContent = "Staking"; s.setAttribute("href", "/stake"); s.removeAttribute("aria-disabled"); s.style.cssText = ""; }
+        return true;
+      } catch (e) { return false; }
+    }
+    if (!go()) { var n = 0, t = setInterval(function () { if (go() || ++n > 40) clearInterval(t); }, 100); }
+  })();
 </script>
 </body>
 </html>

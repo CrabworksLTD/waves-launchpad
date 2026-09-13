@@ -127,6 +127,7 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
 <script src="/shell.js"></script>
 <script src="/launch.js"></script>
 <script src="/token.js"></script>
+<script src="/launchlab.js"></script>
 <script>
 (function () {
   "use strict";
@@ -173,10 +174,13 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
   /* "TSLA AUTO-SHARED HOURLY". The share is named only when it is NOT all of
    * it — 100% is the only option on Robinhood and the common one on Solana, so
    * printing it on every badge was noise that crowded out the useful part. */
-  function sharedBadge(pct, title, burn) {
+  function sharedBadge(pct, title, mode) {
+    var burn = mode === "burn";
+    var split = mode === "split";
     return '<span class="shared"' + (title ? ' title="' + esc(title) + '"' : "") + ">" +
       (pct && pct < 100 ? pct + "% " : "") +
       (burn ? "BUYBACK &amp; BURN HOURLY"
+            : split ? '<span class="rsym"></span>DIVIDEND + BUYBACK HOURLY'
             : '<span class="rsym"></span>AUTO-SHARED HOURLY') + "</span>";
   }
 
@@ -199,9 +203,11 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
       (shared
         ? sharedBadge(pct, t.rewardMode === "burn"
             ? "The keeper claims this pool hourly and uses it to buy the token back and burn it."
-            : "The keeper claims this pool hourly and pays " + pct +
+            : t.rewardMode === "split"
+              ? "The keeper claims this pool hourly: half pays holders a dividend, half buys the token back and burns it."
+              : "The keeper claims this pool hourly and pays " + pct +
               "% to holders automatically; your " + (100 - pct) +
-              "% arrives at your fee wallet in the same run.", t.rewardMode === "burn")
+              "% arrives at your fee wallet in the same run.", t.rewardMode)
         : '<button class="cl" disabled>Claim</button>' +
           (kind === "creator"
             ? '<button class="act">Activate holder rewards</button>' : "")) +
@@ -252,7 +258,7 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             mint: t.mint, sig: out.sig || "", feeSharePct: pct,
-            rewardMode: t.rewardMode === "burn" ? "burn" : "dividend",
+            rewardMode: (t.rewardMode === "burn" || t.rewardMode === "split") ? t.rewardMode : "dividend",
             rewardMint: t.rewardMint || null,
             keeper: window.BRAND.feeKeeper
           })
@@ -306,7 +312,8 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
     var rows = [].slice.call(document.querySelectorAll(".frow"));
     rows.forEach(function (el) {
       var t = tokens.find(function (x) { return x.mint === el.dataset.mint; });
-      window.Token.feeMetrics(t.mint, t.pool || null).then(function (m) {
+      var feeBe = (t.backend === "launchlab" && window.LaunchLab) ? window.LaunchLab : window.Token;
+      feeBe.feeMetrics(t.mint, t.pool || null).then(function (m) {
         // live accrued on the pool — what a Claim button would take right now
         var amt = el.dataset.kind === "creator" ? m.creator : m.partner;
         var aEl = el.querySelector(".amt");   // absent on auto-shared rows
@@ -330,8 +337,9 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
     say("", "");
     try {
       var w = window.Wallet.current();
+      var claimBe = (t.backend === "launchlab" && window.LaunchLab) ? window.LaunchLab : window.Token;
       var fn = el.dataset.kind === "creator"
-        ? window.Token.claimCreatorFeesTo : window.Token.claimPartnerFeesTo;
+        ? claimBe.claimCreatorFeesTo : claimBe.claimPartnerFeesTo;
       var sig = await fn(t.mint, w.publicKey, t.pool || null);
       say("ok", 'Claimed. <a href="https://explorer.solana.com/tx/' + esc(sig) +
         '" target="_blank" rel="noopener">View tx ↗</a>');
@@ -454,8 +462,11 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
           var burn = rec.rewardMode === "burn";
           act.outerHTML = sharedBadge(pct, burn
             ? "The keeper claims these fees hourly and uses them to buy the token back and burn it."
-            : "The keeper claims these fees hourly, converts them and pays holders " +
-              "automatically. Nothing for them to claim.", burn);
+            : rec.rewardMode === "split"
+              ? "The keeper claims these fees hourly: half pays holders a dividend, half buys the token back and burns it."
+              : "The keeper claims these fees hourly, converts them and pays holders " +
+              "automatically. Nothing for them to claim.", rec.rewardMode);
+          // a split still pays holders a dividend, so it names the reward asset
           if (!burn) nameRewardAsset(el, rec.rewardMint, true);
           return;
         }

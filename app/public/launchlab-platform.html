@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WAVES Launchpad</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/theme.css">
+<style>
+/* Internal tool, deliberately unlinked from the nav. Creates the WAVES
+ * PlatformConfig on Raydium LaunchLab — the fee layer for Solana stock-quoted
+ * launches. The wallet that signs here becomes the platform's ADMIN forever
+ * (it can update the platform), and its fees claim to brand.js feeOwner. This
+ * is the LaunchLab twin of /config-create; see tools/sign-launchlab-platform.js
+ * for the CLI equivalent and docs/launchlab-migration-spec.md for the why. */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--void);color:var(--ink);font:400 15px/1.6 Inter,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono",monospace}
+main{max-width:640px;margin:0 auto;padding:48px 24px 90px}
+h1{font-family:Archivo;font-size:28px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}
+.sub{color:var(--dim);margin:0 0 26px;font-size:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:20px 22px;margin-bottom:18px}
+.row{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;
+  padding:8px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row b{font-weight:600;text-align:right;font-family:"IBM Plex Mono",monospace;word-break:break-all}
+.k{color:var(--dim)}
+.warn{border:1px solid rgba(255,180,80,.35);background:rgba(255,180,80,.07);
+  border-radius:8px;padding:13px 15px;font-size:13px;color:#ffd9a0;margin-bottom:18px}
+.cluster{font:600 12px "IBM Plex Mono",monospace;letter-spacing:.1em;
+  text-transform:uppercase;padding:5px 12px;border-radius:99px;display:inline-block;
+  margin-bottom:18px}
+.cluster.main{background:rgba(255,107,107,.12);color:#ff9f9f;border:1px solid rgba(255,107,107,.4)}
+.cluster.dev{background:rgba(var(--accent-rgb),.1);color:var(--accent);border:1px solid rgba(var(--accent-rgb),.35)}
+.go{width:100%;padding:15px;border-radius:8px;border:0;cursor:pointer;
+  font:800 14.5px Archivo;color:var(--accent-ink);
+  background-image:var(--grad);background-repeat:no-repeat;
+  background-size:calc(100% + 2px) 100%;background-position:-1px 0}
+.go:disabled{opacity:.45;cursor:default}
+.msg{margin-top:14px;font-size:13px;padding:12px 14px;border-radius:8px;display:none;
+  word-break:break-all}
+.msg.err{display:block;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ffb3b3}
+.msg.ok{display:block;background:rgba(var(--accent-rgb),.08);border:1px solid rgba(var(--accent-rgb),.3);color:#8ff5cd}
+.msg code{font:500 12.5px ui-monospace,monospace}
+.msg a{color:inherit}
+.note{color:var(--faint);font-size:12px;margin-top:12px;line-height:1.6}
+</style>
+</head>
+<body>
+<main>
+  <h1>Create the LaunchLab platform</h1>
+  <p class="sub">One transaction, signed by the wallet that will ADMIN the WAVES
+  platform on Raydium LaunchLab. This is the fee layer for Solana stock-quoted
+  launches — the same terms <span class="mono">tools/sign-launchlab-platform.js</span> uses.</p>
+
+  <span class="cluster" id="cl">…</span>
+
+  <div class="warn"><b>This wallet controls the platform forever.</b> It's the only
+  address that can update the platform (fee rate, wallets). Its trading fees claim to
+  the treasury below. Sign with a wallet you'll still control — a Ledger through
+  Phantom counts.</div>
+
+  <div class="panel" id="terms">loading…</div>
+
+  <button class="go" id="go" disabled>Loading…</button>
+  <div class="msg" id="msg"></div>
+  <p class="note">Cost is ~0.01 SOL of rent plus the network fee, paid by the signing
+  wallet. It's created once per cluster — the platform id below is deterministic from
+  the admin wallet. After it confirms, paste the id into brand.js.</p>
+</main>
+
+<script src="/brand.js"></script>
+<script src="/ui.js"></script>
+<script src="/wallet.js"></script>
+<script src="/shell.js"></script>
+<script src="/launch.js"></script>
+<script>
+(function () {
+  "use strict";
+  var esc = UI.esc;
+  /* LaunchLab is Solana-only. The shared shell remembers the last chain in
+   * localStorage and a ?chain=rh link pins Robinhood — but Connect must use the
+   * SOLANA wallet (window.Wallet); an EVM wallet (window.MoonpadWallet) can't
+   * sign a Solana transaction. Force Solana BEFORE the shell reads the chain,
+   * and drop a stale ?chain param so it can't flip back on reload. */
+  try { localStorage.setItem("shl-chain", "solana"); } catch (e) {}
+  try {
+    var _u = new URL(location.href);
+    if (_u.searchParams.has("chain")) {   // drop only ?chain, keep ?cluster etc.
+      _u.searchParams.delete("chain");
+      history.replaceState(null, "", _u.pathname + (_u.search || ""));
+    }
+  } catch (e) {}
+  Shell.mount({ search: false });
+
+  var qs = new URLSearchParams(location.search);
+  var CLUSTER = qs.get("cluster") === "devnet" ? "devnet" : "mainnet-beta";
+  window.Launch.cluster(CLUSTER);
+  /* WAVES Solana fee ladder, on-chain units (denom 1e6, 1% = 10000):
+   *   0.25% Raydium (fixed on the config) + 0.40% platform + 0.50% creator = 1.15%.
+   * creatorFeeRate is hard-capped at 5000 (0.5%) by the program. */
+  var PLATFORM_RATE = 4000;   // 0.40% → WAVES
+  var CREATOR_RATE = 5000;    // 0.50% → creator (program max)
+
+  var $ = function (id) { return document.getElementById(id); };
+  var busy = false;
+  var R = null, X = null, prog = null, platformId = null, cpConfigId = null, exists = false;
+
+  function say(k, h) { var m = $("msg"); m.className = "msg " + k; m.innerHTML = h; }
+
+  async function load() {
+    R = await import("/vendor/raydium.esm.js");
+    X = await import("/vendor/metaplex.esm.js");
+    prog = CLUSTER === "devnet" ? R.DEV_LAUNCHPAD_PROGRAM : R.LAUNCHPAD_PROGRAM;
+    var cpmmProg = CLUSTER === "devnet"
+      ? R.DEVNET_PROGRAM_ID.CREATE_CPMM_POOL_PROGRAM : R.CREATE_CPMM_POOL_PROGRAM;
+    cpConfigId = R.getCpmmPdaAmmConfigId(cpmmProg, 0).publicKey;
+  }
+
+  // platformId depends on the connected admin wallet, so it's derived per-wallet
+  function derive(adminPk) {
+    return R.getPdaPlatformId(prog, new X.PublicKey(adminPk)).publicKey;
+  }
+
+  async function paintTerms() {
+    var cl = $("cl");
+    cl.textContent = CLUSTER + " · LaunchLab platform";
+    cl.className = "cluster " + (CLUSTER === "mainnet-beta" ? "main" : "dev");
+    var w = window.Wallet.current();
+    platformId = w ? derive(w.publicKey) : null;
+    exists = false;
+    if (platformId) {
+      try {
+        var rpc = window.Launch.clusters[CLUSTER].rpc;
+        var info = await new X.Connection(rpc, "confirmed").getAccountInfo(platformId);
+        exists = !!info;
+      } catch (e) {}
+    }
+    $("terms").innerHTML =
+      '<div class="row"><span class="k">Name</span><b>WAVES</b></div>' +
+      '<div class="row"><span class="k">Platform fee</span><b>' + (PLATFORM_RATE / 10000) + '% → WAVES</b></div>' +
+      '<div class="row"><span class="k">Creator fee</span><b>' + (CREATOR_RATE / 10000) + '% → creator</b></div>' +
+      '<div class="row"><span class="k">Raydium fee</span><b>0.25% (fixed)</b></div>' +
+      '<div class="row"><span class="k">Total per trade</span><b>' + ((PLATFORM_RATE + CREATOR_RATE + 2500) / 10000) + '%</b></div>' +
+      '<div class="row"><span class="k">Claim wallet</span><b>' + esc(UI.shortAddr(window.BRAND.feeOwner, 4)) + '</b></div>' +
+      '<div class="row"><span class="k">Reward-mode auth</span><b>' + esc(UI.shortAddr(window.BRAND.feeKeeper, 4)) + '</b></div>' +
+      '<div class="row"><span class="k">Graduated LP</span><b>100% burned</b></div>' +
+      '<div class="row"><span class="k">Admin (signer)</span><b>' + (w ? esc(UI.shortAddr(w.publicKey, 4)) : "—") + '</b></div>' +
+      '<div class="row"><span class="k">Platform id</span><b>' + (platformId ? esc(platformId.toBase58()) : "connect wallet") + '</b></div>';
+  }
+
+  function paint() {
+    if (busy) return;
+    var w = window.Wallet.current();
+    var go = $("go");
+    go.disabled = false;
+    if (!w) { go.textContent = "Connect the admin wallet"; go.onclick = connect; return; }
+    if (exists) {
+      go.textContent = "Already created — nothing to do";
+      go.disabled = true;
+      say("ok", "This wallet already owns a platform: <code>" + esc(platformId.toBase58()) +
+        "</code><br>brand.js entry: <code>" + brandEntry(platformId.toBase58()) + "</code>");
+      return;
+    }
+    go.textContent = "Create platform — sign as " + UI.shortAddr(w.publicKey, 4);
+    go.onclick = create;
+  }
+
+  function brandEntry(addr) {
+    return 'launchlabConfigs["' + esc(CLUSTER) + '"].platformId = "' + esc(addr) + '"';
+  }
+
+  async function connect() { await Shell.connect(); await paintTerms(); paint(); }
+
+  async function create() {
+    var w = window.Wallet.current();
+    if (!w || busy) return;
+    busy = true;
+    var go = $("go");
+    go.disabled = true; go.textContent = "Building the transaction…";
+    say("", "");
+    try {
+      var rpc = window.Launch.clusters[CLUSTER].rpc;
+      var conn = new X.Connection(rpc, "confirmed");
+      var owner = new X.PublicKey(w.publicKey);
+      var feeOwner = new X.PublicKey(window.BRAND.feeOwner);
+      var feeKeeper = new X.PublicKey(window.BRAND.feeKeeper);
+
+      // owner as PublicKey — we build here and the wallet signs; the SDK never
+      // holds a secret key in the browser.
+      var raydium = await R.Raydium.load({ connection: conn, owner: owner, cluster: CLUSTER,
+        disableFeatureCheck: true, disableLoadToken: true });
+      var built = await raydium.launchpad.createPlatformConfig({
+        programId: prog,
+        platformAdmin: owner,
+        platformClaimFeeWallet: feeOwner,
+        platformLockNftWallet: feeOwner,
+        platformVestingWallet: feeOwner,
+        cpConfigId: cpConfigId,
+        // platform_scale MUST be 0; the three must sum to 1e6 → 100% burn.
+        migrateCpLockNftScale: { platformScale: new R.BN(0), creatorScale: new R.BN(0), burnScale: new R.BN(1000000) },
+        transferFeeExtensionAuth: feeKeeper,
+        creatorFeeRate: new R.BN(CREATOR_RATE),
+        feeRate: new R.BN(PLATFORM_RATE),
+        name: "WAVES", web: "https://waveslaunchpad.xyz", img: "https://waveslaunchpad.xyz/og.png",
+        txVersion: R.TxVersion.LEGACY,
+      });
+      var tx = built.transaction || (built.transactions && built.transactions[0]);
+      if (!tx) throw new Error("SDK returned no transaction to sign.");
+
+      /* Fetch the blockhash late and retry once on expiry — a blockhash lasts
+       * ~a minute and the wallet prompt eats into that. Same pattern as
+       * /config-create. */
+      var sig = null, rawBytes = null;
+      for (var attempt = 0; attempt < 2 && !sig; attempt++) {
+        try {
+          tx.signatures = [];
+          tx.feePayer = owner;
+          tx.recentBlockhash = (await conn.getLatestBlockhash("confirmed")).blockhash;
+          go.textContent = "Confirm in your wallet…";
+          var signed = await w.signTransaction(tx);
+          go.textContent = "Sending…";
+          rawBytes = signed.serialize();
+          sig = await Promise.race([
+            conn.sendRawTransaction(rawBytes, { skipPreflight: false }),
+            new Promise(function (_, rej) {
+              setTimeout(function () {
+                rej(new Error("The RPC did not answer in 45s. Nothing was created — try again."));
+              }, 45000);
+            })
+          ]);
+        } catch (err) {
+          var stale = /blockhash not found|block height exceeded|expired/i
+            .test(String((err && err.message) || err));
+          if (attempt === 0 && stale) { go.textContent = "Blockhash expired — asking again…"; continue; }
+          throw err;
+        }
+      }
+
+      // Poll status and re-broadcast — Solana drops accepted-but-unincluded txs.
+      var landed = false, lastSend = Date.now();
+      for (var w8 = 0; w8 < 90; w8++) {
+        go.textContent = "Confirming… " + w8 + "s";
+        var st = await conn.getSignatureStatus(sig, { searchTransactionHistory: true })
+          .catch(function () { return null; });
+        var v = st && st.value;
+        if (v && v.err) throw new Error("The platform transaction failed on chain.");
+        if (v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized")) {
+          landed = true; break;
+        }
+        if (rawBytes && Date.now() - lastSend > 5000) {
+          lastSend = Date.now();
+          conn.sendRawTransaction(rawBytes, { skipPreflight: true, maxRetries: 5 }).catch(function () {});
+        }
+        await new Promise(function (r) { setTimeout(r, 1000); });
+      }
+      if (!landed) {
+        throw new Error("Sent, but not confirmed within 90s. Check the wallet's " +
+          "history before signing again — the signature was " + sig);
+      }
+
+      var addr = platformId.toBase58();
+      say("ok",
+        "<b>Platform created.</b><br>Platform id: <code>" + esc(addr) + "</code><br>" +
+        "Admin: <code>" + esc(w.publicKey) + "</code><br>" +
+        '<a href="https://explorer.solana.com/tx/' + esc(sig) +
+          (CLUSTER === "devnet" ? "?cluster=devnet" : "") +
+          '" target="_blank" rel="noopener">View transaction ↗</a><br><br>' +
+        "brand.js entry: <code>" + brandEntry(addr) + "</code>");
+      go.textContent = "Done";
+      return;
+    } catch (e) {
+      var m = String(e && e.message || e);
+      if (/reject/i.test(m)) m = "You cancelled the signature.";
+      say("err", esc(m.slice(0, 300)));
+    }
+    busy = false;
+    paint();
+  }
+
+  (async function init() {
+    try { await load(); } catch (e) {
+      $("terms").textContent = "";
+      say("err", "Could not load the Raydium client: " + esc(String(e.message)));
+      $("go").textContent = "Unavailable";
+      return;
+    }
+    await paintTerms();
+    paint();
+    var n = 0, t = setInterval(async function () {
+      await paintTerms(); paint();
+      if (window.Wallet.current() || ++n > 10) clearInterval(t);
+    }, 800);
+  })();
+})();
+</script>
+</body>
+</html>

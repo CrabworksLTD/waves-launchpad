@@ -25,11 +25,28 @@
    * and audited, launching a pair would strand fees in a vault nobody can claim.
    * So the panel is built and wired behind this flag; flip it the day the
    * program lands. Local testing: set true in the console or here. */
-  // Live only where the staking program is deployed — Solana devnet today. Keeps
-  // mainnet gated (program not there / unaudited) while the demo runs on devnet.
+  // Public gate: devnet-only for now. The staking program IS deployed immutable on
+  // mainnet (jt5Je…), but pairing stays locked for everyone until the keeper's
+  // vault-deposit path is audited, stake.js is audited, and a real mainnet
+  // stake→claim has been run. Until then, an OPERATOR can unlock pairing for their
+  // OWN browser only — visit with ?pairtest=1 — to launch a real pair and rehearse
+  // the loop (tools/staking-rehearse.js). This never changes the public gate; the
+  // keeper stays inert, so a test pair's fees accrue but aren't distributed until
+  // the real flip. Clear it with ?pairtest=0.
+  function pairTestOverride() {
+    try {
+      var u = new URLSearchParams(window.location.search);
+      if (u.get("pairtest") === "1") { try { localStorage.setItem("wavesPairTest", "1"); } catch (e) {} return true; }
+      if (u.get("pairtest") === "0") { try { localStorage.removeItem("wavesPairTest"); } catch (e) {} return false; }
+      return localStorage.getItem("wavesPairTest") === "1";
+    } catch (e) { return false; }
+  }
   function PAIRING_LIVE() {
-    try { return !isEvm() && window.Launch && window.Launch.cluster && window.Launch.cluster() === "devnet"; }
-    catch (e) { return false; }
+    try {
+      if (isEvm()) return false;
+      var onDevnet = window.Launch && window.Launch.cluster && window.Launch.cluster() === "devnet";
+      return !!(onDevnet || pairTestOverride());
+    } catch (e) { return false; }
   }
 
   var run = null;        // { files, count } from the generator
@@ -1781,10 +1798,11 @@
    * A pair exists for one reason: to feed its collection's reward vault, which
    * the collection's NFT holders claim from on the staking page. So the creator
    * decides only what a pair needs — logo, banner, name, ticker, the trading
-   * fee, and their own first buy. There is no quote picker (a pair prices in
-   * SOL), no split slider and no reward-asset picker: 100% of the creator fee
-   * routes to the vault, full stop. Everything the standard token window asks
-   * that a pair does not need is simply absent, by design.
+   * fee, their own first buy, the quote currency (SOL/USDC or a stock/token, same
+   * catalogue as a standard launch), and what holders are paid in. No split slider:
+   * 100% of the creator fee routes to the vault, full stop. When priced in a
+   * stock/token the vault reward IS that asset, so the "paid in" picker hides —
+   * exactly like the standard flow.
    *
    * Reached only from the pair tick, which is gated on PAIRING_LIVE, and always
    * in the preconfig order: this form is filled first, then the collection
@@ -1796,9 +1814,9 @@
     var defSym = flow.preTsym ||
       (defName ? defName.replace(/[^A-Za-z]/g, "").slice(0, 5).toUpperCase() : "");
 
-    flow.quote = "sol";                    // pairs price in SOL
+    if (!flow.quote) flow.quote = "sol";   // default SOL; the picker can change it
     if (!flow.tier) flow.tier = "standard";
-    if (flow.burn == null || flow.burn === "") flow.burn = 1000000;   // burn-to-activate default
+    if (flow.burn == null || flow.burn === "") flow.burn = 100000;   // burn-to-activate default
     /* The whole creator share feeds the collection's vault; NFT holders claim
      * it from the staking program. This is a RECORDED PREFERENCE, not launch-
      * time routing: the pool launches clean with the launcher as poolCreator,
@@ -1843,6 +1861,14 @@
           style="text-transform:uppercase"></div>
       </div>
 
+      <label>Priced in</label>
+      <button class="pick" id="lp-solquote">
+        <span><b>${solQuoteView(flow).sym}</b> &nbsp;<span class="k2">${solQuoteView(flow).name}</span></span>
+        <span class="pk-r"><span class="k2 mono">${solQuoteView(flow).native ? "native" : "trades against this"}</span>
+        <span class="pk-dd">Change ▾</span></span>
+      </button>
+      <p class="note" id="tk-quotenote">${solQuoteNote(flow)}</p>
+
       <label>Trading fee</label>
       <div class="ptabs" id="tk-tiers">${raw(tierButtons(flow))}</div>
       <p class="note" id="tk-taxtxt"></p>
@@ -1853,6 +1879,9 @@
       <p class="note">Lands in the same transaction as the pool, so nobody can snipe
       the opening price ahead of you.</p>
 
+      <!-- Hidden when priced in a stock/token: the vault reward IS that asset then,
+           so there is nothing to choose. Shown for a SOL/USDC-priced pair. -->
+      <div id="tk-rewardwrap" ${rewardSelectable(flow) ? "" : raw("hidden")}>
       <label>Rewards paid in</label>
       <button class="pick" id="lp-reward">
         <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
@@ -1866,10 +1895,11 @@
         ? raw(" <b>Nothing trades " + esc(flow.reward.symbol) + " yet</b>, so holders " +
               "receive SOL until it can be sold — it switches by itself once a market exists.")
         : ""}</p>
+      </div>
 
       <label>Burn to activate — per NFT</label>
-      <input id="lp-burn" type="number" min="1" step="any" value="${flow.burn == null ? 1000000 : flow.burn}"
-        placeholder="1000000">
+      <input id="lp-burn" type="number" min="1" step="any" value="${flow.burn == null ? 100000 : flow.burn}"
+        placeholder="100000">
       <p class="note">How much $${esc((flow.tsym || defSym) || "TOKEN")} a holder burns to switch one NFT
       on for rewards. Each activated NFT then earns an equal share of the fees. A higher number means more
       buy-and-burn pressure on the token.</p>
@@ -1951,6 +1981,15 @@
       if (b) box.querySelector("#lp-tbuy").value = b.dataset.v;
       setTimeout(paintBuyShare, 0);        // after the chip writes the value
     });
+
+    // the quote picker — same categorised catalogue as a standard launch. Picking
+    // a stock/token mirrors it into flow.reward and hides the reward picker on the
+    // re-render (rewardSelectable), because the vault reward IS that asset then.
+    var solQuoteBtn = box.querySelector("#lp-solquote");
+    if (solQuoteBtn) solQuoteBtn.onclick = function () {
+      collect();
+      rwaQuotePicker(flow, solQuoteList());
+    };
 
     // the reward choice is recorded with the launch; it reopens this same form
     var rewardBtn = box.querySelector("#lp-reward");
@@ -2820,7 +2859,10 @@
         icon: meta.iconUri || null,
         banner: meta.bannerUri || null,
         card: meta.cardUri || null,
-        collection: flow.nft ? flow.nft.res.collection : null
+        collection: flow.nft ? flow.nft.res.collection : null,
+        // per-NFT burn-to-activate amount the creator set — recorded so the staking
+        // page defaults the stake input to it (a pair only; harmless otherwise)
+        burn: flow.pair ? (Number(flow.burn) || null) : null
       });
       mark("pool", "done");
 
