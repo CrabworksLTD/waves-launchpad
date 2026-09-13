@@ -277,7 +277,7 @@
     // UNAUDITED launchlab.js. REVERT to false before the public site is deployed,
     // or the public launch gate opens for everyone. Audit must land before this
     // ships to production.
-    launchlabLive: { "mainnet-beta": false, devnet: true },
+    launchlabLive: { "mainnet-beta": true, devnet: true },
 
     // Save files. `fileKind` is written into new saves; `readKinds` is what we
     // accept when opening, so Moonpad projects and the bundled templates

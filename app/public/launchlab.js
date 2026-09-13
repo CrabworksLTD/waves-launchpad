@@ -263,7 +263,12 @@
       name: opts.name, symbol: opts.symbol, uri: opts.uri,
       configId: new c.X.PublicKey(configId),
       platformId: new c.X.PublicKey(plat),            // OUR platform on Raydium's config
-      migrateType: hasHolderTax ? "cpmm" : "amm",     // T2022 must graduate to CPMM
+      // Everything graduates to CPMM. T2022 (dividend/split) MUST; a standard-SPL
+      // "none"/"burn" token also migrates cleanly via CPMM — proven end-to-end on
+      // devnet 2026-09-13 (launch → curve complete → status 2). This retires the
+      // untested AMM/OpenBook path the H-3 fix would otherwise have introduced, so
+      // every launch uses one proven graduation path.
+      migrateType: "cpmm",
       buyAmount: new c.R.BN(devBuyRaw),
       slippage: new c.R.BN(opts.slippageBps || 500),
       token2022: hasHolderTax,
