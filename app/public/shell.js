@@ -48,13 +48,20 @@
    * (nav item, launch card, footer link, launch panel, staking page) reads this so
    * there is one switch, not five.
    *
-   * PUBLIC on Solana as of 2026-09-13: pairing + burn-to-stake are open to
-   * everyone. ⚠️ The reward-distribution keeper is not yet live, so a pair's fees
-   * accrue but are not auto-distributed until it ships — opened by explicit
-   * decision. The Robinhood side keeps its own gate. (?pairtest left as a harmless
-   * no-op so old operator links still resolve.) */
+   * RE-GATED to operator-only (2026-09-13): pairing was briefly public, but the
+   * reward keeper needs the creator-fee→vault path (pool creator = keeper) built +
+   * tested first, and burning is irreversible — so it's back behind ?pairtest=1
+   * (persisted) until rewards actually flow. ?pairtest=0 clears it. Also on for
+   * devnet. Re-open by returning true for Solana here once the keeper is live. */
   function pairUnlocked() {
-    try { return currentChain() !== "robinhood"; } catch (e) { return true; }
+    try {
+      var u = new URLSearchParams(location.search);
+      if (u.get("pairtest") === "1") { try { localStorage.setItem("wavesPairTest", "1"); } catch (e) {} return true; }
+      if (u.get("pairtest") === "0") { try { localStorage.removeItem("wavesPairTest"); } catch (e) {} return false; }
+      if (localStorage.getItem("wavesPairTest") === "1") return true;
+    } catch (e) {}
+    try { if (window.Launch && window.Launch.cluster && window.Launch.cluster() === "devnet") return true; } catch (e) {}
+    return false;
   }
   /* Chains are applied by loading the page, not by re-skinning it in place —
      see the network selector below for why. Boot reads the persisted choice. */

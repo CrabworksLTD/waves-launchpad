@@ -134,9 +134,15 @@ export default async function handler(req, res) {
      * DOES burn half — but a split launch keeps the transfer-fee extension
      * (hasHolderTax = dividend || split), so its burn-half destroys harvested
      * launched-mint tokens directly, which works. Only pure burn is out. */
+    // A PAIR routes the creator's trading fee to a staking vault (feeShare "vault"
+    // + a paired collection). Its token is STANDARD (no transfer tax), so it is
+    // serviced by runPair (claim creator fee → vault), NOT the transfer-fee
+    // dividend path. A tier or a non-pair dividend/split is serviced as before.
+    const isPair = (t) => !!(t.pairedCollection || (t.feeShare === "vault" && t.collection));
     const jobs = all.filter((t) =>
       t.backend === "launchlab" &&
       ((t.tier && t.tier !== "standard") ||
+       isPair(t) ||
        ["dividend", "split"].indexOf(t.rewardMode) >= 0));
 
     log.push("launchlab jobs: " + jobs.length);
@@ -145,11 +151,17 @@ export default async function handler(req, res) {
     for (const job of jobs) {
       if (!job.mint || !job.pool) continue;
       try {
-        if (job.tier && job.tier !== "standard" && tiers[job.tier]) {
-          await runFeeLadder(job, ctx);
-        }
-        if (["dividend", "split"].indexOf(job.rewardMode) >= 0) {   // H-6: burn excluded
-          await runReward(job, ctx);
+        if (isPair(job)) {
+          // pair: the keeper IS the pool creator, so it claims the creator's 0.5%
+          // (in the quote) and routes it to the staking vault. No transfer tax.
+          await runPair(job, ctx);
+        } else {
+          if (job.tier && job.tier !== "standard" && tiers[job.tier]) {
+            await runFeeLadder(job, ctx);
+          }
+          if (["dividend", "split"].indexOf(job.rewardMode) >= 0) {   // H-6: burn excluded
+            await runReward(job, ctx);
+          }
         }
       } catch (e) {
         // the plan (if any) stays in KV; the next run picks it up where it stopped
@@ -247,6 +259,109 @@ async function runFeeLadder(job, ctx) {
     await payOnce(conn, keeper, plan, "keep", () =>
       buildTransfer(conn, w3, splToken, keeper, mintB, mintBProgram, new w3.PublicKey(TREASURY), BigInt(plan.toKeep)), save);
     log.push(job.mint + ": swept " + plan.toKeep + " to treasury");
+  }
+  if (db) await db.del(planKey);
+}
+
+/* ── PAIR ─────────────────────────────────────────────────────────────────────
+ * The keeper is the pool's CREATOR (set at launch), so it claims the creator's
+ * 0.5% trading fee — which accrues in the QUOTE (SOL for a SOL-quoted pair) — and
+ * routes it to the collection's staking vault. Platform (0.4%) and Raydium (0.25%)
+ * are never touched. If the vault's reward asset isn't the quote, the claimed
+ * quote is swapped into it first; swapping FROM the quote (SOL/USDC/a liquid stock)
+ * always routes, so this works from the first trade, pre-graduation. No transfer
+ * tax on the token. Crash-safe: the claim is the one non-idempotent step, the
+ * deposit + sync are payOnce. */
+async function runPair(job, ctx) {
+  const { conn, w3, r, splToken, lp, prog, keeper, db, log } = ctx;
+  const planKey = "llpair:" + job.mint;
+  const save = async () => { if (db) await db.set(planKey, JSON.stringify(plan), { ex: PLAN_TTL }); };
+
+  const pairedCollection = job.pairedCollection || (job.feeShare === "vault" ? job.collection : null);
+  if (!pairedCollection) { log.push(job.mint + ": pair has no collection — skip"); return; }
+
+  // the staking pool + its real vault + reward mint (authoritative, from chain).
+  // pool layout: disc8 | tokenMint32 | collection32 | rewardMint@72..104 | vault@104..136
+  const stakeProg = new w3.PublicKey(STAKE_PROGRAM);
+  const [spool] = w3.PublicKey.findProgramAddressSync(
+    [Buffer.from("pool"), new w3.PublicKey(job.mint).toBuffer(), new w3.PublicKey(pairedCollection).toBuffer()], stakeProg);
+  const spoolAcc = await conn.getAccountInfo(spool);
+  if (!spoolAcc) { log.push(job.mint + ": staking pool not initialised — skip"); return; }
+  const vaultRewardMint = new w3.PublicKey(spoolAcc.data.slice(72, 104)).toBase58();
+  const vault = new w3.PublicKey(spoolAcc.data.slice(104, 136));
+
+  let plan = db ? await db.get(planKey).catch(() => null) : null;
+  if (typeof plan === "string") { try { plan = JSON.parse(plan); } catch { plan = null; } }
+
+  if (!plan) {
+    const p = r.LaunchpadPool.decode((await conn.getAccountInfo(new w3.PublicKey(job.pool))).data);
+    const quote = p.mintB.toBase58();
+    const quoteProgram = await mintProgram(conn, w3, quote);
+
+    // claim the creator's fee (in the quote) to the keeper's quote ATA, by delta.
+    // NON-IDEMPOTENT boundary: Raydium claimCreatorFee execute — the keeper IS the
+    // pool creator, so this succeeds; re-claiming only ever takes freshly-accrued
+    // fees, and the residual crash window strands funds in the keeper's OWN ATA.
+    const before = await ataBalance(conn, w3, splToken, quote, keeper.publicKey, quoteProgram);
+    const built = await lp.claimCreatorFee({
+      programId: prog, mintB: new w3.PublicKey(quote),
+      mintBProgram: new w3.PublicKey(quoteProgram), txVersion: r.TxVersion.LEGACY,
+    });
+    await built.execute({ sendAndConfirm: true });
+    const after = await ataBalance(conn, w3, splToken, quote, keeper.publicKey, quoteProgram);
+    const claimed = after - before;
+    if (claimed <= 0n) { log.push(job.mint + ": no creator fee to claim"); if (db) await db.del(planKey); return; }
+
+    plan = {
+      kind: "pair", mint: job.mint, quote, quoteProgram,
+      vault: vault.toBase58(), vaultRewardMint, spool: spool.toBase58(),
+      claimed: claimed.toString(), payAmount: null, payMint: null, payProgram: null,
+    };
+    await save();
+    log.push(job.mint + ": claimed creator fee " + claimed + " " + quote.slice(0, 6));
+  } else {
+    log.push(job.mint + ": resuming pair plan");
+  }
+
+  // swap the claimed quote into the vault's reward asset, if different
+  if (plan.payAmount == null) {
+    if (plan.vaultRewardMint === plan.quote) {
+      plan.payAmount = plan.claimed; plan.payMint = plan.quote; plan.payProgram = plan.quoteProgram;
+    } else {
+      const got = await jupSwap(conn, w3, keeper, plan.quote, plan.vaultRewardMint, BigInt(plan.claimed));
+      plan.payAmount = got.toString();
+      plan.payMint = plan.vaultRewardMint;
+      plan.payProgram = await mintProgram(conn, w3, plan.vaultRewardMint);
+      log.push(job.mint + ": swapped → " + got + " " + plan.vaultRewardMint.slice(0, 6));
+    }
+    await save();
+  }
+  if (BigInt(plan.payAmount) <= 0n) { if (db) await db.del(planKey); return; }
+
+  // deposit into the staking vault + sync (payOnce, resume-safe)
+  const vaultPk = new w3.PublicKey(plan.vault);
+  const spoolPk = new w3.PublicKey(plan.spool);
+  if (!plan.depositDone) {
+    const payMintPk = new w3.PublicKey(plan.payMint);
+    const payProgPk = new w3.PublicKey(plan.payProgram);
+    const from = splToken.getAssociatedTokenAddressSync(payMintPk, keeper.publicKey, true, payProgPk);
+    const dec = (await conn.getTokenAccountBalance(from)).value.decimals;
+    await payOnce(conn, keeper, plan, "deposit", () => {
+      const t = new w3.Transaction();
+      t.add(splToken.createTransferCheckedInstruction(from, payMintPk, vaultPk, keeper.publicKey, BigInt(plan.payAmount), dec, [], payProgPk));
+      return t;
+    }, save);
+    log.push(job.mint + ": deposited " + plan.payAmount + " to staking vault");
+  }
+  if (!plan.syncDone) {
+    await payOnce(conn, keeper, plan, "sync", () => {
+      const t = new w3.Transaction();
+      t.add({ programId: stakeProg,
+        keys: [{ pubkey: spoolPk, isSigner: false, isWritable: true }, { pubkey: vaultPk, isSigner: false, isWritable: false }],
+        data: SYNC_DISC });
+      return t;
+    }, save);
+    log.push(job.mint + ": synced staking accumulator");
   }
   if (db) await db.del(planKey);
 }

@@ -260,7 +260,13 @@
      * mint a STANDARD SPL token — a creator who opted out of holder rewards must
      * never receive a taxed mint (RugCheck/GMGN auto-flag transfer-fee tokens),
      * and a buyback is funded from the fee share, not a transfer tax. */
-    var hasHolderTax = opts.rewardMode === "dividend" || opts.rewardMode === "split";
+    /* A PAIR funds holder rewards from the creator's TRADING-FEE share (routed to
+     * the staking vault by the keeper, which is set as the pool's creator below),
+     * NOT a Token-2022 transfer tax. So a pair mints a STANDARD token — no tax on
+     * traders, platform (0.4%) + Raydium (0.25%) untouched, only the creator's 0.5%
+     * is redirected. A pair is a launch with a paired collection + feeShare "vault". */
+    var isPairLaunch = opts.feeShare === "vault" && !!opts.collection;
+    var hasHolderTax = !isPairLaunch && (opts.rewardMode === "dividend" || opts.rewardMode === "split");
 
     // dev buy — LaunchLab needs > 0; fall back to ~0.01 of the quote unit
     var devBuyRaw = rawAmount(opts.firstBuySol || 0, q.decimals);
@@ -293,6 +299,32 @@
       extraSigners: [baseMint],
       txVersion: c.R.TxVersion.LEGACY,
     });
+
+    /* PAIR: set the pool's CREATOR to the keeper, so the keeper — not the launcher
+     * — owns the claim on the creator's 0.5% trading fee and routes it to the
+     * staking vault. The creator account is index 1 of the initialize instruction
+     * and is NON-SIGNER + non-writable (verified), so the launcher still signs as
+     * payer (index 0) and there is no extra signer / drainer warning. The launcher
+     * keeps ownership of the token + collection; they hand over only their fee cut,
+     * which is the entire point of a pair. Standard launches are untouched. */
+    if (isPairLaunch) {
+      var KEEPER = (window.BRAND && window.BRAND.feeKeeper) || "EFFY1LjZbzzEYuUr24udxWponKqtta8MaxZxs6HGPswH";
+      var progStr = c.prog.toBase58();
+      var patched = 0;
+      (built.transactions || (built.transaction ? [built.transaction] : [])).forEach(function (tx) {
+        tx.instructions.forEach(function (ix) {
+          // the initialize ix: LaunchLab program, and the owner sits at BOTH index 0
+          // (payer) and index 1 (creator). The dev-buy has the owner only at index 0.
+          if (ix.programId.toBase58() === progStr && ix.keys.length >= 2 &&
+              ix.keys[0].pubkey.equals(c.owner) && ix.keys[1].pubkey.equals(c.owner) &&
+              !ix.keys[1].isSigner) {
+            ix.keys[1] = { pubkey: new c.X.PublicKey(KEEPER), isSigner: false, isWritable: false };
+            patched++;
+          }
+        });
+      });
+      if (patched !== 1) throw new Error("pair launch: expected to set exactly one pool creator, set " + patched + " — aborting to avoid a misrouted launch");
+    }
 
     // fold the Arweave storage fee into the launch transaction (paid in SOL,
     // like the Meteora path) — one System-transfer on the last (pool) tx. Built
