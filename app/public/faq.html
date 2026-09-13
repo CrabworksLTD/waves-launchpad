@@ -131,13 +131,13 @@ details[open] summary::after{transform:rotate(45deg);color:var(--accent)}
   </details>
   <details>
     <summary>What are the trading fees on tokens?</summary>
-    <div class="a"><p><span class="ch-sol">The floor is a <b>1% swap fee</b>, split
-    <b>40% to you, 40% to the platform, 20% to Meteora</b> (whose tech runs the
-    curve).</span><span class="ch-rh">The floor is a <b>1% swap fee</b>, split
+    <div class="a"><p><span class="ch-sol">The swap fee is a flat <b>1.15%</b>, split
+    <b>0.50% to you, 0.40% to the platform, 0.25% to Raydium</b> (whose LaunchLab
+    runs the curve) — the same rate on every token.</span><span class="ch-rh">The floor is a <b>1% swap fee</b>, split
     <b>60% to you, 40% to the platform</b> — the curve is ours, so there is no
     third party taking a cut and you keep more than the same fee pays on
-    Solana.</span> You can set a higher fee at launch — up to 10% — and almost
-    all of the extra goes to your side, not ours. If you're the creator, your
+    Solana.</span><span class="ch-rh"> You can set a higher fee at launch — up to 10% — and almost
+    all of the extra goes to your side, not ours.</span> If you're the creator, your
     share can pay straight into rewards for your holders.</p></div>
   </details>
 
@@ -167,10 +167,12 @@ details[open] summary::after{transform:rotate(45deg);color:var(--accent)}
   </details>
   <details>
     <summary>What can tokens be priced in?</summary>
-    <div class="a"><p class="ch-rh"><b>Token launches are Solana-only today</b> —
-    our own launchpad for Robinhood Chain is in the works. This answer is about
-    the Solana side.</p><p>SOL or USDC. The launch window shows exactly
-    what's available.</p></div>
+    <div class="a"><p class="ch-sol">SOL or USDC. The launch window shows exactly
+    what's available.</p><p class="ch-rh"><b>ETH</b> by default — or <b>USDG</b> or any
+    of <b>170+ tokenised stocks</b> (Tesla, Apple, Nvidia and more). Buyers always pay
+    ETH: it converts to your chosen asset and into the curve in one transaction, and
+    sells pay back in ETH — so nobody has to go and hold the stock to trade the token.
+    The launch window shows exactly what's available.</p></div>
   </details>
 
   <h2>Pairs &amp; rewards</h2>
@@ -185,8 +187,8 @@ details[open] summary::after{transform:rotate(45deg);color:var(--accent)}
     <div class="a"><p>After you launch, not during it. Open <a href="/fees">the fee
     page</a>, find your token, and hit <b>Activate</b> — one signature hands your
     fee stream to the keeper, which pays your holders hourly. Whether it's a
-    dividend or a buyback, and what they're paid in, you chose at launch. Payouts
-    start on the next hourly run.</p>
+    dividend, a buyback-and-burn, or a 50/50 split of both — and what they're paid
+    in — you chose at launch. Payouts start on the next hourly run.</p>
     <p>That signature hands your pool's creator role to the WAVES keeper, which
     is what makes the pledge real: from then on you cannot claim a stream you
     gave away, because the chain will not let you. <b>It cannot be undone</b>,
@@ -200,20 +202,20 @@ details[open] summary::after{transform:rotate(45deg);color:var(--accent)}
   <details>
     <summary>Can I turn rewards off, or change them later?</summary>
     <div class="a"><p>No. Activation is one-way — the chain will not let you
-    reclaim a fee stream you have handed over. Your dividend-or-buyback choice and
-    the asset holders are paid in are set at launch; to do it differently is a
-    decision for your next launch.</p></div>
+    reclaim a fee stream you have handed over. Your reward choice — dividend, buyback,
+    or the 50/50 split — and the asset holders are paid in are set at launch; to do it
+    differently is a decision for your next launch.</p></div>
   </details>
   <details>
     <summary>What do holders actually receive?</summary>
-    <div class="a"><p>Whatever you chose — SOL, USDC, or any of the tokenised
-    stocks. The keeper buys the asset before paying it out,
-    pro-rata by holdings, with nothing for anyone to claim.</p>
+    <div class="a"><p>Whatever you chose — <span class="ch-sol">SOL, USDC,</span><span class="ch-rh">ETH, USDG,</span>
+    or any of the tokenised stocks. When the token is already priced in that stock,
+    the fees accrue in it directly; otherwise the keeper buys it before paying out —
+    either way pro-rata by holdings, with nothing for anyone to claim.</p>
     <p>It pays the trading currency instead whenever buying the asset would not
-    serve holders: nothing trades it yet, the payout is big enough to move its
-    price, or the cost of creating token accounts would eat more than a tenth
-    of it. It switches to your chosen asset by itself once that stops being
-    true — you do not have to do anything.</p></div>
+    serve holders: nothing trades it yet, or the payout is big enough to move its
+    price. It switches to your chosen asset by itself once that stops being true —
+    you do not have to do anything.</p></div>
   </details>
   <details>
     <summary>Is holder staking live?</summary>

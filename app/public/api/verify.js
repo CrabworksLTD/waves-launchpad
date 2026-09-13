@@ -81,8 +81,10 @@ async function submit(address, spec) {
 }
 
 export default async function handler(req, res) {
+  // Fail closed for the full sweep; the single named-token path stays open by
+  // design (submits public source to a public verifier).
   const secret = process.env.CRON_SECRET;
-  const authed = !secret || req.headers.authorization === "Bearer " + secret;
+  const authed = !!secret && req.headers.authorization === "Bearer " + secret;
   const only = (req.query && req.query.token) || null;
   /* One token by name is open, like the indexer's: a fresh launch wants to be
    * verified now rather than at the next sweep, and submitting a contract's own

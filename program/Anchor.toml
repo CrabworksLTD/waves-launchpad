@@ -2,7 +2,7 @@
 anchor_version = "0.31.1"
 
 [programs.localnet]
-waves_staking = "DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY"
+waves_staking = "jt5JegTBVPZP8V6a48fnKYPFKTbpcTfkz91Pemur82H"
 
 [registry]
 url = "https://api.apr.dev"

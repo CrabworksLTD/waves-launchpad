@@ -63,7 +63,16 @@ const SWAP_ROUTER = process.env.RH_SWAP_ROUTER || null;
  * recipient, so no separate burn tx is needed. */
 const HOOK_ROUTER = process.env.RH_HOOK_ROUTER || "0x29b0638dd7fcd8f829fed7cd2a10830a6c1faa27";
 const DEAD = "0x000000000000000000000000000000000000dEaD";
-const ROUTER_BUY = "0xb3ffb760"; // buy(address,uint256,address,uint256)
+const ETH_ADDR = "0x0000000000000000000000000000000000000000"; // the ETH quote sentinel
+// buy(address token,address quote,uint256 quoteIn,uint256 minOut,address to,uint256 deadline)
+const ROUTER_BUY = "0x09aa45a0";
+const SEL_APPROVE = "0x095ea7b3";       // ERC20 approve(address,uint256)
+// owed(address who,address quote) / claim(address quote) on the quote-aware hook
+const SEL_OWED = "0x28079e4a";
+const SEL_CLAIM = "0x1e83409a";
+const SEL_POOL_OF = "0x988b1fa7";
+const SEL_CURVES = "0x66903e80";
+const isEthQuote = (q) => !q || /^0x0+$/i.test(String(q));
 
 // WavesSwapRouter.swap((address,address,uint24,int24,address),uint256,address)
 const SEL_SWAP = "0x4ea88ad7";
@@ -569,8 +578,11 @@ export default async function handler(req, res) {
     }
   }
 
+  // H-1 twin (live money): fail CLOSED — a missing secret must never mean "no
+  // auth" in a preview/restored env.
   const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.authorization !== "Bearer " + secret) {
+  if (!secret) return res.status(500).json({ error: "CRON_SECRET is not set" });
+  if (req.headers.authorization !== "Bearer " + secret) {
     return res.status(401).json({ error: "no" });
   }
   if (!process.env.RH_KEEPER_SECRET) {
@@ -608,6 +620,7 @@ export default async function handler(req, res) {
           tbl[sl.mint] = (await db.hgetall("rhix:" + sl.mint + ":h").catch(() => null)) || {};
         }
         await runSwaps(db, planKey, p, keeper);
+        await runBurns(db, planKey, p, keeper);
         await buildPayments(db, p, tbl);
         await db.set(planKey, JSON.stringify(p));
       }
@@ -635,47 +648,79 @@ export default async function handler(req, res) {
     if (!toks.length) return res.status(200).json({ ok: true, keeper, note: "nothing pledged" });
 
     const latest = BigInt(await rpc("eth_blockNumber", []));
-    const owedHex = await rpc("eth_call", [{
-      to: CURVE, data: "0xdf18e047" + "0".repeat(24) + keeper.slice(2).toLowerCase()
-    }, "latest"]);
-    const pot = BigInt(owedHex || "0x0");
-    if (pot === 0n) return res.status(200).json({ ok: true, keeper, note: "nothing owed" });
 
-    // ── 2. attribute the pot across the tokens that earned it ────────────────
-    const shares = [];
-    const assets = {};
-    const burns = {}; // mint -> true when the creator chose buyback-and-burn
-    let attributed = 0n;
+    /* Decode each pledged token's on-chain curve once: its fee rung, whether it
+     * pledged, and — new — the QUOTE ASSET its pool trades in. Fees now accrue in
+     * the quote (ETH, USDG or a stock), so the keeper owes and claims PER QUOTE.
+     * curves is keyed by PoolId: poolOf(mint) -> curves(poolId). Struct layout:
+     * token(0) creator(1) feeBps(2) rewardsBps(3) keeper(4) raised(5) tokensLeft(6)
+     * full(7) graduated(8) quote(9) ... */
+    const descs = [];
     for (const t of toks) {
       const mint = String(t.mint).toLowerCase();
-      /* What the creator chose to pay holders in. Null, missing or ETH itself
-       * all mean the same thing: no swap, pay the native coin. */
-      const rm = t.rewardMint && String(t.rewardMint).toLowerCase();
-      /* Buyback-and-burn: no asset is paid to holders. The keeper buys the token
-       * ITSELF with the accrued ETH and sends it to 0xdEaD — the same thing the
-       * Solana side does (destroy rather than distribute), and what a burn on the
-       * benchmark launchpad does too. So it takes no asset and no holders. */
-      const isBurn = t.rewardMode === "burn";
-      burns[mint] = isBurn;
-      assets[mint] = (!isBurn && rm && rm !== ZERO_ADDR && /^0x[0-9a-f]{40}$/.test(rm)) ? rm : null;
-      /* The hook keys its Curve by PoolId: poolOf(mint) -> curves(poolId).
-       * curves(address) on the hook returns a zero struct (rewardsBps 0), so the
-       * keeper would skip every token as "no rewards". Layout: token(0)
-       * creator(1) feeBps(2) rewardsBps(3) ... */
       const poolId = await rpc("eth_call", [{
-        to: CURVE, data: "0x988b1fa7" + "0".repeat(24) + mint.slice(2)
+        to: CURVE, data: SEL_POOL_OF + "0".repeat(24) + mint.slice(2)
       }, "latest"]);
       const curve = await rpc("eth_call", [{
-        to: CURVE, data: "0x66903e80" + String(poolId).replace(/^0x/, "")
+        to: CURVE, data: SEL_CURVES + String(poolId).replace(/^0x/, "")
       }, "latest"]);
-      const feeBps = Number(word(curve, 2));
       const rewardsBps = Number(word(curve, 3));
       if (!rewardsBps) continue;
-      const a = await accrued(db, mint, feeBps, rewardsBps, t.block, latest);
-      if (a.wei > 0n) { shares.push({ mint, wei: a.wei, upTo: a.upTo, burn: isBurn }); attributed += a.wei; }
-      else log.push({ mint, earned: "0" });
+      /* Curve word 9 is the quote asset on the quote-aware hook. If the struct is
+       * short (e.g. read against an older hook), fall back to ETH rather than a
+       * malformed address. */
+      const q9 = String(curve).replace(/^0x/, "").slice(9 * 64, 10 * 64);
+      const quote = q9.length === 64 ? ("0x" + q9.slice(24)).toLowerCase() : ETH_ADDR;
+      descs.push({ t, mint, feeBps: Number(word(curve, 2)), rewardsBps, quote });
     }
-    if (!attributed) return res.status(200).json({ ok: true, keeper, note: "no attributable earnings", log });
+    if (!descs.length) return res.status(200).json({ ok: true, keeper, note: "nothing pledged on chain", log });
+
+    // group by quote asset — each pot is claimed and distributed on its own
+    const byQuote = {};
+    for (const d of descs) (byQuote[d.quote] = byQuote[d.quote] || []).push(d);
+
+    /* ⚠️ One quote per run. Processing a single pot keeps the crash-recovery
+     * model (one plan, resumable) intact; the cron drains the rest over later
+     * runs. The first quote with real, attributable earnings is this run's. */
+    for (const quote of Object.keys(byQuote)) {
+      const ethQuote = isEthQuote(quote);
+      const owedHex = await rpc("eth_call", [{
+        to: CURVE, data: SEL_OWED + "0".repeat(24) + keeper.slice(2).toLowerCase() +
+          "0".repeat(24) + quote.slice(2)
+      }, "latest"]);
+      const pot = BigInt(owedHex || "0x0");
+      if (pot === 0n) continue;
+
+      // ── 2. attribute this quote's pot across the tokens that earned it ──────
+      const shares = [];
+      const assets = {};
+      const burns = {};   // mint -> buyback-and-burn
+      const splits = {};  // mint -> 50/50 dividend + buyback
+      let attributed = 0n;
+      for (const d of byQuote[quote]) {
+        const mint = d.mint;
+        const isBurn = d.t.rewardMode === "burn";
+        const isSplit = d.t.rewardMode === "split";
+        burns[mint] = isBurn;
+        splits[mint] = isSplit;
+        /* What holders are paid. ETH-quoted pool: the creator's chosen reward
+         * asset (keeper swaps ETH->asset) or ETH. QUOTED pool: the reward IS the
+         * quote — fees already arrive in it, so it is paid directly and no swap
+         * is possible or needed (WavesSwapRouter is ETH-in only). A burn pays no
+         * holder either way. */
+        if (ethQuote && !isBurn) {
+          const rm = d.t.rewardMint && String(d.t.rewardMint).toLowerCase();
+          assets[mint] = (rm && rm !== ZERO_ADDR && /^0x[0-9a-f]{40}$/.test(rm)) ? rm : null;
+        } else {
+          assets[mint] = null;
+        }
+        const a = await accrued(db, mint, d.feeBps, d.rewardsBps, d.t.block, latest);
+        if (a.wei > 0n) {
+          shares.push({ mint, wei: a.wei, upTo: a.upTo, burn: isBurn, split: isSplit });
+          attributed += a.wei;
+        } else log.push({ mint, earned: "0" });
+      }
+      if (!attributed) continue; // this quote earned nothing yet — try the next
 
     // ── 3. is it worth the gas? ──────────────────────────────────────────────
     const block = await rpc("eth_getBlockByNumber", ["latest", false]);
@@ -689,83 +734,68 @@ export default async function handler(req, res) {
       holderCount += Object.keys(h).length;
     }
     /* A launch nobody holds yet can still burn — only the DIVIDEND path needs a
-     * holder table to pay into. Refuse for no holders only if there is one. */
+     * holder table to pay into. Skip this quote for no holders only if one of its
+     * tokens actually pays a dividend; the cron retries once they are indexed. */
     const dividendShares = shares.filter((s) => !s.burn).length;
-    if (dividendShares > 0 && !holderCount) {
-      return res.status(200).json({ ok: true, keeper, note: "no holders indexed yet" });
-    }
+    if (dividendShares > 0 && !holderCount) { log.push({ quote, note: "no holders indexed yet" }); continue; }
 
-    /* Budget for the dearer path. A token paying an asset costs a swap plus an
-     * ERC20 transfer per holder, and a run that priced itself as ETH sends
-     * would pass the worth-it test and then strand halfway through, holding
-     * money it had already claimed. */
-    const swapping = shares.filter((s) => assets[s.mint] && SWAP_ROUTER).length;
-    const burning = shares.filter((s) => s.burn).length;
-    const perHolder = swapping ? GAS_PER_ERC20 : GAS_PER_TRANSFER;
-    // budget the dearer of the two routes; which one wins is not known until quoted.
-    // a burn is one router.buy, no per-holder tail.
+    /* Budget for the dearer path. A dividend costs (for an ETH pool, a swap to
+     * the reward, then) an ERC20 transfer per holder; a quoted pool pays the
+     * quote (an ERC20 transfer) directly. A burn is one router.buy, no tail. A
+     * split does both, so it counts toward burning AND may swap its dividend
+     * half. Only ETH pools swap (WavesSwapRouter is ETH-in only). */
+    const swapping = shares.filter((s) => ethQuote && assets[s.mint] && SWAP_ROUTER).length;
+    const burning = shares.filter((s) => s.burn || s.split).length;
+    const perHolder = (swapping || !ethQuote) ? GAS_PER_ERC20 : GAS_PER_TRANSFER;
     const gasCost = (GAS_CLAIM + GAS_SWAP2 * BigInt(swapping) + GAS_BURN * BigInt(burning) +
       perHolder * BigInt(holderCount)) * gasPrice;
     /* An explicit, authenticated override for testing the path end to end.
-     *
-     * The economics are real — forwarding a pot smaller than the gas costs more
-     * than it moves — but "wait until a test token has traded several hundred
-     * dollars" is not a way to find out whether the swap leg works. Requires
-     * the deploy secret, so only someone who could change the code anyway. */
+     * Requires the deploy secret, so only someone who could change the code. */
     const force = !!(req.query && req.query.force) && !!secret &&
       req.headers.authorization === "Bearer " + secret;
     if (!force && pot < gasCost * WORTH_IT) {
-      return res.status(200).json({
-        ok: true, keeper, note: "pot too small to be worth the gas",
-        potWei: pot.toString(), gasWei: gasCost.toString(), holders: holderCount
-      });
+      log.push({ quote, note: "pot too small", potWei: pot.toString(), gasWei: gasCost.toString(), holders: holderCount });
+      continue; // maybe another quote's pot clears the bar
     }
 
     const bal = BigInt(await rpc("eth_getBalance", [keeper, "latest"]));
     if (bal < gasCost * 2n) {
+      // low gas is a keeper-wide problem, not a per-quote one — stop the run
       return res.status(200).json({
         ok: true, keeper, note: "keeper is low on gas — top it up",
         balanceWei: bal.toString(), needWei: (gasCost * 2n).toString()
       });
     }
 
-    // ── 4. claim, then 5. write the plan BEFORE spending any of it ───────────
-    const claimHash = await keeperTx(CURVE, "0x4e71d92d", 0n, GAS_CLAIM);
+    // ── 4. claim THIS quote's pot, then 5. write the plan before spending it ──
+    const claimHash = await keeperTx(CURVE, SEL_CLAIM + encAddr(quote), 0n, GAS_CLAIM);
     await mined(claimHash);
 
     /* ── Self-funding ────────────────────────────────────────────────────────
-     * Keep this run's gas OUT of the pot so the keeper's ETH balance stays flat
-     * run after run, instead of bleeding down until someone tops it up by hand —
-     * which at any real volume is not viable. The claim just took the whole pot
-     * into the keeper's balance; distributing (pot - gasReserve) leaves exactly
-     * the gas behind to pay for the swaps/burns/transfers below. gasCost is
-     * already the worst-case (dearer-path) budget and the worth-it gate promised
-     * the pot is several times it, so this is a small slice; 1.3x guards a gas
-     * price bump between estimate and execution, so the keeper trends slightly
-     * positive and builds its own buffer. The bootstrap balance is spent once and
-     * then self-replenishes. */
-    const gasReserve = (gasCost * 13n) / 10n;
+     * Keep this run's gas OUT of the pot so the keeper trends flat rather than
+     * bleeding down. For an ETH pot the reserve is native gas; for a quoted pot
+     * the pot is the QUOTE asset, and the keeper's gas is ETH — so no reserve is
+     * carved from a non-ETH pot (all of it is distributable), and the keeper's
+     * ETH gas is topped up separately. 1.3x guards a gas-price bump. */
+    const gasReserve = ethQuote ? (gasCost * 13n) / 10n : 0n;
     const distributablePot = pot > gasReserve ? pot - gasReserve : 0n;
 
-    /* The plan exists the moment the money does.
-     *
-     * Written before any of it is spent, and before the swaps, because from
-     * here on a crash must be recoverable rather than a loss. It records what
-     * each token is owed in ETH; the swap stage below turns those into assets
-     * and the payment stage turns them into transfers. */
+    /* The plan exists the moment the money does. Written before any of it is
+     * spent, so a crash is recoverable. `quote` fixes the denomination: slices,
+     * swaps, burns and payments are all in the quote asset. */
     const record = {
-      at: Date.now(), claimHash, potWei: pot.toString(),
+      at: Date.now(), claimHash, quote, potWei: pot.toString(),
       gasReserveWei: gasReserve.toString(), distributableWei: distributablePot.toString(),
       cursors: shares.map((s) => ({ mint: s.mint, upTo: s.upTo.toString() })),
-      // slices are pro-rata of the DISTRIBUTABLE pot (pot minus the gas reserve)
+      // slices are pro-rata of the DISTRIBUTABLE pot (pot minus any gas reserve)
       slices: shares.map((s) => ({
         mint: s.mint,
         wei: ((distributablePot * s.wei) / attributed).toString(),
         asset: assets[s.mint] || null,
-        burn: !!s.burn
+        burn: !!s.burn,
+        split: !!s.split
       })),
       swaps: {}, burns: {}, payments: null, sent: 0,
-      // what a transfer costs, so the dust threshold survives into a resumed run
       gasPriceWei: gasPrice.toString()
     };
     await db.set(planKey, JSON.stringify(record));
@@ -777,10 +807,12 @@ export default async function handler(req, res) {
 
     const done = await payOut(db, planKey, record);
     return res.status(200).json({
-      ok: true, keeper, claimHash, swaps: record.swaps, burns: record.burns,
+      ok: true, keeper, quote, claimHash, swaps: record.swaps, burns: record.burns,
       gasReserveWei: record.gasReserveWei, distributableWei: record.distributableWei,
       carriedToNextRun: record.carried || 0, ...done, log
     });
+    } // ── end per-quote loop ──
+    return res.status(200).json({ ok: true, keeper, note: "nothing to distribute", log });
   } catch (e) {
     return res.status(200).json({ ok: false, error: String(e.message || e).slice(0, 300), log });
   }
@@ -804,12 +836,16 @@ export default async function handler(req, res) {
  */
 async function runSwaps(db, planKey, plan, keeper) {
   if (!SWAP_ROUTER) return;
+  // Only ETH pools swap — a quoted pool's reward IS its quote, paid directly, and
+  // WavesSwapRouter is ETH-in only so it could not convert a quote anyway.
+  if (!isEthQuote(plan.quote)) return;
 
   for (const sl of plan.slices || []) {
     if (!sl.asset) continue;                       // paying ETH by choice
     if (plan.swaps[sl.mint] && plan.swaps[sl.mint].done) continue;   // already swapped
 
-    const amountIn = BigInt(sl.wei);
+    // a split pays a dividend with HALF its slice; the other half is burned
+    const amountIn = sl.split ? BigInt(sl.wei) / 2n : BigInt(sl.wei);
     if (amountIn <= 0n) continue;
 
     try {
@@ -898,19 +934,34 @@ async function runSwaps(db, planKey, plan, keeper) {
  * swept into the next run rather than being sent as a transfer that costs more
  * gas than it moves.
  */
+/* Approve the hook router to pull the quote asset for a quoted-pool buyback. A
+ * generous allowance so it is not re-approved every burn; the check first makes
+ * it idempotent and cheap on the common (already-approved) path. */
+const SEL_ALLOWANCE = "0xdd62ed3e";
+async function ensureRouterAllowance(token, amount, keeper) {
+  const cur = BigInt(await rpc("eth_call", [
+    { to: token, data: SEL_ALLOWANCE + encAddr(keeper) + encAddr(HOOK_ROUTER) }, "latest"]) || "0x0");
+  if (cur >= BigInt(amount)) return;
+  const data = SEL_APPROVE + encAddr(HOOK_ROUTER) + pad((1n << 200n) - 1n);
+  await mined(await keeperTx(token, data, 0n, 80000n));
+}
+
 /* Buyback-and-burn. For each burn slice, buy the token on its own curve through
- * the WavesHookRouter with the accrued ETH and deliver it straight to 0xdEaD.
+ * the WavesHookRouter with the accrued quote and deliver it straight to 0xdEaD.
  * Crash-recoverable like runSwaps: the tx is signed and written into the plan
  * BEFORE broadcast, and the amount burned is the dead-address balance DELTA, so
  * a resume — or two runs — can never double-count. The cumulative burn per token
  * is persisted for the token page's "tokens burnt" counter. */
 async function runBurns(db, planKey, plan, keeper) {
+  const eth = isEthQuote(plan.quote);
   for (const sl of plan.slices || []) {
-    if (!sl.burn) continue;
+    if (!sl.burn && !sl.split) continue;  // pure burn, or a split's buyback half
     plan.burns = plan.burns || {};
     if (plan.burns[sl.mint] && plan.burns[sl.mint].done) continue;
 
-    const amountIn = BigInt(sl.wei);
+    // a split burns HALF its slice (the other half pays the dividend); a pure
+    // burn spends the whole slice.
+    const amountIn = sl.split ? BigInt(sl.wei) / 2n : BigInt(sl.wei);
     if (amountIn <= 0n) { plan.burns[sl.mint] = { skipped: "nothing accrued", done: true }; continue; }
 
     try {
@@ -919,11 +970,15 @@ async function runBurns(db, planKey, plan, keeper) {
         // dead-address balance BEFORE, so the burn is measured as a delta
         const beforeHex = await rpc("eth_call", [
           { to: sl.mint, data: SEL_BALANCE_OF + encAddr(DEAD) }, "latest"]);
-        // buy(token, minOut=0, to=DEAD, deadline). Any overfill near graduation is
-        // refunded by the router to the keeper and carried as its own balance.
+        /* buy(token, quote, quoteIn, minOut=0, to=DEAD, deadline). ETH pool: pay
+         * with msg.value, quoteIn 0. Quoted pool: approve the router to pull the
+         * quote, then pass it as quoteIn with no value. Any near-graduation
+         * overfill is refunded to the keeper and carried as its own balance. */
+        if (!eth) await ensureRouterAllowance(plan.quote, amountIn, keeper);
         const deadline = Math.floor(Date.now() / 1000) + 1200;
-        const data = ROUTER_BUY + encAddr(sl.mint) + pad(0n) + encAddr(DEAD) + pad(deadline);
-        const { raw, hash } = await signKeeperTx(HOOK_ROUTER, data, amountIn, GAS_BURN);
+        const data = ROUTER_BUY + encAddr(sl.mint) + encAddr(eth ? ETH_ADDR : plan.quote) +
+          pad(eth ? 0n : amountIn) + pad(0n) + encAddr(DEAD) + pad(deadline);
+        const { raw, hash } = await signKeeperTx(HOOK_ROUTER, data, eth ? amountIn : 0n, GAS_BURN);
         pending = { hash, raw, before: BigInt(beforeHex || "0x0").toString(), done: false };
         plan.burns[sl.mint] = pending;
         await db.set(planKey, JSON.stringify(plan));
@@ -977,27 +1032,35 @@ async function buildPayments(db, plan, tables) {
   const nextCarry = {};
   const gasPrice = BigInt(plan.gasPriceWei || "0");
 
+  const ethQuote = isEthQuote(plan.quote);
   for (const sl of plan.slices || []) {
-    if (sl.burn) continue;                 // burns pay no holders — handled in runBurns
+    if (sl.burn) continue;                 // pure burns pay no holders — see runBurns
     const table = tables[sl.mint] || {};
     const supply = Object.values(table).reduce((a, b) => a + BigInt(b), 0n);
     if (supply === 0n) continue;
 
     /* Each swap recorded what IT brought in, so two tokens paying the same
-     * asset settle side by side without either counting the other's tokens. */
+     * asset settle side by side without either counting the other's tokens. A
+     * split pays holders with HALF its slice (the other half was burned). */
     const sw = plan.swaps[sl.mint];
     const swapped = sw && sw.done;
-    const asset = swapped ? sw.asset : null;
-    const total = swapped ? BigInt(sw.received) : BigInt(sl.wei);
+    const base = sl.split ? BigInt(sl.wei) / 2n : BigInt(sl.wei);
+    /* Payout asset: the swapped reward (ETH pools only), else — for a quoted
+     * pool — the quote itself (paid directly), else ETH. */
+    const asset = swapped ? sw.asset : (ethQuote ? null : plan.quote);
+    const total = swapped ? BigInt(sw.received) : base;
 
-    /* What one transfer costs, expressed in whatever is being sent. For an
-     * asset that is the gas converted at the rate this run's own swap got; for
-     * ETH the two are the same currency already. */
+    /* Dust threshold. For an ETH pool it is the transfer's gas, converted into
+     * the paid asset at this run's own swap rate (ETH spent = base). For a
+     * QUOTED pool the keeper's gas is ETH but the payout is the quote and we have
+     * no ETH/quote rate here, so pay everyone (threshold 0) — the pot already
+     * cleared the run-wide worth-it gate; per-holder dust is a minor
+     * inefficiency, not a wrong split. */
     const sendGas = asset ? GAS_PER_ERC20 : GAS_PER_TRANSFER;
     const gasInEth = sendGas * gasPrice;
-    const threshold = (asset && BigInt(sl.wei) > 0n)
-      ? (total * gasInEth) / BigInt(sl.wei)
-      : gasInEth;
+    const threshold = !ethQuote
+      ? 0n
+      : (asset && base > 0n ? (total * gasInEth) / base : gasInEth);
 
     for (const [addr, held] of Object.entries(table)) {
       const share = (total * BigInt(held)) / supply;

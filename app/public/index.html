@@ -294,7 +294,7 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
         <stop offset="0" style="stop-color:var(--grad-a)"/><stop offset="1" style="stop-color:var(--grad-b)"/>
         </linearGradient></defs>
         <path fill="url(#fg)" d="M0 16h8v8H0ZM8 8h8v8H8Zm8-8h8v8h-8Z"/></svg>WAVES</b>
-      <p>Built on Metaplex Core and Meteora.</p>
+      <p>Built on Metaplex Core and Raydium LaunchLab.</p>
       <a class="x" href="https://x.com/waveslaunchpad" target="_blank" rel="noopener"
         aria-label="WAVES on X"><svg width="15" height="15" viewBox="0 0 24 24"
         fill="currentColor"><path d="M18.9 1.2h3.7l-8.1 9.3L24 22.8h-7.5l-5.9-7.7-6.7 7.7H.2l8.7-9.9L0 1.2h7.7l5.3 7 5.9-7Zm-1.3 19.4h2L6.6 3.3H4.4Z"/></svg></a>
@@ -450,6 +450,26 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
    * launched on; the leaderboards and spotlight read only that side's, and
    * the numbers behind them come from that chain's readers. */
   var EVM = !!(window.Shell && window.Shell.chain && window.Shell.chain() === "robinhood");
+  // The curve reader for this chain. On Robinhood it is the V4-hook token
+  // module (evm-hook.js); on Solana the standalone Token module. Read lazily so
+  // it resolves after the EVM stack has loaded.
+  function mkt() {
+    var M = EVM ? window.MoonpadToken : window.Token;
+    // The Solana module exposes readMarket at the top level; the EVM hook
+    // module (MoonpadToken) exposes it on its adapter(), not the top level.
+    // Resolve either shape, and NEVER return something without readMarket — the
+    // spotlight calls this synchronously inside draw(), so a throw here would
+    // abort draw() before the leaderboard renders.
+    if (M && typeof M.readMarket === "function") return M;
+    if (M && typeof M.adapter === "function") {
+      try { var a = M.adapter(); if (a && typeof a.readMarket === "function") return a; } catch (e) {}
+    }
+    return { readMarket: function () { return Promise.reject(new Error("no market reader")); } };
+  }
+  // A market read gives quote:"ETH" for native pools and null for an RWA/USDG
+  // quote, leaving the address in quoteAddr — resolve that to a ticker so a
+  // CRDO-paired token reads "… CRDO raised", not "… null raised".
+  function qsym(m) { return (m && m.quote) || rewardSym(m && m.quoteAddr) || ""; }
   function mine(list, key) {
     return list.filter(function (r) {
       return EVM ? r.chain === "robinhood" : r.chain !== "robinhood";
@@ -465,8 +485,11 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
     getJson("/templates/index.json", "templates")
   ]).then(function (r) {
     if (EVM) {
-      // the EVM readers live in their own files, loaded only on this side
-      return ["/evm-chains.js", "/evm-contract.js", "/evm-collections.js"]
+      // the EVM readers live in their own files, loaded only on this side.
+      // evm-hook.js is the TOKEN reader (window.MoonpadToken.readMarket) — the
+      // Solana window.Token is never loaded here, so without this the token
+      // leaderboard and spotlight sit forever on "reading the curve…".
+      return ["/evm-chains.js", "/evm-contract.js", "/evm-collections.js", "/evm-hook.js"]
         .reduce(function (p, src) {
           return p.then(function () {
             return new Promise(function (res, rej) {
@@ -654,7 +677,7 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
           href: "/token/" + r.mint, img: r.icon || null,
           // a badge by reward type — DIVIDEND / BUYBACK — nothing if it keeps fees
           badge: (r.feeSharePct || 0) > 0
-            ? (r.rewardMode === "burn" ? "BUYBACK" : "DIVIDEND") : "",
+            ? (r.rewardMode === "burn" ? "BUYBACK" : r.rewardMode === "split" ? "DIVIDEND/BUYBACK" : "DIVIDEND") : "",
           badgeKind: "reward",
           addr: r.mint, at: r.at,
           /* Only once rewards are actually running. feeSharePct is zero at
@@ -722,7 +745,7 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
        * mixes both kinds, so "TOKEN" / "COLLECTION" is the thing you need at a
        * glance. Status lives in the stat line and the bar underneath. */
       if (it.kind === "token") {
-        window.Token.readMarket(it.rec.mint).then(function (m) {
+        mkt().readMarket(it.rec.mint).then(function (m) {
           it.size = m.raised || 0;
           if (m.migrated) { setStat(statEl, "Graduated", ""); setBar(card, 1); return; }
           // prefer the indexer's mcap (set above); the live figure is the
@@ -730,7 +753,7 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
           var q = String(m.quote || "").toLowerCase();
           var mcUsd = m.mcap == null ? null : (q === "sol" ? m.mcap * solUsd : m.mcap);
           setStat(statEl, usdShort(mcapUsd[it.rec.mint]) || usdShort(mcUsd) ||
-            (m.mcap != null ? UI.fmt(m.mcap, 1) + " " + m.quote : "—"), "MC");
+            (m.mcap != null ? UI.fmt(m.mcap, 1) + " " + qsym(m) : "—"), "MC");
           setBar(card, m.progress);
         }).catch(function () {});
         return;
@@ -753,8 +776,9 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
     drawRankedTokens(tokens.slice(0, 10));
   }
 
-  // the official Solana mark — the little chain marker
-  var MINI = '<img src="/art/solana.svg" width="12" height="10" alt="">';
+  // the little chain marker — the mark of whichever chain this homepage shows
+  var MINI = '<img src="' + (EVM ? "/art/robinhood.svg" : "/art/solana.svg") +
+    '" width="12" height="10" alt="">';
 
   function rankRow(href, name, thumb, stat, frac) {
     var bar = frac == null ? ""
@@ -859,8 +883,10 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
             ? '<img alt="" loading="lazy" src="' + esc(x.t.icon) + '">'
             : esc(sym.slice(0, 1))) + "</span>",
           x.m ? (x.m.migrated ? "graduated"
-                : UI.fmt(x.m.raised, 2) + "/" + UI.fmt(x.m.threshold, 0) + " " +
-                  x.m.quote + " raised")
+                : (x.m.raisedEth != null
+                    ? UI.fmt(x.m.raisedEth, 3) + "/" + UI.fmt(x.m.thresholdEth, 2) + " ETH raised"
+                    : UI.fmt(x.m.raised, 2) + "/" + UI.fmt(x.m.threshold, 0) + " " +
+                      qsym(x.m) + " raised"))
               : "reading the curve…",
           x.m ? (x.m.migrated ? 1
                 : x.m.threshold ? x.m.raised / x.m.threshold : 0) : 0);
@@ -869,7 +895,7 @@ footer .steps{position:absolute;right:-20px;bottom:-20px;pointer-events:none;opa
     }
     paintList();
     rows.forEach(function (row) {
-      window.Token.readMarket(row.t.mint).then(function (m) {
+      mkt().readMarket(row.t.mint).then(function (m) {
         row.m = m; paintList();
       }).catch(function () {});
     });

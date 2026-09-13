@@ -58,12 +58,12 @@
      * hitting it: 0.400, 0.512, 0.600, 0.704, 0.800, 0.880. Each value is the
      * closest integer, and t2 is 68 because that is what is already signed.
      *
-     *   fee   Meteora  platform  creator side   config split
-     *    2%     0.40      0.50       1.10        25   / 55
-     *    3%     0.60      0.60       1.80        20   / 60
-     *    4%     0.80      0.70       2.50        17.5 / 62.5
-     *    5%     1.00      0.80       3.20        16   / 64
-     *   10%     2.00      0.90       7.10         9   / 71
+     * (L-4: a stale ASCII table stood here. It disagreed with the code on the t2
+     * and t10 platform figures and on the whole config-split column — the real
+     * split is creatorTradingFeePercentage below, 68/75/78/80/89 after on-chain
+     * integer truncation. This file is where the economics live and get quoted
+     * to creators and auditors, so a wrong number is worse than none: trust the
+     * prose above and the values below.)
      */
     t2:  { label: "Tax token", pct: 2,  baseFeeBps: 200,  creatorTradingFeePercentage: 68 },
     t3:  { label: "Tax token", pct: 3,  baseFeeBps: 300,  creatorTradingFeePercentage: 75 },
@@ -124,8 +124,15 @@
       token: {
         tokenType: sdk.TokenType.SPLToken,
         tokenBaseDecimal: sdk.TokenDecimal.SIX,
+        // L-5: THROW on an unhandled decimal rather than silently defaulting to
+        // SIX. This value is baked into a config that is IMMUTABLE once created;
+        // guessing 6 for a genuine 9- or 4-decimal quote bakes a curve whose
+        // thresholds are off by orders of magnitude into an account nobody can
+        // amend. Registered quotes are 6/8/9; anything else is a mistake to catch.
         tokenQuoteDecimal: Q.decimals === 9 ? sdk.TokenDecimal.NINE
-          : Q.decimals === 8 ? sdk.TokenDecimal.EIGHT : sdk.TokenDecimal.SIX,
+          : Q.decimals === 8 ? sdk.TokenDecimal.EIGHT
+          : Q.decimals === 6 ? sdk.TokenDecimal.SIX
+          : (function () { throw new Error("unsupported quote decimal " + Q.decimals + " — refusing to bake an immutable curve on a guess"); })(),
         tokenAuthorityOption: sdk.TokenAuthorityOption.Immutable,
         totalTokenSupply: TERMS.totalTokenSupply,
         leftover: 0

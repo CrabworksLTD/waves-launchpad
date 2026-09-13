@@ -185,8 +185,20 @@
       } catch (e) { /* fall through to derivation */ }
     }
     var m = clusterConfigs();
+    /* M-8: walk EVERY config family, not just [m, m.tax]. The five live tax
+     * rungs (t2..t10) each hold their own pool configs; naming only two families
+     * dropped every laddered pool through to getPoolByBaseMint — the indexed
+     * scan the RPC refuses and this function exists to avoid (moar cat hit this).
+     * Discover families generically so adding a rung in brand.js can't silently
+     * remove it from lookup again: the base m, plus every sub-object that carries
+     * a sol/usdc/rwa config (t2..t10, tax). */
+    var fams = [m];
+    Object.keys(m).forEach(function (k) {
+      var v = m[k];
+      if (v && typeof v === "object" && (v.sol || v.usdc || v.rwa)) fams.push(v);
+    });
     var cands = [];
-    [m, m.tax || {}].forEach(function (fam) {
+    fams.forEach(function (fam) {
       if (fam.sol) cands.push({ q: WSOL, c: fam.sol });
       if (fam.usdc) cands.push({ q: USDC, c: fam.usdc });
       Object.keys(fam.rwa || {}).forEach(function (mint) {
@@ -607,8 +619,13 @@
       /* Creator-chosen fee: a per-launch config. The program stores the
        * platform wallet as feeClaimer WITHOUT its signature — only the
        * launcher and the ephemeral config key sign. The split is the SAME as
-       * standard — 20% creator / 60% platform / 20% Meteora. A creator who
-       * wants a bigger stream raises the fee %, not the split. */
+       * the standard 1% tier — 40% creator / 40% platform / 20% Meteora
+       * (creatorTradingFeePercentage: 50). L-3: this was 25 (a 20/60/20 split,
+       * the pre-ladder standard), while the comment claimed the current one —
+       * paying the creator a quarter of what the ladder would at the same fee.
+       * This path is currently UNREACHABLE (no caller sets customFeeBps); the
+       * constant is corrected so a future revival ships the split it documents.
+       * A creator who wants a bigger stream raises the fee %, not the split. */
       if (opts.quote !== "sol" && opts.quote !== "usdc") {
         // an RWA custom-fee curve needs a live price to set its market caps;
         // until that's built, RWA quotes launch on the standard tier
@@ -621,7 +638,7 @@
       var cfgKp = c.X.Keypair.generate();
       var quoteMint = opts.quote === "sol" ? "So11111111111111111111111111111111111111112" : USDC;
       var curve = c.M.buildCurveWithMarketCap(terms.buildParams(c.M, opts.quote,
-        { baseFeeBps: opts.customFeeBps, creatorTradingFeePercentage: 25 }));
+        { baseFeeBps: opts.customFeeBps, creatorTradingFeePercentage: 50 }));
 
       progress({ step: "pool", state: "signing" });
       var pair = await within(60000, "Building the launch transaction",

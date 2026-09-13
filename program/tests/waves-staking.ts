@@ -19,6 +19,7 @@ import {
 import {
   createMint, mintTo, createAssociatedTokenAccountIdempotent, getAccount,
   getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountInstruction,
 } from "@solana/spl-token";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import {
@@ -60,8 +61,10 @@ describe("waves-staking", () => {
   const poolPda = () => PublicKey.findProgramAddressSync(
     [Buffer.from("pool"), tokenMint.toBuffer(), collection.toBuffer()],
     program.programId)[0];
-  const posPda = (asset: PublicKey) => PublicKey.findProgramAddressSync(
-    [Buffer.from("pos"), asset.toBuffer()], program.programId)[0];
+  // C-1: the position PDA is bound to (pool, asset), not the asset alone.
+  const posPda = (asset: PublicKey, poolKey: PublicKey = poolPda()) =>
+    PublicKey.findProgramAddressSync(
+      [Buffer.from("pos"), poolKey.toBuffer(), asset.toBuffer()], program.programId)[0];
 
   async function deposit(lamportsOfReward: number | bigint) {
     await mintTo(conn, payer, rewardMint, vault, payer, BigInt(lamportsOfReward));
@@ -242,5 +245,124 @@ describe("waves-staking", () => {
       tokenProgram: TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,
     }).signers([staker2]).rpc().catch(() => { refused = true; });
     expect(refused).to.be.true;
+  });
+
+  // C-1 regression: an attacker who owns a collection NFT must not be able to
+  // drain the real vault by inflating weight in a pool they made themselves that
+  // shares the collection. The position PDA is bound to (pool, asset), so weight
+  // built under a foreign pool cannot reach the real pool's vault.
+  it("C-1: a cross-pool position cannot drain the real vault", async () => {
+    // attacker owns a fresh asset in the SAME collection
+    const a3 = generateSigner(umi);
+    await create(umi, {
+      asset: a3, collection: { publicKey: umiPk(collection.toBase58()) } as any,
+      name: "#3", uri: "https://example.com/3.json",
+      owner: umiPk(staker2.publicKey.toBase58()),
+    }).sendAndConfirm(umi);
+    const asset3 = toWeb3JsPublicKey(a3.publicKey);
+
+    // attacker mints a worthless token and opens their OWN pool for
+    // (worthlessToken, sharedCollection)
+    const fakeToken = await createMint(conn, payer, payer.publicKey, null, 6);
+    const fakeAta = await createAssociatedTokenAccountIdempotent(
+      conn, payer, fakeToken, staker2.publicKey);
+    await mintTo(conn, payer, fakeToken, fakeAta, payer, 1_000_000_000n);
+
+    const fakePool = PublicKey.findProgramAddressSync(
+      [Buffer.from("pool"), fakeToken.toBuffer(), collection.toBuffer()],
+      program.programId)[0];
+    const fakeVault = getAssociatedTokenAddressSync(rewardMint, fakePool, true);
+    await provider.sendAndConfirm(new Transaction().add(
+      createAssociatedTokenAccountInstruction(
+        payer.publicKey, fakeVault, fakePool, rewardMint,
+        TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID)));
+    await program.methods.initPool().accounts({
+      pool: fakePool, tokenMint: fakeToken, collection, rewardMint, vault: fakeVault,
+      payer: payer.publicKey, tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    }).rpc();
+
+    // attacker stakes a huge weight into their own pool — debt anchors to
+    // fakePool.acc_per_weight (0); this is the vector the old seed allowed
+    await program.methods.stake(new BN(500_000_000)).accounts({
+      pool: fakePool, position: posPda(asset3, fakePool), asset: asset3,
+      tokenMint: fakeToken, stakerTokens: fakeAta, owner: staker2.publicKey,
+      tokenProgram: TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,
+    }).signers([staker2]).rpc();
+
+    // ensure the REAL vault holds money worth stealing
+    await deposit(1_000_000);
+    const realBefore = await vaultBal();
+    const dest = await createAssociatedTokenAccountIdempotent(
+      conn, payer, rewardMint, staker2.publicKey);
+
+    // (A) claim the REAL pool pointing at the inflated fakePool position — the
+    //     seed constraint (pool.key() in the seed) rejects it
+    let blockedA = false;
+    await program.methods.claim().accounts({
+      pool, position: posPda(asset3, fakePool), asset: asset3,
+      vault, rewardMint, destination: dest, owner: staker2.publicKey,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    }).signers([staker2]).rpc().catch(() => { blockedA = true; });
+    expect(blockedA, "foreign-pool position must be rejected").to.be.true;
+
+    // (B) claim the REAL pool with the correctly-derived real position — never
+    //     staked there, so the account does not exist and nothing pays
+    let blockedB = false;
+    await program.methods.claim().accounts({
+      pool, position: posPda(asset3, pool), asset: asset3,
+      vault, rewardMint, destination: dest, owner: staker2.publicKey,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    }).signers([staker2]).rpc().catch(() => { blockedB = true; });
+    expect(blockedB, "unstaked real position must not pay").to.be.true;
+
+    // the real vault is untouched
+    expect(await vaultBal()).to.eq(realBefore);
+  });
+
+  // M-1: frozen and plugin-delegated assets are accepted by design (entitlement
+  // is ownership, not transferability). The real exposure the auditor named is
+  // layout drift — so this proves verify_core_asset still reads owner (1..33) and
+  // collection (34..66) correctly when a plugin sits AFTER the fixed-size header.
+  // Pinned to mpl-core 1.10.0 (package.json); re-run if that is bumped.
+  it("M-1: frozen and delegated assets stake + claim by their owner", async () => {
+    const cases = [
+      { name: "frozen", plugins: [{ type: "FreezeDelegate", frozen: true }] },
+      { name: "delegated", plugins: [
+        { type: "FreezeDelegate", frozen: false,
+          authority: { type: "Address", address: umiPk(payer.publicKey.toBase58()) } }] },
+    ];
+    for (const cse of cases) {
+      const a = generateSigner(umi);
+      await create(umi, {
+        asset: a, collection: { publicKey: umiPk(collection.toBase58()) } as any,
+        name: "#" + cse.name, uri: "https://example.com/" + cse.name + ".json",
+        owner: umiPk(staker2.publicKey.toBase58()),
+        plugins: cse.plugins as any,
+      } as any).sendAndConfirm(umi);
+      const asset = toWeb3JsPublicKey(a.publicKey);
+
+      const ata = await createAssociatedTokenAccountIdempotent(conn, payer, tokenMint, staker2.publicKey);
+      await mintTo(conn, payer, tokenMint, ata, payer, 50_000_000n);
+
+      // stake MUST succeed — a shifted offset would revert here (NotAssetOwner /
+      // NotInCollection) instead of reading past the plugin to the base fields
+      await program.methods.stake(new BN(50_000_000)).accounts({
+        pool, position: posPda(asset), asset,
+        tokenMint, stakerTokens: ata, owner: staker2.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId,
+      }).signers([staker2]).rpc();
+
+      await deposit(1_000_000);
+      const dest = await createAssociatedTokenAccountIdempotent(conn, payer, rewardMint, staker2.publicKey);
+      const before = (await getAccount(conn, dest)).amount;
+      await program.methods.claim().accounts({
+        pool, position: posPda(asset), asset,
+        vault, rewardMint, destination: dest, owner: staker2.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      }).signers([staker2]).rpc();
+      expect((await getAccount(conn, dest)).amount > before, cse.name + " owner must be paid")
+        .to.be.true;
+    }
   });
 });

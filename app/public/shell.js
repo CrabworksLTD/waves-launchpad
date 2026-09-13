@@ -105,7 +105,6 @@
     { id: "launch", label: "Launch", menu: [
       { label: "Token",      mode: "token" },
       { label: "Collection", mode: "collection" },
-      // pairing arrives with staking — see the launch window
       { label: "Pair", mode: "pair", soon: true }
     ]},
     { id: "explore", label: "Explore", menu: [
@@ -130,7 +129,12 @@
     ".shl-mark b{font:800 19px Archivo,'Space Grotesk',sans-serif;letter-spacing:-.02em;",
     "  color:var(--ink)}",
     ".shl-mark:hover{transform:translateY(-1px)}",
-    "@media (max-width:560px){.shl-mark b{display:none}}",
+    // A small tilted pill on the wordmark — the site is in beta on both chains.
+    // Uses the chain's own accent (+ ink), so it is green on either side.
+    ".shl-beta{align-self:flex-start;margin:-3px 0 0 -3px;padding:1px 6px;border-radius:6px;",
+    "  background:var(--accent);color:var(--accent-ink);transform:rotate(8deg);",
+    "  font:800 10px Archivo,'Space Grotesk',sans-serif;letter-spacing:.02em;line-height:1.35}",
+    "@media (max-width:560px){.shl-mark b{display:none}.shl-beta{display:none}}",
     ".shl-ico{width:40px;height:40px;border-radius:9px;border:0;background:transparent;",
     "  color:var(--faint);display:grid;place-items:center;cursor:pointer;flex:none;",
     "  transition:color .18s,background .18s}",
@@ -372,7 +376,7 @@
     render(host, H`
       <div class="zone">
         <a class="shl-mark" href="/" aria-label="Home">${raw(markSvg)}<b>${
-          (window.BRAND && window.BRAND.name) || "WAVES"}</b></a>
+          (window.BRAND && window.BRAND.name) || "WAVES"}</b><span class="shl-beta">Beta</span></a>
         ${opts.search === false ? "" : raw(
           '<button class="shl-ico" id="shl-searchbtn" aria-label="Search" title="Search">' +
           '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/>' +
@@ -751,7 +755,7 @@
   function ensureLaunchStack() {
     if (window.LaunchPanel) return Promise.resolve();
     if (stackP) return stackP;
-    stackP = ["/dbc-terms.js", "/storage.js", "/launch.js", "/token.js", "/launchpanel.js"]
+    stackP = ["/dbc-terms.js", "/storage.js", "/launch.js", "/token.js", "/launchlab.js", "/launchpanel.js"]
       .reduce(function (p, src) {
         return p.then(function () {
           return new Promise(function (res, rej) {
@@ -805,7 +809,7 @@
     if (evmLaunchP) return evmLaunchP;
     evmLaunchP = ensureEvmStack().then(function () {
       return ["/evm-contract.js", "/evm-launch.js",
-              "/evm-hook.js"].reduce(function (p, src) {
+              "/vault.js", "/evm-hook.js"].reduce(function (p, src) {
         return p.then(function () {
           return new Promise(function (res, rej) {
             var el = document.createElement("script");

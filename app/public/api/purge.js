@@ -116,7 +116,17 @@ export default async function handler(req, res) {
           "tok:" + t.mint,
           "ix:" + t.mint + ":stats",
           "ix:" + t.mint + ":trades",
-          "ix:" + t.mint + ":cursor"
+          "ix:" + t.mint + ":cursor",
+          // Robinhood keeper per-mint state — missing these let a future token at
+          // the same 0x address inherit a stranger's cursor / paid history. (The
+          // global rhk:plan, rhk:carry, rhkn:plan are NOT per-token and stay.)
+          "rhk:" + t.mint + ":cursor",
+          "rhk:" + t.mint + ":burnEthWei",
+          "rhk:" + t.mint + ":burnt",
+          "rhk:" + t.mint + ":paidAsset",
+          "rhk:" + t.mint + ":paidAssetAddr",
+          "rhk:" + t.mint + ":paidWei",
+          "rhkn:" + t.mint + ":cursor"
         ])
       ]
     };
