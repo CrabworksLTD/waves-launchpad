@@ -25,6 +25,12 @@ const CONFIRM = process.env.CONFIRM === "1";
 const KEYDIR = (process.env.KEYDIR || os.homedir() + "/waves-keys").replace(/^~/, os.homedir());
 const FEE_OWNER = new PublicKey(process.env.FEE_OWNER || "BU9dYi7fGw5G3Wd54CUTmt1Y58jEJaPq8LKiL72ydeKJ");
 const FEE_KEEPER = new PublicKey(process.env.FEE_KEEPER || "BU9dYi7fGw5G3Wd54CUTmt1Y58jEJaPq8LKiL72ydeKJ");
+// A tier's platform fee is claimed HERE, then the keeper splits it — the creator's
+// forwarded share to their wallet, WAVES's cut to the treasury. So it must be a
+// keeper-controlled escrow, NOT the treasury: the escrow only ever holds freshly-
+// claimed fees between claim and split (minimal exposure, like the Meteora partner
+// claimer). Standard (1.15%) needs no forward, so it stays feeOwner.
+const TIER_CLAIM = new PublicKey(process.env.TIER_CLAIM || FEE_KEEPER);
 
 // tier → total fee %. platform feeRate = (total − 0.25 Raydium − 0.50 creator).
 // denom 1e6, so 1% = 10000. WAVES's KEPT cut per tier (keeper forwards the rest
@@ -72,7 +78,7 @@ function loadOrGen(path) {
       const raydium = await (r.Raydium || r.default).load({ connection: conn, owner: admin, cluster: CLUSTER, disableFeatureCheck: true, disableLoadToken: true });
       const { execute } = await raydium.launchpad.createPlatformConfig({
         programId: prog, platformAdmin: admin.publicKey,
-        platformClaimFeeWallet: FEE_OWNER, platformLockNftWallet: FEE_OWNER, platformVestingWallet: FEE_OWNER,
+        platformClaimFeeWallet: TIER_CLAIM, platformLockNftWallet: FEE_OWNER, platformVestingWallet: FEE_OWNER,
         cpConfigId,
         migrateCpLockNftScale: { platformScale: new BN(0), creatorScale: new BN(0), burnScale: new BN(1000000) },
         transferFeeExtensionAuth: FEE_KEEPER,

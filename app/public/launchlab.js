@@ -94,6 +94,17 @@
     return id;
   }
 
+  /* The platform config to launch against. A fee tier (t2..t10) is its OWN
+   * platform config (higher feeRate); "standard"/none uses the flat 1.15% one.
+   * Only the platform changes — the quote's curve config is unchanged. */
+  function platformIdForTier(tier) {
+    if (tier && tier !== "standard") {
+      var t = (llConfigs().tiers || {})[tier];
+      if (t && t.platformId) return t.platformId;
+    }
+    return platformId();
+  }
+
   /* The global (Raydium-owned) config PDA for a quote. Accepts "sol"/"usdc"/mint.
    * Stored configId if brand.js pins it; otherwise derived — index 0, curveType
    * 0, where every LaunchLab config lives. Never creates anything. Async because
@@ -242,7 +253,7 @@
     var progress = opts.onProgress || function () {};
     var q = resolveQuote(opts.quote);
     var configId = await configFor(opts.quote);
-    var plat = platformId();
+    var plat = platformIdForTier(opts.tier);
     var baseMint = c.X.Keypair.generate();
     /* H-3: only a dividend (or the dividend half of a split) carries the
      * Token-2022 transfer-fee tax that funds holder payouts. "none" and "burn"

@@ -989,6 +989,28 @@
   // only the standard rung is offered.
   function solIsLaunchLab() { return solBackend() === window.LaunchLab; }
 
+  // The multi-tier fee ladder is live only when its own flag is set AND we're on
+  // LaunchLab. Until then LaunchLab offers the single flat 1.15% rung.
+  function launchlabLadderLive() {
+    try {
+      if (!solIsLaunchLab()) return false;
+      var b = window.BRAND || {};
+      var c = (window.Launch && window.Launch.cluster) ? window.Launch.cluster() : "mainnet-beta";
+      return !!(b.launchlabLadderLive && b.launchlabLadderLive[c] === true);
+    } catch (e) { return false; }
+  }
+  // Total trade fee % for a LaunchLab tier: 1.15 for standard, else the ladder pct.
+  function llTierPct(name) {
+    if (!name || name === "standard") return 1.15;
+    var T = window.DBC_TERMS;
+    return (T && T.TIERS && T.TIERS[name] && T.TIERS[name].pct) || 1.15;
+  }
+  function llConfigsFor() {
+    var b = window.BRAND || {};
+    var c = (window.Launch && window.Launch.cluster) ? window.Launch.cluster() : "mainnet-beta";
+    return (b.launchlabConfigs || {})[c] || {};
+  }
+
   /* The active holder reward, phrased for the token share card — or null for a
    * plain token that keeps its fees, so no reward line is drawn. Dividend pays
    * holders in the chosen reward asset; burn buys back and burns. */
@@ -1718,9 +1740,12 @@
       if (isEvm()) {
         ready = EVM_PLATFORM_BPS[spec.baseFeeBps] !== undefined;
       } else if (solIsLaunchLab()) {
-        // LaunchLab has one flat fee — no tax rungs; the holder tax is the
-        // per-launch reward-mode transfer fee instead. Only the standard rung.
-        ready = (name === "standard");
+        // Ladder live → every rung we created a tier platform config for (the
+        // DBC ladder pcts 2/3/4/5/10 line up with the LaunchLab tiers). Off →
+        // just the flat 1.15% standard rung.
+        ready = launchlabLadderLive()
+          ? (name === "standard" || !!((llConfigsFor() || {}).tiers || {})[name])
+          : (name === "standard");
       } else {
         try { window.Token.configFor(flow.quote, name); } catch (e) { ready = false; }
       }
@@ -1744,7 +1769,7 @@
     return rungs.map(function (r) {
       // LaunchLab is a flat 1.15% (0.25 Raydium + 0.40 platform + 0.50 creator),
       // not the Meteora rung's 1% — show the real number.
-      var label = solIsLaunchLab() ? "1.15%" : (r.spec.pct + "%");
+      var label = solIsLaunchLab() ? (llTierPct(r.name) + "%") : (r.spec.pct + "%");
       return '<button data-t="' + r.name + '"' + (r.name === cur ? ' class="on"' : "") + ">" +
         label + "</button>";
     }).join("");
@@ -1885,7 +1910,9 @@
     function paintTax() {
       var el = box.querySelector("#tk-taxtxt");
       if (el) el.textContent = solIsLaunchLab()
-        ? "Traders pay 1.15% in total — 0.50% to you, 0.40% platform, 0.25% Raydium."
+        ? ("Traders pay " + llTierPct(flow.tier) + "% in total." + ((!flow.tier || flow.tier === "standard")
+            ? " 0.50% to you, 0.40% platform, 0.25% Raydium."
+            : " Your share is claimed to your fee wallet."))
         : ("Traders pay " + tierPct(flow) + "% in total.");
     }
     paintTax();
@@ -2240,7 +2267,9 @@
     function paintTax() {
       var el = box.querySelector("#tk-taxtxt");
       if (el) el.textContent = solIsLaunchLab()
-        ? "Traders pay 1.15% in total — 0.50% to you, 0.40% platform, 0.25% Raydium."
+        ? ("Traders pay " + llTierPct(flow.tier) + "% in total." + ((!flow.tier || flow.tier === "standard")
+            ? " 0.50% to you, 0.40% platform, 0.25% Raydium."
+            : " Your share is claimed to your fee wallet."))
         : ("Traders pay " + tierPct(flow) + "% in total.");
     }
 
@@ -2634,7 +2663,7 @@
       <div class="row"><span class="k">Metadata storage</span><b id="lp-fee">quoting…</b></div>
       <div class="row"><span class="k">Wallet</span><b>${w ? w.name + " · " + shortAddr(w.publicKey) : "not connected"}</b></div>
       <div class="row"><span class="k">Swap fee</span><b>${
-        solIsLaunchLab() ? "1.15%" : (tierSpec(flow).label + " — " + tierPct(flow) + "%")}</b></div>
+        solIsLaunchLab() ? (llTierPct(flow.tier) + "%") : (tierSpec(flow).label + " — " + tierPct(flow) + "%")}</b></div>
       <p class="note">${solIsLaunchLab()
         ? "Fee on every trade: 1.15% total — 0.50% creator, 0.40% platform, 0.25% Raydium. Your creator share claims straight to any address, including a reward vault."
         : "Fee split on every trade: 20% you, 60% platform, 20% Meteora — the same split at every fee level. Your share claims straight to any address — including a reward vault."}</p>
