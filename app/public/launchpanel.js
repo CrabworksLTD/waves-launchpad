@@ -1742,8 +1742,11 @@
      * being the 1.2% floor every launch pays. Naming them after the number a
      * trader sees keeps the label honest: a 3% tax means traders pay 3%. */
     return rungs.map(function (r) {
+      // LaunchLab is a flat 1.15% (0.25 Raydium + 0.40 platform + 0.50 creator),
+      // not the Meteora rung's 1% — show the real number.
+      var label = solIsLaunchLab() ? "1.15%" : (r.spec.pct + "%");
       return '<button data-t="' + r.name + '"' + (r.name === cur ? ' class="on"' : "") + ">" +
-        r.spec.pct + "%" + "</button>";
+        label + "</button>";
     }).join("");
   }
 
@@ -1881,7 +1884,9 @@
 
     function paintTax() {
       var el = box.querySelector("#tk-taxtxt");
-      if (el) el.textContent = "Traders pay " + tierPct(flow) + "% in total.";
+      if (el) el.textContent = solIsLaunchLab()
+        ? "Traders pay 1.15% in total — 0.50% to you, 0.40% platform, 0.25% Raydium."
+        : ("Traders pay " + tierPct(flow) + "% in total.");
     }
     paintTax();
     box.querySelector("#tk-tiers").addEventListener("click", function (e) {
@@ -2053,7 +2058,7 @@
       </button>
       <p class="note">${solQuoteNote(flow)}</p>`}
 
-      <label>Creator tax</label>
+      <label>Trading fee</label>
       <div class="ptabs" id="tk-tiers">${raw(tierButtons(flow))}</div>
       <p class="note" id="tk-taxtxt"></p>
 
@@ -2234,7 +2239,9 @@
      * creator is choosing a headline number here, not auditing a split. */
     function paintTax() {
       var el = box.querySelector("#tk-taxtxt");
-      if (el) el.textContent = "Traders pay " + tierPct(flow) + "% in total.";
+      if (el) el.textContent = solIsLaunchLab()
+        ? "Traders pay 1.15% in total — 0.50% to you, 0.40% platform, 0.25% Raydium."
+        : ("Traders pay " + tierPct(flow) + "% in total.");
     }
 
 
