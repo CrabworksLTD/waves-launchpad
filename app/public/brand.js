@@ -163,6 +163,21 @@
         // feeOwner BU9d…deKJ; feeRate 4000 / creatorFeeRate 5000 confirmed
         platformId: "iaidSbPCBvzZVSnLdQUHWJFXL2j6oQt386QZ6fTfBoi",
         platformFeeRate: 4000, creatorFeeRate: 5000,
+        /* ── FEE LADDER (INERT until the LaunchLab keeper ships + is audited) ──
+         * One platform config per tier (admin keypairs in ~/waves-keys/; created
+         * by tools/create-launchlab-tiers.js). Total fee = 0.25% Raydium + feeRate
+         * (platform) + 0.50% creator (the on-chain cap). The KEEPER forwards the
+         * creator's real share out of the platform fee — WAVES keeps wavesKeepBps
+         * (mirrors the Meteora ladder). NOT wired into the panel until the keeper
+         * exists, or higher tiers would just charge more and pay creators nothing.
+         * platformId is derived + fixed; configs must be created on-chain first. */
+        tiers: {
+          t2:  { platformId: "GfC5UWEn3WnFQcqB4ddBKRCYnKMaB6Ch5ReqS4MhVLze", pct: 2,  feeRate: 12500, creatorFeeRate: 5000, wavesKeepBps: 5000 },
+          t3:  { platformId: "Dcd5CnsLZkmzGa298XNBqiB7aQLmR6AC6c4LP4ELmuik", pct: 3,  feeRate: 22500, creatorFeeRate: 5000, wavesKeepBps: 6000 },
+          t4:  { platformId: "AoiEDaYTFVeLCaBtMToNWe2BEq4LiFAfzvjCetxuG1ux", pct: 4,  feeRate: 32500, creatorFeeRate: 5000, wavesKeepBps: 7000 },
+          t5:  { platformId: "3J6A7dtV2rS7GP7khzQBfRnpKrBjz5Srfjj51zTGefaT", pct: 5,  feeRate: 42500, creatorFeeRate: 5000, wavesKeepBps: 8000 },
+          t10: { platformId: "Ck3Mho7o21x7JmDcB4kE5fXuoyMxmeNNTzPkTF91eFxF", pct: 10, feeRate: 92500, creatorFeeRate: 5000, wavesKeepBps: 9000 },
+        },
         // Quote currencies, all with a live Raydium LaunchLab config (config-gated
         // — added only when Raydium has created the config; configId is derived at
         // index 0 by launchlab.js, not stored here). Enumerated on-chain + liquidity-
@@ -278,6 +293,11 @@
     // or the public launch gate opens for everyone. Audit must land before this
     // ships to production.
     launchlabLive: { "mainnet-beta": true, devnet: true },
+    // The multi-tier fee ladder. Stays false until the LaunchLab keeper (which
+    // forwards the creator's share out of the platform fee) is built + audited —
+    // flipping it before then would charge creators the higher tier and pay them
+    // only the 0.5% on-chain cap. See tiers{} in launchlabConfigs + the keeper.
+    launchlabLadderLive: { "mainnet-beta": false, devnet: false },
 
     // Save files. `fileKind` is written into new saves; `readKinds` is what we
     // accept when opening, so Moonpad projects and the bundled templates
