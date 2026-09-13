@@ -221,8 +221,11 @@ export default async function handler(req, res) {
    * a secret. So a single named mint may be indexed without one, rate-limited
    * per mint, and only if we already have a record of it. The work is bounded:
    * it reads the signatures since that pool's cursor and stops. */
+  // Fail closed for the full sweep: a missing secret must not authenticate
+  // everything. The single named-mint path below stays open by design (bounded,
+  // must already be listed, throttled) — that's the `only` escape.
   const secret = process.env.CRON_SECRET;
-  const authed = !secret || req.headers.authorization === "Bearer " + secret;
+  const authed = !!secret && req.headers.authorization === "Bearer " + secret;
   const only = (req.query && req.query.mint) || null;
   if (!authed && !only) return res.status(401).json({ error: "no" });
 
@@ -262,9 +265,11 @@ export default async function handler(req, res) {
         const statsKey = "ix:" + t.mint + ":stats";
 
         let cursor = await db.get(cursorKey).catch(() => null);
-        if (req.query && req.query.reset === "1") {
+        if (authed && req.query && req.query.reset === "1") {
           // re-read a pool from scratch, for when a parsing bug has already
-          // written wrong numbers (gated by CRON_SECRET like the rest)
+          // written wrong numbers. M-7: MUST require auth — the open single-mint
+          // path reaches here, and an unauthenticated reset lets anyone wipe any
+          // listed token's chart + stats on a 20s loop (defacement + RPC drain).
           cursor = null;
           await db.del(tradesKey).catch(() => {});
           await db.del(statsKey).catch(() => {});

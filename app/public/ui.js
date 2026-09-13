@@ -72,8 +72,24 @@
     return a.length > n * 2 + 2 ? a.slice(0, n) + "…" + a.slice(-n) : a;
   }
 
+  /* URL sink guard. esc() makes a value safe as TEXT or a quoted ATTRIBUTE, but
+   * NOT as an href/src — "javascript:alert(1)" survives escaping and runs. Any
+   * link built from user data (a token's website or socials) must pass through
+   * this: it allows http/https/mailto and relative URLs, and drops javascript:,
+   * data:, vbscript: and any other scheme (returning "" so the attribute is inert).
+   * There is no such sink today, but socials are collected into token.json — one
+   * feature away — so the guard exists now rather than being remembered later. */
+  function safeUrl(u) {
+    var s = String(u == null ? "" : u).trim();
+    var probe = s.replace(/[\x00-\x20]/g, "").toLowerCase();  // strip chars browsers ignore inside a scheme
+    if (/^(javascript|data|vbscript):/.test(probe)) return "";
+    var m = /^([a-z][a-z0-9+.\-]*):/.exec(probe);
+    if (m && m[1] !== "http" && m[1] !== "https" && m[1] !== "mailto") return "";
+    return s;
+  }
+
   window.UI = {
     html: html, raw: raw, esc: esc, render: render, on: on,
-    fmt: fmt, shortAddr: shortAddr
+    fmt: fmt, shortAddr: shortAddr, safeUrl: safeUrl
   };
 })();

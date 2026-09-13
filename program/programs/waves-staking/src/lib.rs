@@ -13,21 +13,25 @@
 //!   owed           = weight * acc_per_weight / PRECISION - debt
 //! Looping holders inside an instruction dies at scale; this never loops.
 //!
-//! The position is bound to the ASSET, not the wallet: the PDA is seeded on
-//! the Core asset address, and claims verify the signer currently owns the
-//! asset. A sold NFT keeps its tier — the buyer inherits the stream from the
-//! moment of purchase (debt is settled to "now" whenever weight changes, and
-//! an owner can only ever claim what accrued while the accumulator advanced).
+//! The position is bound to the (POOL, ASSET) pair, not the wallet: the PDA is
+//! seeded on both the pool and the Core asset address, and claims verify the
+//! signer currently owns the asset. A sold NFT keeps its tier — the buyer
+//! inherits the stream from the moment of purchase (debt is settled to "now"
+//! whenever weight changes, and an owner can only ever claim what accrued while
+//! the accumulator advanced). Seeding on the pool too (fixes audit C-1) stops
+//! one asset's position being shared across pools to drain a foreign vault.
 //!
-//! ⚠️ AUDIT REQUIRED before this touches mainnet money. Known review points
-//! are marked AUDIT: inline.
+//! ⚠️ AUDIT: C-1 (cross-pool position reuse) is FIXED. M-1 is resolved by
+//! decision — frozen/delegated assets are accepted on purpose (entitlement is
+//! ownership, not transferability); the real exposure is layout offsets, proven
+//! by the frozen/delegated tests against a pinned mpl-core. See verify_core_asset.
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
     self, Burn, Mint, TokenAccount, TokenInterface, TransferChecked,
 };
 
-declare_id!("DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY");
+declare_id!("jt5JegTBVPZP8V6a48fnKYPFKTbpcTfkz91Pemur82H");
 
 /// Fixed-point precision for the accumulator. u128 math throughout;
 /// PRECISION chosen so (u64::MAX weight) * acc cannot overflow u128 within
@@ -91,12 +95,19 @@ pub mod waves_staking {
 
         // settle the position to "now" before its weight changes, or the new
         // weight would claim history it wasn't staked for
+        let pool_key = ctx.accounts.pool.key();
+        let asset_key = ctx.accounts.asset.key();
         let pool = &mut ctx.accounts.pool;
         let pos = &mut ctx.accounts.position;
         if pos.asset == Pubkey::default() {
-            pos.asset = ctx.accounts.asset.key();
+            pos.pool = pool_key;
+            pos.asset = asset_key;
             pos.bump = ctx.bumps.position;
         }
+        // C-1: a position is permanently bound to (pool, asset). The seed binds
+        // the PDA; this guards the init_if_needed load path (where has_one can't
+        // run) and makes the pool binding impossible to escape.
+        require_keys_eq!(pos.pool, pool_key, StakeError::WrongPool);
         let owed = settle(pool, pos)?;
         // AUDIT: owed is carried as credit rather than paid inside stake —
         // one token flow per instruction. pending_credit pays out on claim.
@@ -194,11 +205,18 @@ fn settle(pool: &Account<RewardPool>, pos: &mut Position) -> Result<u64> {
 /// The asset must be a Metaplex Core asset, inside the pool's collection,
 /// currently owned by `expected_owner`.
 ///
-/// AUDIT: this deserializes the Core account layout directly (discriminator,
-/// owner, update authority = collection for grouped assets). Pin the exact
-/// mpl-core version and byte offsets, and cover: burned assets, frozen
-/// assets, plugin-delegated authority, and assets regrouped to another
-/// collection after staking.
+/// This deserializes the Core account layout directly: [0]=Key::AssetV1,
+/// [1..33]=owner, [33]=UpdateAuthority tag (2=Collection), [34..66]=collection.
+///
+/// M-1 (resolved by decision): frozen and plugin-delegated assets are
+/// DELIBERATELY accepted. Entitlement is ownership, not transferability — a
+/// frozen asset still has an owner and claim pays that owner, and a delegated
+/// (listed) asset selling is the asset-bound stream working as intended. The
+/// only real exposure is layout drift: AssetV1's header is fixed-size and
+/// plugins live AFTER it, so 1..33 and 33..66 hold — but that is what the
+/// frozen/delegated tests in waves-staking.ts prove, against a pinned mpl-core
+/// (see program/package.json). Still worth confirming if mpl-core is bumped:
+/// burned assets and assets regrouped to another collection after staking.
 fn verify_core_asset(
     asset: &AccountInfo,
     collection: &Pubkey,
@@ -235,6 +253,9 @@ impl RewardPool {
 
 #[account]
 pub struct Position {
+    pub pool: Pubkey,          // C-1: the pool this position belongs to. Bound in
+                               // the PDA seed AND stored here, so one asset's
+                               // position can never be shared across pools.
     pub asset: Pubkey,         // the Core asset this tier belongs to
     pub weight: u64,           // total ever burned for this asset
     pub debt: u128,            // accumulator checkpoint
@@ -242,7 +263,7 @@ pub struct Position {
     pub bump: u8,
 }
 impl Position {
-    pub const SIZE: usize = 8 + 32 + 8 + 16 + 8 + 1;
+    pub const SIZE: usize = 8 + 32 + 32 + 8 + 16 + 8 + 1;
 }
 
 #[derive(Accounts)]
@@ -282,7 +303,7 @@ pub struct Stake<'info> {
         init_if_needed,
         payer = owner,
         space = Position::SIZE,
-        seeds = [b"pos", asset.key().as_ref()],
+        seeds = [b"pos", pool.key().as_ref(), asset.key().as_ref()],
         bump
     )]
     pub position: Account<'info, Position>,
@@ -302,7 +323,15 @@ pub struct Stake<'info> {
 pub struct Claim<'info> {
     #[account(mut, has_one = vault, has_one = reward_mint)]
     pub pool: Account<'info, RewardPool>,
-    #[account(mut, seeds = [b"pos", asset.key().as_ref()], bump = position.bump)]
+    // C-1: seed binds the position to THIS pool, and has_one = pool rejects a
+    // position whose stored pool differs — belt and suspenders, so the binding
+    // survives even a future seed change.
+    #[account(
+        mut,
+        seeds = [b"pos", pool.key().as_ref(), asset.key().as_ref()],
+        bump = position.bump,
+        has_one = pool,
+    )]
     pub position: Account<'info, Position>,
     /// CHECK: verified byte-level in verify_core_asset
     pub asset: AccountInfo<'info>,
@@ -352,4 +381,6 @@ pub enum StakeError {
     NotAssetOwner,
     #[msg("asset is not in this pool's collection")]
     NotInCollection,
+    #[msg("position does not belong to this pool")]
+    WrongPool,
 }

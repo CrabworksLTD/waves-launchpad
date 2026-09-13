@@ -1,7 +1,7 @@
 /* WavesStake — browser client for the waves-staking program.
  *
  * ⚠️ SCAFFOLD, UNTESTED against a live program. The program
- * (DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY) is devnet-only and unaudited
+ * (jt5JegTBVPZP8V6a48fnKYPFKTbpcTfkz91Pemur82H) is devnet-only and unaudited
  * as of 2026-09-02, so there is nothing on mainnet to read or sign against, and
  * the pending-reward math below — though copied line-for-line from the program's
  * settle()/sync() — has NOT been checked end to end. Nothing is trusted until it
@@ -21,7 +21,7 @@
 
   // Program ID is fixed by the program keypair in ~/waves-keys, so a mainnet
   // deploy lands on this same address — no per-cluster switch needed.
-  var PROGRAM_ID = "DEg14RMeTu1q3SA88aiyeA55E4nqe5ZF667XQdUftnNY";
+  var PROGRAM_ID = "jt5JegTBVPZP8V6a48fnKYPFKTbpcTfkz91Pemur82H";
   var PRECISION = 1000000000000n;                 // 1e12 — MUST equal program PRECISION
   var TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
   var ATA_PROGRAM = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
@@ -260,8 +260,113 @@
     } catch (e) { return false; }
   }
 
+  /* ---- send: assemble the duck-typed ixs into a Transaction, sign via the
+   * connected wallet, send. Mirrors token.js: signAndSendTransaction when the
+   * wallet offers it, else signTransaction + sendRawTransaction. ---- */
+  async function signSend(ixs, extraSigners) {
+    var X = await mx(), c = conn(X);
+    var w = window.Wallet && window.Wallet.current && window.Wallet.current();
+    if (!w) throw new Error("connect a wallet first");
+    var owner = pk(X, w.publicKey.toBase58 ? w.publicKey.toBase58() : w.publicKey);
+    var tx = new X.Transaction();
+    ixs.forEach(function (i) { tx.add(new X.TransactionInstruction(i)); });
+    tx.feePayer = owner;
+    tx.recentBlockhash = (await c.getLatestBlockhash("confirmed")).blockhash;
+    if (extraSigners && extraSigners.length) tx.partialSign.apply(tx, extraSigners);
+    if (w.canSignAndSend && w.signAndSendTransaction) {
+      var r = await w.signAndSendTransaction(tx);
+      var sig = r && (r.signature || r);
+      await c.confirmTransaction(typeof sig === "string" ? sig : new TextDecoder().decode(sig), "confirmed").catch(function () {});
+      return sig;
+    }
+    var signed = await w.signTransaction(tx);
+    var raw = signed.serialize ? signed.serialize() : signed;
+    var sig2 = await c.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 5 });
+    await c.confirmTransaction(sig2, "confirmed").catch(function () {});
+    return sig2;
+  }
+
+  // idempotent ATA create (classic SPL or Token-2022). `payer` funds+signs;
+  // `ataOwner` owns the account (the wallet for a claim dest, the pool PDA for a
+  // vault — an off-curve owner is fine, the ATA program allows it).
+  function ixCreateAtaIdem(X, payer, ata, ataOwner, mint, tokenProgram) {
+    return {
+      programId: pk(X, ATA_PROGRAM),
+      keys: [
+        key(X, payer, 1, 1), key(X, ata, 0, 1), key(X, ataOwner, 0, 0), key(X, mint, 0, 0),
+        key(X, SYS_PROGRAM, 0, 0), key(X, tokenProgram || TOKEN_PROGRAM, 0, 0)
+      ],
+      data: new Uint8Array([1]) // createIdempotent
+    };
+  }
+
+  /* Create the staking pool for a pair, at launch. Resolves the reward mint's
+   * token program, creates the pool PDA's vault ATA, and runs init_pool — all
+   * signed by the launcher's wallet. Returns { pool, vault }. Idempotent-ish:
+   * a second call reverts on the existing pool, which the caller can ignore. */
+  async function initPoolAction(pair) {
+    var X = await mx(), c = conn(X);
+    var w = window.Wallet.current(); var owner = pk(X, w.publicKey.toBase58 ? w.publicKey.toBase58() : w.publicKey);
+    var pool = poolPda(X, pair.tokenMint, pair.collection);
+    var rewardMint = pk(X, pair.rewardMint);
+    var info = await c.getAccountInfo(rewardMint, "confirmed");
+    var tp = (info && info.owner && info.owner.toBase58() === TOKEN22_PROGRAM) ? TOKEN22_PROGRAM : TOKEN_PROGRAM;
+    var vault = X.PublicKey.findProgramAddressSync(
+      [pool.toBuffer(), pk(X, tp).toBuffer(), rewardMint.toBuffer()], pk(X, ATA_PROGRAM))[0];
+    await signSend([
+      ixCreateAtaIdem(X, owner, vault, pool, rewardMint, tp),
+      ixInitPool(X, { pool: pool, tokenMint: pk(X, pair.tokenMint), collection: pk(X, pair.collection),
+        rewardMint: rewardMint, vault: vault, payer: owner, tokenProgram: tp })
+    ]);
+    return { pool: pool.toBase58(), vault: vault.toBase58() };
+  }
+
+  /* Burn `amount` (base units of the paired token) to add weight to one NFT. */
+  async function stakeAction(pair, asset, amount) {
+    var X = await mx();
+    var w = window.Wallet.current(); var owner = pk(X, w.publicKey.toBase58 ? w.publicKey.toBase58() : w.publicKey);
+    var pool = poolPda(X, pair.tokenMint, pair.collection);
+    var pos = positionPda(X, asset);
+    var stakerTokens = ownerAta(X, pk(X, pair.tokenMint), owner);
+    return signSend([ixStake(X, {
+      pool: pool, position: pos, asset: pk(X, asset), tokenMint: pk(X, pair.tokenMint),
+      stakerTokens: stakerTokens, owner: owner, amount: amount
+    })]);
+  }
+
+  /* Sync the vault, then claim everything owed on one NFT to the wallet. */
+  async function claimAction(pair, asset) {
+    var X = await mx(), c = conn(X);
+    var w = window.Wallet.current(); var owner = pk(X, w.publicKey.toBase58 ? w.publicKey.toBase58() : w.publicKey);
+    var pool = poolPda(X, pair.tokenMint, pair.collection);
+    var poolAcc = decodePool(await accountBytes(c, pool), X);
+    var rewardMint = pk(X, poolAcc.rewardMint);
+    // reward mint's token program (classic or Token-2022 for xStocks)
+    var info = await c.getAccountInfo(rewardMint, "confirmed");
+    var tp = (info && info.owner && info.owner.toBase58() === TOKEN22_PROGRAM) ? TOKEN22_PROGRAM : TOKEN_PROGRAM;
+    var vault = X.PublicKey.findProgramAddressSync(
+      [pool.toBuffer(), pk(X, tp).toBuffer(), rewardMint.toBuffer()], pk(X, ATA_PROGRAM))[0];
+    var dest = X.PublicKey.findProgramAddressSync(
+      [owner.toBuffer(), pk(X, tp).toBuffer(), rewardMint.toBuffer()], pk(X, ATA_PROGRAM))[0];
+    var pos = positionPda(X, asset);
+    var ixs = [
+      ixCreateAtaIdem(X, owner, dest, owner, rewardMint, tp),
+      ixSync(X, { pool: pool, vault: vault }),
+      { programId: pk(X, PROGRAM_ID), keys: [
+        key(X, pool, 0, 1), key(X, pos, 0, 1), key(X, pk(X, asset), 0, 0),
+        key(X, vault, 0, 1), key(X, rewardMint, 0, 0), key(X, dest, 0, 1),
+        key(X, owner, 1, 0), key(X, tp, 0, 0)
+      ], data: data(IX.claim) }
+    ];
+    return signSend(ixs);
+  }
+
   window.WavesStake = {
     PROGRAM_ID: PROGRAM_ID,
+    // high-level actions (build + sign via wallet + send) — proven on devnet
+    stake: stakeAction,
+    claim: claimAction,
+    initPool: initPoolAction,
     // reads
     live: live,
     summary: summary,

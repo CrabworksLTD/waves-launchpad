@@ -478,6 +478,10 @@
       };
       if (opts.icon) j.image = ORIGIN + "/m/" + cid + "/" + iconName;
       if (opts.banner) j.banner = ORIGIN + "/m/" + cid + "/" + bannerName;
+      /* Holder-reward choice, carried in the token's own metadata so the token
+       * page can show the reward badge + "/asset" ticker from chain, without
+       * depending on the off-chain listing record. { mint, symbol, mode }. */
+      if (opts.reward) j.reward = opts.reward;
       // the extensions shape Jupiter and the explorers read socials from
       if (opts.links) {
         var ext = {};

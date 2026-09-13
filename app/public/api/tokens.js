@@ -58,7 +58,7 @@ export default async function handler(req, res) {
     if (!(await allow(req, { bucket: "tokens", max: 10, windowSec: 600 }))) return tooMany(res, 600);
 
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-    const { mint, name, symbol, cluster, rewardMint, collection, creator, icon, banner, pool, config, feeShare, feeSharePct, feeWallet, chain } = body;
+    const { mint, name, symbol, cluster, rewardMint, collection, creator, icon, banner, pool, config, feeShare, feeSharePct, feeWallet, chain, backend } = body;
     const isEvm = chain === "robinhood";
 
     /* A Robinhood Chain token is a 0x contract, not a base58 mint — the same
@@ -114,16 +114,26 @@ export default async function handler(req, res) {
          * which is what they are. Without it the tokens page showed every
          * launch on both chains. */
         chain: isEvm ? "robinhood" : null,
+        /* Which Solana launch backend created the pool: "launchlab" (Raydium
+         * LaunchLab) or null (Meteora DBC — the default, so every record written
+         * before this field, and every EVM record, reads as Meteora/legacy). The
+         * token page, keeper, and stats route their pool reads/claims on this. */
+        backend: backend === "launchlab" ? "launchlab" : null,
         // the reward asset the creator picked, and the collection this token
         // is paired with — consumed by the staking keeper later, displayed now
         rewardMint: rewardMint || null,
+        /* The pool's QUOTE asset (Robinhood Chain): ETH by default, else USDG or
+         * a tokenised stock. The indexer/keeper/token-page read it to price the
+         * pool and denominate fees. Validated like any other address. */
+        quoteMint: (body.quoteMint && EVM.test(body.quoteMint)) ? String(body.quoteMint).toLowerCase() : null,
+        quoteSym: (body.quoteSym && /^[A-Za-z0-9$.\-]{1,12}$/.test(body.quoteSym)) ? String(body.quoteSym) : null,
         /* What the pledged share does: pay holders an asset, or buy the token
          * back and burn it. Anything unrecognised reads as a dividend, which
          * is the behaviour every launch had before this existed. */
         /* "none" is the creator keeping everything, and it is the DEFAULT the
          * launch window opens on — so falling through to "dividend" recorded
          * the opposite of what most launches chose. */
-        rewardMode: ["burn", "keep", "none"].includes(body.rewardMode) ? body.rewardMode : "dividend",
+        rewardMode: ["burn", "keep", "none", "split"].includes(body.rewardMode) ? body.rewardMode : "dividend",
         // only arweave art, never an arbitrary URL someone POSTs at us
         card: okArt(body.card),
         icon: okArt(icon), banner: okArt(banner),
@@ -148,6 +158,14 @@ export default async function handler(req, res) {
          * launch to the wallet that made it, and the fee wallet, so the kept
          * portion lost the destination the creator had chosen for it. */
         creator: (creator && (B58.test(creator) || EVM.test(creator))) ? creator : null,
+        /* Paired NFT-reward launch: which keeper services the token, the
+         * collection whose NFT holders are paid, and the reward vault the keeper
+         * forwards fees into. rh-keeper-nft.js reads all three to know a token
+         * is its to service; the claim page reads vault + pairedCollection. */
+        keeper: body.keeper === "nft" ? "nft" : null,
+        pairedCollection: (body.pairedCollection && EVM.test(body.pairedCollection))
+          ? String(body.pairedCollection).toLowerCase() : null,
+        vault: (body.vault && EVM.test(body.vault)) ? String(body.vault).toLowerCase() : null,
         at: Date.now()
       };
       /* Maintenance correction. Filling blanks is open to anyone (it cannot
@@ -178,19 +196,27 @@ export default async function handler(req, res) {
         }
       }
 
-      const first = await db.set("tok:" + mint, 1, { nx: true });
-      if (first !== "OK") {
-        /* Already listed. Rather than dropping the payload, fill in anything
-         * the stored record is missing — a launch that recorded before its
-         * art finished uploading, or was repaired by hand, should be able to
-         * complete itself. Existing values are never overwritten, so this
-         * cannot be used to rewrite someone's listing. */
+      // Low: check-then-claim, with the dedupe key written AFTER the list entry
+      // (below). The old nx-set claimed the key first, so an lpush failure left
+      // the mint marked listed but in no list — permanently unlistable. Worst
+      // case now is a recoverable double entry, not a lost launch.
+      const exists = await db.get("tok:" + mint);
+      if (exists) {
+        /* Already listed. The ONLY thing an unauthenticated caller may fill is
+         * the art that finishes uploading after the record is written — icon,
+         * banner, card. Everything that routes value (feeWallet, vault, keeper,
+         * pairedCollection, rewardMint, pool, config) is deliberately NOT
+         * fillable here: a stranger could POST a blank one on a victim's own
+         * mint+pool and redirect its fees on the next keeper run (C-2). Those
+         * corrections go through the admin-bearer path above. Existing values are
+         * never overwritten either way. */
+        const FILLABLE = ["icon", "banner", "card"];
         const raw = await db.lrange(KEY, 0, MAX - 1);
         for (let i = 0; i < (raw || []).length; i++) {
           const cur = typeof raw[i] === "string" ? JSON.parse(raw[i]) : raw[i];
           if (!cur || cur.mint !== mint) continue;
           let changed = false;
-          for (const k of Object.keys(rec)) {
+          for (const k of FILLABLE) {
             if ((cur[k] === null || cur[k] === undefined) && rec[k] != null) {
               cur[k] = rec[k]; changed = true;
             }
@@ -205,6 +231,8 @@ export default async function handler(req, res) {
       // whatever falls off the end is kept, so the cap is a window and not a delete
       await archiveOverflow(db, KEY, MAX);
       await db.ltrim(KEY, 0, MAX - 1);
+      // claim the dedupe key only now that the entry is actually in the list
+      await db.set("tok:" + mint, 1);
       return res.status(200).json({ ok: true });
     } catch (e) {
       // a launch must never fail because the listing did

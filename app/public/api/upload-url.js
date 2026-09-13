@@ -23,7 +23,7 @@
 // arrived at the hard way — read the comments before relaxing one.
 
 // SHA-256 of the closed-testing password — the team's free path.
-import { allow, tooMany } from "./_guard.js";
+import { allow, tooMany, clientIp } from "./_guard.js";
 
 const TEST_HASH = process.env.TEST_HASH || "";
 
@@ -405,9 +405,12 @@ export default async function handler(req, res) {
      * fee ride in the pool transaction. Checked after the paid and holder
      * paths so neither loses its higher limits to this one. */
     if (!allowed && !signature && isLaunchSized(size, files)) {
-      const who = (isAddress(address) && address) ||
-        String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "anon";
-      allowed = await underLaunchLimit(who);
+      // M-3: no signature in this branch, so `address` is unverified and freely
+      // rotatable — using it as the meter key resets the counter every request,
+      // so LAUNCH_UPLOADS_PER_HOUR bounds nothing. Meter on the client IP, which
+      // the caller can't rotate. (A verified address narrows the key only in the
+      // holder path above, where a signature has proved it.)
+      allowed = await underLaunchLimit(clientIp(req));
       if (!allowed) {
         return res.status(429).json({
           error: "Too many launches started from here this hour. " +

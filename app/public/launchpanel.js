@@ -25,11 +25,24 @@
    * and audited, launching a pair would strand fees in a vault nobody can claim.
    * So the panel is built and wired behind this flag; flip it the day the
    * program lands. Local testing: set true in the console or here. */
-  var PAIRING_LIVE = false;
+  // Live only where the staking program is deployed — Solana devnet today. Keeps
+  // mainnet gated (program not there / unaudited) while the demo runs on devnet.
+  function PAIRING_LIVE() {
+    try { return !isEvm() && window.Launch && window.Launch.cluster && window.Launch.cluster() === "devnet"; }
+    catch (e) { return false; }
+  }
 
   var run = null;        // { files, count } from the generator
   var el = null;
   var busy = false;
+  // True when the panel was opened by navigating here (?launch= from the menu
+  // on another page). The flow's first screen then exits by going *back* to the
+  // page you came from, not by dumping you on /app where the nav landed.
+  var cameFromNav = false;
+  function exitToPage() {
+    if (cameFromNav && history.length > 1) { cameFromNav = false; history.back(); }
+    else close();
+  }
 
   /* ---------- chrome ---------- */
 
@@ -39,20 +52,23 @@
     s.id = "lp-css";
     s.textContent = [
       ".lp-back{position:fixed;inset:0;z-index:9000;background:rgba(4,3,8,.72);",
-      "  backdrop-filter:blur(6px);display:grid;place-items:center;padding:24px}",
-      ".lp{width:min(600px,100%);max-height:88vh;overflow:auto;background:var(--panel);",
-      "  border:1px solid var(--line2);border-radius:14px;padding:24px 24px 20px}",
-      ".lp h2{margin:0 0 4px;font-size:17px;letter-spacing:-.01em}",
-      ".lp .sub{margin:0 0 20px;color:var(--dim);font-size:13px}",
+      "  backdrop-filter:blur(6px);display:flex;overflow:auto;padding:24px}",
+      /* margin:auto centers the panel when it fits and, when it is taller than
+         the viewport, degrades to top-aligned with the backdrop scrolling — no
+         clipped header (which align-items:center would cause). */
+      ".lp{width:min(600px,100%);margin:auto;background:var(--panel);",
+      "  border:1px solid var(--line2);border-radius:14px;padding:20px 22px 14px}",
+      ".lp h2{margin:0 0 3px;font-size:17px;letter-spacing:-.01em}",
+      ".lp .sub{margin:0 0 12px;color:var(--dim);font-size:13px}",
       ".lp label{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;",
-      "  color:var(--faint);margin:14px 0 5px}",
+      "  color:var(--faint);margin:9px 0 4px}",
       ".lp input,.lp textarea{width:100%;background:var(--void);color:var(--ink);",
-      "  border:1px solid var(--line);border-radius:6px;padding:9px 10px;font:inherit;font-size:13px}",
+      "  border:1px solid var(--line);border-radius:6px;padding:8px 10px;font:inherit;font-size:13px}",
       ".lp input:focus,.lp textarea:focus{outline:none;border-color:var(--accent);",
       "  box-shadow:0 0 0 3px var(--accent-glow)}",
-      ".lp .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}",
+      ".lp .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}",
       ".lp .row{display:flex;justify-content:space-between;gap:12px;font-size:13px;",
-      "  padding:7px 0;border-bottom:1px solid var(--line)}",
+      "  padding:6px 0;border-bottom:1px solid var(--line)}",
       ".lp .row b{font-weight:600;text-align:right}",
       ".lp .k{color:var(--dim)}",
       /* Both buttons, one geometry.
@@ -69,8 +85,8 @@
       ".lp .tip span{display:block;font-size:12.5px;color:var(--dim);line-height:1.5}",
       ".lp .tip a{display:inline-block;margin-top:10px;font-size:12.5px;font-weight:600;",
       "  color:var(--accent);text-decoration:none}",
-      ".lp .acts{display:flex;gap:10px;margin-top:22px;align-items:center}",
-      ".lp .acts button{height:46px;padding:0 16px;border-radius:8px;margin:0;",
+      ".lp .acts{display:flex;gap:10px;margin-top:14px;align-items:center}",
+      ".lp .acts button{height:42px;padding:0 16px;border-radius:8px;margin:0;",
       "  display:inline-flex;align-items:center;justify-content:center;line-height:1}",
       ".lp button{flex:1;font:inherit;font-weight:600;font-size:13px;cursor:pointer;",
       "  border-radius:6px;padding:12px 16px;border:1px solid var(--line2);",
@@ -90,7 +106,7 @@
       ".lp .steps i{font-style:normal;width:16px;flex:none}",
       ".lp .err{margin-top:14px;padding:11px 12px;border-radius:6px;font-size:12.5px;",
       "  background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ffb3b3}",
-      ".lp .note{color:var(--faint);font-size:11.5px;margin-top:8px;line-height:1.5}",
+      ".lp .note{color:var(--faint);font-size:11.5px;margin-top:5px;line-height:1.45}",
       /* the perforated drop box for bring-your-own-files */
       ".lp .drop{border:2px dashed var(--line2);border-radius:8px;background:var(--bg);",
       "  padding:34px 20px;text-align:center;cursor:pointer;",
@@ -163,19 +179,27 @@
       "  white-space:nowrap;transition:border-color .15s,color .15s}",
       ".lp .artbtn:hover{border-color:var(--accent);color:var(--ink)}",
       ".lp .artbtn.has{border-style:solid;border-color:rgba(var(--accent-rgb),.4);color:var(--accent)}",
-      ".lp .tiers{display:grid;grid-template-columns:1fr 1fr;gap:10px}",
+      ".lp .tiers{display:grid;grid-template-columns:1fr 1fr;gap:8px}",
       ".lp .tiers.three{grid-template-columns:1fr 1fr 1fr}",
+      ".lp .tiers.four{grid-template-columns:1fr 1fr 1fr 1fr}",
+      "@media (max-width:560px){.lp .tiers.four{grid-template-columns:1fr 1fr}}",
       // three modes, one row — a wrapped third option reads as an afterthought
-      ".lp .tier{text-align:left;padding:12px 14px;border-radius:8px;",
+      // flex-column top-aligns the content: a <button> vertically CENTRES its
+      // content by default, so the card with the shortest body (Normal) floated
+      // its title lower than the others. Top-aligning + the title min-height
+      // below lines every title and body up across the row.
+      ".lp .tier{text-align:left;padding:10px 12px;border-radius:8px;display:flex;flex-direction:column;",
       "  border:1px solid var(--line);background:var(--panel2);cursor:pointer}",
-      ".lp .tier b{display:block;font:700 13px Archivo,sans-serif;margin-bottom:3px}",
-      ".lp .tier span{display:block;font-size:11.5px;color:var(--faint);line-height:1.45}",
+      // reserve two lines for the title so a wrapping label (e.g. Dividend +
+      // Buyback) does not push its body text below the single-line cards' bodies
+      ".lp .tier b{display:block;font:700 13px/1.2 Archivo,sans-serif;margin-bottom:4px;min-height:2.2em}",
+      ".lp .tier span{display:block;font-size:11.5px;color:var(--faint);line-height:1.4}",
       ".lp .tier.on{border-color:var(--accent)}",
       ".lp .tier.on b{color:var(--accent)}",
       ".lp .tier:disabled{opacity:.45;cursor:default}",
       /* long form */
       ".lp .four{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}",
-      ".lp .tick{display:flex;gap:10px;align-items:flex-start;margin:16px 0 4px;cursor:pointer}",
+      ".lp .tick{display:flex;gap:10px;align-items:flex-start;margin:16px 0 4px;cursor:pointer;text-transform:none;letter-spacing:normal}",
       ".lp .tick input{width:16px;height:16px;margin-top:2px;flex:none;accent-color:var(--accent)}",
       ".lp .tick b{font-size:13px;display:block}",
       ".lp .tick span{display:block;color:var(--dim);font-size:12px;margin-top:1px}",
@@ -183,6 +207,8 @@
       ".lp .srow{display:grid;grid-template-columns:1fr 84px 30px;gap:8px;margin-top:6px}",
       ".lp .srow button{flex:none;padding:6px}",
       ".lp .filebtn{display:flex;gap:8px;align-items:center}",
+      ".lp .drag{outline:2px dashed var(--accent);outline-offset:3px;border-radius:8px;",
+      "  background:rgba(140,255,90,.09)}",
       ".lp .filebtn button{flex:none;padding:8px 12px;font-size:12px}",
       ".lp .filebtn span{color:var(--faint);font-size:11.5px;overflow:hidden;",
       "  text-overflow:ellipsis;white-space:nowrap}",
@@ -241,21 +267,28 @@
       el.addEventListener("click", function (e) { if (e.target === el) close(); });
       document.body.appendChild(el);
     }
-    // where the panel sits, and where it is scrolled to, before it is replaced
-    var prev = el.querySelector(".lp");
-    var top = prev ? prev.getBoundingClientRect().top : null;
-    var scrolled = prev ? prev.scrollTop : 0;
+    /* Where it was scrolled to, before it is replaced. The BACKDROP scrolls now
+     * (the panel is centered by margin:auto and grows past the viewport when
+     * long), so preserve the backdrop's offset — several controls re-render the
+     * whole panel (changing the quote currency rebuilds it) and a fresh innerHTML
+     * would otherwise throw the creator back to the top. */
+    var scrolled = el.scrollTop;
 
     el.innerHTML = '<div class="lp">' + (node.s || node) + "</div>";
     var card = el.querySelector(".lp");
-    if (top !== null) pinTop(top);
-    /* Keep the scroll where it was.
-     *
-     * Several controls re-render the whole panel — changing the quote currency
-     * rebuilds it — and a fresh innerHTML starts at the top, so clicking a
-     * button two thirds of the way down threw the creator back to the name
-     * field. The panel looks like it jumped; it was replaced. */
-    if (card && scrolled) card.scrollTop = scrolled;
+    if (scrolled) el.scrollTop = scrolled;
+    /* Drag-and-drop for every image slot, on every panel — by convention a file
+     * input `#X` is paired with a "Choose…" button `#Xbtn`. Wiring it here means
+     * new panels get drop for free, and it flows through each input's own change
+     * handler so nothing else changes. (The "bring your own files" box has its
+     * own dropzone and no `…btn`, so it is skipped.) */
+    if (card) {
+      card.querySelectorAll('input[type="file"]').forEach(function (inp) {
+        if (inp.id && /image/i.test(inp.accept || "") && card.querySelector("#" + inp.id + "btn")) {
+          attachDrop(card, "#" + inp.id + "btn", "#" + inp.id);
+        }
+      });
+    }
     return card;
   }
 
@@ -283,11 +316,37 @@
     if (e) e.innerHTML = '<div class="err">' + esc(msg) + "</div>";
   }
 
+  /* Make a file input's control also accept a dragged-in image, not just a
+   * click-to-pick. `btnSel` is the "Choose…" button; its .filebtn wrapper is the
+   * drop target. On drop we set the input's files and fire the SAME change event
+   * the picker fires, so all the existing read/validate logic runs unchanged. */
+  function attachDrop(box, btnSel, inputSel) {
+    var btn = box.querySelector(btnSel), input = box.querySelector(inputSel);
+    if (!btn || !input) return;
+    var zone = btn.closest(".filebtn") || btn;
+    if (!zone) return;
+    function stop(e) { e.preventDefault(); e.stopPropagation(); }
+    ["dragenter", "dragover"].forEach(function (ev) {
+      zone.addEventListener(ev, function (e) { stop(e); zone.classList.add("drag"); });
+    });
+    ["dragleave", "dragend"].forEach(function (ev) {
+      zone.addEventListener(ev, function (e) { stop(e); zone.classList.remove("drag"); });
+    });
+    zone.addEventListener("drop", function (e) {
+      stop(e); zone.classList.remove("drag");
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!f || !/^image\//.test(f.type || "")) return;
+      try { var dt = new DataTransfer(); dt.items.add(f); input.files = dt.files; }
+      catch (_) { return; }               // Safari <14.1 has no DataTransfer ctor
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+
   /* ---------- mode select ---------- */
 
   function modeSelect() {
     var hasRun = !!(run && run.files);
-    var tokenReady = !!(window.Token && window.Token.configKey());
+    var tokenReady = !!(solBackend() && solBackend().configKey());
     var box = shell(H`
       <h2>Launch</h2>
       <p class="sub">What goes on chain today?</p>
@@ -332,7 +391,7 @@
       name: P.name || "", symbol: "", desc: "",
       price: 0, maxPer: 0, dev: 0, roy: 5, royTo: "",
       site: "", x: "", tg: "", dc: "",
-      openAt: "", splits: [], allowOn: false, phases: [""], wave: 30,
+      openAt: "", splits: [], allowOn: false, allowWallets: "", allowWalletsName: "", gates: [], wave: 30,
       pairOn: false, tname: "", tsym: "", avatar: null, avatarName: "", banner: null, bannerName: ""
     };
 
@@ -369,19 +428,10 @@
       <p class="note">Creator supply is minted to you before the sale opens, taking ids
       from the machine first — free, before price and limits exist.</p>
       <p class="note"><b>Fees:</b> mint revenue is 100% yours — we take no cut.
-      Storage is the only launch cost. A paired token's trading fees split
-      20% you / 60% platform / 20% Meteora on the standard tier.</p>
+      Storage is the only launch cost.</p>
 
       <label>Royalty wallet</label>
       <input id="f-royto" value="${d.royTo}" placeholder="optional — defaults to deployer wallet">
-
-      <label class="tick"><input type="checkbox" id="f-splitOn" ${d.splits.length ? raw("checked") : ""}>
-        <span><b>Split the creator supply</b>
-        <span>Mint parts of it straight to teammates' wallets.</span></span></label>
-      <div class="fold2" id="f-splitbox" ${d.splits.length ? "" : raw("hidden")}>
-        <div id="f-splitrows"></div>
-        <div class="acts" style="margin-top:10px"><button id="f-splitadd" type="button">+ Teammate</button></div>
-      </div>
 
       <div class="four">
         <div><label>Website</label><input id="f-site" value="${d.site}" placeholder="site.xyz"></div>
@@ -394,16 +444,32 @@
       <input id="f-open" type="datetime-local" value="${d.openAt}">
       <p class="note">Empty means the moment you launch. Allowlist waves count from here.</p>
 
+      <label class="tick"><input type="checkbox" id="f-splitOn" ${d.splits.length ? raw("checked") : ""}>
+        <span><b>Split the creator supply</b>
+        <span>Mint parts of it straight to teammates' wallets.</span></span></label>
+      <div class="fold2" id="f-splitbox" ${d.splits.length ? "" : raw("hidden")}>
+        <div id="f-splitrows"></div>
+        <div class="acts" style="margin-top:10px"><button id="f-splitadd" type="button">+ Teammate</button></div>
+      </div>
+
       <label class="tick"><input type="checkbox" id="f-allowOn" ${d.allowOn ? raw("checked") : ""}>
         <span><b>Allowlist first</b>
-        <span>Listed wallets mint in waves before the public. The list is pinned with the
-        collection, so it cannot be quietly edited afterwards.</span></span></label>
+        <span>Wallets — or holders of a collection or token you name — mint in waves before
+        the public. The list is pinned with the collection, so it cannot be quietly edited
+        afterwards.</span></span></label>
       <div class="fold2" id="f-allowbox" ${d.allowOn ? "" : raw("hidden")}>
-        <div id="f-phases"></div>
-        <div class="acts" style="margin-top:10px">
-          <button id="f-phaseadd" type="button">+ Wave</button>
+        <label>Wallets — one per line (they mint first)</label>
+        <input id="f-wallets-name" placeholder="wave name — e.g. OGs (optional)" value="${esc(d.allowWalletsName)}" style="margin-bottom:6px">
+        <textarea class="walls" id="f-wallets" placeholder="paste addresses, one per line — optional">${esc(d.allowWallets)}</textarea>
+        <label style="margin-top:12px">Collections &amp; tokens — holders mint, each a wave later</label>
+        <div id="f-gates"></div>
+        <div class="acts" style="margin-top:8px">
+          <button id="f-gatecoll" type="button">+ Collection</button>
+          <button id="f-gatetok" type="button">+ Token</button>
+        </div>
+        <div class="acts" style="margin-top:12px">
           <div style="flex:1;display:flex;gap:8px;align-items:center">
-            <label style="margin:0;flex:none">Wave lasts</label>
+            <label style="margin:0;flex:none">Each wave lasts</label>
             <input id="f-wave" type="number" min="1" value="${d.wave}" style="width:70px"> min
           </div>
         </div>
@@ -414,9 +480,9 @@
            launch is independent of the staking program (it only routes fees to
            the vault) — but claiming needs that program live, so the tick is
            held until it ships. See PAIRING_LIVE. -->
-      <label class="tick"><input type="checkbox" id="f-pairOn" ${PAIRING_LIVE ? "" : raw("disabled")}>
+      <label class="tick"><input type="checkbox" id="f-pairOn" ${PAIRING_LIVE() ? "" : raw("disabled")}>
         <span><b>Pair a token that rewards NFT holders</b>
-        <span>${PAIRING_LIVE
+        <span>${PAIRING_LIVE()
           ? "Its trading fees feed a vault your holders claim from staking."
           : "Still in closed testing."}</span></span></label>
 
@@ -470,31 +536,57 @@
     };
     drawSplits();
 
-    /* allowlist waves */
-    function drawPhases() {
-      var ph = box.querySelector("#f-phases");
-      ph.innerHTML = d.phases.map(function (txt, i) {
-        return '<label style="margin-top:' + (i ? 10 : 0) + 'px">Wave ' + (i + 1) +
-          " — one wallet per line" + (d.phases.length > 1 ?
-          ' <button type="button" data-pdel="' + i + '" style="float:right;padding:2px 8px">×</button>' : "") +
-          '</label><textarea class="walls" data-p="' + i + '">' + esc(txt) + "</textarea>";
+    /* allowlist: a wallets paste box + collection/token gate rows. A token row
+     * carries a minimum-held threshold; a collection defaults to ≥1. Each row is
+     * its own wave, in order, after the wallets. */
+    function drawGates() {
+      var g = box.querySelector("#f-gates");
+      g.innerHTML = d.gates.map(function (row, i) {
+        var isCoin = row.kind === "coin";
+        return '<div style="display:flex;gap:8px;margin-top:8px;align-items:center">' +
+          '<span style="flex:none;font-size:10px;letter-spacing:.1em;color:var(--faint);width:42px">' +
+            (isCoin ? "TOKEN" : "NFT") + "</span>" +
+          '<input class="gaddr" data-g="' + i + '" placeholder="' + (isCoin ? "token" : "collection") +
+            ' address" value="' + esc(row.addr) + '" style="flex:1">' +
+          '<button type="button" class="gdel" data-g="' + i + '" style="flex:none;padding:2px 8px">×</button>' +
+          '</div>' +
+          '<div style="display:flex;gap:8px;margin-top:4px;align-items:center">' +
+          '<span style="flex:none;width:42px"></span>' +
+          '<input class="gname" data-g="' + i + '" placeholder="wave name (optional)" value="' +
+            esc(row.name || "") + '" style="flex:1">' +
+          (isCoin ? '<input class="gmin" data-g="' + i + '" type="number" min="0" step="any" ' +
+            'placeholder="min held" value="' + esc(row.min) + '" style="width:150px">' : "") +
+          "</div>";
       }).join("");
-      ph.querySelectorAll("textarea").forEach(function (t) {
-        t.addEventListener("input", function () { d.phases[+t.dataset.p] = t.value; });
+      g.querySelectorAll(".gaddr").forEach(function (inp) {
+        inp.addEventListener("input", function () { d.gates[+inp.dataset.g].addr = inp.value.trim(); });
       });
-      ph.querySelectorAll("[data-pdel]").forEach(function (b) {
-        b.onclick = function () { d.phases.splice(+b.dataset.pdel, 1); drawPhases(); };
+      g.querySelectorAll(".gname").forEach(function (inp) {
+        inp.addEventListener("input", function () { d.gates[+inp.dataset.g].name = inp.value; });
+      });
+      g.querySelectorAll(".gmin").forEach(function (inp) {
+        inp.addEventListener("input", function () { d.gates[+inp.dataset.g].min = inp.value.trim(); });
+      });
+      g.querySelectorAll(".gdel").forEach(function (b) {
+        b.onclick = function () { d.gates.splice(+b.dataset.g, 1); drawGates(); };
       });
     }
+    box.querySelector("#f-wallets").addEventListener("input", function (e) { d.allowWallets = e.target.value; });
+    box.querySelector("#f-wallets-name").addEventListener("input", function (e) { d.allowWalletsName = e.target.value; });
     box.querySelector("#f-allowOn").addEventListener("change", function (e) {
       d.allowOn = e.target.checked;
       box.querySelector("#f-allowbox").hidden = !d.allowOn;
     });
-    box.querySelector("#f-phaseadd").onclick = function () {
-      if (d.phases.length >= 8) return;         // labels w1..w8 + pub, 6-char cap
-      d.phases.push(""); drawPhases();
-    };
-    drawPhases();
+    function addGate(kind) {
+      if (d.gates.length >= 7) return;          // + wallets + public ≤ 8 waves (6-char labels)
+      d.gates.push({ kind: kind, addr: "", min: "" });
+      drawGates();
+      var rows = box.querySelectorAll("#f-gates .gaddr");
+      if (rows.length) rows[rows.length - 1].focus();
+    }
+    box.querySelector("#f-gatecoll").onclick = function () { addGate("nft"); };
+    box.querySelector("#f-gatetok").onclick = function () { addGate("coin"); };
+    drawGates();
 
     box.querySelector("#lp-x").onclick = close;
     box.querySelector("#lp-next").onclick = function () {
@@ -516,7 +608,7 @@
       d.allowOn = box.querySelector("#f-allowOn").checked;
       // gated on PAIRING_LIVE: the checkbox is disabled until the staking
       // program (the claim side) ships, so this reads false until then
-      d.pairOn = PAIRING_LIVE && box.querySelector("#f-pairOn").checked;
+      d.pairOn = PAIRING_LIVE() && box.querySelector("#f-pairOn").checked;
       if (!box.querySelector("#f-splitOn").checked) d.splits = [];
 
       // validate
@@ -535,16 +627,25 @@
         " but creator supply is " + d.dev + ".");
       var phases = [];
       if (d.allowOn) {
-        for (var pi = 0; pi < d.phases.length; pi++) {
-          var wallets = d.phases[pi].split(/[\s,]+/).map(function (w) { return w.trim(); })
-            .filter(Boolean);
-          if (!wallets.length) return fail(box, "Wave " + (pi + 1) + " has no wallets — remove it or fill it.");
-          for (var wi = 0; wi < wallets.length; wi++) {
-            if (!B58.test(wallets[wi])) return fail(box,
-              "Wave " + (pi + 1) + ", line " + (wi + 1) + " is not a valid address.");
-          }
-          phases.push({ label: "w" + (pi + 1), wallets: wallets });
+        var addrRe = isEvm() ? /^0x[0-9a-fA-F]{40}$/ : B58;   // per-chain address form
+        var wl = d.allowWallets.split(/[\s,]+/).map(function (w) { return w.trim(); }).filter(Boolean);
+        for (var wi = 0; wi < wl.length; wi++) {
+          if (!addrRe.test(wl[wi])) return fail(box, "Allowlist wallet line " + (wi + 1) + " is not a valid address.");
         }
+        if (wl.length) phases.push({ kind: "wallets", label: "w" + (phases.length + 1),
+          name: (d.allowWalletsName || "").trim() || null, wallets: wl });
+        for (var gi = 0; gi < d.gates.length; gi++) {
+          var grow = d.gates[gi], isCoin = grow.kind === "coin";
+          if (!addrRe.test(grow.addr)) return fail(box,
+            (isCoin ? "Token" : "Collection") + " row " + (gi + 1) + " is not a valid address.");
+          var mn = Number(grow.min);
+          if (isCoin && !(mn > 0)) return fail(box, "Token row " + (gi + 1) + " needs a minimum held.");
+          phases.push({ kind: grow.kind, label: "w" + (phases.length + 1),
+            name: (grow.name || "").trim() || null,
+            address: grow.addr, min: String(mn > 0 ? grow.min : 1) });
+        }
+        if (!phases.length) return fail(box, "Allowlist is on but empty — add wallets, a collection or a token, or turn it off.");
+        if (phases.length > 8) return fail(box, "Too many allowlist waves — 8 max.");
       }
 
       flow.pair = d.pairOn;
@@ -586,8 +687,11 @@
       : window.Wallet.current();
     var CUR = evm ? "ETH" : "SOL";
     var waveTxt = cfg.waves
-      ? cfg.waves.phases.map(function (p) { return p.wallets.length; }).join(" + ") +
-        " wallets · " + cfg.waves.minutes + " min waves"
+      ? cfg.waves.phases.map(function (p) {
+          return p.kind === "wallets" ? (p.wallets.length + " wallets")
+            : p.kind === "coin" ? ("token ≥" + p.min)
+            : ("collection ≥" + p.min);
+        }).join(" → ") + " · " + cfg.waves.minutes + " min waves"
       : "no — public from open";
     var box = shell(H`
       <h2>Confirm</h2>
@@ -638,11 +742,13 @@
     go.onclick = w
       ? function () { (evm ? doEvmNftLaunch : doNftLaunch)(cfg, flow); }
       : async function () {
-          var w2 = evm
-            ? await window.Shell.ensureEvmStack().then(function () {
-                return window.MoonpadWallet.connect();
-              }).catch(function () { return null; })
-            : await (window.Shell ? Shell.connect() : Promise.resolve(null));
+          // Shell.connect() handles both chains: it runs ensureEvmStack, opens
+          // the wallet, and — crucially on Robinhood — WAITS for the account to
+          // arrive (MoonpadWallet.connect() resolves before the picker returns
+          // and yields nothing), then returns it. Calling connect() directly
+          // here was the bug: it came back undefined, so the screen never
+          // advanced even after the wallet connected.
+          var w2 = await (window.Shell ? Shell.connect() : Promise.resolve(null));
           if (w2) nftConfirm(cfg, flow);
         };
   }
@@ -867,6 +973,22 @@
     return !!(window.Shell && window.Shell.chain && window.Shell.chain() === "robinhood");
   }
 
+  /* The Solana launch backend. Once LaunchLab is audited and launchlabLive is
+   * flipped on, ALL new Solana launches route through it (one consistent
+   * platform — stocks, altcoins, SOL/USDC alike); until then this is window.Token
+   * (Meteora), so the live flow is unchanged. EVM is unaffected — it has its own
+   * path. Existing Meteora pools keep trading via window.Token regardless. */
+  function solBackend() {
+    try {
+      if (window.LaunchLab && window.LaunchLab.live && window.LaunchLab.live()) return window.LaunchLab;
+    } catch (e) {}
+    return window.Token;
+  }
+  // LaunchLab has one flat fee, not the Meteora tax-rung ladder — the holder
+  // "tax" is the per-launch reward-mode transfer fee instead. So on LaunchLab
+  // only the standard rung is offered.
+  function solIsLaunchLab() { return solBackend() === window.LaunchLab; }
+
   /* The active holder reward, phrased for the token share card — or null for a
    * plain token that keeps its fees, so no reward line is drawn. Dividend pays
    * holders in the chosen reward asset; burn buys back and burns. */
@@ -941,7 +1063,42 @@
 
     try {
       await window.Shell.ensureEvmLaunch();
-      if (cfg.waves) throw new Error("Allowlist waves are not available on Robinhood Chain yet.");
+
+      /* Pin the allowlist in the gate signer's shape (see api/mint-sig.js):
+       * wallets → lowercased `addresses`; a token gate carries the token's real
+       * decimals so the signer's balance threshold is exact; a collection gate is
+       * a whole-NFT count. gateSeconds is the entire gated window (all waves) from
+       * sale-open, after which mintSigned() opens to everyone. */
+      var rhWaves = null, gateSecs = 0;
+      if (cfg.waves && cfg.waves.phases && cfg.waves.phases.length) {
+        var RH_RPC = "https://rpc.mainnet.chain.robinhood.com";
+        var tokenDecimals = async function (addr) {
+          try {
+            var r = await fetch(RH_RPC, {
+              method: "POST", headers: { "content-type": "application/json" },
+              body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call",
+                params: [{ to: addr, data: "0x313ce567" }, "latest"] })
+            }).then(function (x) { return x.json(); });
+            return parseInt(r.result || "0x12", 16) || 18;
+          } catch (e) { return 18; }
+        };
+        var outPhases = [];
+        for (var pi = 0; pi < cfg.waves.phases.length; pi++) {
+          var p = cfg.waves.phases[pi];
+          if (p.kind === "wallets") {
+            outPhases.push({ kind: "wallets", label: p.label, name: p.name || null,
+              addresses: (p.wallets || []).map(function (w) { return String(w).toLowerCase(); }) });
+          } else if (p.kind === "coin") {
+            outPhases.push({ kind: "coin", label: p.label, name: p.name || null, address: String(p.address).toLowerCase(),
+              min: String(p.min), decimals: await tokenDecimals(p.address) });
+          } else if (p.kind === "nft") {
+            outPhases.push({ kind: "nft", label: p.label, name: p.name || null, address: String(p.address).toLowerCase(),
+              min: String(p.min) });
+          }
+        }
+        rhWaves = { waveMinutes: cfg.waves.minutes, phases: outPhases };
+        gateSecs = cfg.waves.phases.length * (cfg.waves.minutes || 0) * 60;
+      }
 
       var card = await makeCard(cfg, "collection", [
         ["items", String(cfg.supply)],
@@ -957,7 +1114,7 @@
         banner: cfg.banner,
         card: card,
         links: cfg.links,
-        allowlist: null,
+        allowlist: rhWaves,
         onProgress: function (p) {
           if (p.phase === "images" && p.state === "quoting") mark("storage", "on");
           if (p.phase === "images") mark("images", p.state === "done" ? "done" : "on");
@@ -987,8 +1144,9 @@
         royaltyBps: Math.round((cfg.royaltyPercent || 0) * 100),
         reserveQty: cfg.devTotal || 0,
         openAtDeploy: !cfg.openAt,
-        gateSigner: "0x0000000000000000000000000000000000000000",
-        gateSeconds: 0
+        gateSigner: rhWaves ? (window.MOONPAD_MINT_SIGNER || "0x0000000000000000000000000000000000000000")
+          : "0x0000000000000000000000000000000000000000",
+        gateSeconds: gateSecs
       });
       /* ⚠️ waitForContract returns {address, explorer}, not a string.
        *
@@ -1011,6 +1169,16 @@
         explorer: deployed.explorer
       };
       recordEvmCollection(cfg, res, up);
+      /* Paired launch: the collection is on chain and recorded — now go to the
+       * token step, which deploys the reward vault and pledges the token's fees
+       * to the NFT keeper (see doEvmTokenLaunch). Mirrors the Solana flow; its
+       * absence here was why an EVM paired launch stopped after the collection. */
+      if (flow && flow.pair) {
+        flow.nft = { cfg: cfg, res: res, up: up };
+        busy = false;
+        tokenDetails(flow);
+        return;
+      }
       evmDone(cfg, res);
     } catch (e) {
       busy = false;
@@ -1078,11 +1246,14 @@
     return attempt(0);
   }
 
-  function recordEvmCollection(cfg, res, up) {
+  function recordEvmCollection(cfg, res, up, tokenMint, vault) {
     postListing("/api/collections", {
         chain: "robinhood",
         address: res.address,
         name: cfg.name,
+        // a paired launch links its token + reward vault back onto the collection
+        tokenMint: tokenMint || null,
+        vault: vault || null,
         avatar: (up && up.avatarUri) || null,
         card: (up && up.cardUri) || null,
         creator: (window.MoonpadWallet || {}).account || null
@@ -1106,10 +1277,12 @@
     box.querySelector("#lp-open2").onclick = function () { location.href = res.mintUrl; };
   }
 
-  function recordCollection(cfg, res, tokenMint, up) {
+  function recordCollection(cfg, res, tokenMint, up, vault) {
     postListing("/api/collections", {
         candyMachine: res.candyMachine, collection: res.collection,
         name: cfg.name, cluster: res.cluster, tokenMint: tokenMint || null,
+        // the paired token's reward vault, so the mint page can link to claiming
+        vault: vault || null,
         avatar: (up && up.avatarUri) || null,
         banner: (up && up.bannerUri) || null,
         card: (up && up.cardUri) || null,
@@ -1352,6 +1525,57 @@
     { symbol: "USDC", name: "USD Coin", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", kind: "native" }
   ];
 
+  /* ── Robinhood Chain: the pool's QUOTE asset ────────────────────────────────
+   * A launch prices its pool in ETH by default, or an approved ERC-20 (USDG, a
+   * tokenised stock). ETH is the zero address on chain; USDG is fixed. When the
+   * quote is a STOCK the reward IS that stock (fees accrue in it, paid direct),
+   * so the dividend-asset picker is hidden. When the quote is ETH or USDG the
+   * reward picker stays open — including stocks the keeper swaps into. The quote
+   * always FALLS BACK TO ETH when nothing usable is chosen. */
+  var ETH_QUOTE = { mint: "0x0000000000000000000000000000000000000000", symbol: "ETH", name: "Ether", liquid: true, kind: "native" };
+  var USDG_QUOTE_ADDR = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
+  function isEthQuote(q) { return !q || !q.mint || /^0x0+$/i.test(String(q.mint)); }
+  function isUsdgQuote(q) { return !!q && String(q.mint || "").toLowerCase() === USDG_QUOTE_ADDR; }
+  // a stock/RWA quote is anything that is neither ETH nor USDG
+  function isStockQuote(q) { return !!q && !isEthQuote(q) && !isUsdgQuote(q); }
+  function quoteSymOf(flow) { return (flow.quoteAsset && flow.quoteAsset.symbol) || "ETH"; }
+
+  /* Solana-side quote presentation for the single "Priced in" dropdown. flow.quote
+   * is "sol" | "usdc" | <mint>; default is SOL. quoteSym/quoteName are set by the
+   * picker when a stock/token is chosen. */
+  function solQuoteView(flow) {
+    var q = flow.quote || "sol";
+    if (q === "sol") return { sym: "SOL", name: "Solana", native: true };
+    if (q === "usdc") return { sym: "USDC", name: "USD Coin", native: false };
+    return { sym: flow.quoteSym || shortAddr(q), name: flow.quoteName || "traded pair", native: false };
+  }
+  function solQuoteNote(flow) {
+    var q = flow.quote || "sol";
+    if (q === "sol") return "Your token trades against SOL — the default. Pick USDC, a stock, or another token to price against instead.";
+    if (q === "usdc") return "Your token trades against USDC, a stablecoin. Buyers pay in USDC and the curve graduates in it.";
+    return "Your token trades directly against " + (flow.quoteSym || "this asset") + ". Buyers pay in it and holder rewards are paid in it.";
+  }
+  /* The full quote list for the Solana picker: SOL + USDC (whichever the backend
+   * supports) as Tokens, followed by every registered stock/token/commodity. */
+  function solQuoteList() {
+    var base = solBackend().quotes();
+    var toks = [];
+    if (base.indexOf("sol") >= 0) toks.push({ mint: "sol", symbol: "SOL", label: "Solana", cat: "token" });
+    if (base.indexOf("usdc") >= 0) toks.push({ mint: "usdc", symbol: "USDC", label: "USD Coin", cat: "token" });
+    return toks.concat(solBackend().rwaQuotes());
+  }
+
+  /* When is the "Rewards paid in" picker offered? Only for a dividend (or the
+   * dividend half of a split) AND when the pool is priced in SOL/USDC — because a
+   * stock/token quote already IS the reward (fees accrue in it, paid direct), so
+   * there is nothing to choose. On Robinhood Chain the analog is ETH/USDG (any
+   * non-stock quote). */
+  function rewardSelectable(flow) {
+    if (flow.rewardMode !== "dividend" && flow.rewardMode !== "split") return false;
+    if (isEvm()) return !isStockQuote(flow.quoteAsset);
+    return flow.quote === "sol" || flow.quote === "usdc" || !flow.quote;
+  }
+
   /* The token window, grown to FLAP's shape on DBC rails. What a creator
    * controls here is identity, quote currency, first buy, rewards, fee wallet
    * and links. The economics — supply, curve, fee, split — are locked in the
@@ -1493,6 +1717,10 @@
       var ready = true;
       if (isEvm()) {
         ready = EVM_PLATFORM_BPS[spec.baseFeeBps] !== undefined;
+      } else if (solIsLaunchLab()) {
+        // LaunchLab has one flat fee — no tax rungs; the holder tax is the
+        // per-launch reward-mode transfer fee instead. Only the standard rung.
+        ready = (name === "standard");
       } else {
         try { window.Token.configFor(flow.quote, name); } catch (e) { ready = false; }
       }
@@ -1542,6 +1770,7 @@
 
     flow.quote = "sol";                    // pairs price in SOL
     if (!flow.tier) flow.tier = "standard";
+    if (flow.burn == null || flow.burn === "") flow.burn = 1000000;   // burn-to-activate default
     /* The whole creator share feeds the collection's vault; NFT holders claim
      * it from the staking program. This is a RECORDED PREFERENCE, not launch-
      * time routing: the pool launches clean with the launcher as poolCreator,
@@ -1610,6 +1839,13 @@
               "receive SOL until it can be sold — it switches by itself once a market exists.")
         : ""}</p>
 
+      <label>Burn to activate — per NFT</label>
+      <input id="lp-burn" type="number" min="1" step="any" value="${flow.burn == null ? 1000000 : flow.burn}"
+        placeholder="1000000">
+      <p class="note">How much $${esc((flow.tsym || defSym) || "TOKEN")} a holder burns to switch one NFT
+      on for rewards. Each activated NFT then earns an equal share of the fees. A higher number means more
+      buy-and-burn pressure on the token.</p>
+
       <div id="lp-err"></div>
       <div class="acts"><button id="lp-x">Back</button>
       <button class="go" id="lp-next">Continue</button></div>
@@ -1619,6 +1855,7 @@
       flow.tname = box.querySelector("#lp-tname").value;
       flow.tsym = box.querySelector("#lp-tsym").value;
       flow.tbuy = box.querySelector("#lp-tbuy").value;
+      flow.burn = box.querySelector("#lp-burn").value;
     }
 
     box.querySelector("#tk-logobtn").onclick = function () { box.querySelector("#tk-logo").click(); };
@@ -1687,7 +1924,8 @@
     var rewardBtn = box.querySelector("#lp-reward");
     if (rewardBtn) rewardBtn.onclick = function () {
       collect();
-      (isEvm() ? rhRewardPicker : rewardPicker)(flow);
+      if (isEvm()) rhRewardPicker(flow);
+      else rwaQuotePicker(flow, solQuoteList(), { mode: "reward" });
     };
 
     box.querySelector("#lp-x").onclick = function () {
@@ -1722,8 +1960,17 @@
       ? { mint: "0x0000000000000000000000000000000000000000",
           symbol: "ETH", name: "Ether" }
       : BUILTIN_REWARDS[0]);
-    /* Robinhood Chain prices in ETH and nothing else — the curve takes the
-     * chain's native coin, there is no USDC config and no RWA quote. */
+    /* The pool's quote asset (Robinhood Chain). Defaults to ETH; the creator can
+     * price the pool in USDG or a tokenised stock from the "Priced in" picker. */
+    if (isEvm()) {
+      flow.quoteAsset = flow.quoteAsset || ETH_QUOTE;
+      /* A stock quote IS the reward: fees accrue in it and pay holders directly,
+       * so the dividend-asset picker is hidden and the reward mirrors the quote. */
+      if (isStockQuote(flow.quoteAsset)) {
+        flow.reward = { mint: flow.quoteAsset.mint, symbol: flow.quoteAsset.symbol,
+          name: flow.quoteAsset.name, liquidity: flow.quoteAsset.liquidity };
+      }
+    }
     flow.quote = isEvm() ? "eth" : (flow.quote || "sol");
     /* Standard, keeping the fees — the least surprising thing a launch can be,
      * and the state the panel opens in. Sharing is a decision the creator
@@ -1739,15 +1986,20 @@
      * Dividend/Burn to "keep" while the tab still shows it selected — which read
      * on the confirm as "You keep everything" over a highlighted Dividend. Seed
      * the share from the existing mode so the two stay in step. */
-    if (flow.rewardMode === "dividend" || flow.rewardMode === "burn") {
+    // A paired launch routes the token's fees into the collection's reward
+    // vault, paid to NFT holders as a dividend — buyback, split and keep have no
+    // meaning there, so the mode is locked to dividend (and the buttons below
+    // are disabled).
+    if (nft) flow.rewardMode = "dividend";
+    if (flow.rewardMode === "dividend" || flow.rewardMode === "burn" || flow.rewardMode === "split") {
       flow.feeShare = "holders";
       if (!(flow.feeSharePct > 0)) flow.feeSharePct = 100;
     } else {
       flow.feeSharePct = 0;
       flow.feeShare = "keep";
     }
-    var quotes = window.Token.quotes();
-    var rwas = window.Token.rwaQuotes();
+    var quotes = solBackend().quotes();
+    var rwas = solBackend().rwaQuotes();
     var qLabel = isEvm() ? "ETH"
       : flow.quote === "usdc" ? "USDC"
       : flow.quote === "sol" ? "SOL"
@@ -1755,9 +2007,8 @@
 
     var box = shell(H`
       <h2>${nft ? "2 of 2 — the token" : "Launch token"}</h2>
-      <p class="sub">${nft
-        ? "Paired with " + nft.cfg.name + ". Its trading fees reward the collection's holders."
-        : "A bonding-curve token. No liquidity to manage — the curve is the liquidity."}</p>
+      ${nft ? H`<p class="sub">Paired with ${nft.cfg.name}. Its trading fees reward the
+        collection's holders.</p>` : ""}
 
       <div class="two">
         <div><label>Logo · 1:1</label>
@@ -1781,13 +2032,26 @@
       <textarea id="tk-desc" rows="2" placeholder="${isEvm()
         ? "Shown on your token page and explorers" : "Shown on Jupiter and explorers"}">${flow.tdesc || ""}</textarea>
 
-      ${isEvm() ? "" : H`<label>Priced in</label>
-      <div class="ptabs" id="tk-quotes">
-        <button data-q="sol" ${flow.quote === "sol" ? raw('class="on"') : ""}
-          ${quotes.indexOf("sol") < 0 ? raw("disabled") : ""}>SOL</button>
-        <button data-q="usdc" ${flow.quote === "usdc" ? raw('class="on"') : ""}
-          ${quotes.indexOf("usdc") < 0 ? raw("disabled") : ""}>USDC</button>
-      </div>`}
+      ${isEvm() ? H`<label>Priced in</label>
+      <button class="pick" id="lp-quote">
+        <span><b>${quoteSymOf(flow)}</b> &nbsp;<span class="k2">${
+          (flow.quoteAsset && flow.quoteAsset.name) || "Ether"}</span></span>
+        <span class="pk-r"><span class="k2 mono">${
+          isEthQuote(flow.quoteAsset) ? "native" : "trades against this"}</span>
+        <span class="pk-dd">Change ▾</span></span>
+      </button>
+      <p class="note">${isStockQuote(flow.quoteAsset)
+        ? raw("Your token trades directly against <b>" + esc(quoteSymOf(flow)) + "</b> — buyers can pay ETH and it converts automatically. Holder rewards are paid in " + esc(quoteSymOf(flow)) + ".")
+        : isUsdgQuote(flow.quoteAsset)
+          ? "Your token trades against USDG (a stablecoin). Buyers can pay ETH and it converts automatically."
+          : "Your token trades against ETH — the default. Pick USDG or a stock to pair against instead."}</p>`
+      : H`<label>Priced in</label>
+      <button class="pick" id="lp-solquote">
+        <span><b>${solQuoteView(flow).sym}</b> &nbsp;<span class="k2">${solQuoteView(flow).name}</span></span>
+        <span class="pk-r"><span class="k2 mono">${solQuoteView(flow).native ? "native" : "trades against this"}</span>
+        <span class="pk-dd">Change ▾</span></span>
+      </button>
+      <p class="note">${solQuoteNote(flow)}</p>`}
 
       <label>Creator tax</label>
       <div class="ptabs" id="tk-tiers">${raw(tierButtons(flow))}</div>
@@ -1797,26 +2061,32 @@
       <!-- Two ways the pledged share can work. Like the asset below, this is
            recorded with the launch and takes effect when rewards are switched
            on from the fee page — no routing happens here. -->
-      <label>Holder rewards</label>
-      <div class="tiers three" id="tk-modes">
-        <button data-m="none" class="tier ${(flow.rewardMode || "none") === "none" ? "on" : ""}">
+      <label>Holder rewards${nft ? " — dividend to NFT holders" : ""}</label>
+      <div class="tiers ${(isEvm() || solIsLaunchLab()) ? "four" : "three"}" id="tk-modes">
+        <button data-m="none" class="tier ${(flow.rewardMode || "none") === "none" ? "on" : ""}" ${nft ? raw("disabled") : ""}>
           <b>Normal</b><span>You keep all of your trading fees. No holder
           rewards.</span></button>
         <button data-m="dividend" class="tier ${flow.rewardMode === "dividend" ? "on" : ""}">
           <b>Dividend</b><span>Paid out to holders automatically based on their
           holdings.</span></button>
-        <button data-m="burn" class="tier ${flow.rewardMode === "burn" ? "on" : ""}">
+        <button data-m="burn" class="tier ${flow.rewardMode === "burn" ? "on" : ""}" ${nft ? raw("disabled") : ""}>
           <b>Buyback &amp; burn</b><span>Buys the token off the market and burns it,
           causing supply to fall.</span></button>
+        ${(isEvm() || solIsLaunchLab()) ? H`<button data-m="split" class="tier ${flow.rewardMode === "split" ? "on" : ""}" ${nft ? raw("disabled") : ""}>
+          <b>Dividend + Buyback</b><span>Half the holder share pays a dividend,
+          half buys back and burns. 50/50.</span></button>` : ""}
       </div>
+      ${nft ? H`<p class="note">A paired launch pays its fees to the collection's NFT
+        holders as a dividend, through the reward vault — so buyback and split aren't
+        options here.</p>` : ""}
 
       <!-- What holders would be paid in. A preference recorded with the
            launch, not a routing instruction: nothing reaches holders until the
            creator activates rewards on the fee page, which is a separate
            signature. Keeping the choice here means they make it while thinking
            about their token, not weeks later in a different screen. -->
-      <div id="tk-rewardwrap" ${(flow.rewardMode || "none") !== "dividend" ? raw("hidden") : ""}>
-        <label>Holders are paid in</label>
+      <div id="tk-rewardwrap" ${rewardSelectable(flow) ? "" : raw("hidden")}>
+        <label>Holders are paid in${flow.rewardMode === "split" ? " (dividend half)" : ""}</label>
         <button class="pick" id="lp-reward">
           <span><b>${flow.reward.symbol}</b> &nbsp;<span class="k2">${flow.reward.name}</span></span>
           <span class="pk-r"><span class="k2 mono">${
@@ -1847,7 +2117,7 @@
         <div><label>Website</label><input id="tk-web" value="${flow.web || ""}" placeholder="site.xyz"></div>
         <div><label>X</label><input id="tk-x" value="${flow.x || ""}" placeholder="@handle"></div>
       </div>
-      ${window.Token.configKey() ? "" : raw(
+      ${solBackend().configKey() ? "" : raw(
         '<p class="err">Token launches are not configured on this deployment yet — ' +
         "the form is a preview and the launch button is disabled.</p>")}
       <label>Your first buy (${qLabel}) — optional</label>
@@ -1858,7 +2128,7 @@
 
       <div id="lp-err"></div>
       <div class="acts"><button id="lp-x">${nft ? "Skip token" : "Back"}</button>
-      <button class="go" id="lp-next" ${window.Token.configKey() ? "" : raw("disabled")}>Continue</button></div>
+      <button class="go" id="lp-next" ${solBackend().configKey() ? "" : raw("disabled")}>Continue</button></div>
     `);
 
 
@@ -1974,31 +2244,14 @@
 
 
 
-    /* Absent on Robinhood Chain — there is one quote currency, so the picker is
-     * not rendered. Binding to it unconditionally threw a TypeError and took
-     * the whole details screen down with it. */
-    var quoteTabs = box.querySelector("#tk-quotes");
-    if (quoteTabs) quoteTabs.addEventListener("click", function (e) {
-      var b = e.target.closest("button[data-q]");
-      if (!b || b.disabled) return;
+    /* One dropdown for the whole quote choice — SOL/USDC and every stock/token
+     * live behind it, grouped by category, like the Robinhood side. Absent on
+     * Robinhood Chain, which renders its own #lp-quote picker instead. */
+    var solQuoteBtn = box.querySelector("#lp-solquote");
+    if (solQuoteBtn) solQuoteBtn.onclick = function () {
       collect();
-      if (b.dataset.q === "rwa") {
-        // pick WHICH asset prices the pair — only mints with a signed config
-        var r = window.Token.rwaQuotes();
-        if (r.length === 1) {
-          flow.quote = r[0].mint; flow.quoteSym = r[0].label;
-          return tokenDetails(flow);
-        }
-        return rwaQuotePicker(flow, r);
-      }
-      /* Re-render, deliberately. The currency changes labels captured at
-       * render time — "your first buy (SOL)", the graduation figure, the
-       * reward note — so repainting piecemeal leaves at least one of them
-       * lying. shell() preserves the scroll position, so this no longer
-       * throws the creator back to the top. */
-      flow.quote = b.dataset.q;
-      tokenDetails(flow);
-    });
+      rwaQuotePicker(flow, solQuoteList());
+    };
     // the suggested-amount chips are gone; the field is typed into directly
     var chipRow = box.querySelector("#tk-chips");
     if (chipRow) chipRow.addEventListener("click", function (e) {
@@ -2013,13 +2266,13 @@
        * give them that page back, not send them to the collection chooser they
        * never asked for. */
       if (nft) { recordCollection(nft.cfg, nft.res, null, nft.up); nftDone(nft.cfg, nft.res, nft.up); }
-      else close();
+      else exitToPage();
     };
     // present on both chains now; the reward ASSET picker is the Solana-only part
     var modeTabs = box.querySelector("#tk-modes");
     if (modeTabs) modeTabs.addEventListener("click", function (e) {
       var b = e.target.closest("button[data-m]");
-      if (!b) return;
+      if (!b || b.disabled) return;         // paired launch locks this to dividend
       flow.rewardMode = b.dataset.m;
 
       /* The mode has to move the SHARE, not just the label.
@@ -2044,16 +2297,25 @@
       /* A burn pays nobody anything, so "paid in what?" stops being a question
        * — a control that does nothing is worse than no control. */
       var rw = box.querySelector("#tk-rewardwrap");
-      // the "paid in" asset only matters for a dividend — Normal keeps the fees,
-      // burn buys back the token itself
-      if (rw) rw.hidden = flow.rewardMode !== "dividend";
+      // the "paid in" asset matters for a dividend or the split's dividend half,
+      // and only when priced in SOL/USDC — Normal keeps the fees, burn buys back
+      // the token itself, and a stock/token quote already IS the reward.
+      if (rw) rw.hidden = !rewardSelectable(flow);
     });
 
-    // the choice is recorded with the launch; activation happens on the fee page
+    // the choice is recorded with the launch; activation happens on the fee page.
+    // Solana reuses the quote picker (same categorised catalogue), in reward mode.
     var rewardBtn = box.querySelector("#lp-reward");
     if (rewardBtn) rewardBtn.onclick = function () {
       collect();
-      (isEvm() ? rhRewardPicker : rewardPicker)(flow);
+      if (isEvm()) rhRewardPicker(flow);
+      else rwaQuotePicker(flow, solQuoteList(), { mode: "reward" });
+    };
+    // the pool's quote asset — same picker, "quote" mode (Robinhood Chain only)
+    var quoteBtn = box.querySelector("#lp-quote");
+    if (quoteBtn) quoteBtn.onclick = function () {
+      collect();
+      rhRewardPicker(flow, { mode: "quote" });
     };
     box.querySelector("#lp-next").onclick = function () {
       collect();
@@ -2091,16 +2353,19 @@
    * point of chain-verifying this list is that a ticker is not an identity, and
    * hiding what is actually being selected would undo that.
    */
-  function rhRewardPicker(flow) {
+  function rhRewardPicker(flow, opts) {
+    var quoteMode = !!(opts && opts.mode === "quote");
     var box = shell(H`
-      <h2>Reward asset</h2>
-      <p class="sub">Trading fees are converted into this before your holders
-      are paid. Every asset here is verified on chain and has a live market.</p>
+      <h2>${quoteMode ? "Priced in" : "Reward asset"}</h2>
+      <p class="sub">${quoteMode
+        ? "The asset your token trades against. Pick ETH for the classic pairing, USDG for a stable, or a stock to pair against it — buyers can always pay ETH and it converts automatically."
+        : "Trading fees are converted into this before your holders are paid. Every asset here is verified on chain and has a live market."}</p>
       <input id="lp-q" type="search" placeholder="Search…" autocomplete="off">
       <div class="ptabs" id="lp-tabs">
         <button data-t="all" class="on">All</button>
         <button data-t="native">ETH</button>
         <button data-t="stable">USDG</button>
+        <button data-t="crypto">Crypto</button>
         <button data-t="commodity">Commodities</button>
         <button data-t="equity">Stocks &amp; ETFs</button>
       </div>
@@ -2112,6 +2377,14 @@
 
     var tab = "all";
     loadRhAssets().then(function (list) {
+      /* The Crypto tab is forward-staged: the discovery pipeline tags crypto
+       * assets, but until Robinhood tokenises the majors on-chain the list has
+       * none. Drop the tab rather than show one that only ever says "nothing
+       * matches" — it reappears on its own the day a crypto asset lists. */
+      if (!list.some(function (t) { return t.kind === "crypto"; })) {
+        var ctab = box.querySelector('#lp-tabs button[data-t="crypto"]');
+        if (ctab) ctab.remove();
+      }
       /* Same three columns the Solana picker uses — ticker, name, then the
        * detail that matters.
        *
@@ -2146,6 +2419,7 @@
         });
         var native = rows.filter(function (t) { return t.kind === "native"; });
         var stable = rows.filter(function (t) { return t.kind === "stable"; });
+        var crypto = rows.filter(function (t) { return t.kind === "crypto"; });
         var comm   = rows.filter(function (t) { return t.kind === "commodity"; });
         var equity = rows.filter(function (t) { return t.kind === "equity"; });
         var html = "";
@@ -2158,6 +2432,7 @@
          * hid the one thing it contained. */
         if (stable.length) html += head(stable.length === 1 ? stable[0].symbol : "Stablecoins",
                                         stable.length) + stable.map(rowHtml).join("");
+        if (crypto.length) html += head("Crypto", crypto.length) + crypto.map(rowHtml).join("");
         if (comm.length) html += head("Commodities", comm.length) + comm.map(rowHtml).join("");
         if (equity.length) html += head("Stocks & ETFs", equity.length) + equity.map(rowHtml).join("");
         box.querySelector("#lp-list").innerHTML =
@@ -2181,174 +2456,114 @@
         if (!b) return;
         var hit = list.find(function (t) { return t.address === b.dataset.a; });
         if (!hit) return;
-        /* Recorded with the launch, exactly as on Solana — nothing is routed
-         * until rewards are switched on from the fee page. */
-        flow.reward = {
-          mint: hit.address, symbol: hit.symbol,
-          name: (hit.name || "").replace(/ • Robinhood Token$/, ""),
-          liquidity: hit.liquidity
-        };
+        var cleanName = (hit.name || "").replace(/ • Robinhood Token$/, "");
+        if (quoteMode) {
+          /* The pool's quote asset. A stock quote also becomes the reward (fees
+           * accrue in it, paid direct); ETH/USDG leave the reward choice alone. */
+          flow.quoteAsset = { mint: hit.address, symbol: hit.symbol, name: cleanName,
+            liquid: hit.liquid, liquidity: hit.liquidity };
+          if (isStockQuote(flow.quoteAsset)) {
+            flow.reward = { mint: hit.address, symbol: hit.symbol, name: cleanName, liquidity: hit.liquidity };
+          }
+        } else {
+          /* Recorded with the launch, exactly as on Solana — nothing is routed
+           * until rewards are switched on from the fee page. */
+          flow.reward = { mint: hit.address, symbol: hit.symbol, name: cleanName, liquidity: hit.liquidity };
+        }
         tokenDetails(flow);
       });
     });
   }
 
-  function rewardPicker(flow) {
-    var box = shell(H`
-      <h2>Reward asset</h2>
-      <p class="sub">Trading fees are converted into this before distribution.</p>
-      <input id="lp-q" type="search" placeholder="Search assets…" autocomplete="off">
-      <div class="ptabs" id="lp-tabs">
-        <button data-t="all" class="on">All</button>
-        <button data-t="tradeable">Tradeable</button>
-        <button data-t="untradeable">Not tradeable yet</button>
-        <button data-t="native">SOL &amp; USDC</button>
-        <button data-t="equity">Stocks</button>
-        <button data-t="commodity">Commodities</button>
-      </div>
-      <div class="plist" id="lp-list"><p class="note" style="padding:12px">Loading…</p></div>
-      <p class="note" id="lp-hidden"></p>
-      <div class="acts"><button id="lp-x">Back</button></div>
-    `);
-    // return to whichever form opened the picker — the pair panel or the full
-    // token window
-    box.querySelector("#lp-x").onclick = function () { (flow.pair ? pairTokenDetails : tokenDetails)(flow); };
-
-    var all = null, tab = "all", q = "", hidden = 0, showNo = false;
-
-    /* What the row tells you. A creator picking what their holders get paid in
-     * needs to know two things: can it be sold, and how deep is it. */
-    var MIN_LIQUIDITY = 1000;
-    function depth(t) {
-      var n = t.liquidity;
-      if (n === undefined) return "";                 // SOL / USDC
-      if (n < MIN_LIQUIDITY) return "not tradeable yet";
-      if (n >= 1e6) return "$" + (n / 1e6).toFixed(1) + "M deep";
-      return "$" + Math.round(n / 1e3) + "k deep";
+  /* Category-tabbed picker used for BOTH the pool's quote asset (mode "quote",
+   * the default) and — reusing the exact same catalogue — the dividend reward
+   * asset (mode "reward"). One list, Tokens / Stocks / Pre-IPO / Commodities
+   * tabs; only tabs with entries show. Reward mode stores the real SOL/USDC mint
+   * (not the "sol"/"usdc" sentinels the quote uses). */
+  function rwaQuotePicker(flow, list, opts) {
+    opts = opts || {};
+    var reward = opts.mode === "reward";
+    var WSOL_MINT = "So11111111111111111111111111111111111111112";
+    var USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    // the currently-selected row, as a list mint ("sol"/"usdc"/<mint>)
+    function currentSel() {
+      if (reward) {
+        var m = flow.reward && flow.reward.mint;
+        if (m === WSOL_MINT) return "sol";
+        if (m === USDC_MINT) return "usdc";
+        return m || "sol";
+      }
+      return flow.quote || "sol";
     }
-
-    // SOL/USDC carry no liquidity number and are always tradeable
-    function tradeable(t) { return t.liquidity === undefined || (t.liquidity || 0) >= MIN_LIQUIDITY; }
-    function draw() {
-      if (!all) return;
-      /* Two tab kinds share one row: ASSET-TYPE tabs (native/equity/commodity)
-       * filter by t.kind; TRADEABILITY tabs (tradeable/untradeable) filter by
-       * liquidity. "all" filters by neither. Search narrows whatever is showing;
-       * the 2000 cap is a safety bound well above the ~750 catalogue. */
-      var KIND = { native: 1, equity: 1, commodity: 1 };
-      var matched = all.filter(function (t) {
-        if (KIND[tab] && t.kind !== tab) return false;
-        if (tab === "tradeable" && !tradeable(t)) return false;
-        if (tab === "untradeable" && tradeable(t)) return false;
-        if (!q) return true;
-        return (t.symbol + " " + t.name).toLowerCase().indexOf(q) >= 0;
-      }).slice(0, 2000);
-      function rowHtml(t) {
-        return '<button class="prow" data-mint="' + esc(t.mint) + '">' +
-          "<b>" + esc(t.symbol) + "</b><span>" + esc(t.name) + "</span>" +
-          '<i class="' + (tradeable(t) ? "" : "dim") + '">' + esc(depth(t) || shortAddr(t.mint)) +
-          "</i></button>";
-      }
-      function head(label, cls, n) {
-        return '<div class="phead ' + cls + '">' + label + " · " + n + "</div>";
-      }
-
-      var html, hasNo;
-      if (tab === "tradeable") {
-        html = matched.length ? head("Tradeable now", "tradeable", matched.length) +
-          matched.map(rowHtml).join("") : "";
-        hasNo = false;
-      } else if (tab === "untradeable") {
-        html = matched.length ? head("Not tradeable yet", "", matched.length) +
-          matched.map(rowHtml).join("") : "";
-        hasNo = matched.length > 0;
-      } else {
-        // "all" or an asset-type tab: tradeable listed, the rest collapsed under
-        // their own header so it is never buried by hundreds of rows
-        var yes = matched.filter(tradeable);
-        var no = matched.filter(function (t) { return !tradeable(t); });
-        var openNo = showNo || !!q;
-        html = (yes.length ? head("Tradeable now", "tradeable", yes.length) +
-          yes.map(rowHtml).join("") : "");
-        if (no.length) {
-          html += '<div class="phead nohead">Not tradeable yet · ' + no.length +
-            ' <span class="tw">' + (openNo ? "hide ▾" : "show ▸") + "</span></div>" +
-            (openNo ? no.map(rowHtml).join("") : "");
-        }
-        hasNo = no.length > 0;
-      }
-
-      var list = box.querySelector("#lp-list");
-      list.innerHTML = html || '<p class="note" style="padding:12px">Nothing matches.</p>';
-      var note = box.querySelector("#lp-hidden");
-      if (note) {
-        note.textContent = hasNo
-          ? "A not-tradeable pick pays holders the quote currency until the asset " +
-            "can be sold, then switches to it by itself."
-          : "";
-      }
-      var nh = list.querySelector(".nohead");
-      if (nh) nh.onclick = function () { showNo = !showNo; draw(); };
-      list.querySelectorAll(".prow").forEach(function (b) {
-        b.onclick = function () {
-          flow.reward = all.find(function (t) { return t.mint === b.dataset.mint; });
-          (flow.pair ? pairTokenDetails : tokenDetails)(flow);
-        };
-      });
-    }
-
-    /* Everything is offered — the catalogue is the point — but tradeable ones
-     * sort first, so a creator browsing sees what works before what does not. */
-    window.Token.rwa().then(function (rwa) {
-      var list = (rwa || []).slice().sort(function (a, b) {
-        return (b.liquidity || 0) - (a.liquidity || 0);
-      });
-      hidden = list.filter(function (t) { return (t.liquidity || 0) < MIN_LIQUIDITY; }).length;
-      all = BUILTIN_REWARDS.concat(list);
-      // show the exact catalogue size in the search box — "+" because it grows
-      // every time tools/fetch-rwa.js is re-run
-      var qi = box.querySelector("#lp-q");
-      if (qi && list.length) qi.placeholder = "Search " + list.length + "+ assets";
-      draw();
-    });
-    box.querySelector("#lp-q").addEventListener("input", function (e) {
-      q = e.target.value.trim().toLowerCase(); draw();
-    });
-    box.querySelector("#lp-tabs").addEventListener("click", function (e) {
-      var b = e.target.closest("button"); if (!b) return;
-      tab = b.dataset.t;
-      box.querySelectorAll("#lp-tabs button").forEach(function (x) {
-        x.classList.toggle("on", x === b);
-      });
-      draw();
-    });
-  }
-
-  /* Which real-world asset prices the pair. Short list on purpose: every row
-   * here required the platform wallet to sign a curve config for that mint —
-   * this is not the 500+ reward list. */
-  function rwaQuotePicker(flow, list) {
+    /* Tokens first so SOL — the default — is what opens. */
+    var CATS = [
+      { t: "token", label: "Tokens" },
+      { t: "stock", label: "Stocks" },
+      { t: "preipo", label: "Pre-IPO" },
+      { t: "commodity", label: "Commodities" }
+    ].filter(function (c) { return list.some(function (x) { return (x.cat || "stock") === c.t; }); });
+    /* Open on the category holding the current selection, else the first tab. */
+    var cur = list.find(function (x) { return x.mint === currentSel(); });
+    var tab = (cur && cur.cat) || (CATS[0] || { t: "token" }).t;
     var box = shell(H`
-      <h2>Priced in a real-world asset</h2>
-      <p class="sub">The token trades against this asset — buys are paid in it,
-      the curve graduates in it.</p>
-      <div class="plist">
-        ${raw(list.map(function (t) {
-          return '<button class="prow" data-mint="' + esc(t.mint) + '">' +
-            "<b>" + esc(t.symbol) + "</b>" +
-            "<i>" + esc(shortAddr(t.mint)) + "</i></button>";
+      <h2>${reward ? "Rewards paid in" : "Priced in"}</h2>
+      <p class="sub">${reward
+        ? "Pick the asset your holders receive as a dividend. Saved with your launch."
+        : "Pick what your token trades against — buys are paid in it, and the curve graduates in it. SOL is the default."}</p>
+      <div class="ptabs" id="lp-qtabs">
+        ${raw(CATS.map(function (c) {
+          return '<button data-t="' + c.t + '"' + (c.t === tab ? ' class="on"' : "") + ">" + esc(c.label) + "</button>";
         }).join(""))}
       </div>
+      <div class="plist" id="lp-qlist"></div>
       <div class="acts"><button id="lp-x">Back</button></div>
     `);
-    box.querySelector("#lp-x").onclick = function () { tokenDetails(flow); };
-    box.querySelectorAll(".prow").forEach(function (b) {
-      b.onclick = function () {
-        var t = list.find(function (x) { return x.mint === b.dataset.mint; });
-        flow.quote = t.mint; flow.quoteSym = t.label || t.symbol;
-        tokenDetails(flow);
-      };
+    // return to whichever token screen opened us (the paired-launch flow has its own)
+    function back() { return (flow.pair ? pairTokenDetails : tokenDetails)(flow); }
+    function rightLabel(t) {
+      if (t.mint === "sol") return "native";
+      if (t.mint === "usdc") return "stablecoin";
+      return shortAddr(t.mint);
+    }
+    function draw() {
+      var items = list.filter(function (t) { return (t.cat || "stock") === tab; });
+      var sel = currentSel();
+      box.querySelector("#lp-qlist").innerHTML = items.length
+        ? items.map(function (t) {
+            return '<button class="prow' + (t.mint === sel ? " on" : "") + '" data-mint="' + esc(t.mint) + '">' +
+              "<b>" + esc(t.symbol) + "</b><span>" + esc(t.label || t.symbol) + "</span>" +
+              "<i>" + esc(rightLabel(t)) + "</i></button>";
+          }).join("")
+        : '<p class="note" style="padding:12px">None yet.</p>';
+      box.querySelectorAll("#lp-qlist .prow").forEach(function (b) {
+        b.onclick = function () {
+          var t = list.find(function (x) { return x.mint === b.dataset.mint; });
+          if (reward) {
+            var real = t.mint === "sol" ? WSOL_MINT : t.mint === "usdc" ? USDC_MINT : t.mint;
+            flow.reward = { mint: real, symbol: t.symbol, name: t.label || t.symbol };
+          } else {
+            flow.quote = t.mint;
+            flow.quoteSym = t.symbol;
+            flow.quoteName = t.label || t.symbol;
+            /* Priced in a stock/token ⇒ holder rewards ARE that asset (fees accrue
+             * in it, paid direct) and the reward picker is hidden — so mirror it
+             * into flow.reward, or the launch would record a stale SOL default. */
+            if (t.mint !== "sol" && t.mint !== "usdc") {
+              flow.reward = { mint: t.mint, symbol: t.symbol, name: t.label || t.symbol };
+            }
+          }
+          back();
+        };
+      });
+    }
+    box.querySelector("#lp-qtabs").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-t]");
+      if (!b) return;
+      box.querySelectorAll("#lp-qtabs button").forEach(function (x) { x.classList.remove("on"); });
+      b.classList.add("on"); tab = b.dataset.t; draw();
     });
+    box.querySelector("#lp-x").onclick = function () { back(); };
+    draw();
   }
 
   async function tokenConfirm(flow) {
@@ -2374,15 +2589,26 @@
           ? qLabel + " — " + flow.reward.symbol + " has no market yet"
           : (flow.reward.symbol || qLabel)}</b></div>` : ""}
       <div class="row"><span class="k">First buy</span><b>${flow.tbuy > 0
-        ? flow.tbuy + " " + qLabel + buyShareSuffix(flow) : "none"}</b></div>
+        ? flow.tbuy + " " + qLabel + buyShareSuffix(flow)
+        : (solIsLaunchLab() ? "~0.01 " + qLabel + " (minimum)" : "none")}</b></div>
+      ${solIsLaunchLab() && !(flow.tbuy > 0)
+        ? H`<p class="note">Raydium requires a non-zero opening buy, so a minimum
+          <b>~0.01 ${qLabel}</b> lands with the pool — you must already hold that ${qLabel}.</p>`
+        : ""}
       ${flow.feeWallet ? H`<div class="row"><span class="k">Fees claim to</span><b>${shortAddr(flow.feeWallet)}</b></div>` : ""}
       <div class="row"><span class="k">Metadata storage</span><b id="lp-fee">quoting…</b></div>
       <div class="row"><span class="k">Wallet</span><b>${w ? w.name + " · " + shortAddr(w.publicKey) : "not connected"}</b></div>
       <div class="row"><span class="k">Swap fee</span><b>${
-        tierSpec(flow).label + " — " + tierPct(flow) + "%"}</b></div>
-      <p class="note">Fee split on every trade: 20% you, 60% platform, 20% Meteora —
-      the same split at every fee level.
-      Your share claims straight to any address — including a reward vault.</p>
+        solIsLaunchLab() ? "1.15%" : (tierSpec(flow).label + " — " + tierPct(flow) + "%")}</b></div>
+      <p class="note">${solIsLaunchLab()
+        ? "Fee on every trade: 1.15% total — 0.50% creator, 0.40% platform, 0.25% Raydium. Your creator share claims straight to any address, including a reward vault."
+        : "Fee split on every trade: 20% you, 60% platform, 20% Meteora — the same split at every fee level. Your share claims straight to any address — including a reward vault."}</p>
+      ${solIsLaunchLab() && (flow.rewardMode === "dividend" || flow.rewardMode === "split")
+        ? H`<p class="note">A dividend makes your token a Token-2022 mint with a
+          <b>1% transfer fee</b> that funds holder payouts; the platform holds the
+          transfer-fee authority. Some scanners flag transfer-fee mints — choose
+          <b>Normal</b> for a standard token with no fee.</p>`
+        : ""}
       <div id="lp-err"></div>
       <div class="acts"><button id="lp-back">Back</button>
       <button class="go" id="lp-go" disabled>${w ? "Launch token" : "Connect a wallet"}</button></div>
@@ -2437,7 +2663,7 @@
        * whatever the token is priced in, and finding that out after taking the
        * storage fee is how a creator ends up paying for an upload they cannot
        * use. */
-      await window.Token.assertEnoughSol({
+      await solBackend().assertEnoughSol({
         quote: flow.quote, firstBuySol: flow.tbuy
       });
 
@@ -2467,6 +2693,16 @@
         banner: flow.banner || null,
         bannerExt: flow.bannerExt || "png",
         links: { website: flow.web, x: flow.x, telegram: flow.tg },
+        /* Holder-reward choice, written into the token's own metadata so the
+         * token page shows the reward badge + "/asset" ticker from chain — no
+         * listing record needed. Dividend/split name the reward asset; burn has
+         * none. */
+        reward: (function () {
+          var m = flow.rewardMode;
+          if (!m || m === "none" || m === "keep") return null;
+          if (m === "burn") return { mode: "burn" };
+          return flow.reward ? { mint: flow.reward.mint, symbol: flow.reward.symbol, mode: m } : { mode: m };
+        })(),
         /* A token launch charges for storage inside the pool transaction, so
          * there is nothing to approve here. An unspent credit from an earlier
          * attempt is still honoured — it has already been paid for, and
@@ -2499,7 +2735,7 @@
       mark("live", "done", liveOk ? "" : "still publishing — launching anyway");
 
       mark("pool", "on");
-      var res = await window.Token.launchToken({
+      var res = await solBackend().launchToken({
         name: flow.tname,
         symbol: flow.tsym,
         uri: meta.uri,
@@ -2509,7 +2745,11 @@
         feeShare: flow.feeShare || "keep",
         feeSharePct: flow.feeSharePct || 0,
         firstBuySol: flow.tbuy,
-        rewardMode: flow.rewardMode === "burn" ? "burn" : "dividend",
+        // H-3: pass the creator's actual choice through. "none" must stay "none"
+        // (a standard SPL token, no transfer-fee tax) — collapsing it to
+        // "dividend" shipped a taxed mint to a creator who opted out of rewards.
+        rewardMode: flow.rewardMode || "none",
+        rewardBps: flow.rewardBps || undefined,
         // a burn buys the token itself, so there is no reward asset to name
         rewardMint: flow.reward ? flow.reward.mint : null,
         feeWallet: flow.feeWallet || null,
@@ -2542,8 +2782,29 @@
           });
       })(0);
 
-      // Link the records both ways for a pair.
-      if (flow.nft) recordCollection(flow.nft.cfg, flow.nft.res, res.mint, flow.nft.up);
+      // Link the records both ways for a pair; for a PAIR, also create the
+      // staking pool now (init_pool) so the collection's holders can stake the
+      // moment the token exists. Best-effort: the token already launched, so a
+      // pool hiccup must not fail the launch.
+      if (flow.nft) {
+        var vault = null;
+        if (flow.pair) {
+          try {
+            if (!window.WavesStake) await new Promise(function (r2, rej) {
+              var s = document.createElement("script"); s.src = "/stake.js";
+              s.onload = r2; s.onerror = function () { rej(new Error("stake.js")); };
+              document.head.appendChild(s);
+            });
+            var pv = await window.WavesStake.initPool({
+              tokenMint: res.mint,
+              collection: flow.nft.res.collection,
+              rewardMint: (flow.reward && flow.reward.mint) || "So11111111111111111111111111111111111111112"
+            });
+            vault = pv.vault;
+          } catch (e) { /* pool init is best-effort; the token already launched */ }
+        }
+        recordCollection(flow.nft.cfg, flow.nft.res, res.mint, flow.nft.up, vault);
+      }
 
       busy = false;
       tokenDone(flow, res);
@@ -2572,39 +2833,59 @@
     var nft = flow.nft;
     /* The token's own page is where it trades. Jupiter cannot route a token
      * that is still on its bonding curve — it only appears there after the
-     * curve graduates into DAMM — so sending a creator to Jupiter the moment
-     * they launch points them at an empty search result for their own token. */
+     * curve graduates — so sending a creator to Jupiter the moment they launch
+     * points them at an empty search result for their own token. */
     var page = location.origin + "/token/" + res.mint;
+
+    /* Same clean structure as the Robinhood done panel (evmTokenDone), with the
+     * one difference that matters here: LaunchLab bakes holder rewards into the
+     * token at mint (the Token-2022 transfer-fee tax), so a dividend/burn launch
+     * is ALREADY live — there is no activation step. Meteora still needs the
+     * one-signature activation on the fee page. */
+    var isLL = res.backend === "launchlab";
+    var isBurn = flow.rewardMode === "burn";
+    var pledged = flow.rewardMode === "dividend" || isBurn;
+    var rewardsLive = isLL && pledged;   // auto-on, nothing to activate
+
+    var actLabel, actHref;
+    if (rewardsLive) { actLabel = "Fee page"; actHref = "/fees"; }
+    else if (pledged) {
+      actLabel = isBurn ? "Activate buyback" : "Activate rewards";
+      actHref = "/fees?activate=" + encodeURIComponent(res.mint);
+    } else { actLabel = "Claim fees"; actHref = "/fees"; }
+
+    var rewardRow = rewardsLive
+      ? H`<div class="row"><span class="k">Holder rewards</span><b>live · paid hourly</b></div>`
+      : H`<div class="row"><span class="k">Trading fees</span><b>yours to claim</b></div>`;
+
     var box = shell(H`
       <h2>Live</h2>
       <p class="sub">$${flow.tsym} is trading on ${res.cluster}.</p>
-      <div class="row"><span class="k">Trading fees</span><b>yours to claim</b></div>
-
-      <!-- Rewards are a second, separate step now: one instruction the creator
-           signs alone. Doing it inside the launch put a third signer in the
-           transaction and Phantom blocked it. -->
-      <div class="tip">
-        <b>Want your holders to earn from every trade?</b>
-        <span>Turn on holder rewards from the fee page — one signature, and your
-        share starts paying out hourly. You can do it whenever you like.</span>
-        <a class="go" href="/fees">Open the fee page →</a>
-      </div>
+      ${rewardRow}
       ${raw(caRow("Token CA", res.mint))}
       ${nft ? raw(caRow("Collection", nft.res.collection) + caRow("Candy machine", nft.res.candyMachine)) : ""}
       ${nft ? H`<label>Mint page</label>
       <input readonly value="${nft.res.mintUrl}" onclick="this.select()">` : ""}
       <label>Token page</label>
       <input readonly value="${page}" onclick="this.select()">
-      <p class="note">Share this — it is where people buy, and it unfurls with
-      your launch card. Jupiter lists the token once the curve graduates.</p>
-      <div class="acts"><button id="lp-done">Close</button>
-      ${nft ? H`<button id="lp-open">Mint page</button>` : ""}
-      <button class="go" id="lp-token">Open token page</button></div>
+      <p class="note">${rewardsLive ? (isBurn
+          ? "Buyback & burn runs automatically from trading fees. "
+          : "Holder rewards pay out hourly, automatically — nothing to switch on. ") : ""}Share the
+        token page — it is where people buy, and it unfurls with your launch card.
+        Jupiter lists the token once the curve graduates.</p>
+      <div class="acts">
+        <button id="lp-done">Close</button>
+        ${nft ? H`<button id="lp-open">Mint page</button>` : ""}
+        ${rewardsLive ? "" : H`<button id="lp-reward">${actLabel}</button>`}
+        <button class="go" id="lp-token">Open token page</button>
+      </div>
     `);
     bindCopy(box);
     box.querySelector("#lp-done").onclick = close;
     var open = box.querySelector("#lp-open");
     if (open) open.onclick = function () { location.href = nft.res.mintUrl; };
+    var rew = box.querySelector("#lp-reward");   // absent when rewards are already live
+    if (rew) rew.onclick = function () { location.href = actHref; };
     box.querySelector("#lp-token").onclick = function () { location.href = page; };
   }
 
@@ -2634,9 +2915,10 @@
       <p class="sub">One small metadata upload, then the curve. The curve is the liquidity.</p>
       <div class="row"><span class="k">Token</span><b>${flow.tname} · $${flow.tsym}</b></div>
       <div class="row"><span class="k">Chain</span><b>Robinhood</b></div>
-      <div class="row"><span class="k">Priced in</span><b>ETH</b></div>
+      <div class="row"><span class="k">Priced in</span><b>${quoteSymOf(flow)}${
+        isStockQuote(flow.quoteAsset) ? raw(' <span class="k2">· paired</span>') : ""}</b></div>
       <div class="row"><span class="k">First buy</span><b>${
-        flow.tbuy > 0 ? flow.tbuy + " ETH" : "none"}</b></div>
+        flow.tbuy > 0 ? flow.tbuy + " ETH" + (isEthQuote(flow.quoteAsset) ? "" : " → " + quoteSymOf(flow)) : "none"}</b></div>
       <div class="row"><span class="k">Metadata storage</span><b id="lp-fee">quoting…</b></div>
       <div class="row"><span class="k">Wallet</span><b>${
         acct ? shortAddr(acct) : "not connected"}</b></div>
@@ -2647,18 +2929,19 @@
            : flow.feeSharePct + "% holders / " + (100 - flow.feeSharePct) + "% you")
         : "You keep everything"}</b></div>
       ${(flow.feeSharePct || 0) > 0 ? H`<div class="row"><span class="k">Holder share</span><b>${(function () {
-        if (flow.rewardMode === "burn") return "buyback & burn";
-        /* The picker stores { mint, symbol, name, liquidity } — the native
-         * default is the zero-address "ETH". Show the chosen asset unless it IS
-         * ETH; a not-yet-tradeable asset (liquidity < 1000) pays ETH until it has
-         * a market. (My earlier fix checked kind/liquid, which the picker never
-         * sets, so it always fell back to ETH.) */
+        var mode = flow.rewardMode;
+        if (mode === "burn") return "buyback & burn";
+        /* The picker stores { mint, symbol, name, liquidity }; the native default
+         * is the zero-address "ETH". A stock QUOTE is itself the reward, so the
+         * dividend is paid in it directly (no swap). A not-yet-tradeable asset
+         * pays ETH until it has a market. */
         var r = flow.reward || {};
         var sym = r.symbol ? String(r.symbol).replace(/^\$/, "") : "ETH";
         var native = !r.mint || /^0x0+$/.test(String(r.mint)) || sym.toUpperCase() === "ETH";
-        if (native) return "dividend, paid in ETH";
-        var dry = r.liquidity !== undefined && r.liquidity < 1000;
-        return "dividend, paid in " + sym + (dry ? " (ETH until it has a market)" : "");
+        var dry = !isStockQuote(flow.quoteAsset) && r.liquidity !== undefined && r.liquidity < 1000;
+        var paidIn = native ? "ETH" : sym + (dry ? " (ETH until it has a market)" : "");
+        if (mode === "split") return "50% dividend in " + paidIn + " · 50% buyback & burn";
+        return "dividend, paid in " + paidIn;
       })()}</b></div>` : ""}
       ${flow.feeWallet ? H`<div class="row"><span class="k">Fees claim to</span><b>${
         shortAddr(flow.feeWallet)}</b></div>` : ""}
@@ -2728,6 +3011,7 @@
       ["meta", "Storing token metadata"],
       ["curve", "Opening the curve" + (flow.tbuy > 0 ? " + your first buy" : "")]
     ];
+    if (flow.pair && flow.nft) stages.push(["vault", "Deploying the reward vault + routing fees"]);
     var box = shell(H`
       <h2>Launching token</h2>
       <p class="sub">Leave this tab open.</p>
@@ -2745,7 +3029,7 @@
         avatar: flow.icon || null, banner: flow.banner || null,
         reward: rewardLabel(flow)
       }, "token", [
-        ["priced in", "ETH"],
+        ["priced in", quoteSymOf(flow)],
         ["swap fee", (evmSplit(flow) || {}).total + "%"],
         ["chain", "Robinhood"]
       ]);
@@ -2791,6 +3075,11 @@
         symbol: flow.tsym,
         feeBps: tierSpec(flow).baseFeeBps || 100,
         devBuyWei: devWei,
+        /* The pool's quote asset (address(0) = ETH). For a non-ETH quote with a
+         * dev buy, evm-hook swaps the dev's ETH → quote before the launch's
+         * atomic first buy. */
+        quote: (flow.quoteAsset && flow.quoteAsset.mint) || "0x0000000000000000000000000000000000000000",
+        quoteSym: quoteSymOf(flow),
 
         /* ON CHAIN, and only obtainable here.
          *
@@ -2815,14 +3104,56 @@
       var res = await window.MoonpadToken.waitForLaunch(sent.hash);
       mark("curve", "done");
 
+      /* Record the token NOW — BEFORE the vault steps. Those are extra
+       * transactions that can revert, and the token has already launched and
+       * cost real ETH. A failure past this point must never orphan it or make
+       * the creator relaunch (which spends the first buy again). */
       recordEvmToken(flow, res, meta);
       /* Verify on Sourcify right away, before any aggregator indexes the token —
        * a token GMGN meets while still unverified gets a "Unknown Contract" flag
-       * it may cache for good. Fire-and-forget: the done screen must not wait on
-       * it, and the hourly /api/verify cron is the backstop if this misses. */
+       * it may cache for good. Fire-and-forget. */
       try { fetch("/api/verify?token=" + encodeURIComponent(res.token)).catch(function () {}); } catch (e) {}
+
+      /* Paired launch: deploy the reward vault (direct-send, escrow 0, ETH),
+       * bind the coin, and pledge the token's fees to the NFT keeper. Tier 1 =
+       * the creator's burn amount at weight 1 (flat per NFT); tiers 2–4 are
+       * ascending placeholders the claim UI never exposes (the vault requires
+       * four strictly ascending tiers).
+       *
+       * ⚠️ NON-FATAL. If any step reverts, the token still stands and is already
+       * recorded — the creator finishes the vault + pledge from the fees page
+       * instead of losing the launch and re-paying the first buy. */
+      var vaultErr = null;
+      if (flow.pair && flow.nft) {
+        try {
+          mark("vault", "on", "Deploying the reward vault…");
+          var evmChain = window.EvmCollections.chain();
+          var collection = flow.nft.res.collection || flow.nft.res.address || flow.nft.res.candyMachine;
+          var from = res.creator || (window.MoonpadWallet || {}).account;
+          var ETH0 = "0x0000000000000000000000000000000000000000";
+          var b = BigInt(Math.max(1, Math.floor(Number(flow.burn) || 1))) * (10n ** 18n);
+          var vh = await window.MoonpadLaunch.deployVault(
+            evmChain.id, collection, from, [b, b * 2n, b * 3n, b * 4n], [1n, 2n, 3n, 4n], from, ETH0);
+          var vault = (await window.MoonpadLaunch.waitForTx(vh, evmChain.id) || {}).contractAddress;
+          if (!vault) throw new Error("The reward vault did not return an address");
+          mark("vault", "on", "Binding the token + routing fees to the keeper…");
+          await window.MoonpadLaunch.waitForTx(
+            await window.MoonpadLaunch.bindCoin(evmChain.id, vault, res.token, from), evmChain.id);
+          await window.MoonpadLaunch.waitForTx(
+            await window.MoonpadToken.pledgeToHolders(res.token, 10000, evmChain.nftKeeper, from), evmChain.id);
+          flow._vault = vault;
+          flow._pairedCollection = collection;
+          mark("vault", "done");
+          recordEvmToken(flow, res, meta);   // fill in keeper / vault / pairedCollection
+          try { recordEvmCollection(flow.nft.cfg, flow.nft.res, flow.nft.up, res.token, vault); } catch (e) {}
+        } catch (e) {
+          vaultErr = String((e && e.message) || e).slice(0, 200);
+          mark("vault", "on", "Reward vault didn't finish — the token is live; see below");
+        }
+      }
+
       busy = false;
-      evmTokenDone(flow, res);
+      evmTokenDone(flow, res, vaultErr);
     } catch (e) {
       busy = false;
       fail(box, describe(e));
@@ -2860,7 +3191,15 @@
       card: (meta && meta.cardUri) || null,
       feeShare: flow.feeShare || "keep",
       feeSharePct: flow.feeSharePct || 0,
-      rewardMode: flow.rewardMode === "burn" ? "burn" : "dividend",
+      // H-3: pass the real choice through (matches the Solana call site). The old
+      // collapse mislabelled a "none" launch as "dividend" in the listing record —
+      // display-only on EVM (the keeper drops unpledged tokens), but a "none" token
+      // would still show a rewards badge + /ASSET ticker it doesn't have.
+      rewardMode: flow.rewardMode || "none",
+      /* The pool's quote asset — ETH by default, else USDG or a tokenised stock.
+       * The indexer/keeper read this to price the pool and denominate fees. */
+      quoteMint: (flow.quoteAsset && flow.quoteAsset.mint) || null,
+      quoteSym: (flow.quoteAsset && flow.quoteAsset.symbol) || "ETH",
       /* ⚠️ The asset they chose. This was added once already and landed in the
        * Solana record path instead, because the line above it appears in BOTH
        * and only its existence was checked, not that it was unique. The result
@@ -2869,11 +3208,17 @@
        * was told their holders get ETH. */
       rewardMint: (flow.reward && flow.reward.mint) || null,
       // where the creator's KEPT portion claims to — claimTo() on the curve
-      feeWallet: flow.feeWallet || null
+      feeWallet: flow.feeWallet || null,
+      /* Paired launch: which keeper serves it, the collection whose NFT holders
+       * are paid, and the reward vault the keeper forwards into. rh-keeper-nft
+       * reads exactly these three to know a token is its to service. */
+      keeper: flow._vault ? "nft" : undefined,
+      pairedCollection: flow._pairedCollection || undefined,
+      vault: flow._vault || undefined
     });
   }
 
-  function evmTokenDone(flow, res) {
+  function evmTokenDone(flow, res, vaultErr) {
     var page = location.origin + "/token/" + res.token;
     /* The third button reads the launch's own choice: a pledged dividend or burn
      * gets ACTIVATED on the fee page, a keep-everything token just CLAIMS there. */
@@ -2885,6 +3230,9 @@
       <h2>Live</h2>
       <p class="sub">$${flow.tsym} is trading on Robinhood Chain.</p>
       ${raw(caRow("Token CA", res.token))}
+      ${vaultErr ? H`<div class="row" style="align-items:flex-start"><span class="k">Reward vault</span>
+        <b style="color:var(--warn,#e6b800);text-align:right">didn't finish — the token is live and
+        recorded. Finish the reward vault from the fees page.<br><span class="k2">${esc(vaultErr)}</span></b></div>` : ""}
       <label>Token page</label>
       <input readonly value="${page}" onclick="this.select()">
       <p class="note">Share this — it is where people buy. The token moves to a
@@ -2946,9 +3294,9 @@
         </button>
       </div>
       <div id="lp-err"></div>
-      <div class="acts"><button id="lp-x">Cancel</button></div>
+      <div class="acts"><button id="lp-x">Back</button></div>
     `);
-    box.querySelector("#lp-x").onclick = close;
+    box.querySelector("#lp-x").onclick = exitToPage;
     var r = box.querySelector("#src-run");
     if (r) r.onclick = function () { nftDetails(flow); };
     box.querySelector("#src-editor").onclick = function () {
@@ -2972,7 +3320,7 @@
       <p class="sub">PNGs, one per piece. They become 1.png upward
       in natural order.</p>
       <div class="drop" id="of-drop"><b>Drop your files here</b>
-      <span>or click to browse — PNG images, plus an optional .json each</span></div>
+      <span>or click to browse — PNG images, plus a .json each</span></div>
       <input type="file" id="of-input" accept="image/png,application/json" multiple hidden>
       <p class="note" id="of-note"></p>
       <div id="lp-err"></div>
@@ -3063,10 +3411,12 @@
           }
           if (badJson) return fail(box, badJson);
           staged = { images: images, metaplex: metaplex, count: pngs.length };
-          box.querySelector("#of-note").textContent =
-            pngs.length + " pieces staged" + (jsons.length ? " with your metadata" : "") +
-            " — " + pngs[0].name + " becomes 1.png, " +
-            pngs[pngs.length - 1].name + " becomes " + pngs.length + ".png.";
+          var okLine = "✓ " + pngs.length + " PNG" + (pngs.length === 1 ? "" : "s") +
+            " + " + jsons.length + " JSON confirmed";
+          box.querySelector("#of-note").innerHTML =
+            '<b style="color:var(--accent)">' + esc(okLine) + "</b> — staged in order: " +
+            esc(pngs[0].name) + " → 1.png … " +
+            esc(pngs[pngs.length - 1].name) + " → " + pngs.length + ".png.";
           box.querySelector("#of-go").disabled = false;
         });
       });
@@ -3092,6 +3442,7 @@
     var m = new URLSearchParams(location.search).get("launch");
     if (!m) return;
     history.replaceState(null, "", location.pathname);
+    cameFromNav = true;
     setTimeout(function () { openMode(m); }, 60);
   })();
 })();

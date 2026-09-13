@@ -104,7 +104,7 @@ td b{color:var(--ink)}
       <li><b>A launchpad</b><span class="ch-sol"> that deploys your collection to
       Solana as a <b>Metaplex Core</b> collection with a <b>Candy Machine</b>
       handling the mint — price, supply, allowlist waves, team splits, the lot.
-      Tokens launch on a <b>Meteora bonding curve</b> from the same Launch
+      Tokens launch on a <b>Raydium LaunchLab bonding curve</b> from the same Launch
       menu.</span><span class="ch-rh"> that deploys your collection to
       <b>Robinhood Chain</b> as its own <b>ERC-721</b> drop contract — price,
       supply, per-wallet cap and royalties live in the contract you own.
@@ -185,11 +185,11 @@ td b{color:var(--ink)}
     they do everywhere.</p>
 
     <h2 id="tokens">Tokens</h2>
-    <p class="ch-rh"><b>On Robinhood Chain, token launches are not open yet.</b>
+    <p class="ch-rh"><b>On Robinhood Chain, token launches are live.</b>
     We built our own bonding-curve launchpad for this chain rather than routing
-    through anyone else's. It is live.</p>
-    <p class="ch-sol">A token launches on a <b>bonding curve</b> — Meteora's Dynamic
-    Bonding Curve. There is no liquidity pool to create and no LP to manage: the
+    through anyone else's.</p>
+    <p class="ch-sol">A token launches on a <b>bonding curve</b> — Raydium
+    LaunchLab. There is no liquidity pool to create and no LP to manage: the
     curve itself is the liquidity, buys push the price up it, sells push it down.</p>
     <p class="ch-rh">A token launches on a <b>bonding curve</b> of our own, built as a
     <b>Uniswap V4 hook</b>. There is no liquidity pool to create and no LP to
@@ -199,11 +199,13 @@ td b{color:var(--ink)}
     <ul>
       <li><b>Supply</b> is fixed: 1,000,000,000 per token, no exceptions, metadata
       immutable — nobody can rename or re-image a token after launch.</li>
-      <li><b>Priced in</b> <span class="ch-sol">SOL or USDC</span><span class="ch-rh">ETH</span>.</li>
+      <li><b>Priced in</b> <span class="ch-sol">SOL or USDC</span><span class="ch-rh">ETH by
+      default — or in USDG or any of 170+ tokenised stocks, so the pool trades your
+      token directly against that asset</span>.</li>
       <li><b>Your first buy</b> can ride in the same transaction that creates the
       pool, so a sniper cannot get in front of your own launch.</li>
       <li class="ch-sol"><b>Graduation</b> — when the curve raises its target, liquidity
-      migrates automatically to a Meteora DAMM v2 pool and the LP is permanently
+      migrates automatically to a Raydium pool and the LP is permanently
       locked. Trading continues on Jupiter and every major aggregator.</li>
       <li class="ch-rh"><b>Graduation</b> — when the curve raises its target, its
       proceeds seed a <b>Uniswap V4</b> pool and the LP is permanently locked.
@@ -213,6 +215,13 @@ td b{color:var(--ink)}
     <p>Curve targets are locked in the launchpad's config — identical for every
     launch, so nobody negotiates a better curve than you. The launch window
     reads them from the chain and shows them before you sign.</p>
+    <p class="ch-rh"><b>Pricing a token in a stock or USDG</b> pairs it with a real
+    asset without anyone having to go and buy that asset first. Buyers always pay
+    <b>ETH</b>; it is converted to the quote asset and into the curve in a single
+    transaction. Sells run the same path in reverse and pay back in <b>ETH</b>, so
+    a holder never has to hold the stock to trade the token. The curve shape is
+    identical whatever it is priced in — the quote only changes what the pool
+    holds, not how the price moves.</p>
 
     <h2 id="pairs">Pairs &amp; rewards</h2>
     <p class="ch-rh"><b>Solana only for now</b> — pairing a collection with a
@@ -234,13 +243,13 @@ td b{color:var(--ink)}
       <span class="ch-sol">SOL</span><span class="ch-rh">ETH</span> before you sign</td></tr>
       <tr><td>Launching a token</td><td><b>Free</b> (tiny metadata storage + network fees)</td></tr>
       <tr><td>Minting</td><td>The creator's mint price + network fee</td></tr>
-      <tr><td>Trading a token</td><td><b>1% to 10%</b> — the creator's choice at launch</td></tr>
+      <tr class="ch-sol"><td>Trading a token</td><td><b>1.15%</b> flat</td></tr>
+      <tr class="ch-rh"><td>Trading a token</td><td><b>1% to 10%</b> — the creator's choice at launch</td></tr>
     </table>
-    <p class="ch-sol">The creator picks the trading fee at launch, from <b>1%</b> to
-    <b>10%</b>. Meteora takes a fixed fifth of whatever it is, and the rest is
-    divided between the platform and the creator. Our share rises a tenth of a
-    percent per step and stops there, so a creator who sets a high fee is raising
-    it for their token, not for us:</p>
+    <p class="ch-sol">On Solana the swap fee is a flat <b>1.15%</b> on every trade —
+    there is no ladder to pick. It splits three ways: <b>0.50%</b> to the creator,
+    <b>0.40%</b> to the platform, and <b>0.25%</b> to Raydium, whose LaunchLab runs
+    the curve:</p>
     <p class="ch-rh">The creator picks the trading fee at launch, from <b>1%</b> to
     <b>10%</b>. There is no third party on this chain — the curve is ours — so the
     fee splits two ways and the creator keeps more than the same rung pays on
@@ -248,13 +257,8 @@ td b{color:var(--ink)}
     creator who sets a high fee is raising it for their token, not for us:</p>
 
     <table class="fees ch-sol">
-      <tr><th>Trading fee</th><th>Meteora</th><th>Platform</th><th>Creator</th></tr>
-      <tr><td>1%</td><td>0.2%</td><td>0.4%</td><td>0.4%</td></tr>
-      <tr><td>2%</td><td>0.4%</td><td>0.5%</td><td>1.1%</td></tr>
-      <tr><td>3%</td><td>0.6%</td><td>0.6%</td><td>1.8%</td></tr>
-      <tr><td>4%</td><td>0.8%</td><td>0.7%</td><td>2.5%</td></tr>
-      <tr><td>5%</td><td>1.0%</td><td>0.8%</td><td>3.2%</td></tr>
-      <tr><td>10%</td><td>2.0%</td><td>0.9%</td><td>7.1%</td></tr>
+      <tr><th>Swap fee</th><th>Creator</th><th>Platform</th><th>Raydium</th></tr>
+      <tr><td>1.15% (flat)</td><td>0.50%</td><td>0.40%</td><td>0.25%</td></tr>
     </table>
     <!-- Robinhood: two ways, no third party. Platform figures are
          platformVolumeBps() in WavesCurveHook.sol — 40/50/60/70/80/90 bps of
@@ -275,9 +279,11 @@ td b{color:var(--ink)}
 
     <h3>Holder rewards</h3>
     <p>A creator sends their whole share of the fees to the people holding the
-    token — a dividend paid pro-rata every hour, with nothing for holders to
-    claim, or a buyback that takes the token off the market and burns it. It is
-    all or nothing, chosen at launch: keep your fees, or reward your holders.</p>
+    token — as a <b>dividend</b> paid pro-rata every hour, with nothing for holders
+    to claim; a <b>buyback</b> that takes the token off the market and burns it; or
+    a <b>50/50 split</b> that does both, half to a dividend and half to buyback-and-burn.
+    It is chosen at launch: keep your fees, or reward your holders one of those three
+    ways.</p>
 
     <p><b>This is switched on after the launch, not during it.</b> The creator
     opens the fee page and activates it in one signature, which hands the pool's

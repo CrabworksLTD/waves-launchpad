@@ -359,11 +359,13 @@ export default async function handler(req, res) {
 
   // Vercel signs scheduled invocations; a stranger hitting this URL must not
   // be able to start a payout run.
+  // H-1: fail CLOSED. A missing secret must never mean "no auth" — a preview
+  // deploy or restored env with CRON_SECRET absent would otherwise expose the
+  // whole payout path. Matches purge.js / rh-keeper-nft.js.
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.authorization || "";
-    if (auth !== "Bearer " + secret) return res.status(401).json({ error: "no" });
-  }
+  if (!secret) return res.status(500).json({ error: "CRON_SECRET is not set" });
+  const auth = req.headers.authorization || "";
+  if (auth !== "Bearer " + secret) return res.status(401).json({ error: "no" });
   if (!process.env.KEEPER_SECRET) {
     return res.status(200).json({ ok: true, skipped: "KEEPER_SECRET is not set" });
   }
@@ -397,13 +399,28 @@ export default async function handler(req, res) {
     const q = req.query || {};
     let jobs;
     if (q.mint && q.pool) {
+      /* H-1: the rehearsal names WHICH pool only. Everything that decides where
+       * money goes — the split and the destination — comes from the pool's own
+       * KV record, never the caller. A pool with no record has no creator
+       * destination, so a caller can't invent one to drain a pledged pool to an
+       * address of their choosing (feeWallet/pct are no longer read from query). */
+      let rec = null;
+      if (db) {
+        try {
+          const raw = await db.lrange("tokens", 0, 199);
+          const all = (raw || []).map((r) => (typeof r === "string" ? JSON.parse(r) : r)).filter(Boolean);
+          rec = all.find((t) => t.mint === q.mint) || null;
+        } catch (e) {}
+      }
       jobs = [{
-        mint: q.mint, pool: q.pool, symbol: q.symbol || "TEST",
-        feeShare: "holders",
-        feeSharePct: q.pct == null ? 100 : parseInt(q.pct, 10),
-        creator: q.creator || null, feeWallet: q.feeWallet || null
+        mint: q.mint, pool: q.pool,
+        symbol: (rec && rec.symbol) || q.symbol || "TEST",
+        feeShare: (rec && rec.feeShare) || "holders",
+        feeSharePct: rec ? (rec.feeSharePct == null ? 100 : rec.feeSharePct) : 100,
+        creator: rec ? rec.creator : null,
+        feeWallet: rec ? rec.feeWallet : null
       }];
-      log.push("explicit job: " + q.mint);
+      log.push("explicit job: " + q.mint + (rec ? " (destination from record)" : " (no record — no creator destination)"));
     } else {
       /* Straight from KV, not from our own HTTP API. The self-fetch has
        * returned nothing at least twice — and here that means every pledged
@@ -416,8 +433,24 @@ export default async function handler(req, res) {
       } catch (e) {
         log.push("could not read the launch list: " + String((e && e.message) || e).slice(0, 80));
       }
-      jobs = all.filter((t) => (t.feeSharePct || 0) > 0 || t.feeShare === "holders" ||
-                               t.rewardMode === "burn");
+      jobs = all.filter((t) => ((t.feeSharePct || 0) > 0 || t.feeShare === "holders" ||
+                                t.rewardMode === "burn") &&
+                               // Pairs route the creator's fees to the staking VAULT (the
+                               // pool PDA's ATA for the reward mint), not to token holders.
+                               // That deposit path is deliberately NOT wired into this live
+                               // money cron yet: it moves real fees and belongs with the
+                               // staking audit (the devnet demo funds the vault via
+                               // tools/stake-demo-seed.js instead). Excluding pairs here is
+                               // the safety net so one can never be misrouted into the
+                               // holder distribution before that path exists.
+                               t.feeShare !== "vault" &&
+                               // LaunchLab tokens claim + distribute through the Raydium SDK
+                               // (claimCreatorFee / claimPlatformFee), NOT the Meteora client
+                               // below — decoding a LaunchLab pool with the DBC SDK would fail.
+                               // That claim path moves real fees and is audit-gated, so it is
+                               // NOT wired here yet; excluding them keeps the Meteora keeper
+                               // from choking on a pool it cannot read. TODO: LaunchLab keeper.
+                               t.backend !== "launchlab");
     }
 
     /* The platform's own revenue, swept before anything else.
@@ -443,6 +476,10 @@ export default async function handler(req, res) {
           .map((r) => (typeof r === "string" ? JSON.parse(r) : r)).filter(Boolean);
         for (const t of allToks) {
           if (!t.pool) continue;
+          // LaunchLab pools are swept via the Raydium SDK (claimPlatformFee),
+          // not the Meteora claimer below — skip so the DBC decode never runs
+          // on a pool it can't read. TODO: LaunchLab platform-fee sweep.
+          if (t.backend === "launchlab") continue;
           try {
             const p = new w3.PublicKey(t.pool);
 
@@ -566,8 +603,19 @@ export default async function handler(req, res) {
           }
 
           // ── step 2: gas, from the keeper's float ───────────────────────────
-          const nTx = 1 + 1 + Math.ceil(holders.length / BATCH);   // claim + creator + batches
-          const need = BigInt(nTx) * LAMPORTS_PER_SIG + GAS_FLOOR;
+          // M-1: model the ACTUAL payout. Reward-asset payouts batch at 5, not
+          // BATCH(12), so the tx count was ~2.4x low; and each new holder ATA is
+          // rent the keeper fronts (~0.00204 SOL) — thirty holders is 3x the
+          // floor. A burn pays nobody, so it needs neither batches nor per-holder
+          // rent. This check is what guarantees nothing is claimed unless it can
+          // be delivered, so it must count what delivery really costs.
+          const willReward = job.rewardMode !== "burn" && !!job.rewardMint;
+          const payBatch = willReward ? 5 : BATCH;
+          const nPay = job.rewardMode === "burn" ? 0 : holders.length;
+          const nTx = 2 + Math.ceil(nPay / payBatch);              // claim + creator + payout batches
+          const need = BigInt(nTx) * LAMPORTS_PER_SIG
+                     + BigInt(nPay) * ATA_RENT_LAMPORTS
+                     + GAS_FLOOR;
           const bal = BigInt(await conn.getBalance(keeper.publicKey));
           if (bal < need) {
             log.push(job.mint + ": keeper needs " + need + " lamports for gas, has " +
@@ -624,8 +672,12 @@ export default async function handler(req, res) {
             /* Zero holders in the rent check: a burn creates one account, the
              * keeper's own, not one per holder. The per-holder rent rule would
              * otherwise refuse burns that cost nothing per holder to make. */
+            // M-2: the rent guard must count the SAME holder set the payout
+            // opens to. `pays` here is the SOL-dust-filtered list; the post-swap
+            // re-cut pays every holder with a non-zero reward share, so count the
+            // full holder set (a burn pays nobody → 0).
             const decision = await rewardPlan(
-              rewardTarget, qi.mint, pot, qi.decimals, isBurn ? 0 : pays.length);
+              rewardTarget, qi.mint, pot, qi.decimals, isBurn ? 0 : holders.length);
             if (decision && decision.skip) {
               log.push(job.mint + ": paying " + (job.quote || "the quote currency") +
                        " — " + decision.skip);
@@ -637,29 +689,32 @@ export default async function handler(req, res) {
                   reward = { mint: rewardTarget, amount: got.amount.toString(),
                              decimals: got.decimals, swapSig: got.sig,
                              burn: isBurn };
-                  if (isBurn) pays = [];        // nobody is paid, it is destroyed
+                  /* H-2: re-cut the holder shares in the asset actually held
+                   * BEFORE persisting. By this line the pot is already spent, so
+                   * the plan written here must already name the real payees — a
+                   * crash, or one flaky KV write, between here and the final plan
+                   * write would otherwise leave the swapped reward tokens with
+                   * pays:[] and nothing recording whose they are (doSwap no
+                   * longer sweeps, so there is no accidental net). This IS the
+                   * plan; the write below just re-persists the same object. */
+                  if (isBurn) {
+                    pays = [];                  // destroyed, nobody is paid
+                  } else {
+                    const total = got.amount;
+                    pays = holders
+                      .map((h) => ({ owner: h.owner, amount: ((total * h.amount) / held).toString() }))
+                      .filter((p) => BigInt(p.amount) > 0n);
+                  }
                   log.push(job.mint + (isBurn
                     ? ": bought back " + got.amount.toString() + " to burn ("
                     : ": swapped the pot into " + rewardTarget.slice(0, 6) + "… (") +
                     got.sig.slice(0, 12) + "…)");
-                  /* Write it down NOW.
-                   *
-                   * The plan is normally persisted a few steps below, after the
-                   * shares are re-cut — but by this line the pot is already
-                   * spent, and anything that throws between here and there
-                   * leaves reward tokens in the keeper with nothing recording
-                   * who they belong to. That is exactly what happened the first
-                   * time this ran. A plan written here is resumable; one
-                   * written after is a promise that the swap will not be the
-                   * last thing to succeed. */
                   if (db) {
                     await db.set(planKey, JSON.stringify({
                       mint: job.mint, claimSig, claimed: claimed.toString(),
                       creatorCut: creatorCut.toString(),
                       creatorDest: job.feeWallet || job.creator || null,
-                      reward: Object.assign({ mint: rewardTarget, burn: isBurn }, got,
-                                            { amount: got.amount.toString() }),
-                      pays: [], done: 0, at: Date.now(), partial: true
+                      reward, pays, done: 0, at: Date.now()
                     }), { ex: PLAN_TTL });
                   }
                 }
@@ -671,19 +726,8 @@ export default async function handler(req, res) {
             }
           }
 
-          /* Re-cut the shares in the asset actually held. Percentages come from
-           * the token balances already read, so this is the same split. */
-          if (reward && !reward.burn) {
-            const total = BigInt(reward.amount);
-            let assigned = 0n;
-            pays = holders
-              .map((h) => {
-                const share = (total * h.amount) / held;
-                assigned += share;
-                return { owner: h.owner, amount: share.toString() };
-              })
-              .filter((p) => BigInt(p.amount) > 0n);
-          }
+          // (H-2) the holder shares were already re-cut in the reward asset at
+          // the swap, and persisted there — `pays` is final by this point.
 
           // ── step 4: write the plan down before spending it ─────────────────
           plan = {

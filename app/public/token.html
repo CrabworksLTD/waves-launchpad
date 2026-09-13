@@ -292,7 +292,7 @@ input:focus{outline:none;border-color:var(--accent)}
       </div>
       <canvas id="curve"></canvas>
       <div class="bar"><i id="bar"></i></div>
-      <div class="barlb"><span id="pct">—</span><span id="grad-dest">graduation → Meteora DAMM v2, LP locked</span></div>
+      <div class="barlb"><span id="pct">—</span><span id="grad-dest">graduation → LP permanently locked</span></div>
       <p class="desc" id="desc"></p>
     </div>
 
@@ -317,6 +317,7 @@ input:focus{outline:none;border-color:var(--accent)}
 <script src="/shell.js"></script>
 <script src="/launch.js"></script>
 <script src="/token.js"></script>
+<script src="/launchlab.js"></script>
 <script src="/share-widget.js"></script>
 <script>
 (function () {
@@ -342,6 +343,15 @@ input:focus{outline:none;border-color:var(--accent)}
   var tkReady = IS_EVM
     ? Shell.ensureEvmLaunch().then(function () { tk = window.MoonpadToken.adapter(); })
     : Promise.resolve();
+
+  /* Which Solana launch backend made this token — set from the listing record
+   * once it loads (below). Meteora is the default (null / legacy). solTk() is
+   * what every Solana read/trade/fee call routes through, so a LaunchLab token
+   * reads its own pool and a Meteora token keeps its existing path. */
+  var BACKEND = null;
+  function solTk() {
+    return (BACKEND === "launchlab" && window.LaunchLab) ? window.LaunchLab : window.Token;
+  }
 
   function currentWallet() {
     return IS_EVM ? ((window.MoonpadWallet || {}).account || null)
@@ -547,6 +557,21 @@ input:focus{outline:none;border-color:var(--accent)}
         var sym = ($("sym").textContent || "").replace(/^\$/, "");
 
         USD = s.quoteUsd || null;
+        /* The stored stats can carry a stale null quoteUsd — a stock priced
+         * through a pool the indexer momentarily could not read. Rather than
+         * drop the whole page to the raw quote unit, ask the live price endpoint
+         * (it recomputes fresh) so the card stays in USD. Only skip when there
+         * is no quote address to price (a native pool always has a USD figure). */
+        if (USD == null && s.quoteAddr && !/^0x0+$/i.test(String(s.quoteAddr))) {
+          try {
+            USD = await fetch("/api/rh-indexer?quoteeth=" + encodeURIComponent(String(s.quoteAddr).toLowerCase()))
+              .then(function (r) { return r.json(); })
+              .then(function (j) { return (j && j.quoteUsd) ? Number(j.quoteUsd) : null; });
+          } catch (e) { /* keep native quote figures below */ }
+        }
+        // the pool's real quote symbol (ETH / USDG / a stock) — drives every
+        // native amount on the page and the /SYM ticker suffix
+        if (s.quote) QUOTE = s.quote;
 
         if (s.price != null) {
           $("s-price").textContent = USD ? money(s.price * USD) : s.price.toPrecision(3);
@@ -569,8 +594,8 @@ input:focus{outline:none;border-color:var(--accent)}
         if (market) {
           $("s-raised").textContent = USD ? money(market.raised * USD) : native(market.raised);
           $("s-raised-n").textContent = native(market.raised);
-          $("s-grad").textContent = USD ? money(market.threshold * USD) : native(market.threshold, 0);
-          $("s-grad-n").textContent = native(market.threshold, 0);
+          $("s-grad").textContent = USD ? money((market.gradMcap!=null?market.gradMcap:market.threshold) * USD) : native(market.gradMcap!=null?market.gradMcap:market.threshold, 0);
+          $("s-grad-n").textContent = native(market.gradMcap!=null?market.gradMcap:market.threshold, 0);
         }
 
         if (d.points && d.points.length >= 2) {
@@ -709,7 +734,7 @@ input:focus{outline:none;border-color:var(--accent)}
     if (!IS_EVM && !poolHint) { $("hist-note").textContent = "no pool recorded"; return; }
     (IS_EVM
       ? tkReady.then(function () { return tk.recentTrades(MINT, 15); })
-      : window.Token.recentTrades(MINT, poolHint, 15)).then(function (list) {
+      : solTk().recentTrades(MINT, poolHint, 15)).then(function (list) {
       if (!list.length) {
         $("hist-note").textContent = "";
         $("hist").innerHTML = '<div class="empty">No trades yet — the first one shows up here.</div>';
@@ -774,6 +799,12 @@ input:focus{outline:none;border-color:var(--accent)}
   var rewardTicker = null;
   async function drawRewards(rec) {
     var pct = rec && rec.feeSharePct;
+    /* A LaunchLab dividend/burn token carries its reward as a Token-2022
+     * transfer-fee tax baked in at mint — there is no pledged feeSharePct and no
+     * activation step, so it must not be gated on either below. It is live from
+     * the moment it exists. */
+    var llReward = rec && rec.backend === "launchlab" &&
+      (rec.rewardMode === "dividend" || rec.rewardMode === "burn" || rec.rewardMode === "split");
 
     /* ⚠️ On Robinhood the pledge is on the curve, not in the listing.
      *
@@ -793,7 +824,7 @@ input:focus{outline:none;border-color:var(--accent)}
         if (cv && cv.rewardsBps > 0) pct = cv.rewardsBps / 100;
       } catch (e) { /* keep whatever the record said */ }
     }
-    if (!pct || pct <= 0) return;
+    if (!llReward && (!pct || pct <= 0)) return;
 
     /* Intent is not the same as active.
      *
@@ -812,12 +843,12 @@ input:focus{outline:none;border-color:var(--accent)}
      * $MOAR's rewards were live, verified creator == keeper, yet the indicator
      * showed only intermittently). Fall back to the live check only for older
      * records saved before this flag existed. */
-    var active = !!rec.rewardsActivatedAt || (IS_EVM && pct > 0);
+    var active = !!rec.rewardsActivatedAt || (IS_EVM && pct > 0) || llReward;
     if (!active) {
       try {
         active = IS_EVM
           ? await tk.rewardsActive(rec.mint)
-          : await window.Token.rewardsActive(rec.pool || null, rec.mint);
+          : await solTk().rewardsActive(rec.pool || null, rec.mint);
       } catch (e) { active = false; }
     }
     if (!active) return;
@@ -849,19 +880,23 @@ input:focus{outline:none;border-color:var(--accent)}
      * paid so far. */
     function paint(sym, tradeable) {
       var burn = rec.rewardMode === "burn";
+      var split = rec.rewardMode === "split";
       var a = sym || QUOTE;
       /* "TSLA rewards are active · sent hourly". The cadence is the part a
        * holder cares about and it was nowhere on the page — both chains pay on
        * the hour. A buyback-and-burn token pays holders NO asset: the fees buy
-       * the token back and burn it, so it says exactly that instead. */
+       * the token back and burn it, so it says exactly that instead. A split does
+       * both: half a dividend, half a buyback & burn. */
       box.innerHTML = "<b>" + (burn
           ? "Buyback &amp; burn active · hourly"
-          : esc(a) + " rewards are active · sent hourly") + "</b>" +
+          : split
+            ? esc(a) + " dividend + buyback &amp; burn · hourly"
+            : esc(a) + " rewards are active · sent hourly") + "</b>" +
         (!burn && sym && !tradeable
           ? "<span>Paid in " + esc(QUOTE) + " until " + esc(sym) + " is tradeable.</span>"
           : "") +
         '<div class="rfees" hidden>' +
-          '<div><span>' + (burn ? "ETH accrued" : "Fees accrued") + '</span><b class="rf-accrued">—</b></div>' +
+          '<div><span>' + (burn ? esc(QUOTE) + " accrued" : "Fees accrued") + '</span><b class="rf-accrued">—</b></div>' +
           '<div><span>' + (burn ? "Tokens burnt" : "Distributed") + '</span><b class="rf-dist">—</b></div>' +
         "</div>";
       box.hidden = false;
@@ -926,22 +961,27 @@ input:focus{outline:none;border-color:var(--accent)}
         .then(function (r) { return r.json(); }).catch(function () { return null; });
       var rw = d && d.stats && d.stats.rewards;
       if (!rw) return null;
-      var earned = Number(rw.earnedWei) / 1e18;
-      /* Buyback-and-burn: no asset is paid to holders. Accrued is the ETH the
+      /* Fees accrue in the pool's QUOTE asset (ETH, USDG or a stock), so the unit
+       * and decimals follow the quote — 18 for ETH, 6 for USDG, 8 for a stock. */
+      var qsym = (d.stats && d.stats.quote) || "ETH";
+      var ethQ = !rw.quoteAddr || /^0x0+$/.test(String(rw.quoteAddr));
+      var earnUnit = ethQ ? 1e18 : Math.pow(10, rw.quoteDecimals || 18);
+      var earned = Number(rw.earnedWei) / earnUnit;
+      /* Buyback-and-burn: no asset is paid to holders. Accrued is the quote the
        * fees earned (spent buying back + still pending); the right-hand figure is
        * the tokens bought back and sent to the dead address. */
       if (rw.burn) {
         var burnt = Number(rw.burntTokens || "0") / 1e18;
         return {
-          accrued: UI.fmt(earned, 5) + " ETH",
-          accruedTitle: UI.fmt(earned, 6) + " ETH of fees toward buyback & burn",
+          accrued: UI.fmt(earned, 5) + " " + qsym,
+          accruedTitle: UI.fmt(earned, 6) + " " + qsym + " of fees toward buyback & burn",
           distributed: burnt > 0 ? UI.fmt(burnt, 2) : (Number(rw.pendingWei) > 0 ? "pending" : "—"),
           distributedTitle: burnt > 0 ? UI.fmt(burnt, 4) + " tokens burnt" :
             "Fees accrue; the keeper buys the token back and burns it on the first hourly run worth the gas."
         };
       }
-      var sent = Number(rw.paidAsset) / 1e18;
-      var sym = rewardTicker || "";
+      var sent = Number(rw.paidAsset) / earnUnit;
+      var sym = rewardTicker || (ethQ ? "" : qsym);
       /* Accrued in the same asset as distributed, so the two are directly
        * comparable — "how much have I earned" against "how much have I been
        * sent" is not a question you can answer if one side is in ETH.
@@ -950,12 +990,12 @@ input:focus{outline:none;border-color:var(--accent)}
        * with, so it is what the next payout would actually buy rather than a
        * rate invented from two dollar prices. The ETH figure is kept on the
        * title, because that is what the curve genuinely accrued. */
-      var earnedInAsset = rw.earnedAsset ? Number(rw.earnedAsset) / 1e18 : null;
+      var earnedInAsset = rw.earnedAsset ? Number(rw.earnedAsset) / earnUnit : null;
       return {
         accrued: (earnedInAsset != null && sym)
           ? "≈" + UI.fmt(earnedInAsset, 5) + " " + sym
-          : UI.fmt(earned, 5) + " ETH",
-        accruedTitle: UI.fmt(earned, 6) + " ETH accrued on the curve",
+          : UI.fmt(earned, 5) + " " + qsym,
+        accruedTitle: UI.fmt(earned, 6) + " " + qsym + " accrued on the curve",
         distributed: sent > 0 ? UI.fmt(sent, 5) + (sym ? " " + sym : "")
           /* Nothing sent yet: the keeper only moves the pot once it outweighs
            * the gas of moving it (claim + swap + a transfer per holder, with
@@ -972,7 +1012,7 @@ input:focus{outline:none;border-color:var(--accent)}
         .then(function (j) { return (j.payouts && j.payouts[rec.mint]) || null; })
         .catch(function () { return null; }),
       IS_EVM ? Promise.resolve(null)
-             : window.Token.feeMetrics(rec.mint, rec.pool || null).catch(function () { return null; })
+             : solTk().feeMetrics(rec.mint, rec.pool || null).catch(function () { return null; })
     ]);
     var pay = res[0], m = res[1];
     if (!m) return null;
@@ -1014,13 +1054,17 @@ input:focus{outline:none;border-color:var(--accent)}
     var qUsd = prices[0], rUsd = prices[1];
     if (!qUsd || !rUsd) return inQuote();               // no price → stay honest in the quote
     var f = qUsd / rUsd;                                // reward units per 1 quote unit
-    /* Distributed is history — the pot that actually left for holders, which
-     * the keeper log records in the quote. Converting it at TODAY'S price
-     * invents a number nobody received (the swaps happened at other rates), so
-     * it stays in the quote. Accrued keeps the ≈ conversion: it answers "what
-     * would this buy now", which is exactly a live-rate question. */
+    /* Both figures shown in the REWARD asset, so a token that says it rewards
+     * GMEx does not then report its distributions in SOL — which reads as if it
+     * pays the quote. Distributed is history the keeper logs in the quote, so its
+     * reward-asset figure is an ≈ at today's rate (the swaps happened at other
+     * rates); the tooltip keeps the exact quote amount that actually left. */
     return { accrued: "≈ " + UI.fmt(accruedQuote * f, 4) + " " + rsym,
-             distributed: UI.fmt(distQuote, 4) + " " + q };
+             distributed: (distQuote > 0 ? "≈ " : "") + UI.fmt(distQuote * f, 4) + " " + rsym,
+             distributedTitle: distQuote > 0
+               ? "≈ at today's rate — the keeper recorded " + UI.fmt(distQuote, 4) + " " + q +
+                 ", swapped to " + rsym + " at the time of each payout"
+               : "" };
   }
 
   /* A paired launch links both ways. Someone who arrived at the token should
@@ -1071,9 +1115,65 @@ input:focus{outline:none;border-color:var(--accent)}
       })
       .catch(function () { return null; });
 
-    await Promise.resolve(recPromise).then(function (rec) {
+    await Promise.resolve(recPromise).then(async function (rec) {
+      /* Detect the Solana backend up front — with OR without a listing record. A
+       * LaunchLab token resolves from its mint (readPool derives the pool), so its
+       * page loads market data + trading even when no listing was stored (e.g. the
+       * listing API rejected it, or the launch flow failed to post it). */
+      poolHint = (rec && rec.pool) || null;
+      BACKEND = (rec && rec.backend) || null;
+      if (!IS_EVM && !BACKEND && window.LaunchLab && window.LaunchLab.live()) {
+        try {
+          var _llp = await window.LaunchLab.readPool(MINT, poolHint || undefined);
+          if (_llp) { BACKEND = "launchlab"; if (!poolHint) poolHint = _llp.pool; }
+        } catch (e) { /* stays Meteora */ }
+      }
+      if (!IS_EVM && BACKEND === "launchlab" && window.LaunchLab) tk = window.LaunchLab;
+      if (BACKEND === "launchlab") {
+        var gdl = $("grad-dest");
+        if (gdl) gdl.textContent = "graduation → Raydium, LP locked";
+      }
+      /* Recordless but live on a curve: don't leave "Not found" on a real token.
+       * Pull the name, symbol and image from the token's own on-chain metadata
+       * (a LaunchLab dividend token is Token-2022 and carries it inline). */
+      if (!rec && BACKEND === "launchlab") {
+        $("name").firstChild.textContent = "Untitled";
+        solTk().onchainIdentity(MINT).then(function (id) {
+          if (!id) return null;
+          if (id.name) $("name").firstChild.textContent = id.name;
+          if (id.symbol) $("sym").textContent = "$" + id.symbol;
+          if (!id.uri) return null;
+          return fetch(id.uri).then(function (r) { return r.ok ? r.json() : null; });
+        }).then(function (meta) {
+          if (!meta) return;
+          if (meta.description) $("desc").textContent = meta.description;
+          renderLinks(meta);
+          var img = meta.image || meta.icon;
+          if (img) {
+            var lg = document.createElement("img"); lg.alt = "";
+            lg.onload = function () { $("logo").innerHTML = ""; $("logo").appendChild(lg); };
+            lg.src = img;
+          }
+          var bn = meta.banner;
+          if (bn) {
+            var bi = $("tbanner-img");
+            if (bi) { bi.onload = function () { bi.hidden = false; }; bi.src = bn; }
+          }
+          /* Reward badge + "/asset" ticker from the on-chain metadata's reward
+           * field — synthesize the record drawRewards expects. */
+          if (meta.reward && meta.reward.mode && meta.reward.mode !== "none") {
+            drawRewards({
+              backend: "launchlab",
+              rewardMode: meta.reward.mode,
+              feeSharePct: 100,
+              rewardMint: meta.reward.mint || null,
+              pool: poolHint
+            });
+          }
+        }).catch(function () {});
+      }
+
       if (rec) {
-        poolHint = rec.pool || null;
         $("name").firstChild.textContent = rec.name;
         $("sym").textContent = "$" + rec.symbol;
         /* Our index is a convenience, not the truth. The name and ticker a
@@ -1087,7 +1187,7 @@ input:focus{outline:none;border-color:var(--accent)}
         if (IS_EVM) {
           renderLinks(null);
         } else {
-          window.Token.onchainIdentity(MINT).then(function (id) {
+          solTk().onchainIdentity(MINT).then(function (id) {
             if (!id) return;
             if (id.name) $("name").firstChild.textContent = id.name;
             if (id.symbol) $("sym").textContent = "$" + id.symbol;
@@ -1137,14 +1237,17 @@ input:focus{outline:none;border-color:var(--accent)}
     }
     if ($("name").firstChild.textContent === "Loading…")
       $("name").firstChild.textContent = UI.shortAddr(MINT, 4);
+    /* market.quote is "ETH" for an ETH pool and null for a quoted (USDG/stock)
+     * one — keep whatever the indexer stats already resolved rather than resetting
+     * to ETH, so a paired pool shows its real quote symbol. */
+    QUOTE = market.quote || QUOTE || (IS_EVM ? "ETH" : "SOL");
     $("s-price").textContent = market.price ? market.price.toFixed(9) : "—";
-    $("s-raised").textContent = UI.fmt(market.raised, 2) + " " + market.quote;
-    $("s-grad").textContent = UI.fmt(market.threshold, 0) + " " + market.quote;
+    $("s-raised").textContent = UI.fmt(market.raised, 2) + " " + QUOTE;
+    $("s-grad").textContent = UI.fmt(market.gradMcap!=null?market.gradMcap:market.threshold, 0) + " " + QUOTE;
     $("s-status").textContent = market.migrated ? "GRADUATED" : "on the curve";
     $("bar").style.width = (market.progress * 100).toFixed(1) + "%";
     $("pct").textContent = (market.progress * 100).toFixed(1) + "% to graduation";
     drawCurve(market.progress);
-    QUOTE = market.quote || (IS_EVM ? "ETH" : "SOL");
     // the rate, so a token the indexer has not seen still shows dollars
     if (USD == null) {
       try {
@@ -1177,8 +1280,8 @@ input:focus{outline:none;border-color:var(--accent)}
     }
     $("s-raised").textContent = USD ? money(market.raised * USD) : native(market.raised);
     $("s-raised-n").textContent = native(market.raised);
-    $("s-grad").textContent = USD ? money(market.threshold * USD) : native(market.threshold, 0);
-    $("s-grad-n").textContent = native(market.threshold, 0);
+    $("s-grad").textContent = USD ? money((market.gradMcap!=null?market.gradMcap:market.threshold) * USD) : native(market.gradMcap!=null?market.gradMcap:market.threshold, 0);
+    $("s-grad-n").textContent = native(market.gradMcap!=null?market.gradMcap:market.threshold, 0);
     if ($("s-vol").textContent === "—") $("s-vol").textContent = USD ? money(0) : native(0);
     if ($("s-trades").textContent === "") $("s-trades").textContent = "0 trades";
     /* Indexed history if we have it, the chain if we do not — a token launched

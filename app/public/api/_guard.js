@@ -13,6 +13,11 @@
 const SPL_TOKEN  = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 const DBC        = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN";
+// Raydium LaunchLab (mainnet + devnet) — the second launch backend. A pool
+// owned by either program is a real bonding curve.
+const LAUNCHLAB     = "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj";
+const DEV_LAUNCHLAB = "DRay6fNdQ5J82H7xV6uq2aV3mNrUZ1J4PgSKsWgptcm6";
+const CURVE_PROGRAMS = [DBC, LAUNCHLAB, DEV_LAUNCHLAB];
 
 export function kv() {
   return import("@upstash/redis").then(({ Redis }) => new Redis({
@@ -132,7 +137,7 @@ export async function isRealLaunch(mint, pool) {
   if (!m) return { ok: false, reason: "no such mint on chain" };
   if (m.owner !== SPL_TOKEN && m.owner !== TOKEN_2022) return { ok: false, reason: "not a token mint" };
   if (!p) return { ok: false, reason: "no such pool on chain" };
-  if (p.owner !== DBC) return { ok: false, reason: "pool is not a bonding curve" };
+  if (CURVE_PROGRAMS.indexOf(p.owner) < 0) return { ok: false, reason: "pool is not a bonding curve" };
   return { ok: true };
 }
 
