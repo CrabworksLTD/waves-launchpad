@@ -34,9 +34,27 @@
   // the share crawlers serve the Robinhood card — they never run this code,
   // vercel.json routes them by the same query param)
   try {
-    if (new URLSearchParams(location.search).get("chain") === "rh") {
+    var _qs = new URLSearchParams(location.search);
+    var _ch = _qs.get("chain");
+    if (_ch === "rh") {
       localStorage.setItem("shl-chain", "robinhood");
+    } else if (_ch === "solana" || _ch === "sol") {
+      // symmetric with ?chain=rh — a shared link can force the Solana side, so a
+      // browser last left on Robinhood lands where the link intends (e.g. the
+      // Solana tier-ladder test needs Phantom, not MetaMask).
+      localStorage.setItem("shl-chain", "solana");
     }
+    /* Persist the tier-ladder test flag HERE, at the top of boot — the app cleans
+     * the query string (history.replaceState to /app) before launchpanel's
+     * launchlabLadderLive() ever runs, so reading ?laddertest there finds nothing.
+     * launchlabLadderLive() reads localStorage.wavesLadderTest, which survives. */
+    var _lt = _qs.get("laddertest");
+    if (_lt === "1") { localStorage.setItem("wavesLadderTest", "1"); }
+    else if (_lt === "0") { localStorage.removeItem("wavesLadderTest"); }
+    // operator gate for the v0 + lookup-table launch tx (launchlab.js launchToken)
+    var _v0 = _qs.get("txv0");
+    if (_v0 === "1") { localStorage.setItem("wavesTxV0", "1"); }
+    else if (_v0 === "0") { localStorage.removeItem("wavesTxV0"); }
   } catch (e) {}
   function currentChain() {
     try { var c = localStorage.getItem("shl-chain"); } catch (e) {}

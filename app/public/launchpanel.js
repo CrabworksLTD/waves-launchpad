@@ -407,7 +407,7 @@
       <div class="two">
         <div><label>Name</label><input id="f-name" value="${d.name}" maxlength="28"
           placeholder="Your collection's name"></div>
-        <div><label>Symbol</label><input id="f-sym" value="${d.symbol}" maxlength="8"
+        <div><label>Symbol</label><input id="f-sym" value="${d.symbol}" maxlength="10"
           placeholder="OPTIONAL" style="text-transform:uppercase"></div>
       </div>
       <label>Description</label>
@@ -983,16 +983,37 @@
    * platform — stocks, altcoins, SOL/USDC alike); until then this is window.Token
    * (Meteora), so the live flow is unchanged. EVM is unaffected — it has its own
    * path. Existing Meteora pools keep trading via window.Token regardless. */
-  function solBackend() {
-    try {
-      if (window.LaunchLab && window.LaunchLab.live && window.LaunchLab.live()) return window.LaunchLab;
-    } catch (e) {}
-    return window.Token;
+  /* Which Solana backend a launch uses — now FLOW-AWARE. Default is LaunchLab, but a
+   * launch quoted in SOL/USDC that pays a DIVIDEND (or split) routes to Meteora DBC:
+   * holders are paid a tokenized-stock/asset dividend, and the reward rides as a
+   * Jupiter-swapped asset via the DBC keeper — so the stock's compliance extensions
+   * (transfer-hook, frozen-default) never touch a DBC vault. A stock/exotic QUOTE must
+   * stay on LaunchLab (DBC can't hold it). `_curFlow` lets the no-arg callers (the
+   * fee/tier/reward UI + the launch) resolve the right backend for the current flow;
+   * it is refreshed by solRoute(flow) at the top of each details render + before launch. */
+  var _curFlow = null;
+  function solRoute(f) { if (f) _curFlow = f; return _curFlow; }
+  function solBackendFor(flow) {
+    if (isEvm()) return window.Token;
+    var ll = null;
+    try { if (window.LaunchLab && window.LaunchLab.live && window.LaunchLab.live()) ll = window.LaunchLab; } catch (e) {}
+    if (!ll) return window.Token;                                   // LaunchLab not live → DBC
+    var q = flow && flow.quote;
+    if (q && q !== "sol" && q !== "usdc") return ll;                // stock/exotic quote → LaunchLab
+    if (flow && (flow.feeShare === "vault" || flow.pairedCollection)) return ll;  // PAIR → LaunchLab staking-vault path
+    if (flow && (flow.rewardMode === "dividend" || flow.rewardMode === "split")) return window.Token;  // SOL/USDC dividend → DBC
+    return ll;
   }
+  function solBackend() { return solBackendFor(_curFlow); }
   // LaunchLab has one flat fee, not the Meteora tax-rung ladder — the holder
   // "tax" is the per-launch reward-mode transfer fee instead. So on LaunchLab
   // only the standard rung is offered.
-  function solIsLaunchLab() { return solBackend() === window.LaunchLab; }
+  // ⚠️ Solana-only. solBackend() returns window.LaunchLab whenever LaunchLab is
+  // live (a global flag), so WITHOUT the isEvm() guard this reads true on the
+  // Robinhood/EVM chain too — leaking the Solana fee labels ("1.15%", "0.25%
+  // Raydium") onto the EVM launch panel, whose real base is 1% with no Raydium.
+  // The EVM fee is driven by evmSplit()/EVM_PLATFORM_BPS, never by this.
+  function solIsLaunchLab() { return !isEvm() && solBackend() === window.LaunchLab; }
 
   // The multi-tier fee ladder is live only when its own flag is set AND we're on
   // LaunchLab. Until then LaunchLab offers the single flat 1.15% rung.
@@ -1001,7 +1022,17 @@
       if (!solIsLaunchLab()) return false;
       var b = window.BRAND || {};
       var c = (window.Launch && window.Launch.cluster) ? window.Launch.cluster() : "mainnet-beta";
-      return !!(b.launchlabLadderLive && b.launchlabLadderLive[c] === true);
+      if (b.launchlabLadderLive && b.launchlabLadderLive[c] === true) return true;
+      /* Operator test gate (mirrors shell.pairUnlocked's ?pairtest): the tier
+       * platform configs + the forwarding keeper are built and reviewed, but the
+       * ladder must be proven with a controlled tier launch before it's flipped
+       * public. ?laddertest=1 (persisted) exposes the 2/3/4/5% rungs to us only;
+       * ?laddertest=0 clears it. The public switch stays launchlabLadderLive above. */
+      var u = new URLSearchParams(location.search);
+      if (u.get("laddertest") === "1") { try { localStorage.setItem("wavesLadderTest", "1"); } catch (e) {} return true; }
+      if (u.get("laddertest") === "0") { try { localStorage.removeItem("wavesLadderTest"); } catch (e) {} return false; }
+      if (localStorage.getItem("wavesLadderTest") === "1") return true;
+      return false;
     } catch (e) { return false; }
   }
   // Total trade fee % for a LaunchLab tier: 1.15 for standard, else the ladder pct.
@@ -1014,6 +1045,29 @@
     var b = window.BRAND || {};
     var c = (window.Launch && window.Launch.cluster) ? window.Launch.cluster() : "mainnet-beta";
     return (b.launchlabConfigs || {})[c] || {};
+  }
+  /* The under-picker descriptor for a LaunchLab tier: the total a trader pays, then
+   * where every part of it goes — shown for EVERY rung, not just the floor. Computed
+   * from the tier's brand.js config (fee rates are millionths, /10000 = a percent) so
+   * it can never drift from what the keeper actually forwards:
+   *   • the creator gets their on-chain creatorFeeRate PLUS the forwarded remainder
+   *     of the platform fee (feeRate − wavesKeepBps); the floor forwards nothing;
+   *   • WAVES keeps platformFeeRate (floor) / wavesKeepBps (a rung);
+   *   • Raydium always takes a fixed 0.25%.
+   * The parts sum to llTierPct — the same total shown, so the line is self-checking. */
+  function llTaxLine(tier) {
+    var RAYDIUM = 0.25, cfg = llConfigsFor(), creator, platform;
+    if (!tier || tier === "standard") {
+      creator = (Number(cfg.creatorFeeRate) || 0) / 10000;
+      platform = (Number(cfg.platformFeeRate) || 0) / 10000;
+    } else {
+      var t = (cfg.tiers || {})[tier];
+      if (!t) return "Traders pay " + llTierPct(tier) + "% in total.";
+      creator = ((Number(t.creatorFeeRate) || 0) + (Number(t.feeRate) || 0) - (Number(t.wavesKeepBps) || 0)) / 10000;
+      platform = (Number(t.wavesKeepBps) || 0) / 10000;
+    }
+    return "Traders pay " + llTierPct(tier) + "% in total. " +
+      creator.toFixed(2) + "% to you, " + platform.toFixed(2) + "% platform, " + RAYDIUM.toFixed(2) + "% Raydium.";
   }
 
   /* The active holder reward, phrased for the token share card — or null for a
@@ -1532,7 +1586,11 @@
     } catch (e) {}
 
     var started = Date.now();
-    var LIMIT = 90000;                       // ninety seconds, not four minutes
+    // 12s, not 90: metadata is served through our /m/ proxy + the mirror, which
+    // answer immediately, so the on-chain URI resolving on a public gateway is a
+    // nicety, not a blocker. Don't hold the launch on it — proceed and let it
+    // propagate (aggregators read /m/, which always resolves).
+    var LIMIT = 12000;
     while (Date.now() - started < LIMIT) {
       var hit = await Promise.all(urls.map(function (u) {
         return fetch(u, { cache: "no-store" }).then(function (r) { return r.ok; })
@@ -1585,11 +1643,30 @@
   /* The full quote list for the Solana picker: SOL + USDC (whichever the backend
    * supports) as Tokens, followed by every registered stock/token/commodity. */
   function solQuoteList() {
-    var base = solBackend().quotes();
+    // The QUOTE picker offers the full universe (LaunchLab's superset) regardless of
+    // the flow's current backend, so a stock quote is always pickable — picking one
+    // routes the launch to LaunchLab; a SOL/USDC pick may route to DBC (see
+    // solBackendFor). Falls back to whatever backend is live if LaunchLab isn't.
+    var be = window.Token;
+    try { if (window.LaunchLab && window.LaunchLab.live && window.LaunchLab.live()) be = window.LaunchLab; } catch (e) {}
+    var base = be.quotes();
     var toks = [];
     if (base.indexOf("sol") >= 0) toks.push({ mint: "sol", symbol: "SOL", label: "Solana", cat: "token" });
     if (base.indexOf("usdc") >= 0) toks.push({ mint: "usdc", symbol: "USDC", label: "USD Coin", cat: "token" });
-    return toks.concat(solBackend().rwaQuotes());
+    return toks.concat(be.rwaQuotes());
+  }
+
+  /* The reward asset menu is backend-agnostic: any Jupiter-routable asset can be a
+   * dividend (the keeper swaps fees into it), so it ALWAYS offers the full catalogue —
+   * the stocks / commodities / SPLs from LaunchLab's quote universe — even when the
+   * launch routes to Meteora DBC (whose own quote list is small and stock-free). */
+  function solRewardList() {
+    var toks = [{ mint: "sol", symbol: "SOL", label: "Solana", cat: "token" },
+                { mint: "usdc", symbol: "USDC", label: "USD Coin", cat: "token" }];
+    try {
+      if (window.LaunchLab && window.LaunchLab.rwaQuotes) return toks.concat(window.LaunchLab.rwaQuotes());
+    } catch (e) {}
+    return solQuoteList();
   }
 
   /* When is the "Rewards paid in" picker offered? Only for a dividend (or the
@@ -1772,9 +1849,14 @@
      * being the 1.2% floor every launch pays. Naming them after the number a
      * trader sees keeps the label honest: a 3% tax means traders pay 3%. */
     return rungs.map(function (r) {
-      // LaunchLab is a flat 1.15% (0.25 Raydium + 0.40 platform + 0.50 creator),
-      // not the Meteora rung's 1% — show the real number.
-      var label = solIsLaunchLab() ? (llTierPct(r.name) + "%") : (r.spec.pct + "%");
+      // LaunchLab's floor is really 1.15% (0.25 Raydium + 0.40 platform + 0.50
+      // creator), but showing "1.15%" beside the clean 2/3/4/5% rungs reads as a
+      // typo. So the PILL rounds the floor to "1%" for a clean ladder; the exact
+      // 1.15% + its split stays in the details line under the picker (paintTax).
+      // Higher rungs are whole numbers already, so they show their real total.
+      var label = solIsLaunchLab()
+        ? (r.name === "standard" ? "1%" : (llTierPct(r.name) + "%"))
+        : (r.spec.pct + "%");
       return '<button data-t="' + r.name + '"' + (r.name === cur ? ' class="on"' : "") + ">" +
         label + "</button>";
     }).join("");
@@ -1797,6 +1879,7 @@
    * launches, then the token pairs to it. */
   function pairTokenDetails(flow) {
     flow = flow || {};
+    solRoute(flow);   // pairs resolve to LaunchLab (feeShare vault) — keep the ref current
     var nft = flow.nft;
     var defName = flow.preTname || (nft ? nft.cfg.name : "");
     var defSym = flow.preTsym ||
@@ -1845,7 +1928,7 @@
         <div><label>Name</label>
         <input id="lp-tname" value="${flow.tname || defName}" maxlength="30" placeholder="My Token"></div>
         <div><label>Ticker</label>
-        <input id="lp-tsym" value="${flow.tsym || defSym}" maxlength="8" placeholder="TKN"
+        <input id="lp-tsym" value="${flow.tsym || defSym}" maxlength="10" placeholder="TKN"
           style="text-transform:uppercase"></div>
       </div>
 
@@ -1861,7 +1944,7 @@
       <div class="ptabs" id="tk-tiers">${raw(tierButtons(flow))}</div>
       <p class="note" id="tk-taxtxt"></p>
 
-      <label>Your first buy (${isEvm() ? "ETH" : "SOL"}) — optional</label>
+      <label>Your first buy (${isEvm() ? "ETH" : (flow.quote === "usdc" ? "USDC" : "SOL")}) — optional</label>
       <input id="lp-tbuy" type="number" min="0" step="${isEvm() ? "0.005" : "0.1"}" value="${flow.tbuy || 0}">
       <p class="note" id="tk-buyshare"></p>
       <p class="note">Lands in the same transaction as the pool, so nobody can snipe
@@ -1928,9 +2011,7 @@
     function paintTax() {
       var el = box.querySelector("#tk-taxtxt");
       if (el) el.textContent = solIsLaunchLab()
-        ? ("Traders pay " + llTierPct(flow.tier) + "% in total." + ((!flow.tier || flow.tier === "standard")
-            ? " 0.50% to you, 0.40% platform, 0.25% Raydium."
-            : " Your share is claimed to your fee wallet."))
+        ? llTaxLine(flow.tier)
         : ("Traders pay " + tierPct(flow) + "% in total.");
     }
     paintTax();
@@ -1984,7 +2065,7 @@
     if (rewardBtn) rewardBtn.onclick = function () {
       collect();
       if (isEvm()) rhRewardPicker(flow);
-      else rwaQuotePicker(flow, solQuoteList(), { mode: "reward" });
+      else rwaQuotePicker(flow, solRewardList(), { mode: "reward" });
     };
 
     box.querySelector("#lp-x").onclick = function () {
@@ -2007,6 +2088,7 @@
 
   function tokenDetails(flow) {
     flow = flow || {};
+    solRoute(flow);   // backend follows this flow (quote + reward), for the fee UI + launch
     var nft = flow.nft;
     // what they typed beside the pair tick comes through as the default here,
     // so the token step opens already carrying their answer
@@ -2084,7 +2166,7 @@
         <div><label>Name</label>
         <input id="lp-tname" value="${flow.tname || defName}" maxlength="30" placeholder="My Token"></div>
         <div><label>Symbol</label>
-        <input id="lp-tsym" value="${flow.tsym || defSym}" maxlength="8" placeholder="TKN"
+        <input id="lp-tsym" value="${flow.tsym || defSym}" maxlength="10" placeholder="TKN"
           style="text-transform:uppercase"></div>
       </div>
       <label>Description</label>
@@ -2179,7 +2261,7 @@
       ${solBackend().configKey() ? "" : raw(
         '<p class="err">Token launches are not configured on this deployment yet — ' +
         "the form is a preview and the launch button is disabled.</p>")}
-      <label>Your first buy (${qLabel}) — optional</label>
+      <label>Your first buy (${isEvm() ? "ETH" : (flow.quote === "usdc" ? "USDC" : "SOL")}) — optional</label>
       <input id="lp-tbuy" type="number" min="0" step="${isEvm() ? "0.005" : "0.1"}" value="${flow.tbuy || 0}">
       <p class="note" id="tk-buyshare"></p>
       <p class="note">Lands in the same transaction as the pool, so nobody can snipe
@@ -2294,9 +2376,7 @@
     function paintTax() {
       var el = box.querySelector("#tk-taxtxt");
       if (el) el.textContent = solIsLaunchLab()
-        ? ("Traders pay " + llTierPct(flow.tier) + "% in total." + ((!flow.tier || flow.tier === "standard")
-            ? " 0.50% to you, 0.40% platform, 0.25% Raydium."
-            : " Your share is claimed to your fee wallet."))
+        ? llTaxLine(flow.tier)
         : ("Traders pay " + tierPct(flow) + "% in total.");
     }
 
@@ -2364,6 +2444,14 @@
       // and only when priced in SOL/USDC — Normal keeps the fees, burn buys back
       // the token itself, and a stock/token quote already IS the reward.
       if (rw) rw.hidden = !rewardSelectable(flow);
+      /* The mode can flip the backend — a SOL/USDC dividend/split routes to Meteora
+       * DBC, whose fee ladder differs from LaunchLab's. _curFlow is this same flow,
+       * so solBackend() now resolves from the updated rewardMode; re-render the tier
+       * pills + the fee line to match (the tk-tiers click handler is delegated on the
+       * container, so replacing its innerHTML keeps it). */
+      var tiersEl = box.querySelector("#tk-tiers");
+      if (tiersEl) tiersEl.innerHTML = tierButtons(flow);
+      paintTax();
     });
 
     // the choice is recorded with the launch; activation happens on the fee page.
@@ -2372,7 +2460,7 @@
     if (rewardBtn) rewardBtn.onclick = function () {
       collect();
       if (isEvm()) rhRewardPicker(flow);
-      else rwaQuotePicker(flow, solQuoteList(), { mode: "reward" });
+      else rwaQuotePicker(flow, solRewardList(), { mode: "reward" });
     };
     // the pool's quote asset — same picker, "quote" mode (Robinhood Chain only)
     var quoteBtn = box.querySelector("#lp-quote");
@@ -2658,10 +2746,16 @@
   }
 
   async function tokenConfirm(flow) {
+    solRoute(flow);   // confirm + launch resolve the backend from the final flow
     var w = window.Wallet.current();
     var nft = flow.nft;
     var qLabel = flow.quote === "usdc" ? "USDC"
       : flow.quote === "sol" ? "SOL" : (flow.quoteSym || "RWA");
+    // an exotic (stock / T-token) quote's opening buy is HOPPED from SOL by
+    // launchlab.js, so it's shown + entered in SOL — the launcher never holds the
+    // quote token. SOL/USDC quotes are bought directly in that quote.
+    var isExotic = !!(flow.quote && flow.quote !== "sol" && flow.quote !== "usdc");
+    var buyUnit = isExotic ? "SOL" : qLabel;
     var box = shell(H`
       <h2>Confirm token</h2>
       <p class="sub">One small metadata upload, then the pool. The curve is the liquidity.</p>
@@ -2680,11 +2774,12 @@
           ? qLabel + " — " + flow.reward.symbol + " has no market yet"
           : (flow.reward.symbol || qLabel)}</b></div>` : ""}
       <div class="row"><span class="k">First buy</span><b>${flow.tbuy > 0
-        ? flow.tbuy + " " + qLabel + buyShareSuffix(flow)
-        : (solIsLaunchLab() ? "~0.01 " + qLabel + " (minimum)" : "none")}</b></div>
-      ${solIsLaunchLab() && !(flow.tbuy > 0)
-        ? H`<p class="note">Raydium requires a non-zero opening buy, so a minimum
-          <b>~0.01 ${qLabel}</b> lands with the pool — you must already hold that ${qLabel}.</p>`
+        ? flow.tbuy + " " + buyUnit + (isExotic ? "" : buyShareSuffix(flow))
+        : (solIsLaunchLab() ? (isExotic ? "~0.02 SOL (minimum)" : "~0.01 " + qLabel + " (minimum)") : "none")}</b></div>
+      ${solIsLaunchLab() && (isExotic || !(flow.tbuy > 0))
+        ? H`<p class="note">${isExotic
+            ? raw("Raydium requires a non-zero opening buy — it's swapped from your SOL into " + esc(qLabel) + " automatically, so you don't need to hold " + esc(qLabel) + ".")
+            : raw("Raydium requires a non-zero opening buy, so a minimum <b>~0.01 " + esc(qLabel) + "</b> lands with the pool — you must already hold that " + esc(qLabel) + ".")}</p>`
         : ""}
       ${flow.feeWallet ? H`<div class="row"><span class="k">Fees claim to</span><b>${shortAddr(flow.feeWallet)}</b></div>` : ""}
       <div class="row"><span class="k">Metadata storage</span><b id="lp-fee">quoting…</b></div>
@@ -2730,11 +2825,15 @@
 
   async function doTokenLaunch(flow) {
     busy = true;
+    // an exotic (stock / T-token) quote hops SOL → quote for the opening buy — a
+    // separate wallet signature before the pool tx; show it as its own stage.
+    var qHop = !isEvm() && flow.quote && flow.quote !== "sol" && flow.quote !== "usdc";
     var stages = [
       ["meta", "Storing token metadata"],
-      ["live", "Waiting for the artwork to go live"],
-      ["pool", "Creating the pool" + (flow.tbuy > 0 ? " + your first buy" : "")]
+      ["live", "Waiting for the artwork to go live"]
     ];
+    if (qHop) stages.push(["hop", "Swapping SOL → " + (flow.quoteSym || "quote") + " for your first buy"]);
+    stages.push(["pool", "Creating the pool" + (qHop || flow.tbuy > 0 ? " + your first buy" : "")]);
     /* No "pledge" step: the pool is created with the keeper as its creator, so
      * it is pledged from the instant it exists rather than a transaction later.
      * See token.js — the gap that step left is what cost $MOAR's holders
@@ -2825,12 +2924,15 @@
       });
       mark("live", "done", liveOk ? "" : "still publishing — launching anyway");
 
-      mark("pool", "on");
+      mark(qHop ? "hop" : "pool", "on");
       var res = await solBackend().launchToken({
         name: flow.tname,
         symbol: flow.tsym,
         uri: meta.uri,
         quote: flow.quote,
+        // when an exotic quote hops SOL→quote first, close that stage + open the
+        // pool stage once launchToken moves past the swap to the pool tx.
+        onProgress: function (p) { if (p.step === "pool" && qHop) { mark("hop", "done"); mark("pool", "on"); } },
         tier: flow.tier || "standard",
         storageFee: flow.storageFee || null,
         feeShare: flow.feeShare || "keep",
@@ -2880,25 +2982,12 @@
       // staking pool now (init_pool) so the collection's holders can stake the
       // moment the token exists. Best-effort: the token already launched, so a
       // pool hiccup must not fail the launch.
-      if (flow.nft) {
-        var vault = null;
-        if (flow.pair) {
-          try {
-            if (!window.WavesStake) await new Promise(function (r2, rej) {
-              var s = document.createElement("script"); s.src = "/stake.js";
-              s.onload = r2; s.onerror = function () { rej(new Error("stake.js")); };
-              document.head.appendChild(s);
-            });
-            var pv = await window.WavesStake.initPool({
-              tokenMint: res.mint,
-              collection: flow.nft.res.collection,
-              rewardMint: (flow.reward && flow.reward.mint) || "So11111111111111111111111111111111111111112"
-            });
-            vault = pv.vault;
-          } catch (e) { /* pool init is best-effort; the token already launched */ }
-        }
-        recordCollection(flow.nft.cfg, flow.nft.res, res.mint, flow.nft.up, vault);
-      }
+      // Record the collection→token link. The staking pool is NOT created here
+      // anymore — that was a blocking second signature that held up the success
+      // panel (and Phantom now blocks it). The pool is created lazily on the
+      // creator's first "Activate rewards" (distributeToVault), so the launch ends
+      // fast with one signature.
+      if (flow.nft) recordCollection(flow.nft.cfg, flow.nft.res, res.mint, flow.nft.up, null);
 
       busy = false;
       tokenDone(flow, res);
@@ -2938,8 +3027,11 @@
      * one-signature activation on the fee page. */
     var isLL = res.backend === "launchlab";
     var isBurn = flow.rewardMode === "burn";
+    var isPair = !!(flow.pair && nft);
     var pledged = flow.rewardMode === "dividend" || isBurn;
-    var rewardsLive = isLL && pledged;   // auto-on, nothing to activate
+    // a PAIR is NOT auto-on: its token has no tax, so the creator activates rewards
+    // (claims their 0.5% into the vault) — a first-class step here + on the fee page.
+    var rewardsLive = isLL && pledged && !isPair;
 
     var actLabel, actHref;
     if (rewardsLive) { actLabel = "Fee page"; actHref = "/fees"; }
@@ -2948,9 +3040,11 @@
       actHref = "/fees?activate=" + encodeURIComponent(res.mint);
     } else { actLabel = "Claim fees"; actHref = "/fees"; }
 
-    var rewardRow = rewardsLive
-      ? H`<div class="row"><span class="k">Holder rewards</span><b>live · paid hourly</b></div>`
-      : H`<div class="row"><span class="k">Trading fees</span><b>yours to claim</b></div>`;
+    var rewardRow = isPair
+      ? H`<div class="row"><span class="k">Holder rewards</span><b>activate to start</b></div>`
+      : rewardsLive
+        ? H`<div class="row"><span class="k">Holder rewards</span><b>live · paid hourly</b></div>`
+        : H`<div class="row"><span class="k">Trading fees</span><b>yours to claim</b></div>`;
 
     var box = shell(H`
       <h2>Live</h2>
@@ -2962,16 +3056,18 @@
       <input readonly value="${nft.res.mintUrl}" onclick="this.select()">` : ""}
       <label>Token page</label>
       <input readonly value="${page}" onclick="this.select()">
-      <p class="note">${rewardsLive ? (isBurn
-          ? "Buyback & burn runs automatically from trading fees. "
-          : "Holder rewards pay out hourly, automatically — nothing to switch on. ") : ""}Share the
-        token page — it is where people buy, and it unfurls with your launch card.
-        Jupiter lists the token once the curve graduates.</p>
+      <p class="note">${isPair
+          ? "Your holders are paid from your 0.5% of every trade. Rewards don't tax the token — you activate them: claim your cut into the collection's vault and holders can claim their share. Do it here, or any time from the fee page."
+          : rewardsLive ? (isBurn
+            ? "Buyback & burn runs automatically from trading fees. "
+            : "Holder rewards pay out hourly, automatically — nothing to switch on. ") : ""}${isPair ? "" : "Share the token page — it is where people buy, and it unfurls with your launch card. Jupiter lists the token once the curve graduates."}</p>
+      ${isPair ? H`<div id="lp-actmsg" class="note" style="margin-top:-6px;min-height:0"></div>` : ""}
       <div class="acts">
         <button id="lp-done">Close</button>
         ${nft ? H`<button id="lp-open">Mint page</button>` : ""}
-        ${rewardsLive ? "" : H`<button id="lp-reward">${actLabel}</button>`}
-        <button class="go" id="lp-token">Open token page</button>
+        ${isPair ? H`<button class="go" id="lp-activate">Activate rewards</button>`
+          : rewardsLive ? "" : H`<button id="lp-reward">${actLabel}</button>`}
+        <button ${isPair ? "" : raw('class="go"')} id="lp-token">Open token page</button>
       </div>
     `);
     bindCopy(box);
@@ -2981,6 +3077,22 @@
     var rew = box.querySelector("#lp-reward");   // absent when rewards are already live
     if (rew) rew.onclick = function () { location.href = actHref; };
     box.querySelector("#lp-token").onclick = function () { location.href = page; };
+
+    // PAIR: activate rewards inline — claim the creator's 0.5% into the staking vault
+    var act = box.querySelector("#lp-activate");
+    if (act) act.onclick = async function () {
+      var msg = box.querySelector("#lp-actmsg");
+      act.disabled = true; var lbl = act.textContent; act.textContent = "Confirm in wallet…";
+      if (msg) { msg.style.color = "var(--dim)"; msg.textContent = ""; }
+      try {
+        var out = await window.LaunchLab.distributeToVault(res.mint, nft.res.collection, res.pool);
+        if (msg) { msg.style.color = "var(--accent)"; msg.textContent = "Rewards activated — your holders can now claim their share. Come back and activate again whenever fees build up."; }
+        act.textContent = "Rewards activated ✓";
+      } catch (e) {
+        if (msg) { msg.style.color = "var(--faint)"; msg.textContent = String((e && e.message) || e); }
+        act.disabled = false; act.textContent = lbl;
+      }
+    };
   }
 
   /* ---------- Robinhood Chain token launches ---------- */

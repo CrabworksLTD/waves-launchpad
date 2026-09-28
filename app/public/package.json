@@ -5,6 +5,7 @@
   "description": "Deploy root. Exists so Vercel installs what the api/ functions import \u2014 the site itself is static and has no build step.",
   "dependencies": {
     "@ardrive/turbo-sdk": "^1.42.0",
+    "@raydium-io/raydium-sdk-v2": "^0.2.69-alpha",
     "@metaplex-foundation/mpl-core-candy-machine": "^0.3.0",
     "@metaplex-foundation/umi": "^1.5.1",
     "@metaplex-foundation/umi-bundle-defaults": "^1.5.1",

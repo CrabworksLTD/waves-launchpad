@@ -21,6 +21,14 @@
       "destination": "/api/dex?path=:path"
     }
   ],
+  "headers": [
+    {
+      "source": "/(.*).js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, must-revalidate" }
+      ]
+    }
+  ],
   "redirects": [
     {
       "source": "/",
@@ -99,6 +107,10 @@
     },
     {
       "path": "/api/rh-keeper-nft",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/launchlab-keeper",
       "schedule": "0 * * * *"
     }
   ]

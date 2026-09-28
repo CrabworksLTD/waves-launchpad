@@ -187,7 +187,15 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
   function row(t, kind, amt) {
     var sym = (t.symbol || "?").toUpperCase();
     var pct = t.feeSharePct || (t.feeShare === "holders" ? 100 : 0);
-    var shared = kind === "creator" && pct > 0;
+    // A LaunchLab PAIR is NOT auto-shared-hourly — the creator activates it (claims
+    // their cut into the staking vault) — so it gets the Distribute button, not the
+    // "AUTO-SHARED HOURLY" badge.
+    var llPair = t.backend === "launchlab" && (t.pairedCollection || t.feeShare === "vault");
+    var shared = kind === "creator" && pct > 0 && !llPair;
+    /* Only a launch that actually has holder rewards can be activated/distributed.
+     * A pair distributes to its staking vault; a dividend/split activates the
+     * hourly payout. A NORMAL launch keeps all fees — no reward button, just Claim. */
+    var canActivate = llPair || ["dividend", "split"].indexOf(t.rewardMode) >= 0;
     return '<div class="frow" data-mint="' + esc(t.mint) + '" data-kind="' + kind + '">' +
       '<span class="coin">' + (t.icon ? '<img alt="" src="' + esc(t.icon) + '">'
         : esc(sym.slice(0, 1))) + "</span>" +
@@ -209,8 +217,8 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
               "% to holders automatically; your " + (100 - pct) +
               "% arrives at your fee wallet in the same run.", t.rewardMode)
         : '<button class="cl" disabled>Claim</button>' +
-          (kind === "creator"
-            ? '<button class="act">Activate holder rewards</button>' : "")) +
+          (kind === "creator" && canActivate
+            ? '<button class="act">' + (llPair ? "Distribute to holders" : "Activate holder rewards") + "</button>" : "")) +
       "</div>";
   }
 
@@ -227,14 +235,23 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
       return;
     }
     var pct = 100;
+    // A LaunchLab PAIR distributes differently: LaunchLab can't hand the creator
+    // role over, so the creator claims their 0.5% straight into the staking vault
+    // (one signature) whenever they want to pay holders — no "hourly keeper".
+    var llPair = t.backend === "launchlab" && (t.pairedCollection || t.feeShare === "vault") && (t.pairedCollection || t.collection);
     var box = document.createElement("div");
     box.className = "actbox";
     box.innerHTML =
-      "<b>Pay your holders from every trade</b>" +
-      "<p>Hands this pool's creator role to the WAVES keeper, which claims the " +
-      "fees hourly and pays your holders pro-rata. One signature. " +
-      "<b>This cannot be undone.</b></p>" +
-      '<button class="go">Activate</button>' +
+      (llPair
+        ? "<b>Pay your holders now</b>" +
+          "<p>Claims your 0.5% of the trading fees so far and drops it into the " +
+          "collection's reward vault — your NFT holders then claim their share. " +
+          "One signature. Run it again whenever fees build up.</p>"
+        : "<b>Pay your holders from every trade</b>" +
+          "<p>Hands this pool's creator role to the WAVES keeper, which claims the " +
+          "fees hourly and pays your holders pro-rata. One signature. " +
+          "<b>This cannot be undone.</b></p>") +
+      '<button class="go">' + (llPair ? "Distribute rewards" : "Activate") + "</button>" +
       '<button class="cancel">Cancel</button>' +
       '<div class="amsg" style="margin-top:10px;font-size:12.5px"></div>';
     rowEl.insertAdjacentElement("afterend", box);
@@ -249,6 +266,18 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
       msg.textContent = "Confirm in your wallet…";
       try {
         if (!t.pool) throw new Error("This launch has no pool recorded.");
+        // LaunchLab pair → claim creator fee into the vault; no /api/rewards write
+        if (llPair) {
+          var pout = await window.LaunchLab.distributeToVault(t.mint, t.pairedCollection || t.collection, t.pool);
+          var amt = (Number((pout && pout.amount) || 0) / 1e9);
+          // replace the whole box with a clear, persistent success — no reload back
+          // into the same button (which reads as "nothing happened").
+          box.innerHTML = '<b style="color:var(--accent)">✓ Rewards distributed</b>' +
+            "<p>" + (amt > 0 ? amt.toFixed(4) + " SOL" : "Your fees") +
+            " went into the collection's reward vault — your NFT holders can claim their share now. " +
+            "Come back and distribute again whenever new fees build up.</p>";
+          return;
+        }
         var out = await window.Token.activateHolderRewards(t.pool);
         msg.textContent = out.already
           ? "Already handed over — saving your terms…"
@@ -313,15 +342,28 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
     rows.forEach(function (el) {
       var t = tokens.find(function (x) { return x.mint === el.dataset.mint; });
       var feeBe = (t.backend === "launchlab" && window.LaunchLab) ? window.LaunchLab : window.Token;
-      feeBe.feeMetrics(t.mint, t.pool || null).then(function (m) {
+      feeBe.feeMetrics(t.mint, t.pool || null).then(async function (m) {
         // live accrued on the pool — what a Claim button would take right now
         var amt = el.dataset.kind === "creator" ? m.creator : m.partner;
+        /* A LaunchLab tier creator's fee has TWO parts claimed in one action: the
+         * on-chain 0.5% above (m.creator) + the keeper-held forwarded share (the
+         * part LaunchLab caps out of the on-chain fee), ledgered per creator. Pull
+         * it in so the accrued figure — and the Claim — cover the whole thing. */
+        var ledgerRaw = "0";
+        if (t.backend === "launchlab" && el.dataset.kind === "creator") {
+          try {
+            var lj = await fetch("/api/claim-fee-share?mint=" + encodeURIComponent(t.mint)).then(function (r) { return r.json(); });
+            ledgerRaw = (lj && lj.owed) || "0";
+          } catch (e) {}
+        }
+        var ledger = Number(ledgerRaw) / Math.pow(10, m.quoteDec || 9);
+        var total = amt + ledger;
         var aEl = el.querySelector(".amt");   // absent on auto-shared rows
-        if (aEl) aEl.textContent = UI.fmt(amt, 4) + " " + m.quote;
+        if (aEl) aEl.textContent = UI.fmt(total, 4) + " " + m.quote;
         var btn = el.querySelector(".cl");
-        if (btn && amt > 0) {
+        if (btn && total > 0) {
           btn.disabled = false;
-          btn.onclick = function () { doClaim(el, t, btn); };
+          btn.onclick = function () { doClaim(el, t, btn, { onchain: amt, ledger: ledgerRaw }); };
         }
         var act = el.querySelector(".act");
         if (act) act.onclick = function () { openActivate(el, t, act); };
@@ -332,17 +374,31 @@ h2{font-family:Archivo;font-size:19px;font-weight:800;margin:36px 0 12px}
     });
   }
 
-  async function doClaim(el, t, btn) {
+  async function doClaim(el, t, btn, ctx) {
     btn.disabled = true; btn.textContent = "Confirm…";
     say("", "");
     try {
       var w = window.Wallet.current();
       var claimBe = (t.backend === "launchlab" && window.LaunchLab) ? window.LaunchLab : window.Token;
-      var fn = el.dataset.kind === "creator"
-        ? claimBe.claimCreatorFeesTo : claimBe.claimPartnerFeesTo;
-      var sig = await fn(t.mint, w.publicKey, t.pool || null);
-      say("ok", 'Claimed. <a href="https://explorer.solana.com/tx/' + esc(sig) +
-        '" target="_blank" rel="noopener">View tx ↗</a>');
+      var sig = null;
+      // 1. the on-chain fee (creator vault / partner) — a wallet signature. Skip when
+      //    there's only a keeper-held balance (nothing on-chain to sign for).
+      if (!ctx || ctx.onchain > 0) {
+        var fn = el.dataset.kind === "creator"
+          ? claimBe.claimCreatorFeesTo : claimBe.claimPartnerFeesTo;
+        sig = await fn(t.mint, w.publicKey, t.pool || null);
+      }
+      // 2. release the keeper-held forwarded share (LaunchLab tier creators) — no
+      //    signature, the keeper pays the recorded creator from escrow.
+      if (t.backend === "launchlab" && el.dataset.kind === "creator" && ctx && ctx.ledger && ctx.ledger !== "0") {
+        btn.textContent = "Releasing…";
+        await fetch("/api/claim-fee-share", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ mint: t.mint }),
+        }).then(function (r) { return r.json(); });
+      }
+      say("ok", "Claimed." + (sig ? ' <a href="https://explorer.solana.com/tx/' + esc(sig) +
+        '" target="_blank" rel="noopener">View tx ↗</a>' : ""));
       el.querySelector(".amt").textContent = "0 " + el.querySelector(".amt").textContent.split(" ").pop();
       btn.textContent = "Claimed";
     } catch (e) {

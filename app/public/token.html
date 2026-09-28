@@ -42,6 +42,10 @@ main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
    part of what this token IS, not a footnote further down the page */
 .who .rsym{-webkit-text-fill-color:var(--accent);color:var(--accent);
   font-size:16px;letter-spacing:0}
+/* the trading pair — what this token is priced/quoted in — worn next to the
+   ticker exactly like the reward asset (.rsym), as "/KALSHI". */
+.who .qpair{-webkit-text-fill-color:var(--accent);color:var(--accent);
+  font-size:16px;letter-spacing:0}
 .socials{display:flex;gap:8px;flex-wrap:wrap}
 .socials a{display:inline-flex;align-items:center;gap:6px;
   padding:7px 14px;border:1px solid rgba(255,255,255,.22);border-radius:99px;
@@ -130,6 +134,9 @@ main{max-width:1420px;margin:0 auto;padding:26px 24px 90px}
   letter-spacing:.11em;text-transform:uppercase;color:var(--faint)}
 .rewards .rfees b{display:block;margin-top:4px;font:700 14px "IBM Plex Mono",monospace;color:var(--ink)}
 .rewards .rfees .rf-dist{color:var(--accent)}
+/* the creator's description, sat under the rewards box */
+.tdesc{margin-top:12px;font-size:12.5px;line-height:1.5;color:var(--dim);
+  white-space:pre-wrap;overflow-wrap:anywhere}
 
 /* the collection this token was paired with, and where its holders stake */
 .pairlink{display:flex;align-items:center;gap:10px;margin-top:12px;padding:11px 13px;
@@ -220,7 +227,7 @@ input:focus{outline:none;border-color:var(--accent)}
   <div class="hero-in">
     <div class="who">
       <div class="logo" id="logo">?</div>
-      <h1 id="name">Loading…<span class="sym" id="sym"></span><span class="rsym" id="rsym" hidden></span></h1>
+      <h1 id="name">Loading…<span class="sym" id="sym"></span><span class="rsym" id="rsym" hidden></span><span class="qpair" id="qpair" hidden></span></h1>
       <button class="ca" id="ca-copy" title="Copy the contract address">
         <code id="ca">—</code>
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/>
@@ -245,8 +252,8 @@ input:focus{outline:none;border-color:var(--accent)}
       <label id="amt-label">Amount</label>
       <input id="amt" type="number" min="0" step="0.01" placeholder="0.0">
       <div class="chips" id="chips">
-        <button data-v="0.01">0.01</button><button data-v="0.025">0.025</button>
-        <button data-v="0.05">0.05</button><button data-v="0.1">0.1</button>
+        <button data-v="0.1">0.1</button><button data-v="0.25">0.25</button>
+        <button data-v="0.5">0.5</button><button data-v="1">1</button>
       </div>
       <div class="est"><span>You receive ≈</span><b id="est">—</b></div>
       <div class="est"><span>Slippage</span><b>1%</b></div>
@@ -255,12 +262,8 @@ input:focus{outline:none;border-color:var(--accent)}
       <a class="pairlink" id="pairlink" hidden></a>
       <a class="pairlink" id="stakelink" hidden></a>
       <div class="rewards" id="rewards" hidden></div>
-      <!-- The fee split lives in the docs. Someone at a buy box needs to know
-           how trading works here, not how the fee is apportioned three ways —
-           and on a pledged token that breakdown was misleading anyway, since
-           most of the creator's share goes straight back to holders. -->
-      <p class="note">Trades run against the bonding curve — no order book, no
-      liquidity providers. <a href="/docs#fees">How fees work ↗</a></p>
+      <!-- The creator's own description of the token, read from its metadata. -->
+      <div class="tdesc" id="tdesc" hidden></div>
     </div>
 
     <div class="panel chartp">
@@ -293,7 +296,6 @@ input:focus{outline:none;border-color:var(--accent)}
       <canvas id="curve"></canvas>
       <div class="bar"><i id="bar"></i></div>
       <div class="barlb"><span id="pct">—</span><span id="grad-dest">graduation → LP permanently locked</span></div>
-      <p class="desc" id="desc"></p>
     </div>
 
   </div>
@@ -845,6 +847,20 @@ input:focus{outline:none;border-color:var(--accent)}
      * showed only intermittently). Fall back to the live check only for older
      * records saved before this flag existed. */
     var active = !!rec.rewardsActivatedAt || (IS_EVM && pct > 0) || llReward;
+    /* A payout record with sentRaw > 0 is proof the keeper HAS paid holders —
+     * a server-stored, race-free fact. Older Solana records never got the
+     * rewardsActivatedAt flag (e.g. $MOAR, $VROOM: rewards demonstrably live,
+     * flag unset), and the getPool fallback below flickered out on RPC
+     * cold-start races. Trust the ledger first; it can't lie about a payment
+     * that already happened, and it costs one cheap KV read, not a getPool. */
+    if (!active && !IS_EVM) {
+      try {
+        var pr = await fetch("/api/payouts?mint=" + encodeURIComponent(rec.mint))
+          .then(function (r) { return r.json(); })
+          .then(function (j) { return (j.payouts && j.payouts[rec.mint]) || null; });
+        if (pr && Number(pr.sentRaw) > 0) active = true;
+      } catch (e) {}
+    }
     if (!active) {
       try {
         active = IS_EVM
@@ -879,10 +895,23 @@ input:focus{outline:none;border-color:var(--accent)}
      * nothing to claim — are true but nobody reads a paragraph in a buy box;
      * what matters is that holding this pays you, in what, and how much it has
      * paid so far. */
+    var isPair = !!(rec.pairedCollection || rec.feeShare === "vault");
     function paint(sym, tradeable) {
       var burn = rec.rewardMode === "burn";
       var split = rec.rewardMode === "split";
       var a = sym || QUOTE;
+      // A PAIR is creator-distributed (not the hourly keeper) — the creator claims
+      // their cut into the vault; holders claim from it. Its numbers are: fees now
+      // sitting in the vault for holders, and the creator's pending (undistributed) cut.
+      if (isPair) {
+        box.innerHTML = "<b>" + esc(a) + " rewards active · staked NFTs earn</b>" +
+          '<div class="rfees" hidden>' +
+            '<div><span>In vault for holders</span><b class="rf-dist">—</b></div>' +
+            '<div><span>Undistributed</span><b class="rf-accrued">—</b></div>' +
+          "</div>";
+        box.hidden = false;
+        return;
+      }
       /* "TSLA rewards are active · sent hourly". The cadence is the part a
        * holder cares about and it was nowhere on the page — both chains pay on
        * the hour. A buyback-and-burn token pays holders NO asset: the fees buy
@@ -945,6 +974,31 @@ input:focus{outline:none;border-color:var(--accent)}
    * Distributed = the holder pot actually paid out (sentRaw). Returns formatted
    * strings, or null when the pool's quote/decimals can't be read. */
   async function fetchRewardFees(rec) {
+    /* PAIR: creator-distributed, so there's no keeper payout log. The two numbers
+       are read straight from chain — what's in the staking vault for holders, and
+       the creator's still-undistributed cut sitting in their fee vault. */
+    if (!IS_EVM && (rec.pairedCollection || rec.feeShare === "vault")) {
+      try {
+        if (!window.WavesStake) await new Promise(function (res, rej) {
+          var s = document.createElement("script"); s.src = "/stake.js";
+          s.onload = res; s.onerror = function () { rej(new Error("stake.js")); };
+          document.head.appendChild(s);
+        });
+        var pr = { tokenMint: rec.mint, collection: rec.pairedCollection || rec.collection,
+                   rewardMint: rec.rewardMint || "So11111111111111111111111111111111111111112" };
+        var summ = await window.WavesStake.summary(pr, null).catch(function () { return null; });
+        var m = await solTk().feeMetrics(rec.mint, rec.pool || null).catch(function () { return null; });
+        var qsym = (m && m.quote) || "SOL", qdec = Math.pow(10, (m && m.quoteDec) || 9);
+        var inVault = (summ && summ.live) ? Number(summ.vaultBalance || 0) / qdec : 0;
+        var pending = m ? (m.creator || 0) : 0;
+        return {
+          distributed: UI.fmt(inVault, 4) + " " + qsym,
+          distributedTitle: "Sitting in the collection's staking vault — activated NFT holders claim their share",
+          accrued: UI.fmt(pending, 4) + " " + qsym,
+          accruedTitle: "Your fees not yet distributed — hit Distribute on the fee page to send them to holders"
+        };
+      } catch (e) { return null; }
+    }
     /* ⚠️ Robinhood took a different route to the same two numbers.
      *
      * This returned null outright for EVM, so the figures under the rewards
@@ -1147,7 +1201,7 @@ input:focus{outline:none;border-color:var(--accent)}
           return fetch(id.uri).then(function (r) { return r.ok ? r.json() : null; });
         }).then(function (meta) {
           if (!meta) return;
-          if (meta.description) $("desc").textContent = meta.description;
+          if (meta.description) { $("tdesc").textContent = meta.description; $("tdesc").hidden = false; }
           renderLinks(meta);
           var img = meta.image || meta.icon;
           if (img) {
@@ -1196,7 +1250,7 @@ input:focus{outline:none;border-color:var(--accent)}
             return fetch(id.uri).then(function (r) { return r.ok ? r.json() : null; });
           }).then(function (meta) {
             renderLinks(meta);
-            if (meta && meta.description) $("desc").textContent = meta.description;
+            if (meta && meta.description) { $("tdesc").textContent = meta.description; $("tdesc").hidden = false; }
           }).catch(function () { renderLinks(null); });
         }
         /* Art is pinned to Arweave at launch, and the gateway can take a
@@ -1251,6 +1305,16 @@ input:focus{outline:none;border-color:var(--accent)}
       && market.quoteMint !== "So11111111111111111111111111111111111111112"
       && market.quoteMint !== "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
     if ($("t-buy")) setSide(side);
+    /* Trading-pair badge: name the quote asset next to the ticker whenever it is
+     * not the chain-native coin (a stock/token/USDC pair). SOL-native tokens need
+     * no badge — that pair is implied. This is the indicator that a token like
+     * TESS trades against KALSHI, which was otherwise only buried in the stats. */
+    (function () {
+      var qp = $("qpair"); if (!qp) return;
+      var nativeQ = IS_EVM ? "ETH" : "SOL";
+      if (QUOTE && QUOTE !== nativeQ) { qp.textContent = "/" + QUOTE; qp.hidden = false; }
+      else { qp.hidden = true; }
+    })();
     $("s-price").textContent = market.price ? market.price.toFixed(9) : "—";
     $("s-raised").textContent = UI.fmt(market.raised, 2) + " " + QUOTE;
     $("s-grad").textContent = UI.fmt(market.gradMcap!=null?market.gradMcap:market.threshold, 0) + " " + QUOTE;
@@ -1521,7 +1585,11 @@ input:focus{outline:none;border-color:var(--accent)}
     $("amt-label").textContent = s === "buy"
       ? (IS_EVM ? "Amount (ETH)" : "Amount (SOL)") : "Amount (tokens)";
     $("chips").innerHTML = s === "buy"
-      ? '<button data-v="0.01">0.01</button><button data-v="0.025">0.025</button><button data-v="0.05">0.05</button><button data-v="0.1">0.1</button>'
+      // SOL is cheap enough that 0.01 is a dust buy — Solana presets step 0.1/0.25/
+      // 0.5/1. ETH is worth far more, so the EVM side keeps its smaller amounts.
+      ? (IS_EVM
+          ? '<button data-v="0.01">0.01</button><button data-v="0.025">0.025</button><button data-v="0.05">0.05</button><button data-v="0.1">0.1</button>'
+          : '<button data-v="0.1">0.1</button><button data-v="0.25">0.25</button><button data-v="0.5">0.5</button><button data-v="1">1</button>')
       : '<button data-p="10">10%</button><button data-p="25">25%</button><button data-p="50">50%</button><button data-p="100">100%</button>';
     $("est").textContent = "—"; lastQuote = null; requote(); paintGo();
   }

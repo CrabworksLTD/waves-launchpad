@@ -76,7 +76,10 @@
     tax: { label: "Tax token", pct: 5, baseFeeBps: 500, creatorTradingFeePercentage: 25 }
   };
 
-  var LADDER = ["standard", "t2", "t3", "t4", "t5", "t10"];
+  // t10 (10%) dropped from the ladder to match the LaunchLab side, which tops at 5%
+  // (LaunchLab caps the platform feeRate at ~5%). TIERS.t10 is kept above so any pool
+  // already launched against it still reads, but nothing new can select it.
+  var LADDER = ["standard", "t2", "t3", "t4", "t5"];
 
   var QUOTES = {
     sol: {

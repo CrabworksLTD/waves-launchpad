@@ -249,7 +249,11 @@
     // program than the classic one vaultAta() assumes — deriving it would read a
     // non-existent account and show zero earned. (Same lesson as the keeper's M-10.)
     var vault = pk(X, poolAcc.vault);
-    var vaultBal = tokenAmount(await accountBytes(c, vault));
+    // read balance + DECIMALS (WSOL is 9, USDC 6, xStocks 8) — the page needs the
+    // real decimals to format earnings, not a hardcoded guess.
+    var vb = await c.getTokenAccountBalance(vault).catch(function () { return null; });
+    var vaultBal = vb ? BigInt(vb.value.amount) : 0n;
+    var rewardDecimals = vb ? vb.value.decimals : 9;
 
     var assets = owner ? await myAssets(pair.collection, owner) : [];
     var positions = [];
@@ -271,7 +275,7 @@
       // stake). poolTotalWeight is kept only for a share calc if the page wants one.
       staked: staked, yourWeight: yourWeight, yourBurned: yourWeight,
       poolTotalWeight: poolAcc.totalWeight,
-      vaultBalance: vaultBal, vaultLast: poolAcc.vaultLast,
+      vaultBalance: vaultBal, vaultLast: poolAcc.vaultLast, rewardDecimals: rewardDecimals,
       rewardMint: poolAcc.rewardMint, positions: positions,
       pool: pool.toBase58(), vault: vault.toBase58()
     };
@@ -393,6 +397,15 @@
         key(X, owner, 1, 0), key(X, tp, 0, 0)
       ], data: data(IX.claim) }
     ];
+    // NATIVE SOL: if the reward is wrapped SOL, unwrap it in the same tx — close the
+    // holder's WSOL account so the balance lands as native SOL (we're on Solana; a
+    // holder who chose "SOL" wants SOL, not a WSOL line item). SPL Token CloseAccount
+    // (ix 9): [account(w), destination-for-lamports(w), authority(signer)].
+    if (poolAcc.rewardMint === "So11111111111111111111111111111111111111112") {
+      ixs.push({ programId: pk(X, TOKEN_PROGRAM),
+        keys: [key(X, dest, 0, 1), key(X, owner, 0, 1), key(X, owner, 1, 0)],
+        data: new Uint8Array([9]) });
+    }
     return signSend(ixs);
   }
 

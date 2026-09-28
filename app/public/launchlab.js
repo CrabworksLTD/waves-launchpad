@@ -56,6 +56,12 @@
     return (typeof location !== "undefined" ? location.origin : "") + "/api/rpc";
   }
   function cluster() { return window.Launch ? window.Launch.cluster() : "mainnet-beta"; }
+  // Our custom Address Lookup Table of static LaunchLab accounts (brand.js launchAlt),
+  // added on top of Raydium's default ALTs to shrink v0 launch/trade txs. null ⇒ none.
+  function launchAltAddr() {
+    try { return (((window.BRAND || {}).launchAlt || {})[cluster()]) || null; }
+    catch (e) { return null; }
+  }
 
   var WSOL = "So11111111111111111111111111111111111111112";
   var USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -235,6 +241,36 @@
     return last;
   }
 
+  /* Poll a signature to confirmation, rebroadcasting the raw bytes while waiting —
+   * public nodes' confirmTransaction hangs even on landed txs (see sendOne). */
+  async function pollConfirm(c, raw, sig, label) {
+    for (var w = 0; w < 60; w++) {
+      var st = await c.conn.getSignatureStatus(sig, { searchTransactionHistory: true }).catch(function () { return null; });
+      var v = st && st.value;
+      if (v && v.err) throw new Error((label || "The transaction") + " failed on chain.");
+      if (v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized")) return sig;
+      if (w % 5 === 4) c.conn.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 5 }).catch(function () {});
+      await new Promise(function (r) { setTimeout(r, 1000); });
+    }
+    throw new Error("Sent, but not confirmed within 60s. Check the wallet history — signature: " + sig);
+  }
+
+  /* Build a Raydium builder result as ONE v0 tx with our launchAlt (on top of the
+   * SDK's default ALTs), wallet-sign it, and send. The builder pre-signs any of its
+   * own keypairs (e.g. the launch base-mint) before we sign, matching the launch
+   * path; a swap builder has none. `label` names the tx in errors. */
+  async function sendV0Built(c, built, label) {
+    var alt = launchAltAddr();
+    var opts = { txVersion: c.R.TxVersion.V0 };
+    if (alt) opts.lookupTableAddress = [alt];
+    var vtx = (await built.builder.versionBuild(opts)).transaction;
+    var vsigned = await c.wallet.signTransaction(vtx);
+    var vraw = vsigned.serialize();
+    if (vraw.length > 1232) throw new Error((label || "transaction") + " over 1232 bytes after the lookup table (" + vraw.length + ")");
+    var vsig = await c.conn.sendRawTransaction(vraw, { skipPreflight: false });
+    return pollConfirm(c, vraw, vsig, label);
+  }
+
   /* ---- launch ----
    * Drop-in for Token.launchToken: the same opts the launch panel builds. quote
    * is "sol" | "usdc" | <mint>. rewardMode "dividend" mints the base as
@@ -247,9 +283,61 @@
    *      minimum (~0.01 of the quote). TODO(product): surface this in the UI.
    *   2. Token-2022 base graduates to CPMM; standard SPL to AMM v4. Only the
    *      CPMM+T2022 path is devnet-proven — the AMM path is UNTESTED. */
+
+  /* SOL-hop for the opening dev buy of an EXOTIC-quoted launch (stock / T-token).
+   * createLaunchpad's dev buy is in the QUOTE, but the launcher holds SOL — so we
+   * swap the chosen SOL into the quote in a SEPARATE Jupiter tx (the launch tx is
+   * already near the size limit, so composing the swap in isn't reliable) and use
+   * what ARRIVES as the dev buy. Mirrors buyWithSol's Jupiter flow. Returns the raw
+   * quote amount received. */
+  async function hopSolForDevBuy(c, solLamports, quoteMint, quoteProg, progress) {
+    progress({ step: "hop", state: "signing" });
+    var jq = await (await fetch("https://lite-api.jup.ag/swap/v1/quote?inputMint=" + WSOL +
+      "&outputMint=" + quoteMint + "&amount=" + String(solLamports) +
+      "&slippageBps=150&restrictIntermediateTokens=true")).json();
+    if (!jq || !jq.outAmount) throw new Error("No SOL → " + quoteMint.slice(0, 6) + "… route for the first buy — try a different amount.");
+    var sr = await (await fetch("https://lite-api.jup.ag/swap/v1/swap", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ quoteResponse: jq, userPublicKey: c.owner.toBase58(), wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true }),
+    })).json();
+    if (!sr || !sr.swapTransaction) throw new Error("Could not build the SOL → quote swap.");
+    var ata = ataFor(c.X, quoteMint, c.owner, quoteProg);
+    var before = await c.conn.getTokenAccountBalance(ata).then(function (r) { return BigInt(r.value.amount); }).catch(function () { return 0n; });
+    var vtx = c.X.VersionedTransaction.deserialize(b64ToBytes(sr.swapTransaction));
+    var signed = await c.wallet.signTransaction(vtx);
+    var raw = signed.serialize();
+    var sig = await c.conn.sendRawTransaction(raw, { skipPreflight: false });
+    var landed = false;
+    for (var w = 0; w < 60; w++) {
+      var st = await c.conn.getSignatureStatus(sig, { searchTransactionHistory: true }).catch(function () { return null; });
+      var v = st && st.value;
+      if (v && v.err) throw new Error("The SOL → quote swap failed on chain.");
+      if (v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized")) { landed = true; break; }
+      if (w % 5 === 4) c.conn.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 5 }).catch(function () {});
+      await new Promise(function (r) { setTimeout(r, 1000); });
+    }
+    if (!landed) throw new Error("SOL → quote swap not confirmed within 60s — signature: " + sig);
+    var after = before;
+    for (var i = 0; i < 6; i++) {
+      after = await c.conn.getTokenAccountBalance(ata).then(function (r) { return BigInt(r.value.amount); }).catch(function () { return before; });
+      if (after > before) break;
+      await new Promise(function (r) { setTimeout(r, 800); });
+    }
+    var got = after - before;
+    if (got <= 0n) throw new Error("Swap confirmed but no quote token arrived for the first buy.");
+    return got;
+  }
+
   async function launchToken(opts) {
     if (!LAUNCHLAB_LIVE()) throw new Error("LaunchLab launches are not enabled yet (audit-gated).");
     var c = await client();
+    /* v0 + Address Lookup Table path (Phantom's Lighthouse flags a launch tx that
+     * nears the 1232-byte limit; an ALT tables the static program accounts to shrink
+     * it — the SDK's versionBuild merges Raydium's default mainnet ALTs, and we add
+     * our own launchAlt of static LaunchLab accounts on top). v0 is the DEFAULT now
+     * (Phantom flags near-limit LEGACY txs); ?txv0=0 forces the old LEGACY path. */
+    var useV0 = true;
+    try { if (typeof localStorage !== "undefined" && localStorage.getItem("wavesTxV0") === "0") useV0 = false; } catch (e) {}
     var progress = opts.onProgress || function () {};
     var q = resolveQuote(opts.quote);
     var configId = await configFor(opts.quote);
@@ -268,12 +356,38 @@
     var isPairLaunch = opts.feeShare === "vault" && !!opts.collection;
     var hasHolderTax = !isPairLaunch && (opts.rewardMode === "dividend" || opts.rewardMode === "split");
 
-    // dev buy — LaunchLab needs > 0; fall back to ~0.01 of the quote unit
-    var devBuyRaw = rawAmount(opts.firstBuySol || 0, q.decimals);
-    if (String(devBuyRaw) === "0") devBuyRaw = String(Math.pow(10, Math.max(0, q.decimals - 2)));
+    /* Dev buy — LaunchLab needs > 0, denominated in the QUOTE. SOL/USDC quotes: the
+     * first-buy field IS that quote. EXOTIC quote (stock / T-token): the launcher
+     * holds SOL, not the quote, so HOP — swap the chosen SOL into the quote (a
+     * separate Jupiter tx the wallet signs) and use what arrives as the dev buy. A
+     * non-zero opening buy is mandatory, so a 0 field still hops a small default. */
+    var devBuyRaw, curveOverride = null;
+    var exoticQuote = q.mint !== WSOL && q.mint !== USDC;
+    if (exoticQuote) {
+      var solForBuy = Number(opts.firstBuySol) > 0 ? Number(opts.firstBuySol) : 0.02;
+      var solLam = Math.floor(solForBuy * 1e9);
+      var qProg = await quoteProgram(c.conn, c.X, q.mint);
+      devBuyRaw = String(await hopSolForDevBuy(c, solLam, q.mint, qProg, progress));
+      /* ⚠️ An exotic quote's config is PERMISSIONLESS — it is NOT in Raydium's config
+       * API, so createLaunchpad can't read its defaultParams (crashes on
+       * `Se.defaultParams`). Provide the curve explicitly: supply/totalSellA are the
+       * standard 1B-supply / ~793M-on-curve values (token-side, quote-independent);
+       * totalFundRaisingB is the graduation raise in QUOTE units, targeting the same
+       * ~85 SOL of value the SOL config uses — derived from THIS launch's own SOL→
+       * quote swap rate above, so no price oracle is needed. */
+      var raiseB = solLam > 0 ? (85000000000n * BigInt(devBuyRaw)) / BigInt(solLam) : BigInt(devBuyRaw);
+      curveOverride = {
+        supply: new c.R.BN("1000000000000000"),
+        totalSellA: new c.R.BN("793100000000000"),
+        totalFundRaisingB: new c.R.BN(raiseB.toString()),
+      };
+    } else {
+      devBuyRaw = rawAmount(opts.firstBuySol || 0, q.decimals);
+      if (String(devBuyRaw) === "0") devBuyRaw = String(Math.pow(10, Math.max(0, q.decimals - 2)));
+    }
 
     progress({ step: "pool", state: "signing" });
-    var built = await c.raydium.launchpad.createLaunchpad({
+    var built = await c.raydium.launchpad.createLaunchpad(Object.assign({
       programId: c.prog,
       mintA: baseMint.publicKey,
       decimals: opts.decimals || 6,
@@ -297,60 +411,53 @@
         maxinumFee: new c.R.BN("1000000000000000")        // SDK's (mis)spelled key — keep as-is
       } : undefined,
       extraSigners: [baseMint],
-      txVersion: c.R.TxVersion.LEGACY,
-    });
+      txVersion: useV0 ? c.R.TxVersion.V0 : c.R.TxVersion.LEGACY,
+    }, curveOverride || {}));
 
-    /* PAIR: set the pool's CREATOR to the keeper, so the keeper — not the launcher
-     * — owns the claim on the creator's 0.5% trading fee and routes it to the
-     * staking vault. The creator account is index 1 of the initialize instruction
-     * and is NON-SIGNER + non-writable (verified), so the launcher still signs as
-     * payer (index 0) and there is no extra signer / drainer warning. The launcher
-     * keeps ownership of the token + collection; they hand over only their fee cut,
-     * which is the entire point of a pair. Standard launches are untouched. */
-    if (isPairLaunch) {
-      var KEEPER = (window.BRAND && window.BRAND.feeKeeper) || "EFFY1LjZbzzEYuUr24udxWponKqtta8MaxZxs6HGPswH";
-      var progStr = c.prog.toBase58();
-      var patched = 0;
-      (built.transactions || (built.transaction ? [built.transaction] : [])).forEach(function (tx) {
-        tx.instructions.forEach(function (ix) {
-          // the initialize ix: LaunchLab program, and the owner sits at BOTH index 0
-          // (payer) and index 1 (creator). The dev-buy has the owner only at index 0.
-          if (ix.programId.toBase58() === progStr && ix.keys.length >= 2 &&
-              ix.keys[0].pubkey.equals(c.owner) && ix.keys[1].pubkey.equals(c.owner) &&
-              !ix.keys[1].isSigner) {
-            ix.keys[1] = { pubkey: new c.X.PublicKey(KEEPER), isSigner: false, isWritable: false };
-            patched++;
-          }
-        });
-      });
-      if (patched !== 1) throw new Error("pair launch: expected to set exactly one pool creator, set " + patched + " — aborting to avoid a misrouted launch");
-    }
+    /* PAIR: the LAUNCHER stays the pool creator (clean — no foreign creator, so no
+     * Phantom "malicious" drainer warning on the launch or on buys). The creator's
+     * 0.5% accrues to the launcher, who ROUTES it to the staking vault from the
+     * claim page after deploy — the post-launch "activate rewards" step (see
+     * launchlab.js claimCreatorFeeToVault + the fee page). Standard launches
+     * unchanged; a pair still mints a standard token (no transfer tax). */
 
-    // fold the Arweave storage fee into the launch transaction (paid in SOL,
-    // like the Meteora path) — one System-transfer on the last (pool) tx. Built
-    // by hand: the metaplex bundle exposes PublicKey but not SystemProgram, so
-    // we push the raw instruction exactly as token.js's addStorageFee does.
+    // the Arweave storage fee is a System transfer folded into the launch tx (paid
+    // in SOL like the Meteora path). DUCK-TYPED {programId,keys,data} — the bundle
+    // exports PublicKey but NOT TransactionInstruction/SystemProgram; Transaction.add
+    // and compileToV0Message both coerce this shape, so it works in legacy AND v0.
+    // System transfer = instruction index 2 + u64 lamports.
+    var sfIx = null;
     if (opts.storageFee && opts.storageFee.to && opts.storageFee.lamports) {
       var lamports = BigInt(opts.storageFee.lamports);
       if (lamports > 0n) {
-        var txs = built.transactions || (built.transaction ? [built.transaction] : []);
-        var last = txs[txs.length - 1];
-        if (last) {
-          var data = new Uint8Array(12);
-          var dv = new DataView(data.buffer);
-          dv.setUint32(0, 2, true);                 // System Program transfer index
-          dv.setBigUint64(4, lamports, true);
-          last.instructions.push({
-            keys: [{ pubkey: c.owner, isSigner: true, isWritable: true },
-                   { pubkey: new c.X.PublicKey(opts.storageFee.to), isSigner: false, isWritable: true }],
-            programId: new c.X.PublicKey("11111111111111111111111111111111"),
-            data: data
-          });
-        }
+        var sdata = new Uint8Array(12);
+        var sdv = new DataView(sdata.buffer);
+        sdv.setUint32(0, 2, true); sdv.setBigUint64(4, lamports, true);
+        sfIx = {
+          programId: new c.X.PublicKey("11111111111111111111111111111111"),
+          keys: [{ pubkey: c.owner, isSigner: true, isWritable: true },
+                 { pubkey: new c.X.PublicKey(opts.storageFee.to), isSigner: false, isWritable: true }],
+          data: sdata
+        };
       }
     }
 
-    var sig = await sendBuilt(c, built, [baseMint]);
+    var sig;
+    if (useV0) {
+      // Add the storage fee to the builder, rebuild the launch as ONE v0 tx (with
+      // Raydium's default ALTs), then wallet-sign the versioned tx (buildV0 already
+      // signed the base-mint keypair) and send it. Confirm by polling, like sendOne.
+      if (sfIx) built.builder.addInstruction({ instructions: [sfIx] });
+      sig = await sendV0Built(c, built, "The launch transaction");
+    } else {
+      // LEGACY (proven): fold the storage fee onto the last tx, send in order.
+      if (sfIx) {
+        var txs = built.transactions || (built.transaction ? [built.transaction] : []);
+        var last = txs[txs.length - 1];
+        if (last) last.instructions.push(sfIx);
+      }
+      sig = await sendBuilt(c, built, [baseMint]);
+    }
     var poolPk = (built.extInfo && built.extInfo.address && built.extInfo.address.poolId)
       ? built.extInfo.address.poolId
       : c.R.getPdaLaunchpadPoolId(c.prog, baseMint.publicKey, new c.X.PublicKey(q.mint)).publicKey.toBase58();
@@ -394,12 +501,17 @@
     var conn = new X.Connection(rpcUrl(cluster()), "confirmed");
     var bal = await conn.getBalance(new X.PublicKey(w.publicKey));
     var need = 30000000;                               // ~0.03 SOL rent + priority + fees
-    if ((!opts.quote || opts.quote === "sol") && opts.firstBuySol) {
-      need += Math.floor(Number(opts.firstBuySol) * 1e9);
+    // the opening buy costs SOL for a SOL quote OR an exotic quote (which hops SOL →
+    // quote); a USDC quote buys in USDC. An exotic quote with no amount hops ~0.02.
+    var buySol = 0;
+    if (opts.quote !== "usdc") {
+      buySol = Number(opts.firstBuySol) > 0 ? Number(opts.firstBuySol)
+        : (opts.quote && opts.quote !== "sol" ? 0.02 : 0);
     }
+    need += Math.floor(buySol * 1e9);
     if (bal < need) {
       throw new Error("Not enough SOL — need about " + (need / 1e9).toFixed(3) +
-        " SOL for rent, fees" + ((!opts.quote || opts.quote === "sol") && opts.firstBuySol ? " and your first buy" : "") +
+        " SOL for rent, fees" + (buySol > 0 ? " and your first buy" : "") +
         ", have " + (bal / 1e9).toFixed(3) + ".");
     }
     return true;
@@ -422,16 +534,20 @@
     var mintB = poolInfo.mintB;
     var mintAProgram = new c.X.PublicKey(poolInfo.mintProgramFlag === 1 ? TOKEN2022 : TOKENKEG);
     var mintBProgram = new c.X.PublicKey(await quoteProgram(c.conn, c.X, mintB.toBase58()));
+    // v0 by default (Phantom flags near-limit LEGACY txs); ?txv0=0 forces LEGACY.
+    var useV0Trade = true;
+    try { if (typeof localStorage !== "undefined" && localStorage.getItem("wavesTxV0") === "0") useV0Trade = false; } catch (e) {}
     var common = {
       programId: c.prog, mintA: mintA, mintB: mintB,
       poolInfo: poolInfo, configInfo: configInfo,
       mintAProgram: mintAProgram, mintBProgram: mintBProgram,
-      slippage: new c.R.BN(100), txVersion: c.R.TxVersion.LEGACY,
+      slippage: new c.R.BN(100),
+      txVersion: useV0Trade ? c.R.TxVersion.V0 : c.R.TxVersion.LEGACY,
     };
     var built = (direction === "buy")
       ? await c.raydium.launchpad.buyToken(Object.assign({ buyAmount: new c.R.BN(String(amountInRaw)) }, common))
       : await c.raydium.launchpad.sellToken(Object.assign({ sellAmount: new c.R.BN(String(amountInRaw)) }, common));
-    return sendBuilt(c, built);
+    return useV0Trade ? sendV0Built(c, built, "The " + direction + " transaction") : sendBuilt(c, built);
   }
 
   /* ---- pay-in-SOL for a token priced in a stock/token quote ----
@@ -466,89 +582,16 @@
     var mintB = poolInfo.mintB.toBase58();
     // already SOL-quoted → no hop needed, take the normal buy path
     if (mintB === WSOL) return swap(baseMint, "buy", String(solLamports), "0", poolId.toBase58());
-    var configInfo = c.R.LaunchpadConfig.decode((await c.conn.getAccountInfo(poolInfo.configId)).data);
     var mintBProgram = await quoteProgram(c.conn, c.X, mintB);
-
-    // 1) Jupiter quote SOL → quote (ExactIn). maxAccounts keeps the route small so
-    // the composed tx fits; restrictIntermediateTokens avoids exotic multi-hops.
-    var jq = await (await fetch("https://lite-api.jup.ag/swap/v1/quote?inputMint=" + WSOL +
-      "&outputMint=" + mintB + "&amount=" + String(solLamports) +
-      "&slippageBps=100&restrictIntermediateTokens=true&maxAccounts=20")).json();
-    if (!jq || !jq.outAmount) throw new Error("No route from SOL to the quote token");
-    var minQuote = jq.otherAmountThreshold || jq.outAmount;   // guaranteed minimum received
-
-    // 2) Jupiter swap-INSTRUCTIONS (so we compose, not send its own tx)
-    var si = await (await fetch("https://lite-api.jup.ag/swap/v1/swap-instructions", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ quoteResponse: jq, userPublicKey: c.owner.toBase58(),
-        wrapAndUnwrapSol: true, dynamicComputeUnitLimit: false }),
-    })).json();
-    if (!si || !si.swapInstruction) throw new Error("Jupiter did not return swap instructions");
-
-    // 3) the curve buy, sized to the GUARANTEED quote output. SDK-built so the 18
-    // accounts are derived correctly, then we take ONLY the LaunchLab program
-    // instruction (buyExactIn) and create the base ATA ourselves — that way none of
-    // the SDK's own ATA-setup instructions can clash with Jupiter's (both create
-    // the quote ATA; a non-idempotent create would fail "already exists").
-    var baseProgram = new c.X.PublicKey(poolInfo.mintProgramFlag === 1 ? TOKEN2022 : TOKENKEG);
-    var built = await c.raydium.launchpad.buyToken({
-      programId: c.prog, mintA: mintA, mintB: poolInfo.mintB, poolInfo: poolInfo, configInfo: configInfo,
-      mintAProgram: baseProgram, mintBProgram: new c.X.PublicKey(mintBProgram),
-      buyAmount: new c.R.BN(String(minQuote)), slippage: new c.R.BN(100), txVersion: c.R.TxVersion.LEGACY,
-    });
-    var progStr = c.prog.toBase58();
-    var buyIx = built.transaction.instructions.filter(function (ix) { return ix.programId.toBase58() === progStr; })[0];
-    if (!buyIx) throw new Error("could not build the curve buy instruction");
-
-    // 4) assemble: our own compute budget (Jupiter's is sized for the swap alone,
-    // the buy needs more), then Jupiter setup + swap + cleanup, then create the base
-    // ATA idempotently, then the buy.
-    function deIx(x) {
-      return new c.X.TransactionInstruction({
-        programId: new c.X.PublicKey(x.programId),
-        keys: (x.accounts || []).map(function (k) {
-          return { pubkey: new c.X.PublicKey(k.pubkey), isSigner: k.isSigner, isWritable: k.isWritable };
-        }),
-        data: b64ToBytes(x.data),
-      });
-    }
-    var ixs = [c.X.ComputeBudgetProgram.setComputeUnitLimit({ units: 600000 })];
-    (si.setupInstructions || []).forEach(function (x) { ixs.push(deIx(x)); });
-    ixs.push(deIx(si.swapInstruction));
-    if (si.cleanupInstruction) ixs.push(deIx(si.cleanupInstruction));
-    ixs.push(ataIdempotentIx(c.X, c.owner, mintA, baseProgram));   // user's base-token ATA
-    ixs.push(buyIx);
-
-    // 5) resolve Jupiter's address lookup tables + build one v0 tx
-    var alts = [];
-    var altAddrs = si.addressLookupTableAddresses || [];
-    for (var i = 0; i < altAddrs.length; i++) {
-      var got = await c.conn.getAddressLookupTable(new c.X.PublicKey(altAddrs[i])).then(function (x) { return x.value; }).catch(function () { return null; });
-      if (got) alts.push(got);
-    }
-    var bh = (await c.conn.getLatestBlockhash("confirmed")).blockhash;
-    var msg;
-    try {
-      msg = new c.X.TransactionMessage({ payerKey: c.owner, recentBlockhash: bh, instructions: ixs }).compileToV0Message(alts);
-    } catch (e) {
-      throw new Error("route too large — try a smaller amount or buy with the quote token directly");
-    }
-    var vtx = new c.X.VersionedTransaction(msg);
-    var signed = await c.wallet.signTransaction(vtx);
-    var raw = signed.serialize();
-    if (raw.length > 1232) throw new Error("route too large — try a smaller amount or buy with the quote token directly");
-    var sig = await c.conn.sendRawTransaction(raw, { skipPreflight: false });
-
-    // confirm by polling + rebroadcast (public nodes lie about confirmation)
-    for (var w8 = 0; w8 < 60; w8++) {
-      var st = await c.conn.getSignatureStatus(sig, { searchTransactionHistory: true }).catch(function () { return null; });
-      var v = st && st.value;
-      if (v && v.err) throw new Error("The buy failed on chain (the swap or the curve buy reverted).");
-      if (v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized")) return sig;
-      if (w8 % 5 === 4) c.conn.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 5 }).catch(function () {});
-      await new Promise(function (r) { setTimeout(r, 1000); });
-    }
-    throw new Error("Sent, but not confirmed within 60s — signature: " + sig);
+    /* An exotic quote's SOL→quote route is a 2-hop swap whose accounts, plus the
+     * curve buy's own, overrun a single 1232-byte transaction (composing them threw
+     * "encoding overruns Uint8Array", and there is no smaller route — a direct
+     * SOL→quote pool doesn't exist). So do it in TWO txs, exactly like the launch
+     * dev-buy: swap SOL→quote in Jupiter's own tx (its ALTs cover the route), then
+     * buy on the curve with what actually arrived (v0 + our launchAlt). Two
+     * signatures, but each fits and neither leg can silently overflow. */
+    var got = await hopSolForDevBuy(c, solLamports, mintB, mintBProgram, function () {});
+    return swap(baseMint, "buy", String(got), "0", poolId.toBase58());
   }
 
   /* Build a create-associated-token-account-IDEMPOTENT instruction by hand (the
@@ -591,7 +634,7 @@
     if (m.quoteMint === WSOL) return getQuote(baseMint, solLamports / 1e9, "buy", poolHint);
     var jq = await (await fetch("https://lite-api.jup.ag/swap/v1/quote?inputMint=" + WSOL +
       "&outputMint=" + m.quoteMint + "&amount=" + String(solLamports) +
-      "&slippageBps=100&restrictIntermediateTokens=true&maxAccounts=20")).json();
+      "&slippageBps=100&restrictIntermediateTokens=true&maxAccounts=32")).json();
     if (!jq || !jq.outAmount) return { out: 0, quoteOut: 0 };
     var quoteHuman = Number(jq.outAmount) / Math.pow(10, m.quoteDec || 8);
     return { out: quoteHuman / m.price, quoteOut: quoteHuman };
@@ -605,7 +648,13 @@
     var poolId = poolHint ? new X.PublicKey(poolHint)
       : R.getPdaLaunchpadPoolId(prog, new X.PublicKey(baseMint), new X.PublicKey(WSOL)).publicKey;
     var acc = await conn.getAccountInfo(poolId);
-    if (!acc) return null;
+    // A caller-supplied poolHint may be a Meteora pool (that's the token's pool
+    // in its listing record, whatever backend launched it). Its bytes decode
+    // into a garbage-but-truthy LaunchpadPool struct, which made backend
+    // detection on the token page flip Meteora tokens to "launchlab" and read
+    // their fees through the wrong path ($MOAR/$VROOM showed "N quote"). Only an
+    // account OWNED by the LaunchLab program is actually one of our pools.
+    if (!acc || !acc.owner || !acc.owner.equals(prog)) return null;
     var p = R.LaunchpadPool.decode(acc.data);
     return {
       pool: poolId.toBase58(),
@@ -643,7 +692,9 @@
     var poolId = poolHint ? new X.PublicKey(poolHint)
       : R.getPdaLaunchpadPoolId(prog, new X.PublicKey(baseMint), new X.PublicKey(WSOL)).publicKey;
     var acc = await conn.getAccountInfo(poolId);
-    if (!acc) return null;
+    // Not ours unless owned by the LaunchLab program — a Meteora poolHint's
+    // bytes would otherwise decode into a bogus market. See readPool.
+    if (!acc || !acc.owner || !acc.owner.equals(prog)) return null;
     var p = R.LaunchpadPool.decode(acc.data);
     var decA = p.mintDecimalsA, decB = p.mintDecimalsB;
 
@@ -793,9 +844,96 @@
     return sendBuilt(c, built);
   }
 
-  /* Accrued fees for the fees page. partner = our platform fee sitting in the
-   * platform vault; creator is tracked on-chain per-creator and isn't exposed on
-   * the pool, so it reads 0 here until the per-creator vault read is wired. */
+  var STAKE_PROGRAM = "jt5JegTBVPZP8V6a48fnKYPFKTbpcTfkz91Pemur82H";
+  var ATA_PROGRAM = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
+  // ATA for (mint, owner) under a token program — derived by hand (no spl-token in browser)
+  function ataFor(X, mint, owner, tokenProgram) {
+    return X.PublicKey.findProgramAddressSync(
+      [new X.PublicKey(owner).toBuffer(), new X.PublicKey(tokenProgram).toBuffer(), new X.PublicKey(mint).toBuffer()],
+      new X.PublicKey(ATA_PROGRAM))[0];
+  }
+  // SPL/Token-2022 TransferChecked (ix 12): [source(w), mint, dest(w), owner(signer)].
+  // Returns a DUCK-TYPED {programId,keys,data} — Transaction.add coerces it; the
+  // browser bundle does NOT export TransactionInstruction (would throw "not a
+  // constructor"), same gotcha as stake.js.
+  function transferCheckedIx(X, tokenProgram, source, mint, dest, owner, amount, decimals) {
+    var d = new Uint8Array(10); d[0] = 12;
+    new DataView(d.buffer).setBigUint64(1, BigInt(amount), true); d[9] = decimals;
+    return {
+      programId: new X.PublicKey(tokenProgram),
+      keys: [{ pubkey: source, isSigner: false, isWritable: true },
+             { pubkey: new X.PublicKey(mint), isSigner: false, isWritable: false },
+             { pubkey: dest, isSigner: false, isWritable: true },
+             { pubkey: new X.PublicKey(owner), isSigner: true, isWritable: false }],
+      data: d };
+  }
+
+  /* PAIR reward distribution — the creator's "activate rewards" action.
+   *
+   * The launcher IS the pool creator (kept clean so Phantom shows no drainer flag),
+   * so the keeper can't claim their 0.5%. The creator does it here, in ONE
+   * signature: claim the accrued creator fee (in the quote), deposit it into the
+   * collection's staking vault, and sync so holders' pending updates. They run this
+   * whenever they want to pay holders. Supports pairs whose reward IS the quote
+   * (SOL/USDC); a stock-reward pair needs a swap step (coming). Returns { sig,
+   * amount } — amount is the base-unit quote distributed. */
+  async function distributeToVault(baseMint, collection, poolHint) {
+    var c = await client();
+    var pq = await poolQuote(c.conn, c.X, c.R, c.prog, poolHint, baseMint);
+    if (!pq) throw new Error("pool not found");
+    var quote = pq.mintB, quoteProg = pq.mintBProgram;
+
+    // the collection's staking pool + its real vault + reward mint (from chain)
+    var STAKE = new c.X.PublicKey(STAKE_PROGRAM);
+    var spool = c.X.PublicKey.findProgramAddressSync(
+      [new TextEncoder().encode("pool"), new c.X.PublicKey(baseMint).toBuffer(), new c.X.PublicKey(collection).toBuffer()], STAKE)[0];
+    var spoolAcc = await c.conn.getAccountInfo(spool);
+    if (!spoolAcc) {
+      // first activation: create the reward pool (vault = the quote, since we
+      // distribute the claimed quote directly). Lazy-load the staking client.
+      if (!window.WavesStake) await new Promise(function (res, rej) {
+        var s = document.createElement("script"); s.src = "/stake.js";
+        s.onload = res; s.onerror = function () { rej(new Error("could not load the staking client")); };
+        document.head.appendChild(s);
+      });
+      await window.WavesStake.initPool({ tokenMint: baseMint, collection: collection, rewardMint: quote });
+      spoolAcc = await c.conn.getAccountInfo(spool);
+      if (!spoolAcc) throw new Error("Could not create the reward pool — try again.");
+    }
+    var vaultRewardMint = new c.X.PublicKey(spoolAcc.data.slice(72, 104)).toBase58();
+    var vault = new c.X.PublicKey(spoolAcc.data.slice(104, 136));
+    if (vaultRewardMint !== quote) throw new Error("This pair's reward isn't its quote asset — stock/token-reward distribution is coming soon.");
+
+    // accrued creator fee = the creator vault's balance (creator = the launcher)
+    var creatorVault = c.X.PublicKey.findProgramAddressSync(
+      [c.owner.toBuffer(), new c.X.PublicKey(quote).toBuffer()], c.prog)[0];
+    var bal = await c.conn.getTokenAccountBalance(creatorVault).catch(function () { return null; });
+    var accrued = bal ? BigInt(bal.value.amount) : 0n;
+    if (accrued <= 0n) throw new Error("Nothing new to distribute — you've already sent all accrued fees to the vault. Trade the pair to build up more, then distribute again.");
+
+    // claim (creator signs) → owner's quote ATA, then move the accrued to the vault + sync, one tx
+    var built = await c.raydium.launchpad.claimCreatorFee({
+      programId: c.prog, mintB: new c.X.PublicKey(quote),
+      mintBProgram: new c.X.PublicKey(quoteProg), txVersion: c.R.TxVersion.LEGACY,
+    });
+    var claimTx = built.transaction || (built.transactions && built.transactions[0]);
+    var ownerAta = ataFor(c.X, quote, c.owner, quoteProg);
+    var dec = pq.pool.mintDecimalsB;
+
+    var tx = new c.X.Transaction();
+    claimTx.instructions.forEach(function (ix) { tx.add(ix); });
+    tx.add(transferCheckedIx(c.X, quoteProg, ownerAta, quote, vault, c.owner, accrued, dec));
+    tx.add({   // WavesStake sync — duck-typed (no TransactionInstruction in the bundle)
+      programId: STAKE,
+      keys: [{ pubkey: spool, isSigner: false, isWritable: true }, { pubkey: vault, isSigner: false, isWritable: false }],
+      data: new Uint8Array([4, 219, 40, 164, 21, 157, 189, 88]),
+    });
+    var sig = await sendOne(c, tx, built.signers || []);
+    return { sig: sig, amount: accrued.toString() };
+  }
+
+  /* Accrued fees for the fees page. partner = our platform fee in the platform
+   * vault; creator = the connected wallet's claimable trading fee. */
   async function feeMetrics(baseMint, poolHint) {
     var R = await ray(), X = await mx();
     var conn = new X.Connection(rpcUrl(cluster()), "confirmed");
@@ -809,7 +947,25 @@
       var bal = await conn.getTokenAccountBalance(pv).catch(function () { return null; });
       partner = bal ? Number(bal.value.amount) / Math.pow(10, decB) : 0;
     } catch (e) {}
-    return { creator: 0, partner: partner, quote: quoteSymForMint(pq.mintB), quoteDec: decB };
+    /* The creator's 0.5% accrues to a per-creator, per-quote vault PDA
+     * ([creator, quoteMint] under the program), NOT the pool — so it reads only
+     * for a known creator. The connected wallet IS the creator of its own
+     * launches, and this is exactly the balance claimCreatorFee would take
+     * (same derivation as distributeToVault). Zero before a wallet connects or
+     * for a viewer who isn't the creator. ⚠️ The vault aggregates every pool this
+     * creator launched against the same quote, so two same-quote launches show —
+     * and claim — the same combined total; fine for the common one-per-quote case. */
+    var creator = 0;
+    try {
+      var w = window.Wallet && window.Wallet.current();
+      if (w && w.publicKey) {
+        var cv = X.PublicKey.findProgramAddressSync(
+          [new X.PublicKey(w.publicKey).toBuffer(), new X.PublicKey(pq.mintB).toBuffer()], prog)[0];
+        var cbal = await conn.getTokenAccountBalance(cv).catch(function () { return null; });
+        creator = cbal ? Number(cbal.value.amount) / Math.pow(10, decB) : 0;
+      }
+    } catch (e) {}
+    return { creator: creator, partner: partner, quote: quoteSymForMint(pq.mintB), quoteDec: decB };
   }
 
   /* Live trade quote for the trade box. Spot-price estimate (quote-per-token);
@@ -956,6 +1112,7 @@
     // fees
     feeMetrics: feeMetrics,
     claimCreatorFeesTo: claimCreatorFeesTo,
+    distributeToVault: distributeToVault,   // pair "activate rewards": creator fee → staking vault
     claimPartnerFeesTo: claimPartnerFeesTo,
     claimPlatformFeesTo: claimPlatformFeesTo,
     platformId: function () { try { return platformId(); } catch (e) { return null; } },

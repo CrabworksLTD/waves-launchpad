@@ -1,11 +1,14 @@
 // api/launchlab-keeper.js   POST, Authorization: Bearer $CRON_SECRET
 //
-// ⚠️ FUND-MOVING. NOT wired into any cron and NOT called from the app. This is
-// the reviewable artifact for the LaunchLab keeper audit (Phase 3 of
-// docs/launchlab-ladder-keeper.md). It moves real money on every claim, so it
-// ships ONLY after the auditor signs off and `launchlabLadderLive` is flipped.
-// keeper.js (the Meteora keeper) still excludes backend:"launchlab", so nothing
-// here runs today.
+// ⚠️ FUND-MOVING. Wired to an hourly cron (2026-09-14) for the CONTROLLED-TEST
+// phase: the tier ladder is exposed only behind the operator gate (?laddertest=1
+// in launchpanel.js), so the ONLY jobs this can find are our own test launches
+// until the public `launchlabLadderLive` flag is flipped. Reviewed end-to-end
+// 2026-09-14 — split math, and the keeper (EFFY) confirmed on-chain as the tier
+// platforms' claim-fee wallet (standard stays feeOwner). keeper.js (the Meteora
+// keeper) still excludes backend:"launchlab", so the two never double-service.
+// Flip `launchlabLadderLive` public only after a real tier launch proves the
+// claim→forward→sweep loop on mainnet (same bar the pair loop was held to).
 //
 // It does two jobs for a LaunchLab launch, both reusing keeper.js's proven shape
 // (fail-closed auth · claim/harvest → persist the REAL plan → execute each step
@@ -56,6 +59,7 @@ const DUST = 10000n;
 const TOKEN2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 const TOKENKEG = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const WSOL = "So11111111111111111111111111111111111111112";
+const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const STAKE_PROGRAM = "jt5JegTBVPZP8V6a48fnKYPFKTbpcTfkz91Pemur82H";
 const SYNC_DISC = Buffer.from([4, 219, 40, 164, 21, 157, 189, 88]); // stake.js IX.sync
 
@@ -148,20 +152,33 @@ export default async function handler(req, res) {
     log.push("launchlab jobs: " + jobs.length);
 
     const ctx = { conn, w3, r, splToken, BN, lp, prog, keeper, db, log, tiers };
+
+    /* FEE LADDER — grouped by (tier, quote), NOT per-job. The tier's platform fee
+     * accrues to ONE vault shared by every pool on that (tier, quote); claiming it
+     * per-job would forward the whole shared pot to whichever job ran first. So each
+     * group is claimed once and split among its pools' creators by their fee shares.
+     * Reward/pair work stays per-job — those pots are unique to one launch. */
+    const feeGroups = {};
+    for (const t of jobs) {
+      if (!t.mint || !t.pool || isPair(t)) continue;
+      if (!(t.tier && t.tier !== "standard" && tiers[t.tier])) continue;
+      const qmint = (!t.quote || t.quote === "sol") ? WSOL : (t.quote === "usdc" ? USDC : t.quote);
+      const key = t.tier + "|" + qmint;
+      (feeGroups[key] = feeGroups[key] || { tier: t.tier, quoteMint: qmint, pools: [] }).pools.push(t);
+    }
+    for (const key of Object.keys(feeGroups)) {
+      try { await runFeeLadderGroup(feeGroups[key], ctx); }
+      catch (e) { log.push(key + ": FEE FAILED — " + String((e && e.message) || e).slice(0, 140)); }
+    }
+
+    // rewards + pairs — per launch (the pot is a unique mint / a single pool's fee)
     for (const job of jobs) {
       if (!job.mint || !job.pool) continue;
       try {
         if (isPair(job)) {
-          // pair: the keeper IS the pool creator, so it claims the creator's 0.5%
-          // (in the quote) and routes it to the staking vault. No transfer tax.
           await runPair(job, ctx);
-        } else {
-          if (job.tier && job.tier !== "standard" && tiers[job.tier]) {
-            await runFeeLadder(job, ctx);
-          }
-          if (["dividend", "split"].indexOf(job.rewardMode) >= 0) {   // H-6: burn excluded
-            await runReward(job, ctx);
-          }
+        } else if (["dividend", "split"].indexOf(job.rewardMode) >= 0) {   // H-6: burn excluded
+          await runReward(job, ctx);
         }
       } catch (e) {
         // the plan (if any) stays in KV; the next run picks it up where it stopped
@@ -169,7 +186,7 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({ ok: true, jobs: jobs.length, log });
+    return res.status(200).json({ ok: true, jobs: jobs.length, groups: Object.keys(feeGroups).length, log });
   } catch (e) {
     return res.status(200).json({ ok: false, error: String((e && e.message) || e).slice(0, 200), log });
   } finally {
@@ -179,87 +196,160 @@ export default async function handler(req, res) {
   }
 }
 
-/* ── FEE LADDER ────────────────────────────────────────────────────────────────
- * Claim the tier's platform fee into the keeper escrow, forward the creator's
- * share, sweep WAVES's cut. Resume-safe: the plan records the exact amounts, and
- * the forward + sweep are payOnce steps. */
-async function runFeeLadder(job, ctx) {
+/* ── FEE LADDER (grouped by tier + quote) ──────────────────────────────────────
+ * A tier's platform fee accrues DIRECTLY to a platform vault (getPdaPlatformVault,
+ * keyed by platform+quote) — NOT to pool.platformFee, which stays 0 (so the per-pool
+ * claimPlatformFee(poolId) reverts NoAssetsToCollect 0x1779). That vault is SHARED by
+ * every pool on this (tier, quote), so we claim it ONCE and split the proceeds among
+ * the group's pools by each pool's fee share.
+ *
+ * Attribution weight = the DELTA of each pool's on-chain `protocolFee` since our last
+ * claim. protocolFee is a per-pool cumulative counter taken on the same per-trade base
+ * as the platform fee (a fixed ratio: platform feeRate / protocol 0.25%), so a pool's
+ * share of the vault === its share of ΣΔprotocol. We persist the last-seen protocolFee
+ * per pool in KV and advance it with each claim. Reset-aware: Raydium claiming its own
+ * protocol fee zeroes the counter, so current < seen means "credit the post-reset
+ * amount" — the only imprecision is the pre-reset remainder in the rare run coinciding
+ * with a Raydium claim, and it only shifts the split BETWEEN creators, never the total
+ * (WAVES's cut is always 1−frac of the whole vault) and never loses funds.
+ *
+ * Resume-safe: the plan records the exact per-creator amounts + the sweep before any
+ * transfer; each is a payOnce step. The claim is the one non-idempotent boundary — a
+ * crash between claim and plan-save strands the claimed amount in the keeper's OWN
+ * escrow (recoverable), exactly like the other keepers. */
+async function runFeeLadderGroup(group, ctx) {
   const { conn, w3, r, splToken, lp, prog, keeper, db, log, tiers } = ctx;
-  const tier = tiers[job.tier];
+  const tier = tiers[group.tier];
   const frac = creatorFraction(tier);
-  const planKey = "llfee:" + job.mint;
+  const groupKey = group.tier + "|" + group.quoteMint;
+  const planKey = "llfee:" + groupKey;
+  const seenKey = "llfeeseen:" + groupKey;
   const save = async () => { if (db) await db.set(planKey, JSON.stringify(plan), { ex: PLAN_TTL }); };
 
-  /* M-11: a tier with a bad brand.js entry makes frac === 0, which would forward
-   * the creator NOTHING and sweep the ENTIRE platform fee to the treasury —
-   * logged as a normal run. That is the one failure mode in this file that would
-   * read as deliberate theft in a dispute. So a non-standard tier that resolves to
-   * frac 0 SKIPS loudly and claims nothing, rather than paying us 100%. (A resume
-   * of a plan already written with a good frac is unaffected — this guards the
-   * fresh-claim path.) */
+  /* M-11: a bad brand.js tier entry makes frac === 0, which would forward creators
+   * NOTHING and sweep the ENTIRE vault to the treasury — the one failure mode that
+   * reads as theft. So frac 0 SKIPS loudly and claims nothing. (Resume of a plan
+   * already written is unaffected — this guards the fresh-claim path.) */
   const resuming = db ? await db.get(planKey).catch(() => null) : null;
   if (!resuming && !(frac > 0)) {
-    log.push(job.mint + ": ⚠ tier '" + job.tier + "' resolves to creator-fraction 0 (bad config) — SKIPPED, not claiming");
+    log.push(groupKey + ": ⚠ tier '" + group.tier + "' resolves to creator-fraction 0 (bad config) — SKIPPED, not claiming");
     return;
   }
 
-  // resume an in-flight plan before claiming again (keeper.js pattern)
   let plan = resuming;
   if (typeof plan === "string") { try { plan = JSON.parse(plan); } catch { plan = null; } }
 
   if (!plan) {
-    const poolId = new w3.PublicKey(job.pool);
-    const p = r.LaunchpadPool.decode((await conn.getAccountInfo(poolId)).data);
-    const mintB = p.mintB.toBase58();
+    const mintB = group.quoteMint;
     const mintBProgram = await mintProgram(conn, w3, mintB);
 
-    // measure the DELTA the claim adds (never the whole balance — a shared quote
-    // ATA holds sibling launches' fees; see the header note).
+    // per-pool protocolFee deltas → attribution weights. Read the on-chain creator
+    // (authoritative) and the record's feeWallet (its chosen payout address).
+    let seen = db ? await db.get(seenKey).catch(() => null) : null;
+    if (typeof seen === "string") { try { seen = JSON.parse(seen); } catch { seen = null; } }
+    seen = seen || {};
+    const weights = [];
+    let totalW = 0n;
+    for (const pj of group.pools) {
+      let pd;
+      try { pd = r.LaunchpadPool.decode((await conn.getAccountInfo(new w3.PublicKey(pj.pool))).data); }
+      catch (e) { log.push(pj.mint + ": could not read pool — excluded from this split"); continue; }
+      const cur = BigInt(pd.protocolFee.toString());
+      const prev = BigInt(seen[pj.mint] || "0");
+      const d = cur >= prev ? (cur - prev) : cur;          // reset-aware
+      const dest = pj.feeWallet || pd.creator.toBase58();  // record's fee wallet, else on-chain creator
+      weights.push({ mint: pj.mint, dest, delta: d });
+      totalW += d;
+      seen[pj.mint] = cur.toString();
+    }
+
+    // claiming an EMPTY platform vault REVERTS (it doesn't no-op to a 0 claim), so
+    // read the vault balance first and skip when there's nothing there — still
+    // advancing the seen markers so the next real claim measures from here.
+    let vaultBal = 0n;
+    try {
+      const pvault = r.getPdaPlatformVault(prog, new w3.PublicKey(tier.platformId), new w3.PublicKey(mintB)).publicKey;
+      vaultBal = await ataBal(conn, w3, pvault);
+    } catch (e) {}
+    if (vaultBal <= DUST) {
+      log.push(groupKey + ": platform vault empty — nothing to claim");
+      if (db) { await db.set(seenKey, JSON.stringify(seen), { ex: PLAN_TTL }); await db.del(planKey); }
+      return;
+    }
+
+    // claim the shared platform vault to the keeper; delta on the keeper's quote ATA
+    // isolates this claim from any sibling balance already sitting there.
     const before = await ataBalance(conn, w3, splToken, mintB, keeper.publicKey, mintBProgram);
-    // NON-IDEMPOTENT boundary #1: Raydium's own execute. Re-claiming is safe (it
-    // only ever claims freshly-accrued fees), so the residual crash window here —
-    // claim lands, process dies before `save()` below — is recovered on the next
-    // run: re-claim adds ~0, delta ≈ 0, and the previously-claimed amount stays in
-    // the keeper's OWN escrow. It is never lost, only deferred to manual sweep.
-    const built = await lp.claimPlatformFee({
+    const built = await lp.claimVaultPlatformFee({
       programId: prog, platformId: new w3.PublicKey(tier.platformId),
-      platformClaimFeeWallet: keeper.publicKey,
-      poolId, mintB: new w3.PublicKey(mintB),
-      mintBProgram: new w3.PublicKey(mintBProgram), txVersion: r.TxVersion.LEGACY,
+      mintB: new w3.PublicKey(mintB), mintBProgram: new w3.PublicKey(mintBProgram),
+      claimFeeWallet: keeper.publicKey, txVersion: r.TxVersion.LEGACY,
     });
     await built.execute({ sendAndConfirm: true });
     const after = await ataBalance(conn, w3, splToken, mintB, keeper.publicKey, mintBProgram);
     const claimed = after - before;
-    if (claimed <= 0n) { log.push(job.mint + ": no platform fee to claim"); if (db) await db.del(planKey); return; }
+    if (claimed <= 0n) {
+      log.push(groupKey + ": no platform fee to claim");
+      if (db) { await db.set(seenKey, JSON.stringify(seen), { ex: PLAN_TTL }); await db.del(planKey); }
+      return;
+    }
 
-    const toCreator = (claimed * BigInt(Math.round(frac * 1e6))) / 1000000n;
-    const dest = job.feeWallet || job.creator;             // from the RECORD, never a request
+    // split the claim by weight; forward frac to each creator, keep the remainder.
+    // If ΣΔ is 0 (all counters reset in lockstep — degenerate), fall back to an even
+    // split so no creator is dropped and the money still moves out to its owners.
+    const pays = [];
+    const parts = totalW > 0n
+      ? weights.filter((w) => w.delta > 0n)
+      : weights;
+    const denom = totalW > 0n ? totalW : BigInt(parts.length || 1);
+    for (const w of parts) {
+      const num = totalW > 0n ? w.delta : 1n;
+      const share = (claimed * num) / denom;
+      const toCreator = (share * BigInt(Math.round(frac * 1e6))) / 1000000n;
+      if (toCreator > 0n && w.dest) pays.push({ mint: w.mint, dest: w.dest, amount: toCreator.toString() });
+    }
+    const totalToCreators = pays.reduce((s, p) => s + BigInt(p.amount), 0n);
     plan = {
-      kind: "fee", mint: job.mint, mintB, mintBProgram,
-      claimed: claimed.toString(),
-      toCreator: (dest ? toCreator : 0n).toString(),
-      toKeep: (claimed - (dest ? toCreator : 0n)).toString(),
-      creatorDest: dest || null, frac,
+      kind: "feegroup", groupKey, mintB, mintBProgram,
+      claimed: claimed.toString(), pays, toKeep: (claimed - totalToCreators).toString(),
+      // carried IN the plan and committed to seenKey only when the plan fully
+      // completes (below) — so a crash mid-forward resumes and then advances the
+      // markers, never leaving them advanced over money that didn't finish moving.
+      seen,
     };
     await save();
-    log.push(job.mint + ": claimed " + claimed + " (fee tier " + job.tier + ")");
+    log.push(groupKey + ": claimed " + claimed + " → " + pays.length + " creator(s)");
   } else {
-    log.push(job.mint + ": resuming fee plan");
+    log.push(plan.groupKey + ": resuming fee plan");
   }
 
   const mintB = plan.mintB, mintBProgram = plan.mintBProgram;
-  // forward the creator's share (payOnce — resume-safe token transfer)
-  if (BigInt(plan.toCreator) > 0n && plan.creatorDest && !plan.creatorDone) {
-    await payOnce(conn, keeper, plan, "creator", () =>
-      buildTransfer(conn, w3, splToken, keeper, mintB, mintBProgram, new w3.PublicKey(plan.creatorDest), BigInt(plan.toCreator)), save);
-    log.push(job.mint + ": forwarded " + plan.toCreator + " (" + (plan.frac * 100).toFixed(1) + "%) to creator");
+  /* CREDIT each creator's share to their claimable ledger instead of pushing it —
+   * one consistent model where the creator PULLS everything from the fee page
+   * (their on-chain 0.5% + this). The money STAYS in the keeper escrow (this quote
+   * ATA), which backs the ledger; /api/claim-fee-share pays it out on demand.
+   * Ledger key is per (destination wallet, quote), so a creator's same-quote pools
+   * accumulate into one claimable balance — matching how the on-chain creator vault
+   * already aggregates. Idempotency: each pay is guarded by its own `credited` flag;
+   * the incr-then-flag window is a single KV op (a crash there could double-credit
+   * one pay — bounded, rare, the same residual-window class as the rest of this file). */
+  for (let i = 0; i < plan.pays.length; i++) {
+    const p = plan.pays[i];
+    if (p.credited || BigInt(p.amount) <= 0n || !p.dest) continue;
+    if (db) await db.incrby("llcredit:" + p.dest + "|" + mintB, Number(p.amount));
+    p.credited = true;
+    await save();
+    log.push(p.mint + ": credited " + p.amount + " to creator's claimable balance");
   }
-  // sweep WAVES's cut to the treasury
+  // sweep WAVES's cut to the treasury (still automatic — that's WAVES's own revenue)
   if (BigInt(plan.toKeep) > 0n && !plan.keepDone) {
     await payOnce(conn, keeper, plan, "keep", () =>
       buildTransfer(conn, w3, splToken, keeper, mintB, mintBProgram, new w3.PublicKey(TREASURY), BigInt(plan.toKeep)), save);
-    log.push(job.mint + ": swept " + plan.toKeep + " to treasury");
+    log.push(plan.groupKey + ": swept " + plan.toKeep + " to treasury");
   }
+  // plan complete: all money moved → now commit the advanced protocolFee markers, so
+  // the next fresh run measures deltas from here. Then drop the plan.
+  if (db && plan.seen) await db.set(seenKey, JSON.stringify(plan.seen), { ex: PLAN_TTL });
   if (db) await db.del(planKey);
 }
 

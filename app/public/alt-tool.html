@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>WAVES · Create Launch Lookup Table</title>
+<style>
+  :root {
+    --bg: #0b0d0c; --panel: #14171500; --card: #161a18; --line: #232823;
+    --ink: #e9efe9; --dim: #8a938a; --lime: #b8ff3a; --lime-ink: #0b0d0c;
+    --bad: #ff5d5d; --good: #7dff9b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+    min-height: 100vh; display: flex; align-items: flex-start; justify-content: center;
+    padding: 48px 20px;
+  }
+  .wrap { width: 100%; max-width: 620px; }
+  h1 { font-size: 20px; letter-spacing: .5px; margin: 0 0 4px; }
+  .sub { color: var(--dim); margin: 0 0 28px; font-size: 13px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px; margin-bottom: 16px;
+  }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .k { color: var(--dim); font-size: 13px; }
+  .v { font-size: 13px; word-break: break-all; text-align: right; }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer; border: 0; border-radius: 9px;
+    padding: 12px 18px; background: var(--lime); color: var(--lime-ink);
+    transition: opacity .15s;
+  }
+  button:hover { opacity: .88; }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .full { width: 100%; }
+  .log {
+    background: #0d100e; border: 1px solid var(--line); border-radius: 9px;
+    padding: 14px; font-size: 12.5px; color: var(--dim); white-space: pre-wrap;
+    max-height: 240px; overflow-y: auto; margin-top: 14px;
+  }
+  .log .ok { color: var(--good); }
+  .log .err { color: var(--bad); }
+  .result {
+    margin-top: 14px; padding: 16px; border: 1px solid var(--lime); border-radius: 10px;
+    background: rgba(184,255,58,.06);
+  }
+  .result .k { color: var(--lime); }
+  .result .addr { font-size: 14px; word-break: break-all; margin: 6px 0 12px; }
+  .mut { color: var(--dim); font-size: 12px; }
+  .list { font-size: 11.5px; color: var(--dim); margin: 10px 0 0; max-height: 150px; overflow-y: auto; }
+  .list div { padding: 1px 0; }
+  a { color: var(--lime); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Launch Lookup Table</h1>
+  <p class="sub">Creates the Address Lookup Table of static LaunchLab accounts so v0 launch &amp; trade transactions stay small (Phantom Lighthouse headroom). One signature — create + fill, atomic.</p>
+
+  <div class="card">
+    <div class="row">
+      <span class="k">Wallet</span>
+      <span class="v" id="wallet">not connected</span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <span class="k">Balance</span>
+      <span class="v" id="balance">—</span>
+    </div>
+    <div style="margin-top:16px">
+      <button id="connect" class="full">Connect Phantom</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <span class="k">Cluster</span><span class="v">mainnet-beta</span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <span class="k">Addresses to table</span><span class="v" id="count">19</span>
+    </div>
+    <details style="margin-top:8px">
+      <summary class="mut" style="cursor:pointer">show addresses</summary>
+      <div class="list" id="addrlist"></div>
+    </details>
+    <div style="margin-top:16px">
+      <button id="create" class="full" disabled>Create Lookup Table</button>
+    </div>
+    <div class="log" id="log">idle.</div>
+    <div id="result"></div>
+  </div>
+</div>
+
+<script type="module">
+import { Connection, PublicKey, AddressLookupTableProgram, Transaction } from "/vendor/metaplex.esm.js";
+
+// The 19 STATIC LaunchLab launch/trade accounts (verified via tools/create-launch-alt.js).
+// Per-launch accounts (mint, pool, vaults, creator) are intentionally NOT here.
+const ADDRESSES = [
+  "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj",  // LaunchLab program
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",  // Token
+  "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",  // Token-2022
+  "11111111111111111111111111111111",             // System
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",  // ATA
+  "SysvarRent111111111111111111111111111111111",  // Rent
+  "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s",   // Metaplex metadata
+  "ComputeBudget111111111111111111111111111111",   // ComputeBudget
+  "WLHv2UAZm6z4KyaaELi5pjdbJh6RESMva1Rnn8pJVVh",   // LaunchLab vault authority
+  "2DPAtwB8L12vrMRExbLuyGnC7n2J5LNoZQSejeQGpwkr",  // LaunchLab event authority
+  "iaidSbPCBvzZVSnLdQUHWJFXL2j6oQt386QZ6fTfBoi",   // our platform: standard
+  "GfC5UWEn3WnFQcqB4ddBKRCYnKMaB6Ch5ReqS4MhVLze",  // our platform: t2
+  "Dcd5CnsLZkmzGa298XNBqiB7aQLmR6AC6c4LP4ELmuik",  // our platform: t3
+  "AoiEDaYTFVeLCaBtMToNWe2BEq4LiFAfzvjCetxuG1ux",  // our platform: t4
+  "3J6A7dtV2rS7GP7khzQBfRnpKrBjz5Srfjj51zTGefaT",  // our platform: t5
+  "So11111111111111111111111111111111111111112",  // WSOL
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  // USDC
+  "6s1xP3hpbAfFoNtUNF8mfHsjr2Bd97JxFJRWLbL6aHuX",  // WSOL curve config
+  "8gj14w8vkNZjJTPak6e96Uf1sY438WKheH4s5dHyxiRw",  // USDC curve config
+];
+
+const RPC = location.origin + "/api/rpc";
+const conn = new Connection(RPC, "confirmed");
+const $ = (id) => document.getElementById(id);
+let pubkey = null;
+
+function log(msg, cls) {
+  const el = $("log");
+  const span = cls ? `<span class="${cls}">${msg}</span>` : msg;
+  el.innerHTML += "\n" + span;
+  el.scrollTop = el.scrollHeight;
+}
+
+// render address list
+$("addrlist").innerHTML = ADDRESSES.map((a) => `<div>${a}</div>`).join("");
+$("count").textContent = ADDRESSES.length;
+
+async function refreshBalance() {
+  if (!pubkey) return;
+  try {
+    const lam = await conn.getBalance(new PublicKey(pubkey));
+    $("balance").textContent = (lam / 1e9).toFixed(4) + " SOL";
+  } catch (e) { $("balance").textContent = "?"; }
+}
+
+$("connect").onclick = async () => {
+  const p = window.solana;
+  if (!p || !p.isPhantom) { log("Phantom not found — install/enable it.", "err"); return; }
+  try {
+    const res = await p.connect();
+    pubkey = res.publicKey.toBase58();
+    $("wallet").textContent = pubkey.slice(0, 6) + "…" + pubkey.slice(-6);
+    $("connect").textContent = "Connected";
+    $("connect").disabled = true;
+    $("create").disabled = false;
+    await refreshBalance();
+    log("connected " + pubkey, "ok");
+  } catch (e) { log("connect failed: " + e.message, "err"); }
+};
+
+$("create").onclick = async () => {
+  if (!pubkey) return;
+  $("create").disabled = true;
+  try {
+    const authority = new PublicKey(pubkey);
+    log("fetching recent slot…");
+    const slot = await conn.getSlot("finalized");
+    const [createIx, altAddress] = AddressLookupTableProgram.createLookupTable({
+      authority, payer: authority, recentSlot: slot,
+    });
+    log("ALT address will be: " + altAddress.toBase58());
+    const extendIx = AddressLookupTableProgram.extendLookupTable({
+      authority, payer: authority, lookupTable: altAddress,
+      addresses: ADDRESSES.map((a) => new PublicKey(a)),
+    });
+
+    const tx = new Transaction().add(createIx, extendIx);
+    tx.feePayer = authority;
+    tx.recentBlockhash = (await conn.getLatestBlockhash("confirmed")).blockhash;
+
+    const raw = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+    log("tx size: " + raw.length + " bytes (create + extend, atomic)");
+
+    log("requesting signature…");
+    const { signature } = await window.solana.signAndSendTransaction(tx);
+    log("sent: " + signature);
+    log("confirming…");
+    // poll — public nodes hang on confirmTransaction even for landed txs
+    let landed = false;
+    for (let i = 0; i < 60; i++) {
+      const st = await conn.getSignatureStatus(signature, { searchTransactionHistory: true }).catch(() => null);
+      const v = st && st.value;
+      if (v && v.err) throw new Error("transaction failed on chain: " + JSON.stringify(v.err));
+      if (v && (v.confirmationStatus === "confirmed" || v.confirmationStatus === "finalized")) { landed = true; break; }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    if (!landed) throw new Error("not confirmed in 60s — check the signature in the explorer");
+
+    log("✅ lookup table created + filled", "ok");
+    await refreshBalance();
+    const alt = altAddress.toBase58();
+    $("result").innerHTML =
+      `<div class="result">
+         <div class="k">✅ Lookup Table live</div>
+         <div class="addr" id="altaddr">${alt}</div>
+         <button class="ghost" id="copy">Copy address</button>
+         <p class="mut" style="margin:12px 0 0">Paste this into <code>brand.js</code> → <code>launchAlt["mainnet-beta"]</code> and redeploy. An ALT must be one slot old before use — wait a few seconds.</p>
+         <p class="mut" style="margin:8px 0 0"><a href="https://solscan.io/account/${alt}" target="_blank" rel="noopener">view on Solscan ↗</a></p>
+       </div>`;
+    $("copy").onclick = () => { navigator.clipboard.writeText(alt); $("copy").textContent = "Copied ✓"; };
+  } catch (e) {
+    log("error: " + (e.message || String(e)), "err");
+    $("create").disabled = false;
+  }
+};
+</script>
+</body>
+</html>

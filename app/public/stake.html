@@ -87,29 +87,43 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
   color:var(--faint);font-size:13px;margin-top:8px}
 .none a{color:var(--accent)}
 
-/* per-NFT list — thumbnail · name/state · weight · action */
+/* per-NFT list — thumbnail · name/state · earned · action */
 .slist{padding:4px 22px}
-.srow{display:grid;grid-template-columns:52px 1fr 120px 148px;align-items:center;gap:14px;
-  padding:14px 0;border-top:1px solid var(--line)}
+.srow{display:grid;grid-template-columns:48px 1fr auto;align-items:center;gap:16px;
+  padding:16px 0;border-top:1px solid var(--line)}
 .srow:first-child{border-top:0}
-.sthumb{width:52px;height:52px;border-radius:8px;overflow:hidden;border:1px solid var(--line);
+.sthumb{width:48px;height:48px;border-radius:10px;overflow:hidden;border:1px solid var(--line);
   display:grid;place-items:center;font:800 13px Archivo;color:var(--faint);
   background:linear-gradient(135deg,var(--panel2),var(--void))}
 .sname{min-width:0}
-.sname b{display:block;font:700 14px Archivo}
-.sstate{display:block;font:600 10.5px "IBM Plex Mono",monospace;letter-spacing:.13em;
-  text-transform:uppercase;color:var(--faint);margin-top:2px}
+.sname b{display:block;font:700 14.5px Archivo}
+.sstate{display:inline-flex;align-items:center;gap:6px;font:600 10px "IBM Plex Mono",monospace;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--faint);margin-top:4px}
+.sstate::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--faint)}
 .sstate.on{color:var(--accent)}
-.sweight{text-align:right;font:600 14px "IBM Plex Mono",monospace;color:var(--dim)}
-.sbtn{padding:11px 16px;border-radius:8px;border:1px solid var(--line2);width:100%;
-  background:var(--panel2);color:var(--ink);font:700 12.5px Archivo;cursor:default;text-align:center}
-.sbtn:disabled{opacity:.4}
+.sstate.on::before{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+/* action cell: earned figure + control, right-aligned, never cramped */
+.sact{display:flex;align-items:center;gap:14px;justify-content:flex-end}
+.searned{text-align:right;line-height:1.15}
+.searned b{display:block;font:700 15px "IBM Plex Mono",monospace;color:var(--ink);font-variant-numeric:tabular-nums}
+.searned span{display:block;font:600 9px "IBM Plex Mono",monospace;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--faint);margin-top:2px}
+.samt{width:96px;padding:11px 12px;border-radius:9px;border:1px solid var(--line2);
+  background:var(--panel2);color:var(--ink);font:600 13px "IBM Plex Mono",monospace;
+  font-variant-numeric:tabular-nums;text-align:right;outline:none}
+.samt:focus{border-color:var(--accent)}
+.sbtn{padding:11px 18px;border-radius:9px;border:1px solid var(--line2);min-width:104px;
+  background:var(--panel2);color:var(--ink);font:700 12.5px Archivo;cursor:pointer;
+  text-align:center;white-space:nowrap;transition:border-color .12s,background .12s}
+.sbtn:hover:not(:disabled){border-color:var(--accent)}
+.sbtn.claim{border-color:color-mix(in srgb,var(--accent) 45%,var(--line2));color:var(--accent)}
+.sbtn:disabled{opacity:.55;cursor:default}
 /* stake-all footer */
 .sfoot{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .sfoot .earn-lab{margin:0}
 .sfoot .go{padding:13px 26px}
-@media(max-width:640px){.srow{grid-template-columns:44px 1fr;gap:10px}
-  .sweight,.srow .sbtn{display:none}}
+@media(max-width:640px){.srow{grid-template-columns:40px 1fr;gap:12px}
+  .sact{grid-column:1/-1;margin-top:10px}}
 </style>
 </head>
 <body>
@@ -124,12 +138,6 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
        with a 0x address) renders its live activate/claim UI here, and the Solana
        preview + directory below are hidden. See the loader script at the foot. -->
   <div id="es-root" hidden></div>
-
-  <div class="soon"><b>In development.</b>
-    <span>The staking program is being built and will be audited before it touches real
-    money. Everything below is the real interface, parked until then.</span>
-    <span class="tag">COMING</span>
-  </div>
 
   <div class="how">
     <div class="step"><i>1</i><b>Burn to activate</b>
@@ -236,10 +244,14 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
         rewardMint: B58.test(q.get("reward") || "") ? q.get("reward") : null, sym: q.get("sym") || "" }
     : null;
 
-  var DEC = 6; // demo tokens/reward are 6-dec; xStocks (8/T22) would format differently
-  function fmt(bi) {
-    var s = (bi || 0n).toString(); while (s.length <= DEC) s = "0" + s;
-    var i = s.slice(0, s.length - DEC), f = s.slice(s.length - DEC).replace(/0+$/, "");
+  var DEC = 9;   // REWARD decimals (earnings); set per-pool from summary.rewardDecimals
+  var TDEC = 6;  // STAKED-TOKEN decimals (burned amount) — LaunchLab standard is 6
+  // fmt(bi) formats in the reward's decimals; pass an explicit `dec` for the staked
+  // token (they differ: SOL reward = 9, the burned pair token = 6).
+  function fmt(bi, dec) {
+    if (dec == null) dec = DEC;
+    var s = (bi || 0n).toString(); while (s.length <= dec) s = "0" + s;
+    var i = s.slice(0, s.length - dec), f = s.slice(s.length - dec).replace(/0+$/, "");
     return f ? i + "." + f : i;
   }
   function owner() {
@@ -332,12 +344,13 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
       return;
     }
     if (!pair.rewardMint) pair.rewardMint = s.rewardMint;
+    DEC = s.rewardDecimals || DEC;   // format earnings in the reward's real decimals (WSOL=9)
 
     var earnB = document.querySelector(".earnrow b"); if (earnB) earnB.textContent = fmt(s.earned);
     var stats = document.querySelectorAll(".statrow b");
     if (stats[0]) stats[0].textContent = s.positions.length;
     if (stats[1]) stats[1].textContent = s.staked;
-    if (stats[2]) stats[2].textContent = fmt(s.yourBurned);
+    if (stats[2]) stats[2].textContent = fmt(s.yourBurned, TDEC);   // burned = pair-token decimals
 
     var slist = document.querySelector(".slist");
     if (!owner()) { slist.innerHTML = '<div class="none">Connect your wallet (top right) to stake your NFTs.</div>'; return; }
@@ -348,16 +361,19 @@ h1{font-family:Archivo;font-size:clamp(28px,3.6vw,44px);font-weight:800;
     var rec = await pairRecord();
     var burnDefault = (rec && Number(rec.burn) > 0) ? Number(rec.burn) : 100000;
 
+    var rsym = esc(pair.sym || "reward");
     slist.innerHTML = s.positions.map(function (p) {
       var on = p.staked;
+      var earned = '<div class="searned"><b>' + fmt(p.pending) + '</b><span>earned</span></div>';
+      var control = on
+        ? '<button class="sbtn claim" data-act="claim">Claim</button>'
+        : '<input class="samt" type="number" value="' + burnDefault + '" min="1" inputmode="numeric">' +
+          '<button class="sbtn" data-act="stake">Burn</button>';
       return '<div class="srow" data-asset="' + esc(p.asset) + '">' +
         '<div class="sthumb">' + esc((pair.sym || "#").slice(0, 2)) + '</div>' +
         '<div class="sname"><b>' + esc(shortAddr(p.asset)) + '</b>' +
-        '<span class="sstate' + (on ? ' on' : '') + '">' + (on ? 'ACTIVATED' : 'not activated') + '</span></div>' +
-        '<div class="sweight">' + fmt(p.pending) + '</div>' +
-        (on
-          ? '<button class="sbtn" data-act="claim">Claim</button>'
-          : '<span style="display:flex;gap:6px"><input class="samt" type="number" value="' + burnDefault + '" min="1" style="width:90px;padding:9px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);color:var(--ink)"><button class="sbtn" data-act="stake">Burn</button></span>') +
+        '<span class="sstate' + (on ? ' on' : '') + '">' + (on ? 'activated' : 'not activated') + '</span></div>' +
+        '<div class="sact">' + earned + control + '</div>' +
         '</div>';
     }).join("");
 

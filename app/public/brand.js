@@ -63,6 +63,11 @@
     // signed the stream away. Nothing had pledged yet, so nothing was misrouted.
     // If you rotate KEEPER_SECRET, rotate this in the same commit.
     feeKeeper: "EFFY1LjZbzzEYuUr24udxWponKqtta8MaxZxs6HGPswH",
+    // Address Lookup Table of the STATIC LaunchLab launch/trade accounts, so v0 txs
+    // shrink and leave Phantom's Lighthouse headroom under 1232 bytes. Created by
+    // tools/create-launch-alt.js — paste its output here. null ⇒ v0 uses only
+    // Raydium's default ALTs (still works, just less headroom).
+    launchAlt: { "mainnet-beta": "4prYAMyxoFWCBsT5ZSzzNojnMwXy7e3qMyRcS7V2ooHd", devnet: null },
 
     /* The wallet named as feeClaimer on NEW configs.
      *
@@ -256,9 +261,9 @@
           "PresTj4Yc2bAR197Er7wz4UUKSfqt6FryBEdAriBoQB": { symbol: "ANDURIL", decimals: 9, label: "Anduril", cat: "preipo" },
           "Pren1FvFX6J3E4kXhJuCiAD5aDmGEb7qJRncwA8Lkhw": { symbol: "ANTHROPIC", decimals: 9, label: "Anthropic", cat: "preipo" },
           "PreZad18qfPtbxNpMtMuAuX2zVpvkEU8DnJx56faCWd": { symbol: "FIGUREAI", decimals: 9, label: "Figure AI", cat: "preipo" },
-          "PreLWGkkeqG1s4HEfFZSy9moCrJ7btsHuUtfcCeoRua": { symbol: "KALSHI", decimals: 9, label: "Kalshi", cat: "preipo" },
+          "TKLSidmLVt3cqGaaodG8tyRzoANfQwoh67AccjmubeZ": { symbol: "KALSHI", decimals: 9, label: "Kalshi (Tessera)", cat: "preipo" },
           "PrekqLJvJ3qVdXmBGDiexvwUTF4rLFDa6HWS4HJbw9S": { symbol: "NEURALINK", decimals: 9, label: "Neuralink", cat: "preipo" },
-          "PreweJYECqtQwBtpxHL171nL2K6umo692gTm7Q3rpgF": { symbol: "OPENAI", decimals: 9, label: "OpenAI", cat: "preipo" },
+          "oPAiAikWTaFj9RYoRFD35ccfwhnMcB3ThgBZRHSkjTZ": { symbol: "OPENAI", decimals: 9, label: "OpenAI (Tessera)", cat: "preipo" },
           "Pre8AREmFPtoJFT8mQSXQLh56cwJmM7CFDRuoGBZiUP": { symbol: "POLYMARKET", decimals: 9, label: "Polymarket", cat: "preipo" },
           // SPL tokens with a live Raydium LaunchLab config — altcoins/majors a
           // token can be priced in (verified mints/decimals/configs 2026-09-13).
